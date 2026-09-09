@@ -1,6 +1,6 @@
 # marcopilot
 
-**不是"接近 Typora"，是超越 Typora。**
+**AI时代，Markdown文件越来越重要，同时也需要让AI更好地融入markdown编辑**
 
 marcopilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时候，它已经在替你想下一句。同一套编辑内核，两种工作形态——既能作为 Windows 桌面应用开箱即用，也能作为插件装进 VS Code、Trae 等 AI IDE。
 
