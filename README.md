@@ -1,10 +1,13 @@
-# marcopilot
+# MarkPilot · 万可百律
 
-**AI时代，Markdown文件越来越重要，同时也需要让AI更好地融入markdown编辑**
+> ### AI 时代，全新定义 Markdown 编辑器——万有可能，一致百「律」。
+> **开源项目，万众铸造。程序与插件本体免费，想魔改的源码另行授权。**
 
-marcopilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时候，它已经在替你想下一句。同一套编辑内核，两种工作形态——既能作为 Windows 桌面应用开箱即用，也能作为插件装进 VS Code、Trae 等 AI IDE。
+![version](https://img.shields.io/badge/version-2.0.9-blue) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20VS%20Code%20%7C%20Trae-green) ![license](https://img.shields.io/badge/license-%E6%9C%AC%E4%BD%93%E5%85%8D%E8%B4%B9%20%7C%20%E6%BA%90%E7%A0%81%E6%8E%88%E6%9D%83-orange)
 
-## 四个 Typora 给不了的重磅能力
+MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时候，它已经在替你想下一句；你排版的一撇一捺之间，藏着一套正经的中文排版引擎。同一套编辑内核，两种工作形态——既能作为 Windows 桌面应用开箱即用，也能作为插件装进 VS Code、Trae 等 AI IDE。
+
+## 五个 Typora 给不了的重磅能力
 
 ### ✦ AI 行内补全
 
@@ -13,6 +16,15 @@ marcopilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时�
 ### ✦ 数学公式的精准映射
 
 公式源码与渲染结果一一对应：原地点开编辑、精确撤销重做；公式嵌在表格单元格里、或者层层嵌套，映射关系都不丢。写数学文档时，公式不再是"渲染完就碰不得的图片"，而是可编辑、可回退的活内容。
+
+### ✦ 印刷级中文排版
+
+这是 2.0 系列打磨最狠的一块，也是中文名「万可百律」里那个「律」字的来历——排版的韵律：
+
+- **中西文混排自动间距**：中文与西文、数字之间自动留出呼吸空隙，公式与代码内部的像素布局不受干扰；
+- **宋体系衬线双主题**（宋体-朙 / 宋体-暗）：正文中文宋体、西文 Georgia 双衬线，细笔画描边、暗色表格不再陷成黑条纹，中文斜体以楷体呈现——把屏幕当"纸"来排；
+- **1280px 阅读版心**：宽屏不再一行读到脖子断；
+- **导出采用 TeX 同源的 Knuth–Plass 整段最优断行**：不是逐行贪心塞满，而是整段代价最优——TeX 排了四十年的数学论文，用的就是它。
 
 ### ✦ 大文件不卡顿
 
@@ -27,29 +39,37 @@ marcopilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时�
 - 即时渲染 / 所见即所得 / 源码三种模式，随时切换
 - 侧栏大纲树，点击标题直达正文
 - 智能表格编辑，表格里写公式也没问题
-- Mermaid 图表、代码高亮、图片粘贴自动归档
-- 明暗主题与阅读调色盘
+- Mermaid 图表、上百款代码高亮主题、图片粘贴自动归档
+- 悬浮工具栏岛：自动收纳，点空白处即落笔
+- Word / Excel / PPT 迁移导出，公式以可编辑的 OMML 直达 DOCX，无需 Pandoc
+- 明暗主题、阅读调色盘、Ctrl+滚轮缩放
 - Windows 安装版 + 免安装便携版
 
-## marcopilot vs Typora
+## MarkPilot vs Typora
 
-|  | marcopilot | Typora |
+|  | MarkPilot | Typora |
 | --- | --- | --- |
 | AI 行内补全 | ✅ 大模型 + 本地双引擎 | ❌ |
 | 数学公式精准映射（表格内、嵌套可编辑） | ✅ | 部分 |
+| 印刷级中文排版（中西文间距 / 衬线宋体 / Knuth–Plass 断行导出） | ✅ | 部分 |
 | 大文档性能优化 | ✅ 分片渲染 + 缓存 | ❌ |
 | 装进 VS Code / Trae 等 AI IDE | ✅ 插件形态 | ❌ 仅独立应用 |
-| 编辑模式 | 即时渲染 / 所见即所得 / 源码 | 所见即所得 / 源码 |
 | 价格 | 免费 | $14.99 |
 
 ## 下载
 
 到 GitHub 仓库的 **Releases** 页取最新版本：
 
-- **Windows 桌面版**：`marcopilot-Setup-x.x.x.exe`（安装版）或 `marcopilot-vx.x.x-portable.exe`（便携版，免安装）
-- **IDE 插件版**：`marcopilot-x.x.x.vsix`
+- **Windows 桌面版**：`markpilot-Setup-x.x.x.exe`（安装版）或 `markpilot-vx.x.x-portable.exe`（便携版，免安装）
+- **IDE 插件版**：`markpilot-x.x.x.vsix`
   - VS Code / Trae：扩展视图 → `⋯` 菜单 →「从 VSIX 安装」→ 选中下载的 vsix → 重载窗口
-  - 装好后活动栏出现 marcopilot 图标，点开即用；AI 补全在设置里填自己的 API Key
+  - 装好后活动栏出现 MarkPilot 图标，点开即用；AI 补全在设置里填自己的 API Key
+
+## 开源与授权
+
+开源项目，万众铸造——功能请求、缺陷反馈、主题与词条贡献都通过 GitHub Issues 汇入，每个版本都由真实写作场景驱动。**程序与插件本体永久免费**；需要二次开发、想魔改的完整源码为付费授权，请到仓库 Issues 联系作者。
+
+安装包内附《第三方组件声明》（THIRD-PARTY-NOTICES.md），随每个版本同步更新。
 
 ## 隐私
 
@@ -57,4 +77,4 @@ marcopilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时�
 
 ---
 
-*marcopilot · 由一个每天用它写文档的人维护*
+*MarkPilot（万可百律）· 万有可能，一致百「律」 · 由一个每天用它写文档的人维护*
