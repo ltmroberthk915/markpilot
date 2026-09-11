@@ -57,7 +57,7 @@ The whole editing core ships as a standard extension: install the VSIX in VS Cod
 
 ### ✦ Large files that stay smooth
 
-Chunked background rendering with source-cache reuse: open a big document, keep typing, undo, jump through the outline — it stays responsive even with thousands of formulas. In our internal benchmarks, CPU cost per edit dropped by 57–87%.
+Chunked background rendering with source-cache reuse: open a big document, keep typing, undo, jump through the outline — it stays responsive even with thousands of formulas. In our own measurements, the CPU cost of editing dropped by 57–87%.
 
 ### ✦ Print-quality typography
 
