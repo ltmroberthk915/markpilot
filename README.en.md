@@ -90,17 +90,16 @@ Grab the latest from the **[Releases page](https://github.com/ltmroberthk915/mar
 
 ## Latest release: v2.0.18
 
-- **Opening a document is about a second faster** — small files went from ~1.5 s to ~0.55 s to first content, and a 200,000-character document from ~1.9 s to ~0.9 s, with no regression in switching documents, scrolling or reading-position restore.
-- **Formulas inside table cells are directly editable** — click to reveal the source, edit, instant re-render; insert and delete rows/columns from the right-click menu without disturbing anything outside the table.
-- **Fidelity: if you did not change something, saving changes nothing** — our test suite now asserts that a no-op edit round-trip leaves the file byte-for-byte identical, so "silently rewrote my file" bugs are caught before release.
-- **More edge cases covered** — 12 packaged-build scenarios with 180 assertions, all driven through real mouse and keyboard input on the actual installer build.
+- **Opening a document is about a second faster** — small files go from ~1.5 s to ~0.55 s to first content, and a 200,000-character document from ~1.9 s to ~0.9 s.
+- **Formulas inside table cells are directly editable** — click to reveal the source, edit, instant re-render; insert and delete rows and columns from the right-click menu.
+- **Saving does not quietly rewrite your document** — text you did not touch comes back out character for character.
 
 See the [full release notes](https://github.com/ltmroberthk915/markpilot/releases/latest) for details.
 
 ### Fixed in v2.0.18
 
-- **Cut from the right-click menu copied without deleting** — in some environments the system cut command reports success and puts the text on the clipboard without actually removing the selection, so "Cut" looked like it did nothing and pasting produced a duplicate. MarkPilot now verifies the selection was really removed and completes the deletion itself.
-- **Table layout is re-aligned when saving** — column widths are padded and the delimiter row is recomputed. We re-checked this: after reopening, the row/column structure and every cell are identical; it is alignment normalization, not data loss. This release does not change the behaviour, it adds an automated round-trip check so it is never mistaken for a regression.
+- **Cut from the right-click menu did nothing in some environments** — it copied the text but left it in the document, so pasting produced a duplicate. Cut now really removes what you selected.
+- **Table rows and columns stay intact after saving** — saving re-aligns table layout, and every cell comes back exactly as it was.
 
 ## License
 
