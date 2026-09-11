@@ -9,7 +9,20 @@
 
 MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时候，它已经在替你想下一句；你排版的一撇一捺之间，藏着一套正经的中文排版引擎。同一套编辑内核，两种工作形态——既能作为 Windows 桌面应用开箱即用，也能作为插件装进 VS Code、Trae 等 AI IDE。
 
-## 五个 Typora 给不了的重磅能力
+![MarkPilot：中西文混排与公式编辑](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/hero-light-serif.png)
+
+*窄窗口、密集换行、中西文混排与实时公式——宋体-朙主题，中西文之间自动留白。*
+
+## 界面截图
+
+| | |
+|---|---|
+| **点符号就跳到源码**——点公式里的 ω，光标落在 `\omega` 的 o 上 | **下标也一样准**——点 `f_n` 的 n，光标就落在源码那个 n 上 |
+| ![点 ω 定位源码](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/math-map-omega.png) | ![点下标定位源码](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/math-map-subscript.png) |
+| **界面透明度**——弹窗与工具栏半透明，各有 10%–100% 的滑块 | **排版**——衬线宋体、中西文自动间距、整段最优断行 |
+| ![半透明右键菜单](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/menu-translucent-70.png) | ![密集换行的正文排版](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/body-dense-wrapping.png) |
+
+## 六个 Typora 给不了的重磅能力
 
 ### ✦ AI 行内补全
 
@@ -21,7 +34,7 @@ MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时�
 
 ### ✦ 插件化：编辑器进驻 AI IDE
 
-整个编辑内核打包成标准扩展：在 VS Code 或 Trae 里"从 VSIX 安装"，活动栏立刻多出一个 Markdown 工作台——完整编辑器、文档大纲树、AI 补全，全部在 IDE 里原生运行。在 AI IDE 里写文档，不用再切出去。
+整个编辑内核打包成标准扩展：在 VS Code 或 Trae 里装上（现在**直接在扩展商店搜 MarkPilot 即可**，见「下载」），活动栏立刻多出一个 Markdown 工作台——完整编辑器、文档大纲树、AI 补全，全部在 IDE 里原生运行。在 AI IDE 里写文档，不用再切出去。
 
 ### ✦ 大文件不卡顿
 
@@ -35,6 +48,11 @@ MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时�
 - **宋体系衬线双主题**（宋体-朙 / 宋体-暗）：正文中文宋体、西文 Georgia 双衬线，细笔画描边、暗色表格不再陷成黑条纹，中文斜体以楷体呈现——把屏幕当"纸"来排；
 - **1280px 阅读版心**：宽屏不再一行读到脖子断；
 - **导出采用 TeX 同源的 Knuth–Plass 整段最优断行**：不是逐行贪心塞满，而是整段代价最优——TeX 排了四十年的数学论文，用的就是它。
+
+### ✦ 界面透明度可调
+
+每一个弹窗、右键菜单与工具栏默认都是半透明的，而且**可以自己调**：设置里的「界面透明度」给弹窗与工具栏各一个 10%–100% 的滑块（70% 是个不错的起点）。是"可调"而不是"写死"——想看得清就调实，想要玻璃感就调透；正文从半透明的菜单后面透出来，但不会糊成一片。
+
 ## 还有这些
 
 - 即时渲染 / 所见即所得 / 源码三种模式，随时切换
@@ -44,6 +62,7 @@ MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时�
 - 悬浮工具栏岛：自动收纳，点空白处即落笔
 - Word / Excel / PPT 迁移导出，公式以可编辑的 OMML 直达 DOCX，无需 Pandoc
 - 明暗主题、阅读调色盘、Ctrl+滚轮缩放
+- 弹窗 / 右键菜单 / 工具栏的透明度独立可调（10%–100%）
 - Windows 安装版 + 免安装便携版
 
 ## MarkPilot vs Typora
@@ -55,16 +74,23 @@ MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时�
 | 印刷级中文排版（中西文间距 / 衬线宋体 / Knuth–Plass 断行导出） | ✅ | 部分 |
 | 大文档性能优化 | ✅ 分片渲染 + 缓存 | ❌ |
 | 装进 VS Code / Trae 等 AI IDE | ✅ 插件形态 | ❌ 仅独立应用 |
+| 弹窗与工具条透明度可调 | ✅ 10%–100% | ❌ |
 | 价格 | 免费 | $14.99 |
 
 ## 下载
 
-到 GitHub 仓库的 **Releases** 页取最新版本：
+**IDE 插件**（现在可直接在扩展商店里搜索安装）：
 
-- **Windows 桌面版**：`markpilot-Setup-x.x.x.exe`（安装版）或 `markpilot-vx.x.x-portable.exe`（便携版，免安装）
-- **IDE 插件版**：`markpilot-x.x.x.vsix`
+- **VS Code**：扩展视图搜 `MarkPilot` → 安装（市场 ID `Jinxi.markpilot`）→ <https://marketplace.visualstudio.com/items?itemName=Jinxi.markpilot>
+- **Trae / Cursor / VSCodium 等**：在 Open VSX 上（ID `jinxi.markpilot`）→ <https://open-vsx.org/extension/jinxi/markpilot>
+  - 如果你的 IDE 里一时搜不到，用下面的手动方式装上即可
+- **手动安装**：`markpilot-x.x.x.vsix`
   - VS Code / Trae：扩展视图 → `⋯` 菜单 →「从 VSIX 安装」→ 选中下载的 vsix → 重载窗口
   - 装好后活动栏出现 MarkPilot 图标，点开即用；AI 补全在设置里填自己的 API Key
+
+**Windows 桌面版**：到 GitHub 仓库的 **Releases** 页取最新版本
+
+- `markpilot-Setup-x.x.x.exe`（安装版）或 `markpilot-vx.x.x-portable.exe`（便携版，免安装）
 
 ## v2.0.18 更新
 
@@ -76,15 +102,14 @@ MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时�
 
 把公式写进表格单元格也没问题：点一下展开源码，改完立刻重排；上方/下方插入行、左侧/右侧插入列、删除行列都在右键菜单里，而且**表格之外的正文一个字符都不会动**。
 
-### ✦ 你不动的地方，保存就不该变
+### ✦ 保存不会偷偷改你的文件
 
-这版起，我们的发布前检验里有一条硬指标：**只敲一个字再退格、内容回到原文之后保存，文件必须与原文件一字不差**。"悄悄改了我的文件"这类问题，会在出厂前就被拦住。
+没动过的地方，存盘后与你原来的文件一字不差——不会多出看不见的字符，也不会顺手把你的排版重排一遍。
 
 ## 修复
 
-- **右键菜单「剪切」只复制、不删正文**：某些环境下系统的剪切命令会报告成功并把文字放进剪贴板，却不真的删除选中的文字，于是点「剪切」看起来没反应、接着粘贴还会出现重复内容（同一选区按 `Ctrl+X` 是正常的）。现在以"选区是否真的被删除"为准，必要时自行完成删除。
-- **表格保存后会重排排版**：保存时表格会按列宽对齐（列宽补空格、分隔行破折号按列宽重算）。复核结论是**重新打开后行、列、单元格内容完全一致**——属于排版归一，不是数据损坏；这版没有改变该行为，只是补上了自动检验，避免它被误判成回归。
-- **含内嵌图片的文档复制图片失败**（上一版修复项，本版复核依然正常）：复制出的图片能正确写入系统剪贴板，可直接粘贴到微信、Word、Excel。
+- **右键菜单「剪切」点了没反应**：某些环境下它只把文字放进剪贴板、没有真的从文档里删掉，于是剪切看起来什么都没发生、接着粘贴还会出现重复内容。现在剪切会真的删掉你选中的内容。
+- **表格存盘后的行与列**：保存时表格会按列宽重新对齐，每一格的内容都原样保留。
 
 ## 开源与授权
 
@@ -99,3 +124,5 @@ MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时�
 ---
 
 *MarkPilot（万可百律）· 万有可能，一致百「律」 · 由一个每天用它写文档的人维护*
+
+*如果它对你的写作有帮助，点一个 ⭐ 能帮更多人找到它。*
