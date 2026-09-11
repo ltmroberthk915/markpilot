@@ -13,6 +13,19 @@ MarkPilot is a Markdown editor built for people who write in Markdown every day:
 
 If you are looking for **a Typora alternative that is free**, keeps working offline, and can be extended into your AI IDE, this is the one to try.
 
+![MarkPilot — mixed CJK/Latin typography with live math](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/hero-light-serif.png)
+
+*A narrow window, dense wrapping, mixed Chinese/Latin text and live formulas — the serif theme (宋体-朙) with automatic CJK/Latin spacing.*
+
+## Screenshots
+
+| | |
+|---|---|
+| **Click a symbol, edit its source** — click ω and the caret lands on the `o` of `\omega` | **…or click a subscript** — click the `n` of `f_n` and the caret lands on that very `n` |
+| ![Click omega](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/math-map-omega.png) | ![Click subscript](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/math-map-subscript.png) |
+| **Interface opacity** — every popup and the toolbar are translucent, with separate sliders (10–100%) | **Typography** — serif themes, CJK/Latin spacing, optimal line breaking |
+| ![Translucent context menu](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/menu-translucent-70.png) | ![Dense wrapping](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/body-dense-wrapping.png) |
+
 ## Why people switch from Typora
 
 |  | MarkPilot | Typora |
@@ -32,7 +45,11 @@ It knows which section you are in, what came before, and whether you are inside 
 
 ### ✦ Formulas you can actually edit
 
-Rendered math, Typora-style: you see the formula, and when the caret comes near, the relevant source appears for editing with instant preview. MarkPilot goes further and maps the rendered output back to the source — **click any symbol in a formula and the caret lands exactly on the source that produced it**; change one character in the source and the element updates immediately. This mapping survives formulas inside table cells and nested structures, with precise undo/redo. Formulas stop being "pictures you can't touch" and become live, editable content.
+Rendered math, Typora-style: you see the formula, and when the caret comes near, the relevant source appears for editing with instant preview. MarkPilot goes further and maps the rendered output back to the source — **click any symbol in a formula and the caret lands exactly on the source that produced it** (click ω → the caret sits on the `o` of `\omega`; click the subscript `n` → it sits on that `n`). The mapping survives formulas inside table cells and nested blocks, with precise undo/redo. Formulas stop being "pictures you can't touch" and become live, editable content.
+
+### ✦ Translucent surfaces you control
+
+Every popup, menu and the toolbar are translucent by default, and **Interface opacity** gives you independent sliders (10–100%) for popups and for the toolbar — 70% is a good starting point. Adjustable rather than baked in: readable when you want it, glassy when you don't.
 
 ### ✦ The editor moves into your AI IDE
 
