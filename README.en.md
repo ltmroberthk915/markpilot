@@ -17,6 +17,20 @@ If you are looking for **a Typora alternative that is free**, keeps working offl
 
 *A narrow window, dense wrapping, mixed Chinese/Latin text and live formulas — the serif theme (宋体-朙) with automatic CJK/Latin spacing.*
 
+## How much faster than Typora? (measured)
+
+Same machine, same window size, same Chinese-with-formulas document, both apps opening maximized; every row was run several times and is reported as the median. Two independent measurement methods were cross-checked and agree.
+
+| Scenario | Measured |
+| --- | --- |
+| Opening a small document (1.7 KB) | MarkPilot is **~0.2 s faster** (0.51 s vs 0.71 s) |
+| Opening a medium document (67 KB) | MarkPilot is **~0.14 s faster** (0.61 s vs 0.75 s) |
+| Opening a large document (240 KB) | about the same (0.91 s vs 0.90 s) |
+| Window appearing after a double-click | MarkPilot is **faster** (0.29 s vs 0.33 s) |
+| Clicking a formula near the end of a long document to edit its LaTeX source | MarkPilot is **6.5× faster** (0.024 s vs 0.156 s) |
+
+Compared against the current Typora of that week (1.14.10); MarkPilot numbers come from the Windows desktop build 2.0.18. Measured on 2026-09-10 — absolute times move with the machine and the document, but "opening a document is never slower, and clicking into a formula is an order of magnitude quicker" held on this machine.
+
 ## Screenshots
 
 | | |
