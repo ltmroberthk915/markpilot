@@ -81,12 +81,18 @@ The part of the 2.0 series we polished hardest:
 
 ## Download and install
 
-Grab the latest from the **[Releases page](https://github.com/ltmroberthk915/markpilot/releases/latest)**:
+**IDE extension** — search `MarkPilot` in your editor's extension view:
 
-- **Windows desktop** — `markpilot-Setup-x.x.x.exe` (installer) or `markpilot-vx.x.x-portable.exe` (portable, nothing to install)
-- **IDE extension** — `markpilot-x.x.x.vsix`
+- **VS Code** — install from the Marketplace (ID `Jinxi.markpilot`) → <https://marketplace.visualstudio.com/items?itemName=Jinxi.markpilot>
+- **Trae / Cursor / VSCodium** — from Open VSX (ID `jinxi.markpilot`) → <https://open-vsx.org/extension/jinxi/markpilot>
+  - If your editor does not show it yet, use the manual install below
+- **Manual** — download `markpilot-x.x.x.vsix` from the **[Releases page](https://github.com/ltmroberthk915/markpilot/releases/latest)**
   - VS Code / Trae: Extensions view → `⋯` menu → **Install from VSIX…** → pick the file → reload the window
   - A MarkPilot icon appears in the activity bar; open it and add your own API key in settings for AI completion
+
+**Windows desktop** — from the **[Releases page](https://github.com/ltmroberthk915/markpilot/releases/latest)**:
+
+- `markpilot-Setup-x.x.x.exe` (installer) or `markpilot-vx.x.x-portable.exe` (portable, nothing to install)
 
 ## Latest release: v2.0.18
 
