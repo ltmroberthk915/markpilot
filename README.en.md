@@ -157,7 +157,7 @@ The window can no longer be squeezed shorter than the toolbar either: the **mini
 - **The record button was a trap, and is removed** — it appeared to record audio: it really did take the microphone, then handed the audio to the *image* pipeline, failed with an "unsupported image format" message, and saved the recording nowhere. Worse, it left the editing surface read-only, so after two clicks the document could no longer be typed into. The feature was never actually wired up, so it has been taken out.
 - **The About box described someone else's project** — it used to show the editor core's own open-source blurb, complete with links to its website and forum, and Help linked to that same third-party documentation site. About now shows MarkPilot's own version and repository; Help points at our GitHub repository.
 
-## Latest release: v2.0.18
+## v2.0.18 update
 
 - **Opening a document is about a second faster** — small files go from ~1.5 s to ~0.55 s to first content, and a 200,000-character document from ~1.9 s to ~0.9 s.
 - **Formulas inside table cells are directly editable** — click to reveal the source, edit, instant re-render; insert and delete rows and columns from the right-click menu.
