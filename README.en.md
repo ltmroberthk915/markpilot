@@ -112,109 +112,159 @@ The part of the 2.0 series we polished hardest:
 
 ### ✦ Typing after clearing the document no longer turns into a formula
 
-Both of the items 2.1.4 left open are settled here: **one was a real defect and is fixed; the other was never a product defect — my measurement was wrong.**
+After you clear the document with `Ctrl+A` and one `Backspace`, the first thing you typed used to **become a formula**:
+when the last block of the document is a display formula, the caret stayed inside the emptied `$$`, so your characters
+went straight into the formula source — the screen showed italic, formula-typeset text (type `abc` and the document reads
+`$$\nabc\n$$`). The cleared document is now an ordinary empty paragraph, and typing goes to the body.
 
-Start with the gesture you verified by hand (`Ctrl+A`, then one Backspace). The body text and every formula source *were* deleted — but when the last block of the document is a display formula, Vditor keeps that formula node as the caret host and only empties its source. The Markdown then holds an empty `$$` shell **with the caret inside the source**. What 2.1.4 never measured is what happens next: typing `abc` produced `$$\nabc\n$$`, i.e. the character went into TeX and the screen showed a rendered formula instead of your text. So this was not a cosmetic leftover shell — **it was "the first sentence you type after clearing the document becomes a formula".**
+## Fixes (v2.1.5)
 
-Four attribution experiments (real build, real keystrokes): selecting a single formula and pressing Backspace removes 15 characters and leaves the other 196 untouched (our delete path removes one node — it is not what wiped the document); `document.execCommand('delete')`, which fires no `beforeinput` at all, still leaves the same shell; a document whose last block is a fenced code block clears to one empty paragraph with typing going to the body (so the shell is formula-specific, not generic block deletion); and WYSIWYG mode does not show the shape, so nothing there was touched.
-
-Now the cleared document is an ordinary empty paragraph, typing goes to the body, and **one `Ctrl+Z` still restores the document byte for byte** (undo granularity was the one thing this fix could have broken, so it is pinned by its own reading).
-
-### ✦ A correction to something I got wrong: the arrow-key step was not a defect
-
-2.1.4 reported "1 of 8 left-arrow steps lands in the heading's `##` marker with no painted caret". What is actually true: that step's caret container was the `<h2>` **element** itself, with the offset counting *child nodes* — and Blink returns zero client rects for any collapsed range positioned on an element child boundary. Measured: putting the range at `(h2, 0)`, `(h2, 1)` and `(h2, 2)` all read zero, so the reading simply does not apply there. A magnified screenshot shows the caret plainly drawn in that frame (the vertical bar after `## 紧跟块公式的标题`). The criterion and the log were rewritten accordingly, and "collapsed range on an element boundary reads zero" is now captured as a witness so a future round does not read it as a symptom.
-
-### ✦ Bug fixes (listed last)
-
-1. **After clearing the whole document the caret could sit inside the emptied display-formula source, so the next characters were written as TeX** (measured on 2.1.4: typing `abc` produced `$$\nabc\n$$`). It now falls back to an empty paragraph, typing goes to the body, and one `Ctrl+Z` restores everything byte for byte.
+- **Typing after clearing the whole document was written as a formula:** after `Ctrl+A` and one `Backspace`, if the last
+  block of the document is a display formula, the caret sat inside that empty `$$` source and everything typed afterwards
+  was written as TeX (typing `abc` produced `$$\nabc\n$$`). That "only an empty block formula is left" shape now falls
+  back to an empty paragraph, typing goes to the body, and **one** `Ctrl+Z` still restores the whole document byte for byte.
 
 ## v2.1.4 update
 
-### ✦ The final performance round: one measured win shipped, three candidates measured and deliberately left alone
+### ✦ Word-wise delete next to a formula no longer breaks it
 
-This round started with an observation-only attribution probe (`scripts/math-edit-perf-probe.cjs`, run on the real 490 KB / 5,634-formula document) that decomposed the work done on **every** selection change — then changed only the one item that measured a real win:
+`Ctrl+Backspace` / `Ctrl+Delete` used to bypass the formula boundary guard: with the caret in front of a display formula,
+one press merged the whole `$$…$$` into the preceding paragraph and the formula dissolved into a line of text. Those
+modified keys now run through the same guard; nothing else about them changes.
 
-- **Changed:** the expanded-node lookup moved from `querySelectorAll` to `getElementsByClassName`. Measured **0.213–0.228 ms → 0.0003–0.002 ms (570–640×)**, and a whole `refreshMathEditing` pass **0.289 ms → 0.099 ms**.
-- **Measured, then deliberately not changed (numbers kept):** rewriting `ownMath` as a hand-rolled walk is *slower* (0.00010 → 0.00017 ms); a "previous character" fast path for the paragraph-edge test would save 0.0003 ms while our entire edge test costs **0.0012 ms** (0.005% of a 6.67 ms Backspace event); the enforcement `MutationObserver` only sees **0.9 records per keystroke**, so narrowing it buys nothing; the WYSIWYG full-document normalization really does cost **2.42 ms per pass**, but WYSIWYG is not the default mode and there is no reliable way to tell a freshly created formula node from an already normalized one — making it O(1) would expose every formula's source after a `setValue`. Recorded, not touched.
+### ✦ Clicking the few pixels of blank space above or below a formula no longer eats its source
 
-### ✦ The final edge round: only gestures never tested before — it found and fixed two real defects
+A click in the blank band just above or below a collapsed display formula used to resolve into the hidden TeX source, so
+the Backspace that followed deleted one character of the formula. Such clicks are now mapped by geometry to just
+before/after the formula, never inside it.
 
-The new `75-edge-ops-not-covered` scenario (48 assertions / 82 witnesses, **a screenshot for every check**) covers formulas at the very start and very end of a document, two formulas separated by a single blank line, formulas followed by headings and lists, `Ctrl+A` select-all, word-wise delete, arrow-key traversal across fences, double-clicking a formula, find hitting formula source, and toggling the source view. Two real defects it caught:
+### ✦ Cheaper caret movement in large documents
 
-1. **Word-wise delete (`Ctrl+Backspace`) bypassed every boundary guard and merged a whole display formula into the preceding paragraph.** Measured on the real document: the `> (1)` line became `> (1)\neg\,\exists x\in A, P(x)\;\Leftrightarrow…`. Ctrl/Cmd + Backspace/Delete now runs through the same guard.
-2. **Clicking the few pixels of page margin above the first display formula and pressing Backspace ate the last character of its source.** A click in the blank band adjacent to a collapsed formula is now mapped to before/after the formula.
+Every caret move runs one pass of formula-state syncing, and inside it the "find the currently expanded formula" lookup
+was by far the most expensive step — on a 490 KB document with 5,634 formulas it alone accounted for ~90% of the pass.
+With a cheaper lookup the pass went from **0.289 ms to 0.099 ms** (about 3×).
+
+## Fixes (v2.1.4)
+
+- **Word-wise delete (`Ctrl+Backspace` / `Ctrl+Delete`) bypassed the boundary guard and merged a whole display formula
+  into the preceding paragraph:** measured on a real document, the `> (1)` line became
+  `> (1)\neg\,\exists x\in A, P(x)\;\Leftrightarrow…` (the formula dissolved into block-quote text). Those keys now run
+  through the same guard, with no other behaviour changed.
+- **Clicking the few pixels of page margin above a formula block and pressing Backspace ate the last character of its
+  source:** a click in the blank band next to a collapsed formula is now mapped to before/after the formula.
 
 ## v2.1.3 update
 
-### ✦ The gesture you verified by hand: caret before `(2)`, Backspace deletes the formula
+### ✦ Clicking the blank space around a formula no longer drops the caret into hidden source
 
-This release reproduces that exact gesture against the **installed 2.1.2** and found three real mechanisms (each with measured numbers):
-
-- **That "blank line" was actually a click into the hidden formula source.** A collapsed block formula keeps its source as a `0×0` shell, and Chromium resolves a click in the blank band below the rendered formula into a position *inside* that source — left side gives the source end, middle gives its start, depending on where you click. So "click once, then Backspace" deleted one character of the formula (measured: `x+y=1` → `x+y=`).
-- **The paragraph-edge guard only looked at DOM siblings.** In the material, `> $$ … $$` is followed by a blank line *without* `>`, then `> (2)` — so the label and the formula live in two different block quotes. Backspace there stripped the `>` prefixes of the whole quote (measured: `> (2)` → `(2)`), which reads exactly like "the formula got deleted".
-- **Clicking the `$$` fence dropped the caret into the source** (what you saw was not where the caret went), and the next Backspace then deleted source text again.
+While a display formula is collapsed its source is a `0×0` shell, and Chromium resolves a click in the blank band below it
+into a position *inside* that source — left side gives the source end, middle gives its start, depending on where you click.
+So "click once, then Backspace" deleted one character of the formula (`x+y=1` → `x+y=`). A click in the blank area now lands
+before/after the formula, while clicking the rendered formula itself still expands it and puts the caret in the source.
 
 ### ✦ How it behaves now
 
-- **Clicking the blank space around a block formula** puts the caret before/after the formula: the block does not expand and the caret never lands in hidden source. Clicking the rendered formula itself still expands it and puts the caret in the source.
-- **Clicking the `$$` fence** puts the caret **on the fence itself** — before the first `$`, between the two `$`, or after the last one, wherever you click. The "caret can go anywhere around the dollar signs" request is now a real position.
-- **Backspace on a fence or right against a block** changes **not a single byte**, and shows a one-line notice explaining that `$$` is generated by the renderer (a single `$` cannot be deleted there) and pointing at the source view.
+- **Clicking the blank space around a block formula** puts the caret before/after it: the block does not expand and the caret
+  never lands in hidden source. Clicking the rendered formula itself still expands it.
+- **Clicking the `$$` fence** puts the caret **on the fence itself** — before the first `$`, between the two `$`, or after the
+  last one, wherever you click.
+- **Backspace on a fence or right against a block** changes **not a single byte** and shows a one-line notice.
 - **Typing / pasting / IME on a fence** sends the characters into the source on that side; fences and Markdown stay intact.
-- **Additive only**: every earlier fix is kept.
+- **Additive only:** every earlier fix is kept.
 
-### ✦ One honest note (updated numbers)
+### ✦ Why a single `$` cannot be deleted in the rendered view
 
-"Delete just one `$`, like source editing" is not possible in the rendered view, and this round measured what it would cost: a real Markdown change makes Lute re-pair the fences (measured: after rewriting the closing fence to a single `$`, the following `> (2)` line was swallowed into the formula source), and Markdown can only be changed by reparsing the whole document — 24 ms for a 20 KB file but **2.0–2.2 s for a 481 KB one**, and the round trip is not even byte-identical. So the choice here is "the fence is a real caret position, Backspace changes nothing, and the reason is shown on the spot"; to delete fence characters one by one, use the source view (toolbar "切换源码视图").
+The `$$` of a display formula and the `$` of an inline formula are markers the renderer regenerates on every re-parse, so
+"delete one `$`" is not an editable action in the editor core (editing marker text is discarded rather than saved). The
+choice here is therefore "the fence is a real caret position, Backspace changes nothing, and the reason is shown on the spot"
+— rather than pretending to delete a `$` and leaving half a formula behind. To edit fences character by character, use the
+toolbar's source view, where they are ordinary text; to delete a whole formula, select all of it and press `Backspace`/`Delete`.
+
+## Fixes (v2.1.3)
+
+- **A paragraph edge inside a different block quote was not protected:** with `> $$ … $$` followed by a blank line without
+  `>`, then `> (2)`, the two lines live in different block quotes and Backspace stripped the `>` prefixes of the whole quote
+  (`> (2)` → `(2)`), which reads exactly like "the formula got deleted". The edge test now walks up parent nodes.
+- **Clicking the `$$` fence dropped the caret into the source** (not where you clicked): the opening fence now puts the caret
+  at the start of the source and the closing fence at its end, so characters typed afterwards land on the side you clicked.
+- **Backspace at position 0 of an inline formula's source erased the formula:** it is now intercepted at the boundary too.
 
 ## v2.1.2 update
 
-### ✦ The two fixes 2.1.1 only claimed — now actually verified against the shipped build
+### ✦ Backspace next to a formula no longer changes a single byte
 
-After installing 2.1.1 you reported that none of the fixes worked. Re-testing the installed build with real mouse and keyboard input, that verdict was correct: two and a half of the 2.1.1 fixes were no-ops (the expand-state reclaim ran before Vditor added the class; the boundary check did not recognise element-level caret positions; "select the whole formula first" was not the behaviour you asked for). This release redoes them your way:
+At the edge of a display formula, Backspace used to dissolve `$$…$$` into the previous paragraph; the previous release turned
+that into "first press selects the whole formula, second deletes it", so two presses still destroyed it. Now the press only
+moves the caret to the nearest text outside the formula — the document is untouched — and the next press deletes ordinary text.
 
-- **Backspace next to a formula no longer changes a single byte.** Previously a press at the edge of a block formula dissolved `$$…$$` into the previous paragraph; 2.1.1 merely turned that into "first press selects the whole formula, second deletes it", so two presses still destroyed it. Now the press only moves the caret to the nearest text outside the formula — the document is untouched — and the next press deletes ordinary text outside it.
-- **The `$$` fences put the caret where you click.** Click the opening `$$` and the caret goes to the start of the source; click the closing one and it goes to the end. Characters you then type really land on that side (before, typing with the caret parked on a fence silently appended to the end of the source).
-- **The preview box can no longer linger at a line end.** The expanded state is now enforced structurally: if the caret is not in the formula's source or preview, the expanded class is removed immediately, instead of racing Vditor with a single retry (which is why 2.1.1 behaved differently on different attempts).
-- Everything else from 2.1.1 stays: selecting a whole formula and deleting it leaves no `<span>` residue, and `Ctrl+B/I/U` or Enter inside TeX source no longer corrupts it.
+### ✦ The `$$` fences put the caret where you click
 
-### ✦ One honest limitation
+Click the opening `$$` and the caret goes to the start of the source; click the closing one and it goes to the end. Characters
+you then type really land on that side (before, typing with the caret parked on a fence silently appended to the end).
 
-Your report held up "source editing only deletes the last `$`" as the expected behaviour. The `$$` of a block and the `$` of an inline formula are markers Vditor regenerates on every re-parse; "delete one `$`" is not an editable action in the IR (editing marker text is discarded). This release therefore chooses **not to change the document at all** on a boundary press, rather than pretending to delete a `$` and leaving half a formula behind. To delete a formula deliberately, select the whole thing and press `Backspace`/`Delete` — that path is still clean.
+### ✦ The preview box can no longer linger at a line end
+
+If the caret is not in the formula's source or preview, the expanded state is removed immediately — it no longer depends on
+racing the renderer with a single retry, so it cannot behave differently on different attempts.
 
 ## Fixes (v2.1.2)
 
-- Element-level caret containers (`code[data-type="math-block"]@0`, the shape Chromium produces when you click a formula body) were not recognised as boundaries, so one Backspace dissolved the whole `$$…$$` block into the previous paragraph: `formulaEdge` now covers element-level positions (the source element itself and the fence markers).
-- Boundary Backspace no longer selects the whole formula; it moves the caret to the nearest text outside the formula and leaves the document unchanged.
-- The expanded state is now enforced with a `MutationObserver` (removed whenever the caret is not in the formula's source/preview), removing the timing race behind the intermittent preview box.
-- Fence clicks have defined semantics: opening `$$` → caret at source start, closing `$$` → caret at source end (before, clicking the closing fence dropped the caret into the next paragraph).
-- Backspace at position 0 of an inline formula's source is now intercepted too (the v2.0.4 "formula disappears" shape was still reachable for inline math).
-- Measured cost (same-session A/B): observer connected vs disconnected, 51.7/50.7 ms vs 53.2/52.6 ms per keystroke, minimum 41 vs 40 ms — within noise.
+- **A caret landing on the formula body (element-level position) was not recognised as a boundary:** one Backspace dissolved
+  the whole `$$…$$` block into the previous paragraph. Those positions are now covered by the boundary test.
+- **Boundary Backspace no longer "selects the whole formula first":** it moves the caret to the nearest text outside the
+  formula and leaves the document unchanged.
+- **The expanded state is now enforced** (removed whenever the caret is not in the formula's source/preview), removing the
+  timing race behind the intermittent preview box.
+- **Fence clicks have defined semantics:** opening `$$` → caret at source start, closing `$$` → caret at source end (before,
+  clicking the closing fence dropped the caret into the next paragraph).
+- **Backspace at position 0 of an inline formula's source erased the formula** (the v2.0.4 shape was still reachable for
+  inline math): it is now intercepted as well.
+- **Additive only:** every other fix from the previous release is kept (selecting a whole formula and deleting it leaves no
+  residue, and `Ctrl+B/I/U` or Enter inside TeX source no longer corrupts it).
 
 ## v2.1.1 update
 
 ### ✦ Editing next to a formula now behaves the way you expect
 
-All three come from reports made in a real document:
+All of these come from reports made in real documents:
 
-- **A line that ends with a formula no longer pops the preview box when you put the caret at the end of the line.** Before, clicking at the line end (or pressing End) made the last formula's floating preview appear over the text below. Now only **clicking the formula itself** expands its source for editing; before/after the formula are ordinary caret positions, and typing there lands after the formula.
-- **The `$$` of a `$$ … $$` block are real, clickable text now.** Previously, however you clicked, the caret could only land at the very first position of the source (the two `$$` were drawn by pseudo-elements and were not part of the document). They can now be clicked, selected and edited character by character.
-- **Backspace next to a formula no longer destroys it.** At a block's edge — its start, its end, or the paragraph right before/after it — one Backspace used to dissolve `$$…$$` into a plain line of text, or silently eat characters out of the source. The first press now only **selects the whole formula** (the document does not change); a second press deletes it as one unit, so removing a formula is still two keystrokes.
+- **A line that ends with a formula no longer pops the preview box when you put the caret at the end of the line.** Before,
+  clicking at the line end (or pressing End) made the last formula's floating preview appear over the text below. Now only
+  **clicking the formula itself** expands its source for editing; before/after the formula are ordinary caret positions, and
+  typing there lands after the formula.
+- **The `$$` of a `$$ … $$` block are real, clickable text now.** Previously, however you clicked, the caret could only land at
+  the very first position of the source. They can now be clicked, selected and edited character by character.
+- **Backspace next to a formula no longer destroys it.** At a block's edge — its start, its end, or the paragraph right
+  before/after it — one Backspace used to dissolve `$$…$$` into a plain line of text, or silently eat characters out of the
+  source. The first press now only **selects the whole formula** (the document does not change); a second press deletes it as
+  one unit, so removing a formula is still two keystrokes.
 
 ### ✦ Three related problems found while testing
 
-- **Ctrl+B / Ctrl+I / Ctrl+U inside formula source** no longer inserts `****`, `**` or `<u></u>` into the TeX (which broke the formula instantly). Clipboard, undo/redo and select-all are unaffected.
-- **Enter inside an inline formula's source** no longer splits the TeX (it used to produce garbage such as `$a$a+1+1$`). The caret simply moves out of the formula; block formulas keep their multi-line source, so Enter still inserts a newline there.
-- **Deleting a whole formula** (whether you selected it yourself or the step above selected it) no longer leaves stray `<span>` text behind.
+- **Ctrl+B / Ctrl+I / Ctrl+U inside formula source** no longer inserts `****`, `**` or `<u></u>` into the TeX (which broke the
+  formula instantly). Clipboard, undo/redo and select-all are unaffected.
+- **Enter inside an inline formula's source** no longer splits the TeX (it used to produce garbage such as `$a$a+1+1$`). The
+  caret simply moves out of the formula; display formulas keep their multi-line source, so Enter still inserts a newline there.
+- **Deleting a whole formula** (whether you selected it yourself or the step above selected it) no longer leaves stray
+  `<span>` text behind.
 
 ## Fixes (v2.1.1)
 
-- A line ending in a formula had its last formula auto-expanded by Vditor (the node under the caret), which floated the preview box: a boundary caret no longer counts as editing the formula, and an expansion Vditor added is now reclaimed.
-- The `$$` of a block formula were `::before/::after` pseudo-elements, which never take part in hit testing, so every click landed at source offset 0: the expanded state now uses the real `$$` text nodes (the pseudo-elements are turned off so the fence is not drawn twice), while the collapsed state still shows only the rendered result.
-- With the caret as a direct child position of a node's start/end (Chromium's usual landing spot at a line end), Backspace ate the trailing `$` and turned the formula into literal text: such boundary positions now select the whole formula first.
-- Backspace at the start of a block formula's source removed the `$$` fence (the whole block collapsed into one line of text), and Delete at the end of an inline formula's source erased the formula: deletion towards the fence now selects the whole formula first, while normal editing **inside** the source (Backspace at the end, Delete at the start) is left untouched.
-- Delete with the caret at the start/end of the paragraph next to a block formula merged the formula into that paragraph's text: it now selects the whole formula first.
-- `Ctrl+B` / `Ctrl+I` / `Ctrl+U` inside formula source inserted Markdown markers into the TeX: formatting shortcuts no longer apply inside formula source.
-- Enter inside an inline formula's source split the TeX and duplicated half of the formula: it now only moves the caret out of the formula and leaves the document unchanged.
+- **A line ending in a formula had its last formula auto-expanded**, floating the preview box over the text below: a boundary
+  caret no longer counts as editing the formula, and an expansion added automatically is now reclaimed.
+- **Clicking a `$$` used to always land at source offset 0** (the fences were drawn, not real text taking part in hit testing):
+  the expanded state now uses the real `$$` text nodes, so the caret goes where you click, while the collapsed state still
+  shows only the rendered result.
+- **With the caret as a direct child position of a node's start/end, Backspace ate the trailing `$`** and turned the formula
+  into literal text: such boundary positions now select the whole formula first.
+- **Backspace at the start of a display formula's source removed the `$$` fence** (the whole block collapsed into one line of
+  text), and **Delete at the end of an inline formula's source erased the formula**: deletion towards a fence now selects the
+  whole formula first, while normal editing **inside** the source (Backspace at its end, Delete at its start) is untouched.
+- **Delete with the caret at the start/end of the paragraph next to a display formula merged the formula into that paragraph:**
+  it now selects the whole formula first.
+- **`Ctrl+B` / `Ctrl+I` / `Ctrl+U` inside formula source** no longer insert Markdown markers into the TeX.
+- **Enter inside an inline formula's source** split the TeX and duplicated half of the formula: it now only moves the caret out
+  of the formula and leaves the document unchanged.
 
 ## v2.1.0 update
 
