@@ -2,7 +2,7 @@
 
 **A free Typora alternative with inline AI completion, live math editing, and print-quality typography.**
 
-[![version](https://img.shields.io/badge/version-2.1.0-blue)](https://github.com/ltmroberthk915/markpilot/releases/latest)
+[![version](https://img.shields.io/badge/version-2.1.22-blue)](https://github.com/ltmroberthk915/markpilot/releases/latest)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20VS%20Code%20%7C%20Trae-green)](https://github.com/ltmroberthk915/markpilot/releases/latest)
 [![price](https://img.shields.io/badge/price-free-brightgreen)](https://github.com/ltmroberthk915/markpilot/releases/latest)
 [![license](https://img.shields.io/badge/license-app%20free%20%7C%20source%20licensed-orange)](#license)
@@ -107,6 +107,257 @@ The part of the 2.0 series we polished hardest:
 **Windows desktop** — from the **[Releases page](https://github.com/ltmroberthk915/markpilot/releases/latest)**:
 
 - `markpilot-Setup-x.x.x.exe` (installer) or `markpilot-vx.x.x-portable.exe` (portable, nothing to install)
+
+## v2.1.22 update
+
+- ✦ **Clicking inside an inline formula's pre-render box no longer flashes.** The previous release wired "click the box = put the caret in the source"; that exposed an older behaviour: for the duration of every press, the formula being edited was **visually** folded back into its rendered form — the source disappeared, the floating box was flattened into the line, the paragraph reflowed, and it all snapped back on release: one flash per click (frame sampling during a 250 ms press: 16 of 43 frames had the source at `display:none` and the box at `position:static`, while the `--expand` class never changed and KaTeX never re-rendered — so looking only at classes cannot see it). Pressing a formula that is **already expanded** now excludes it from those rules: it stays expanded while you hold the button. Collapsed formulas keep the old behaviour (the drag-over rendering used by selection still applies).
+- ✦ **The box no longer jumps to the previous line's end when the source wraps.** When an inline formula's source is too wide for one line it wraps, and the box used to be positioned against the node's **first line fragment** — the `$` at the end of the previous line: the box ended up pushed to the right and hung below the wrong line (the `f^*\in[f^{\inf},f^{\sup}]` case from the screenshot). The box is now anchored to **the source itself** (CSS anchor positioning): it sits at the source's left edge and 4 px under the source, wrapped or not.
+
+## Fixes (v2.1.22)
+
+- Clicking an inline formula's pre-render box (or its source) flashed the whole formula once: it was visually folded back into rendered form for the duration of the press.
+- The floating pre-render box was pushed to the previous line's end when the formula's source wrapped across lines.
+
+## v2.1.21 update
+
+- ✦ **Clicking inside an inline formula's pre-render box now puts the caret where you clicked.** While you edit an inline formula, its rendered result floats in a box below the source. Clicking in that box used to send the caret to the **very start of the formula source** (even when you clicked the middle), and clicking the box's padding **collapsed the formula on the spot** and popped it back on release — two jumps per click. The box now uses the **same pixel-to-caret mapping** as clicking the collapsed rendered result: the glyph you click is the character the caret lands on, the last glyph follows the end-of-line rule (caret at the end of the formula), and padding clicks resolve to the nearest glyph. The formula is never collapsed while you hold the button (frame sampling: zero folded frames).
+- ✦ The mapping reuses the same source-location data that is already emitted with the rendered output; the change is to compute the offset from the layout you aimed at **at press time** and place the caret ourselves, instead of letting the browser clamp the click (it resolves into KaTeX's subtree, which is why the old offset read as 0).
+- ✦ Double-click (word selection) and modifier-clicks still go to the browser; dragging right from inside the box still produces a selection.
+
+## Fixes (v2.1.21)
+
+- Clicking inside an inline formula's pre-render box moved the caret to the start of the formula source (offset 0 for middle and right-side clicks alike).
+- Clicking the box's padding collapsed the formula immediately and popped it back on release.
+
+## What's new in v2.1.20
+
+- ✦ **A plain click inside an expanded block formula no longer makes the whole block flicker.** With both the pre-render and the code editor expanded, a click in the **source area** or in the **rendered area** used to collapse the block and snap it back (block height 145 → 119 → 145; the 26px difference is exactly the source line) — that is the flicker you saw, and no character of the document was involved. A mouse press now **freezes an already-expanded block formula as-is** (neither expands nor collapses it); after release the normal "is the caret inside the formula?" rule takes over again.
+- ✦ **The rendered result is no longer rebuilt**: during a click with no text change KaTeX does not run at all, the pre-render subtree is byte-identical with the same first child, and the formula source is unchanged. Keyboard movement and typing behave exactly as before (they never flickered).
+
+## Fixes (v2.1.20)
+
+- A single click inside an expanded block formula (source area or rendered area) re-laid-out and flashed the whole block: on press we stripped `--expand` ourselves and Vditor re-added it after release, with frames in between — i.e. the block collapsing and snapping back on screen.
+
+## What's new in v2.1.19
+
+- ✦ **The formula-command ranking was rebuilt** following mature practice (VS Code's model: **match quality decides the order**, declaration order only breaks ties between equally good matches). Tiers: **exact → prefix (within the tier, a longer share of the name ranks first) → siblings (right after the strong matches, ordered by longest common prefix with what you typed) → description → subsequence fuzzy**. So `\mathbb` gives `\mathbb`, **`\mathbf`**, `\mathcal`, `\mathrm`, **`\mathscr`**, `\mathfrak`…; `\frac` gives `\frac`, `\sqrt`, `\dfrac`, `\tfrac`, `\cfrac`; `\lr` gives the prefix matches followed by `\leftrightarrow`/`\Leftrightarrow` from the fuzzy tier.
+- ✦ **"Already used in this formula" no longer promotes across tiers.** The old scoring added a bonus for commands present in the current formula, applied to every entry — so in a formula containing `\int`/`\mathbf`, typing `\` put `\int` and `\in` (a substring of `\int`) at the top. It is now only a secondary key *within* a tier: a bare `\` always lists the same twelve common commands in the same order.
+- ✦ The table gained `\mathscr`/`\mathfrak`/`\mathsf`/`\mathtt`/`\mathit`/`\boldsymbol`/`\mathnormal`/`\operatorname` (42 → 215 entries, 13 groups); the number of candidates adapts (siblings only when fewer than four strong matches, capped at twelve).
+
+## Fixes (v2.1.19)
+
+- Typing `\` inside a formula that already contains `\int`/`\mathbf` moved `\int`/`\in` to the top of the list, displacing the common commands.
+- Typing `\frac` lost `\sqrt` (the "enough matches already" rule counted the fuzzy matches as matches).
+
+## Fixes (v2.1.18)
+
+- The formula-command candidate list leaked internal group wording into the UI ("同一类（字体）"). The detail column now shows **only the command's own description**; sibling commands are still offered, just without the internal annotation.
+
+## What's new in v2.1.17
+
+- ✦ **Formula-command completion is smart again: sibling commands come with it.** Typing `\mathbb` now also offers the rest of the font family — `\mathbf`, `\mathcal`, `\mathscr`, `\mathfrak`, `\mathsf`, `\mathtt`, `\mathrm`, `\mathit`, `\boldsymbol`, `\mathnormal`, `\operatorname`; `\frac` brings `\sqrt`/`\dfrac`/`\tfrac`/`\cfrac`; `\sum` brings `\prod`/`\int`/`\iint`/`\oint`/`\lim`; `\alpha` brings the whole Greek family. Siblings are labelled "· 同一类（字体）" so it is obvious why they are there.
+- ✦ **The number of candidates adapts to the query**: siblings are only appended when the prefix matches fewer than four commands (up to twelve entries); with many matches nothing is appended — so a bare `\` still lists the same twelve common commands in the same order (`\frac` → `\sqrt` → `\sum` → `\int` …). The table grew from 42 to 215 entries, ordered by usage and then grouped.
+- ✦ **For the record: formula-command completion has always been offline.** The candidates come from a static table in the source (`render/js/completion-sources.js`) plus local matching — no network, no model call, and the panel is drawn before any host/AI round trip. The only networked feature is the optional AI continuation (ghost text), which needs your own API key and is absent entirely from the public/API-free build.
+
+## Fixes (v2.1.17)
+
+- Formula-command completion only offered the exact prefix match (typing `\mathbb` listed `\mathbb` alone), so sibling commands such as `\mathscr`/`\mathbf` were never suggested.
+
+## What's new in v2.1.16
+
+- ✦ **End-of-line clicking on display formulas now follows the behaviour you specified**: clicking the **last glyph** (either half) or **anywhere to its right on that line** puts the caret at the **end of the formula's source** (after the trailing comma). The previous build had it backwards (stopping before the comma), which is why it still looked wrong. Earlier glyphs keep the half-cell rule (left half → before it, right half → after it), and commands (`\sum`, `\int`, `\lim`) still land after the backslash.
+- ✦ **Deleting an image now takes a single Ctrl+Z (second mechanism).** After rebuilding the document (`setValue`), Vditor schedules its own debounced history push; it records "markdown unchanged, but a formula re-rendered / reconcile moved nodes" as a real patch and parks it **on top of** the deletion patch — that is the entry the first Ctrl+Z used to hit (reproduced on your own document with the image placed right after a display formula). Undo/redo now **skips such no-op steps**; history recording itself is untouched.
+- ✦ **Dragging upward across a `$$…$$` block formula no longer jitters.** The 2.1.11 fix covered inline formulas only; an expanded block formula inserts its source line into the layout (block height 91↔118), shifting the text under the pointer so the drag endpoint lands elsewhere and the formula flips again. While the mouse is down, block formulas are now **not expanded** — measured: `--expand` flips 4 → **0**, block height constant throughout.
+- ✦ **The completion panel now treats the toolbar's bottom edge as a ceiling**: when the space above the line is taken by the toolbar, the panel shrinks on that side (it is scrollable) instead of parking across the toolbar.
+
+## Fixes (v2.1.16)
+
+- Clicking at the end of a display formula's rendered line (the trailing comma and anything after it) put the caret before the comma instead of after it.
+- Deleting a selected image needed **two** Ctrl+Z presses (reproducible when the image sits right after a display formula; the extra entry comes from Vditor's own debounced push).
+- Dragging upward across a `$$…$$` block formula made the editing area jitter (less pronounced when dragging downward).
+
+## What's new in v2.1.15
+
+- ✦ **Clicking at the end of a display formula's rendered line no longer skips the trailing comma.** Hit testing used to snap to the *start* of a glyph, and a digit cell is about 9px wide on screen — clicking its right half still put the caret *before* it, which reads as "the caret jumped one character too far left". The mapping is now half-cell aware: the left half lands before the glyph, the right half after it. The **last glyph of the formula** is the exception (clicking it still lands before it), so clicking the end of a line always stops before the final character instead of running past the formula. Commands (`\sum`, `\int`, `\lim`, `\frac`, …) always land after the backslash, matching inline formulas.
+- ✦ **Clicking a display-mode ∑/∫/lim now puts the caret between `\` and the following letter** (it used to land inside the first argument of `\sum_{}`). Reason: in display mode KaTeX gives the big operator **no source mapping of its own** (the mapping sits on the outer `mop`), so the old fallback picked the *nearest mapped glyph* — the `=` inside the subscript. The mapping now uses the outer container's location when the point sits on an element that renders text but has no mapping, and it skips KaTeX's empty vlist/strut shells (measured: they overlap neighbouring glyphs by 1px).
+- ✦ **The math hint panel (completion candidates) no longer covers the formula's pre-render box.** Panel placement only avoided the edited line and the mouse; it now also avoids the pre-rendered box, weighted above "show more items" — the panel gets shorter rather than hiding what you are editing.
+- ✦ **Deleting an image now takes a single Ctrl+Z** (it used to take two, the first doing nothing). Vditor's history snapshots carry the caret position, so a pure caret move (clicking to select the image) counted as a difference and was frozen into a markdown-identical undo entry. History points are now only added when the markdown actually changed — this also applies to cut/paste/table/image-scale and everything else on that path.
+- ✦ **Deleting an image whose top has scrolled above the top edge of the page now keeps the text below it in place and brings the content above down into view** (as requested). The condition is geometric (image box top above the visible top), and the compensation is measured from the change in total content height (image box 881px, its block 906px, content height actually 920px smaller — geometry alone would be off by 39px and the text below would still jump). When the image is fully inside the viewport the old behaviour is kept (text below moves up).
+
+## Fixes (v2.1.15)
+
+- Clicking at the end of a display formula's rendered line skipped the trailing comma and landed before the character preceding it (reproducible by clicking the right half of the last digit).
+- Display formulas starting with `\sum`/`\int`/`\lim`: clicking the big operator put the caret inside the first argument of `\sum_{}`/`\int_{}` (inline formulas were already correct).
+- The math hint panel covered the pre-render box of the formula being edited, hiding its rendered result.
+- Deleting a selected image needed **two** Ctrl+Z presses (the first did nothing).
+- Deleting an image whose top had scrolled past the top edge made the text below jump up one screen height.
+
+## What's new in v2.1.14
+
+- ✦ **Clicking the upper part of a character in a paragraph that sits directly under a display formula no longer throws the caret to the start of the line.** The user's diagnosis was exactly right ("it's about how the vertical position inside the line is decided"). The culprit is the *blank-space landing* translation: a point within ±10px of a folded block formula is treated as blank space beside it and the caret is moved to that formula's insertion point. But the display formula above and the paragraph below are **flush** (measured: formula box y=257..387, paragraph y=387..412), so the whole upper half of the first text line fell inside that band and the caret landed on the block boundary — i.e. the start of that line. The rule now also requires the point not to be inside **another** block's box, in which case the click goes back to the browser (Chromium's own answer was correct all along). Measured on the same line, 162 clicks: deviations at "top edge +2" dropped from **27/29** to 2/30.
+- ✦ Recorded a methodology lesson: probes that judge "click point → caret position" must sample **top / centre / bottom** of a character; earlier rounds only clicked centres, which hid this bug entirely.
+
+## Fixes (v2.1.14)
+
+- Clicking the upper half of any character in a paragraph directly beneath a display formula moved the caret to that formula's insertion point (i.e. the start of the line).
+
+## What's new in v2.1.13
+
+- ✦ **Clicking an inline formula's rendered result now puts the caret where you clicked.** The click was mapped to a source offset only at `click` time — but by then the editor had already expanded the formula for editing (our own `selectionchange` → `refreshMathEditing`), so the rendered glyphs were no longer measurable, the map failed, and the fallback threw the caret to **offset 0 of the formula source**: click the middle of a formula and the caret jumps to its very beginning (the reported "caret runs to the start"). Measured on your document's `$f=f^+-f^-$`, 23 sample points every 4px across the rendered box: before, **6 points** (including one in the right half) landed at the formula start with 2 backward jumps; after, 0 backward jumps and none in the right half. The press-time offset is now computed at `mousedown`, when the layout is still the one you aimed at.
+- ✦ **The gaps between glyphs are clickable too**: KaTeX leaves gaps between glyphs and strut padding above/below (13–26% of sampled points inside a rendered box), where the map used to fail. It now falls back to the nearest glyph — the same semantics as the browser's "clamp to the nearest position when you click empty space".
+
+## Fixes (v2.1.13)
+
+- Clicking an inline formula's rendered result put the caret at the very start of that formula's source for some pixels (including in the right half), with a non-monotonic offset sequence.
+- Points landing between rendered glyphs failed to map and fell back to source offset 0.
+
+## What's new in v2.1.12
+
+- ✦ **HTML images (raw `<img …>` in the body) can be deleted again**: after click-selecting one, Delete/Backspace used to leave the image in place, **eat a character elsewhere in the document and leave the caret up on the heading** (Vditor collapses the DOM selection after such a click, so the old guard declined and the keystroke fell through to the browser). The delete now follows the explicit selection state: exactly the `<img …>` tag goes away, nothing else is touched, the caret lands where the image was, and **one** Ctrl+Z restores it.
+- ✦ Added a **real keyboard/mouse injection** harness (SendInput drag / keys / window targeting by PID) for gestures that only misbehave with a human hand.
+
+## Fixes (v2.1.12)
+
+- Selecting an HTML image and pressing Delete/Backspace deleted a character from the heading instead of the image, and moved the caret there.
+
+## What's new in v2.1.11
+
+- ✦ **The caret no longer falls into the "marker hole"**: clicking between the end of a bold/italic run and the following punctuation used to drop the caret inside the *invisible* `**` marker — Backspace then ate a marker asterisk (`导数**。` became `导数*。`), and Shift+arrow plus typing produced `*X*`. The caret is now returned to the text boundary; moving the caret into a marker *with the keyboard* (deliberate marker editing) is untouched.
+- ✦ **No more twitching while dragging upward**: the real cause was Vditor swapping the formula under the selection endpoint for its source mid-drag (line width/height change), which shifted the text under the pointer, which moved the endpoint onto another formula — a feedback loop (formula tops oscillated 226↔247 in our measurements). Formulas now stay rendered for the whole press (visual suppression only; restored on release), so a drag causes **zero layout change**.
+- ✦ **The release point is visible**: a selection has no caret, so after a drag you only saw a blue band. A 2px blinking bar now marks the point where you released (removed as soon as you type or clear the selection).
+- ✦ The blue highlight **covers the formulas it spans** (verified on real window pixels for a paragraph containing four formulas).
+
+## Fixes (v2.1.11)
+
+- Backspace eating a `**` asterisk, and typing/shift-selecting producing `*X*`, when clicking between bold text and punctuation.
+- Formula area twitching during upward drag-selection (invisible when dragging downward).
+- No visible indication of where a drag-selection ended.
+- Also repaired a regression introduced by 2.1.10: **clicking a display formula's rendered result did nothing** (the click mapping was gated to inline math only; block math now takes over only when the source offset can be resolved). The renderer suite is back to 354 passing / 0 failing.
+
+## New in 2.1.10
+
+- ✦ **Dragging backwards (from the paragraph end to its first word) now selects the whole paragraph**: a reversed anchor/focus pair used to collapse the range (per spec, `Range.setEnd` with an end before the start collapses it); switching the fallback to the Selection API's `setBaseAndExtent` makes direction irrelevant.
+- ✦ **Works when the formula paragraph is the document's last block** (the user reported it only worked after adding a blank line below — the real cause is the press landing on the rendered formula, not the document end).
+- ✦ Inline math previews are now selectable (`user-select:text`), which is what lets Chromium arm a selection drag from a press on a formula. Inline only; block math semantics untouched.
+
+## Fixes (v2.1.10)
+
+- Selecting backwards from the paragraph end copied only the last line and showed no highlight at all.
+- A native drag confined inside a pressed formula (pointer moved far away) is replaced by our own selection.
+
+## New in 2.1.9
+
+- ✦ **Drag-select across a paragraph containing math** now works: drag from text across the paragraph, or press on a formula and drag out — every formula the selection crosses keeps its rendered form and shows the same blue selection highlight as normal text. On mouse-up the boundary formulas unfold to source and the endpoint snaps to the whole formula (Typora's expand() / includeTrailMeta), so copying yields `$…$` source instead of nothing.
+- ✦ **Copy is no longer blank**: the collapsed formula source used to be a 0×0 box that neither contributed text to the selection nor painted a highlight.
+- ✦ **Clicking a formula still unfolds it and puts the caret in the source** (the editing path is intact).
+
+## Fixes (v2.1.9)
+
+- Pressing on a formula and dragging did nothing at all (Chromium never arms a selection drag from a press on a user-select:none preview).
+- "Only text gets the highlight, the formula area gets nothing."
+- Caret at the end of the paragraph, select backwards: the copy came out blank.
+- Also: the spurious click fired at the end of a drag collapsed the freshly made selection.
+
+## What's new in 2.1.8
+
+### ✦ Close every window one by one — they all come back next time
+
+The previous version fixed session restore for the "File → Quit" path, but closing the windows
+one at a time with the title-bar **X** (which is also "quitting the app") removed each window from
+the restore list as it closed, leaving only the last one — exactly the "only the first file came
+back" you saw, and which window survived was partly luck.
+
+Closing a window is now only **pending**: if you close the rest within 5 seconds (i.e. you were
+quitting the app), the removal is cancelled and every window comes back with its file; if you keep
+working for more than 5 seconds after closing one, it is really dropped and won't reopen.
+
+### ✦ No more shivering when a document opens
+
+When you open a document you have read before, the app restores your reading position. That should
+finish as soon as the content height stops changing and the anchor is on target (within a second),
+but the "is it on target" formula had **its two terms subtracted in the wrong order**, reporting
+exactly twice the real offset (1 px measured as 2, −11 px as 22), so it could never pass its own
+±2 px line. Every open therefore rewrote the scroll position **every 0.12 s for the full 6 s
+give-up window** (76 rewrites measured; under 10 is normal). Any layout change during those 6
+seconds got re-yanked — that is the shivering you saw.
+
+The check now uses the same formula as the repositioning: it settles within a second (13 rewrites
+measured), and offsets below 1 px no longer touch the scroll position at all.
+
+### ✦ Context menus no longer cover the pointer or the line you clicked
+
+Your rule: the panel may go above or below, but must never cover the mouse or the line being acted
+on. The previous version fixed this for the completion popup; the **context menus** still pinned
+their top-left corner to the pointer, covering both the mouse and the clicked row — clicking "Image
+settings…" or "Delete (recycle bin)" closed the menu on mouse-up and looked like nothing happened.
+Both the file-tree menu and the in-editor menu now try below the line, then above, then beside the
+pointer, and in all four placements cover neither the mouse nor the line.
+
+## Fixes (2.1.8)
+
+- **Only one window came back after quitting by closing windows** (each closed window was removed from
+  the session list; only the last survived). Now pending-for-5-seconds, with the list frozen when the
+  app starts exiting, and no re-computation on window destruction (that used to write an empty list,
+  depending on a 400 ms save debounce — hence the flaky behaviour).
+- **A single closed window is really dropped from the restore list only after 5 seconds** of continued use.
+- **The scroll position was rewritten for a full 6 seconds on open** (anchor error computed as 2× offset,
+  so convergence never triggered): same formula as the repositioning now, and no write below 1 px.
+- **Context menus covered the mouse and the clicked row** (file tree + editor): four candidate placements,
+  none of which cover the pointer or the row.
+
+## v2.1.7
+
+### ✦ The buttons on the start screen actually work now
+
+If you had ever collapsed the sidebar, clicking **Open Folder** on the start screen used to change nothing
+on screen: the file tree was read, but it lived inside a collapsed panel. With the sidebar visible the welcome
+page still gave no feedback at all. Now opening a folder expands the sidebar, shows the tree, and the welcome
+page tells you where to look.
+
+### ✦ Reopening the app brings back your windows and files
+
+A normal exit used to forget which windows were open, so the next launch showed nothing but the start screen
+(only a crash preserved the session). Now a normal exit — or closing the last window — keeps the session and
+restores every window with its own file, position and size.
+
+### ✦ Delete in the file tree really deletes
+
+Right-click → **Delete (Recycle Bin)** used to do nothing at all: the confirmation never appeared and the file
+never moved. It now asks once, sends the file to the Recycle Bin, and does nothing if you cancel.
+
+### ✦ In-document anchors jump
+
+`[jump to section 3](#section-3)` links did nothing. They now scroll to the heading and flash it briefly.
+
+### ✦ Delete several images at once
+
+After Ctrl-clicking several images, Backspace/Delete did nothing — and from that moment the keyboard stopped
+reaching the document at all. Multiple selected images now delete in one action; undo brings them back.
+
+### ✦ Completion popups no longer cover the line you are editing
+
+With a short window the formula/snippet popup used to cover the very line you were typing on and the mouse
+pointer itself, so a stray click inserted the wrong formula. It now stays below or above that line, fully
+inside the window, and never overlaps the edited line or the pointer.
+
+## Fixes (v2.1.7)
+
+- **No feedback when opening a folder from the start screen** — collapsed sidebar: zero visible change;
+  visible sidebar: the welcome page never explained the next step. Opening a folder now reveals the sidebar
+  and shows the hint (a workspace restored at startup still respects your collapsed-sidebar preference).
+- **A normal exit wiped the window session** — every window detached itself on close, so quitting emptied the
+  record and nothing came back on the next launch. Only closing one of several windows removes it now.
+- **File-tree delete never worked** — `window.confirm` always returns false and shows nothing in the Electron
+  shell, so the confirmation never passed. It now uses the host's native dialog.
+- **Create/rename failures were swallowed** — `window.alert` is equally invisible; failures now show a visible
+  error strip in the sidebar.
+- **"Open file in this window…" opened a new window** — the menu item now really replaces the document in the
+  current window (asking first when there are unsaved changes).
+- **In-document anchors did nothing** — the host ignored `#…` URLs and the renderer had no handler.
+- **Ctrl+multi-selected images could not be deleted** — deletion only looked at the single-click selection, and
+  multi-selecting silently dropped keyboard focus to the shell. Focus is kept, and the selection deletes at once.
+- **Completion popup covered the edited line and the pointer** in short windows — the panel is now capped to the
+  real space on one side (scrollable inside) so it never overlaps the edited line or the mouse.
 
 ## v2.1.6 update
 
@@ -395,254 +646,3 @@ Local first. Editing, rendering and exporting all happen on your machine; AI com
 ---
 
 *MarkPilot — if you find it useful, a ⭐ helps other people find it too.*
-
-## v2.1.7
-
-### ✦ The buttons on the start screen actually work now
-
-If you had ever collapsed the sidebar, clicking **Open Folder** on the start screen used to change nothing
-on screen: the file tree was read, but it lived inside a collapsed panel. With the sidebar visible the welcome
-page still gave no feedback at all. Now opening a folder expands the sidebar, shows the tree, and the welcome
-page tells you where to look.
-
-### ✦ Reopening the app brings back your windows and files
-
-A normal exit used to forget which windows were open, so the next launch showed nothing but the start screen
-(only a crash preserved the session). Now a normal exit — or closing the last window — keeps the session and
-restores every window with its own file, position and size.
-
-### ✦ Delete in the file tree really deletes
-
-Right-click → **Delete (Recycle Bin)** used to do nothing at all: the confirmation never appeared and the file
-never moved. It now asks once, sends the file to the Recycle Bin, and does nothing if you cancel.
-
-### ✦ In-document anchors jump
-
-`[jump to section 3](#section-3)` links did nothing. They now scroll to the heading and flash it briefly.
-
-### ✦ Delete several images at once
-
-After Ctrl-clicking several images, Backspace/Delete did nothing — and from that moment the keyboard stopped
-reaching the document at all. Multiple selected images now delete in one action; undo brings them back.
-
-### ✦ Completion popups no longer cover the line you are editing
-
-With a short window the formula/snippet popup used to cover the very line you were typing on and the mouse
-pointer itself, so a stray click inserted the wrong formula. It now stays below or above that line, fully
-inside the window, and never overlaps the edited line or the pointer.
-
-## Fixes (v2.1.7)
-
-- **No feedback when opening a folder from the start screen** — collapsed sidebar: zero visible change;
-  visible sidebar: the welcome page never explained the next step. Opening a folder now reveals the sidebar
-  and shows the hint (a workspace restored at startup still respects your collapsed-sidebar preference).
-- **A normal exit wiped the window session** — every window detached itself on close, so quitting emptied the
-  record and nothing came back on the next launch. Only closing one of several windows removes it now.
-- **File-tree delete never worked** — `window.confirm` always returns false and shows nothing in the Electron
-  shell, so the confirmation never passed. It now uses the host's native dialog.
-- **Create/rename failures were swallowed** — `window.alert` is equally invisible; failures now show a visible
-  error strip in the sidebar.
-- **"Open file in this window…" opened a new window** — the menu item now really replaces the document in the
-  current window (asking first when there are unsaved changes).
-- **In-document anchors did nothing** — the host ignored `#…` URLs and the renderer had no handler.
-- **Ctrl+multi-selected images could not be deleted** — deletion only looked at the single-click selection, and
-  multi-selecting silently dropped keyboard focus to the shell. Focus is kept, and the selection deletes at once.
-- **Completion popup covered the edited line and the pointer** in short windows — the panel is now capped to the
-  real space on one side (scrollable inside) so it never overlaps the edited line or the mouse.
-
-## What's new in 2.1.8
-
-### ✦ Close every window one by one — they all come back next time
-
-The previous version fixed session restore for the "File → Quit" path, but closing the windows
-one at a time with the title-bar **X** (which is also "quitting the app") removed each window from
-the restore list as it closed, leaving only the last one — exactly the "only the first file came
-back" you saw, and which window survived was partly luck.
-
-Closing a window is now only **pending**: if you close the rest within 5 seconds (i.e. you were
-quitting the app), the removal is cancelled and every window comes back with its file; if you keep
-working for more than 5 seconds after closing one, it is really dropped and won't reopen.
-
-### ✦ No more shivering when a document opens
-
-When you open a document you have read before, the app restores your reading position. That should
-finish as soon as the content height stops changing and the anchor is on target (within a second),
-but the "is it on target" formula had **its two terms subtracted in the wrong order**, reporting
-exactly twice the real offset (1 px measured as 2, −11 px as 22), so it could never pass its own
-±2 px line. Every open therefore rewrote the scroll position **every 0.12 s for the full 6 s
-give-up window** (76 rewrites measured; under 10 is normal). Any layout change during those 6
-seconds got re-yanked — that is the shivering you saw.
-
-The check now uses the same formula as the repositioning: it settles within a second (13 rewrites
-measured), and offsets below 1 px no longer touch the scroll position at all.
-
-### ✦ Context menus no longer cover the pointer or the line you clicked
-
-Your rule: the panel may go above or below, but must never cover the mouse or the line being acted
-on. The previous version fixed this for the completion popup; the **context menus** still pinned
-their top-left corner to the pointer, covering both the mouse and the clicked row — clicking "Image
-settings…" or "Delete (recycle bin)" closed the menu on mouse-up and looked like nothing happened.
-Both the file-tree menu and the in-editor menu now try below the line, then above, then beside the
-pointer, and in all four placements cover neither the mouse nor the line.
-
-## Fixes (2.1.8)
-
-- **Only one window came back after quitting by closing windows** (each closed window was removed from
-  the session list; only the last survived). Now pending-for-5-seconds, with the list frozen when the
-  app starts exiting, and no re-computation on window destruction (that used to write an empty list,
-  depending on a 400 ms save debounce — hence the flaky behaviour).
-- **A single closed window is really dropped from the restore list only after 5 seconds** of continued use.
-- **The scroll position was rewritten for a full 6 seconds on open** (anchor error computed as 2× offset,
-  so convergence never triggered): same formula as the repositioning now, and no write below 1 px.
-- **Context menus covered the mouse and the clicked row** (file tree + editor): four candidate placements,
-  none of which cover the pointer or the row.
-
-## New in 2.1.9
-
-- ✦ **Drag-select across a paragraph containing math** now works: drag from text across the paragraph, or press on a formula and drag out — every formula the selection crosses keeps its rendered form and shows the same blue selection highlight as normal text. On mouse-up the boundary formulas unfold to source and the endpoint snaps to the whole formula (Typora's expand() / includeTrailMeta), so copying yields `$…$` source instead of nothing.
-- ✦ **Copy is no longer blank**: the collapsed formula source used to be a 0×0 box that neither contributed text to the selection nor painted a highlight.
-- ✦ **Clicking a formula still unfolds it and puts the caret in the source** (the editing path is intact).
-
-## Fixes (v2.1.9)
-
-- Pressing on a formula and dragging did nothing at all (Chromium never arms a selection drag from a press on a user-select:none preview).
-- "Only text gets the highlight, the formula area gets nothing."
-- Caret at the end of the paragraph, select backwards: the copy came out blank.
-- Also: the spurious click fired at the end of a drag collapsed the freshly made selection.
-
-## New in 2.1.10
-
-- ✦ **Dragging backwards (from the paragraph end to its first word) now selects the whole paragraph**: a reversed anchor/focus pair used to collapse the range (per spec, `Range.setEnd` with an end before the start collapses it); switching the fallback to the Selection API's `setBaseAndExtent` makes direction irrelevant.
-- ✦ **Works when the formula paragraph is the document's last block** (the user reported it only worked after adding a blank line below — the real cause is the press landing on the rendered formula, not the document end).
-- ✦ Inline math previews are now selectable (`user-select:text`), which is what lets Chromium arm a selection drag from a press on a formula. Inline only; block math semantics untouched.
-
-## Fixes (v2.1.10)
-
-- Selecting backwards from the paragraph end copied only the last line and showed no highlight at all.
-- A native drag confined inside a pressed formula (pointer moved far away) is replaced by our own selection.
-
-## What's new in v2.1.11
-
-- ✦ **The caret no longer falls into the "marker hole"**: clicking between the end of a bold/italic run and the following punctuation used to drop the caret inside the *invisible* `**` marker — Backspace then ate a marker asterisk (`导数**。` became `导数*。`), and Shift+arrow plus typing produced `*X*`. The caret is now returned to the text boundary; moving the caret into a marker *with the keyboard* (deliberate marker editing) is untouched.
-- ✦ **No more twitching while dragging upward**: the real cause was Vditor swapping the formula under the selection endpoint for its source mid-drag (line width/height change), which shifted the text under the pointer, which moved the endpoint onto another formula — a feedback loop (formula tops oscillated 226↔247 in our measurements). Formulas now stay rendered for the whole press (visual suppression only; restored on release), so a drag causes **zero layout change**.
-- ✦ **The release point is visible**: a selection has no caret, so after a drag you only saw a blue band. A 2px blinking bar now marks the point where you released (removed as soon as you type or clear the selection).
-- ✦ The blue highlight **covers the formulas it spans** (verified on real window pixels for a paragraph containing four formulas).
-
-## Fixes (v2.1.11)
-
-- Backspace eating a `**` asterisk, and typing/shift-selecting producing `*X*`, when clicking between bold text and punctuation.
-- Formula area twitching during upward drag-selection (invisible when dragging downward).
-- No visible indication of where a drag-selection ended.
-- Also repaired a regression introduced by 2.1.10: **clicking a display formula's rendered result did nothing** (the click mapping was gated to inline math only; block math now takes over only when the source offset can be resolved). The renderer suite is back to 354 passing / 0 failing.
-
-## What's new in v2.1.12
-
-- ✦ **HTML images (raw `<img …>` in the body) can be deleted again**: after click-selecting one, Delete/Backspace used to leave the image in place, **eat a character elsewhere in the document and leave the caret up on the heading** (Vditor collapses the DOM selection after such a click, so the old guard declined and the keystroke fell through to the browser). The delete now follows the explicit selection state: exactly the `<img …>` tag goes away, nothing else is touched, the caret lands where the image was, and **one** Ctrl+Z restores it.
-- ✦ Added a **real keyboard/mouse injection** harness (SendInput drag / keys / window targeting by PID) for gestures that only misbehave with a human hand.
-
-## Fixes (v2.1.12)
-
-- Selecting an HTML image and pressing Delete/Backspace deleted a character from the heading instead of the image, and moved the caret there.
-
-## What's new in v2.1.13
-
-- ✦ **Clicking an inline formula's rendered result now puts the caret where you clicked.** The click was mapped to a source offset only at `click` time — but by then the editor had already expanded the formula for editing (our own `selectionchange` → `refreshMathEditing`), so the rendered glyphs were no longer measurable, the map failed, and the fallback threw the caret to **offset 0 of the formula source**: click the middle of a formula and the caret jumps to its very beginning (the reported "caret runs to the start"). Measured on your document's `$f=f^+-f^-$`, 23 sample points every 4px across the rendered box: before, **6 points** (including one in the right half) landed at the formula start with 2 backward jumps; after, 0 backward jumps and none in the right half. The press-time offset is now computed at `mousedown`, when the layout is still the one you aimed at.
-- ✦ **The gaps between glyphs are clickable too**: KaTeX leaves gaps between glyphs and strut padding above/below (13–26% of sampled points inside a rendered box), where the map used to fail. It now falls back to the nearest glyph — the same semantics as the browser's "clamp to the nearest position when you click empty space".
-
-## Fixes (v2.1.13)
-
-- Clicking an inline formula's rendered result put the caret at the very start of that formula's source for some pixels (including in the right half), with a non-monotonic offset sequence.
-- Points landing between rendered glyphs failed to map and fell back to source offset 0.
-
-## What's new in v2.1.14
-
-- ✦ **Clicking the upper part of a character in a paragraph that sits directly under a display formula no longer throws the caret to the start of the line.** The user's diagnosis was exactly right ("it's about how the vertical position inside the line is decided"). The culprit is the *blank-space landing* translation: a point within ±10px of a folded block formula is treated as blank space beside it and the caret is moved to that formula's insertion point. But the display formula above and the paragraph below are **flush** (measured: formula box y=257..387, paragraph y=387..412), so the whole upper half of the first text line fell inside that band and the caret landed on the block boundary — i.e. the start of that line. The rule now also requires the point not to be inside **another** block's box, in which case the click goes back to the browser (Chromium's own answer was correct all along). Measured on the same line, 162 clicks: deviations at "top edge +2" dropped from **27/29** to 2/30.
-- ✦ Recorded a methodology lesson: probes that judge "click point → caret position" must sample **top / centre / bottom** of a character; earlier rounds only clicked centres, which hid this bug entirely.
-
-## Fixes (v2.1.14)
-
-- Clicking the upper half of any character in a paragraph directly beneath a display formula moved the caret to that formula's insertion point (i.e. the start of the line).
-
-## What's new in v2.1.15
-
-- ✦ **Clicking at the end of a display formula's rendered line no longer skips the trailing comma.** Hit testing used to snap to the *start* of a glyph, and a digit cell is about 9px wide on screen — clicking its right half still put the caret *before* it, which reads as "the caret jumped one character too far left". The mapping is now half-cell aware: the left half lands before the glyph, the right half after it. The **last glyph of the formula** is the exception (clicking it still lands before it), so clicking the end of a line always stops before the final character instead of running past the formula. Commands (`\sum`, `\int`, `\lim`, `\frac`, …) always land after the backslash, matching inline formulas.
-- ✦ **Clicking a display-mode ∑/∫/lim now puts the caret between `\` and the following letter** (it used to land inside the first argument of `\sum_{}`). Reason: in display mode KaTeX gives the big operator **no source mapping of its own** (the mapping sits on the outer `mop`), so the old fallback picked the *nearest mapped glyph* — the `=` inside the subscript. The mapping now uses the outer container's location when the point sits on an element that renders text but has no mapping, and it skips KaTeX's empty vlist/strut shells (measured: they overlap neighbouring glyphs by 1px).
-- ✦ **The math hint panel (completion candidates) no longer covers the formula's pre-render box.** Panel placement only avoided the edited line and the mouse; it now also avoids the pre-rendered box, weighted above "show more items" — the panel gets shorter rather than hiding what you are editing.
-- ✦ **Deleting an image now takes a single Ctrl+Z** (it used to take two, the first doing nothing). Vditor's history snapshots carry the caret position, so a pure caret move (clicking to select the image) counted as a difference and was frozen into a markdown-identical undo entry. History points are now only added when the markdown actually changed — this also applies to cut/paste/table/image-scale and everything else on that path.
-- ✦ **Deleting an image whose top has scrolled above the top edge of the page now keeps the text below it in place and brings the content above down into view** (as requested). The condition is geometric (image box top above the visible top), and the compensation is measured from the change in total content height (image box 881px, its block 906px, content height actually 920px smaller — geometry alone would be off by 39px and the text below would still jump). When the image is fully inside the viewport the old behaviour is kept (text below moves up).
-
-## Fixes (v2.1.15)
-
-- Clicking at the end of a display formula's rendered line skipped the trailing comma and landed before the character preceding it (reproducible by clicking the right half of the last digit).
-- Display formulas starting with `\sum`/`\int`/`\lim`: clicking the big operator put the caret inside the first argument of `\sum_{}`/`\int_{}` (inline formulas were already correct).
-- The math hint panel covered the pre-render box of the formula being edited, hiding its rendered result.
-- Deleting a selected image needed **two** Ctrl+Z presses (the first did nothing).
-- Deleting an image whose top had scrolled past the top edge made the text below jump up one screen height.
-
-## What's new in v2.1.16
-
-- ✦ **End-of-line clicking on display formulas now follows the behaviour you specified**: clicking the **last glyph** (either half) or **anywhere to its right on that line** puts the caret at the **end of the formula's source** (after the trailing comma). The previous build had it backwards (stopping before the comma), which is why it still looked wrong. Earlier glyphs keep the half-cell rule (left half → before it, right half → after it), and commands (`\sum`, `\int`, `\lim`) still land after the backslash.
-- ✦ **Deleting an image now takes a single Ctrl+Z (second mechanism).** After rebuilding the document (`setValue`), Vditor schedules its own debounced history push; it records "markdown unchanged, but a formula re-rendered / reconcile moved nodes" as a real patch and parks it **on top of** the deletion patch — that is the entry the first Ctrl+Z used to hit (reproduced on your own document with the image placed right after a display formula). Undo/redo now **skips such no-op steps**; history recording itself is untouched.
-- ✦ **Dragging upward across a `$$…$$` block formula no longer jitters.** The 2.1.11 fix covered inline formulas only; an expanded block formula inserts its source line into the layout (block height 91↔118), shifting the text under the pointer so the drag endpoint lands elsewhere and the formula flips again. While the mouse is down, block formulas are now **not expanded** — measured: `--expand` flips 4 → **0**, block height constant throughout.
-- ✦ **The completion panel now treats the toolbar's bottom edge as a ceiling**: when the space above the line is taken by the toolbar, the panel shrinks on that side (it is scrollable) instead of parking across the toolbar.
-
-## Fixes (v2.1.16)
-
-- Clicking at the end of a display formula's rendered line (the trailing comma and anything after it) put the caret before the comma instead of after it.
-- Deleting a selected image needed **two** Ctrl+Z presses (reproducible when the image sits right after a display formula; the extra entry comes from Vditor's own debounced push).
-- Dragging upward across a `$$…$$` block formula made the editing area jitter (less pronounced when dragging downward).
-
-## What's new in v2.1.17
-
-- ✦ **Formula-command completion is smart again: sibling commands come with it.** Typing `\mathbb` now also offers the rest of the font family — `\mathbf`, `\mathcal`, `\mathscr`, `\mathfrak`, `\mathsf`, `\mathtt`, `\mathrm`, `\mathit`, `\boldsymbol`, `\mathnormal`, `\operatorname`; `\frac` brings `\sqrt`/`\dfrac`/`\tfrac`/`\cfrac`; `\sum` brings `\prod`/`\int`/`\iint`/`\oint`/`\lim`; `\alpha` brings the whole Greek family. Siblings are labelled "· 同一类（字体）" so it is obvious why they are there.
-- ✦ **The number of candidates adapts to the query**: siblings are only appended when the prefix matches fewer than four commands (up to twelve entries); with many matches nothing is appended — so a bare `\` still lists the same twelve common commands in the same order (`\frac` → `\sqrt` → `\sum` → `\int` …). The table grew from 42 to 215 entries, ordered by usage and then grouped.
-- ✦ **For the record: formula-command completion has always been offline.** The candidates come from a static table in the source (`render/js/completion-sources.js`) plus local matching — no network, no model call, and the panel is drawn before any host/AI round trip. The only networked feature is the optional AI continuation (ghost text), which needs your own API key and is absent entirely from the public/API-free build.
-
-## Fixes (v2.1.17)
-
-- Formula-command completion only offered the exact prefix match (typing `\mathbb` listed `\mathbb` alone), so sibling commands such as `\mathscr`/`\mathbf` were never suggested.
-
-## Fixes (v2.1.18)
-
-- The formula-command candidate list leaked internal group wording into the UI ("同一类（字体）"). The detail column now shows **only the command's own description**; sibling commands are still offered, just without the internal annotation.
-
-## What's new in v2.1.19
-
-- ✦ **The formula-command ranking was rebuilt** following mature practice (VS Code's model: **match quality decides the order**, declaration order only breaks ties between equally good matches). Tiers: **exact → prefix (within the tier, a longer share of the name ranks first) → siblings (right after the strong matches, ordered by longest common prefix with what you typed) → description → subsequence fuzzy**. So `\mathbb` gives `\mathbb`, **`\mathbf`**, `\mathcal`, `\mathrm`, **`\mathscr`**, `\mathfrak`…; `\frac` gives `\frac`, `\sqrt`, `\dfrac`, `\tfrac`, `\cfrac`; `\lr` gives the prefix matches followed by `\leftrightarrow`/`\Leftrightarrow` from the fuzzy tier.
-- ✦ **"Already used in this formula" no longer promotes across tiers.** The old scoring added a bonus for commands present in the current formula, applied to every entry — so in a formula containing `\int`/`\mathbf`, typing `\` put `\int` and `\in` (a substring of `\int`) at the top. It is now only a secondary key *within* a tier: a bare `\` always lists the same twelve common commands in the same order.
-- ✦ The table gained `\mathscr`/`\mathfrak`/`\mathsf`/`\mathtt`/`\mathit`/`\boldsymbol`/`\mathnormal`/`\operatorname` (42 → 215 entries, 13 groups); the number of candidates adapts (siblings only when fewer than four strong matches, capped at twelve).
-
-## Fixes (v2.1.19)
-
-- Typing `\` inside a formula that already contains `\int`/`\mathbf` moved `\int`/`\in` to the top of the list, displacing the common commands.
-- Typing `\frac` lost `\sqrt` (the "enough matches already" rule counted the fuzzy matches as matches).
-
-## What's new in v2.1.20
-
-- ✦ **A plain click inside an expanded block formula no longer makes the whole block flicker.** With both the pre-render and the code editor expanded, a click in the **source area** or in the **rendered area** used to collapse the block and snap it back (block height 145 → 119 → 145; the 26px difference is exactly the source line) — that is the flicker you saw, and no character of the document was involved. A mouse press now **freezes an already-expanded block formula as-is** (neither expands nor collapses it); after release the normal "is the caret inside the formula?" rule takes over again.
-- ✦ **The rendered result is no longer rebuilt**: during a click with no text change KaTeX does not run at all, the pre-render subtree is byte-identical with the same first child, and the formula source is unchanged. Keyboard movement and typing behave exactly as before (they never flickered).
-
-## Fixes (v2.1.20)
-
-- A single click inside an expanded block formula (source area or rendered area) re-laid-out and flashed the whole block: on press we stripped `--expand` ourselves and Vditor re-added it after release, with frames in between — i.e. the block collapsing and snapping back on screen.
-
-## v2.1.21 update
-
-- ✦ **Clicking inside an inline formula's pre-render box now puts the caret where you clicked.** While you edit an inline formula, its rendered result floats in a box below the source. Clicking in that box used to send the caret to the **very start of the formula source** (even when you clicked the middle), and clicking the box's padding **collapsed the formula on the spot** and popped it back on release — two jumps per click. The box now uses the **same pixel-to-caret mapping** as clicking the collapsed rendered result: the glyph you click is the character the caret lands on, the last glyph follows the end-of-line rule (caret at the end of the formula), and padding clicks resolve to the nearest glyph. The formula is never collapsed while you hold the button (frame sampling: zero folded frames).
-- ✦ The mapping reuses the same source-location data that is already emitted with the rendered output; the change is to compute the offset from the layout you aimed at **at press time** and place the caret ourselves, instead of letting the browser clamp the click (it resolves into KaTeX's subtree, which is why the old offset read as 0).
-- ✦ Double-click (word selection) and modifier-clicks still go to the browser; dragging right from inside the box still produces a selection.
-
-## Fixes (v2.1.21)
-
-- Clicking inside an inline formula's pre-render box moved the caret to the start of the formula source (offset 0 for middle and right-side clicks alike).
-- Clicking the box's padding collapsed the formula immediately and popped it back on release.
-
-## v2.1.22 update
-
-- ✦ **Clicking inside an inline formula's pre-render box no longer flashes.** The previous release wired "click the box = put the caret in the source"; that exposed an older behaviour: for the duration of every press, the formula being edited was **visually** folded back into its rendered form — the source disappeared, the floating box was flattened into the line, the paragraph reflowed, and it all snapped back on release: one flash per click (frame sampling during a 250 ms press: 16 of 43 frames had the source at `display:none` and the box at `position:static`, while the `--expand` class never changed and KaTeX never re-rendered — so looking only at classes cannot see it). Pressing a formula that is **already expanded** now excludes it from those rules: it stays expanded while you hold the button. Collapsed formulas keep the old behaviour (the drag-over rendering used by selection still applies).
-- ✦ **The box no longer jumps to the previous line's end when the source wraps.** When an inline formula's source is too wide for one line it wraps, and the box used to be positioned against the node's **first line fragment** — the `$` at the end of the previous line: the box ended up pushed to the right and hung below the wrong line (the `f^*\in[f^{\inf},f^{\sup}]` case from the screenshot). The box is now anchored to **the source itself** (CSS anchor positioning): it sits at the source's left edge and 4 px under the source, wrapped or not.
-
-## Fixes (v2.1.22)
-
-- Clicking an inline formula's pre-render box (or its source) flashed the whole formula once: it was visually folded back into rendered form for the duration of the press.
-- The floating pre-render box was pushed to the previous line's end when the formula's source wrapped across lines.
