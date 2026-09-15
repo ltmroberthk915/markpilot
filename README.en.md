@@ -2,7 +2,7 @@
 
 **A free Typora alternative with inline AI completion, live math editing, and print-quality typography.**
 
-[![version](https://img.shields.io/badge/version-2.1.22-blue)](https://github.com/ltmroberthk915/markpilot/releases/latest)
+[![version](https://img.shields.io/badge/version-2.1.24-blue)](https://github.com/ltmroberthk915/markpilot/releases/latest)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20VS%20Code%20%7C%20Trae-green)](https://github.com/ltmroberthk915/markpilot/releases/latest)
 [![price](https://img.shields.io/badge/price-free-brightgreen)](https://github.com/ltmroberthk915/markpilot/releases/latest)
 [![license](https://img.shields.io/badge/license-app%20free%20%7C%20source%20licensed-orange)](#license)
@@ -107,6 +107,19 @@ The part of the 2.0 series we polished hardest:
 **Windows desktop** — from the **[Releases page](https://github.com/ltmroberthk915/markpilot/releases/latest)**:
 
 - `markpilot-Setup-x.x.x.exe` (installer) or `markpilot-vx.x.x-portable.exe` (portable, nothing to install)
+
+## v2.1.24 update
+
+- **Any reasonable address spelling works**: `https://api.deepseek.com`, `.../v1` and `.../anthropic` all resolve to the same endpoint, so you can paste what the provider gives you. Keys are stored per platform, and renaming a model never loses them.
+- Changing the address no longer switches AI off; you are told which protocol the address implies and that the new address needs its key entered once (the old one keeps its key).
+- Failures are diagnosable: the provider message and the **actual request URL** are shown together.
+
+## v2.1.23 update
+
+- **The AI suggestion box scrolls**: long suggestions scroll inside the box, and the window grows with the space around your caret, so you are not reading half a sentence. Clicking the box neither closes it nor moves the caret - read it, then press Tab to accept or Esc to dismiss.
+- **Completion config is entirely yours**: no providers or models are preinstalled. Paste a Claude Code / cc-switch `settings.json`, a JSON object, or `KEY=VALUE` lines and you are set; delete any model entry whenever you want, and its stored key goes with it.
+- Failures no longer collapse into a bare "no suggestion": the message distinguishes a missing key, a wrong address, a thinking-only model and a truncated generation, and includes the actual request URL.
+- The public and self-use distribution lines are merged into one artifact; keys stay only in your own machine's encrypted store.
 
 ## v2.1.22 update
 
