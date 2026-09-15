@@ -5,7 +5,7 @@
 > ### AI 时代，全新定义 Markdown 编辑器——万有可能，一致百「律」。
 > **开源项目，万众铸造。程序与插件本体免费，想魔改的源码另行授权。**
 
-![version](https://img.shields.io/badge/version-2.1.22-blue) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20VS%20Code%20%7C%20Trae-green) ![license](https://img.shields.io/badge/license-%E6%9C%AC%E4%BD%93%E5%85%8D%E8%B4%B9%20%7C%20%E6%BA%90%E7%A0%81%E6%8E%88%E6%9D%83-orange)
+![version](https://img.shields.io/badge/version-2.1.24-blue) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20VS%20Code%20%7C%20Trae-green) ![license](https://img.shields.io/badge/license-%E6%9C%AC%E4%BD%93%E5%85%8D%E8%B4%B9%20%7C%20%E6%BA%90%E7%A0%81%E6%8E%88%E6%9D%83-orange)
 
 MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时候，它已经在替你想下一句；你排版的一撇一捺之间，藏着一套正经的中文排版引擎。同一套编辑内核，两种工作形态——既能作为 Windows 桌面应用开箱即用，也能作为插件装进 VS Code、Trae 等 AI IDE。
 
@@ -105,6 +105,19 @@ MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时�
 **Windows 桌面版**：到 GitHub 仓库的 **Releases** 页取最新版本
 
 - `markpilot-Setup-x.x.x.exe`（安装版）或 `markpilot-vx.x.x-portable.exe`（便携版，免安装）
+
+## v2.1.24 更新
+
+- **地址怎么写都能用**：`https://api.deepseek.com`、`.../v1`、`.../anthropic` 都指向同一个端点，不用再对着服务商文档拼路径；密钥按平台保存，改模型名不会把密钥弄丢。
+- 换地址不再顺手关掉 AI，而是告诉你「协议按地址判定」以及「这个地址要填一次密钥，旧地址的密钥仍在」。
+- 出问题时能自己排查：把服务商返回的原文与**实际请求地址**一起显示出来。
+
+## v2.1.23 更新
+
+- **AI 建议框可以滚了**：建议很长时在框内直接滚动查看，窗口会按光标上下的空间自动放大，不用拉着看半句；点一下框不会消失、也不会把光标挪走，读完再按 Tab 接受，Esc 取消。
+- **补全配置完全由你决定**：不再预设任何服务商与模型。粘贴 Claude Code / cc-switch 的 `settings.json`、一段 JSON 或 `KEY=VALUE` 就能配好；不用的模型配置随时删除，密钥一并清掉。
+- 出问题不再只报一句「暂无建议」：会区分密钥没填、地址不对、模型只回了思考内容、生成被截断，并附上实际请求地址。
+- 公开版与自用版两条发行线合并，只此一个发布产物；密钥始终只存在你自己机器的加密存储里。
 
 ## v2.1.22 更新
 
