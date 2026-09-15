@@ -2,7 +2,7 @@
 
 **A free Typora alternative with inline AI completion, live math editing, and print-quality typography.**
 
-[![version](https://img.shields.io/badge/version-2.1.24-blue)](https://github.com/ltmroberthk915/markpilot/releases/latest)
+[![version](https://img.shields.io/badge/version-2.1.27-blue)](https://github.com/ltmroberthk915/markpilot/releases/latest)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20VS%20Code%20%7C%20Trae-green)](https://github.com/ltmroberthk915/markpilot/releases/latest)
 [![price](https://img.shields.io/badge/price-free-brightgreen)](https://github.com/ltmroberthk915/markpilot/releases/latest)
 [![license](https://img.shields.io/badge/license-app%20free%20%7C%20source%20licensed-orange)](#license)
@@ -108,6 +108,24 @@ The part of the 2.0 series we polished hardest:
 
 - `markpilot-Setup-x.x.x.exe` (installer) or `markpilot-vx.x.x-portable.exe` (portable, nothing to install)
 
+## v2.1.27 update
+
+- In a long document, an undo used to drop the placeholder heights of skipped content, inflating the document height to **8× its real size** and shifting both the scrollbar ratio and "read up to here" — permanently. It is now restored on the spot, in a way you will not notice.
+- Typing in a long document used to silently drop the recorded height of the rebuilt part (the scrollbar drifted slightly). It is now topped up right away.
+## v2.1.26 update
+
+- Import your own Typora theme: in Themes, pick a theme’s CSS files (select several, including the ones pulled in by `@import`) or paste the CSS. It applies immediately, and you can switch it off or delete it any time.
+- Fonts and images that ship with a theme do not come along (relative references are blocked instead of being requested), so text falls back to system fonts where the theme used its own font files.
+- `@media`, `:has()`, `@import` and the theme’s own colour variables all keep working. It styles the document only, so the toolbar and menus stay as they are.
+- After import you get one line of numbers: rules applied, rules dropped, local fonts not loaded — so you can see exactly where it differs from Typora.
+- Fixed an interface defect: with several themes imported, the Themes dialog grew past the window and its bottom buttons could not be reached.
+## v2.1.25 更新
+
+- Clicking left of a heading’s `#` puts the caret there. It used to be pushed in front of the heading text; the marker no longer flickers and the line no longer shifts. Change a heading’s level by clicking the marker itself or walking in with the arrow keys — that still works.
+- Backspace just before the `#` now means “delete at the start of the block”: it merges into the previous paragraph when that is text, and does nothing when the previous block is a table, code block or formula. The marker is no longer eaten and the heading no longer silently becomes a paragraph.
+- The floating menus (edit mode, headings) now close as soon as the pointer leaves the toolbar instead of sitting on top of your text.
+- The desktop toolbar no longer offers “open in VS Code’s default editor” — the desktop app edits everything itself. The extension keeps it: there it means returning to VS Code’s own text editor.
+- The two theme dropdowns in the ⋮ menu that did nothing are gone. Colours are set from “Themes” and “Reading palette” on the toolbar.
 ## v2.1.24 update
 
 - **Any reasonable address spelling works**: `https://api.deepseek.com`, `.../v1` and `.../anthropic` all resolve to the same endpoint, so you can paste what the provider gives you. Keys are stored per platform, and renaming a model never loses them.
