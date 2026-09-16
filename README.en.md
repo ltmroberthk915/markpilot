@@ -2,7 +2,7 @@
 
 **A free Typora alternative with inline AI completion, live math editing, and print-quality typography.**
 
-[![version](https://img.shields.io/badge/version-2.1.27-blue)](https://github.com/ltmroberthk915/markpilot/releases/latest)
+[![version](https://img.shields.io/badge/version-2.1.28-blue)](https://github.com/ltmroberthk915/markpilot/releases/latest)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20VS%20Code%20%7C%20Trae-green)](https://github.com/ltmroberthk915/markpilot/releases/latest)
 [![price](https://img.shields.io/badge/price-free-brightgreen)](https://github.com/ltmroberthk915/markpilot/releases/latest)
 [![license](https://img.shields.io/badge/license-app%20free%20%7C%20source%20licensed-orange)](#license)
@@ -108,6 +108,10 @@ The part of the 2.0 series we polished hardest:
 
 - `markpilot-Setup-x.x.x.exe` (installer) or `markpilot-vx.x.x-portable.exe` (portable, nothing to install)
 
+## v2.1.28 update
+
+- The toolbar can be folded away: click the new button at its right end and the whole bar becomes a single small button in the top-right corner, with the text moving up into the freed space. Click it again to bring the bar back. The folded state is remembered next time you open it.
+- Narrow the window and the H1 / H2 level badge beside a heading no longer ends up pressed against the edge of the writing area — it keeps a margin on its left, just like the right-hand side.
 ## v2.1.27 update
 
 - In a long document, an undo used to drop the placeholder heights of skipped content, inflating the document height to **8× its real size** and shifting both the scrollbar ratio and "read up to here" — permanently. It is now restored on the spot, in a way you will not notice.
