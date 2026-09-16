@@ -5,7 +5,7 @@
 > ### AI 时代，全新定义 Markdown 编辑器——万有可能，一致百「律」。
 > **开源项目，万众铸造。程序与插件本体免费，想魔改的源码另行授权。**
 
-![version](https://img.shields.io/badge/version-2.1.27-blue) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20VS%20Code%20%7C%20Trae-green) ![license](https://img.shields.io/badge/license-%E6%9C%AC%E4%BD%93%E5%85%8D%E8%B4%B9%20%7C%20%E6%BA%90%E7%A0%81%E6%8E%88%E6%9D%83-orange)
+![version](https://img.shields.io/badge/version-2.1.28-blue) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20VS%20Code%20%7C%20Trae-green) ![license](https://img.shields.io/badge/license-%E6%9C%AC%E4%BD%93%E5%85%8D%E8%B4%B9%20%7C%20%E6%BA%90%E7%A0%81%E6%8E%88%E6%9D%83-orange)
 
 MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时候，它已经在替你想下一句；你排版的一撇一捺之间，藏着一套正经的中文排版引擎。同一套编辑内核，两种工作形态——既能作为 Windows 桌面应用开箱即用，也能作为插件装进 VS Code、Trae 等 AI IDE。
 
@@ -106,6 +106,10 @@ MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时�
 
 - `markpilot-Setup-x.x.x.exe`（安装版）或 `markpilot-vx.x.x-portable.exe`（便携版，免安装）
 
+## v2.1.28 更新
+
+- 工具栏能收起来了：点工具栏最右边那个「收起」按钮，整条工具栏收成右上角一个小按钮，正文跟着上移、把这块空间让出来；再点一下原样展开。收起状态会记住，下次打开还是收着的。
+- 窗口缩窄之后，标题左边那个 H1 / H2 级别角标不再被挤到写作区边上——它左边始终留着空白，与右侧一样不贴边。
 ## v2.1.27 更新
 
 - 长文档撤销之后，被跳过渲染的部分会丢掉记下来的高度，**文档总高被抬到真实值的 8 倍**，滚动条比例与「上次读到哪里」跟着漂，而且不会自己恢复。现在会当场补回，几乎察觉不到。
