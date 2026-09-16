@@ -2,7 +2,7 @@
 
 **A free Typora alternative with inline AI completion, live math editing, and print-quality typography.**
 
-[![version](https://img.shields.io/badge/version-2.1.28-blue)](https://github.com/ltmroberthk915/markpilot/releases/latest)
+[![version](https://img.shields.io/badge/version-2.1.29-blue)](https://github.com/ltmroberthk915/markpilot/releases/latest)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20VS%20Code%20%7C%20Trae-green)](https://github.com/ltmroberthk915/markpilot/releases/latest)
 [![price](https://img.shields.io/badge/price-free-brightgreen)](https://github.com/ltmroberthk915/markpilot/releases/latest)
 [![license](https://img.shields.io/badge/license-app%20free%20%7C%20source%20licensed-orange)](#license)
@@ -108,6 +108,12 @@ The part of the 2.0 series we polished hardest:
 
 - `markpilot-Setup-x.x.x.exe` (installer) or `markpilot-vx.x.x-portable.exe` (portable, nothing to install)
 
+## v2.1.29 update
+
+- Press Shift+Enter at the end of a line and then type with a Chinese IME: the caret used to jump back to the previous line and the characters landed at the start of the paragraph. They now stay on the new line.
+- Inline math (Ctrl+Shift+E): arrow out past the closing `$` and type — the characters used to be written into the formula source and the caret jumped back inside it. They now land outside the formula.
+- Arrow keys no longer skip over inline math: moving towards a formula opens its source and puts the caret inside (as in Typora); inside the source the arrows step character by character and come out at either end.
+- Shift+Enter right after a formula, then typing with an IME: both the line break and the characters land outside the formula.
 ## v2.1.28 update
 
 - The toolbar can be folded away: click the new button at its right end and the whole bar becomes a single small button in the top-right corner, with the text moving up into the freed space. Click it again to bring the bar back. The folded state is remembered next time you open it.
