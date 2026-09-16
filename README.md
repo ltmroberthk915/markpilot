@@ -5,7 +5,7 @@
 > ### AI 时代，全新定义 Markdown 编辑器——万有可能，一致百「律」。
 > **开源项目，万众铸造。程序与插件本体免费，想魔改的源码另行授权。**
 
-![version](https://img.shields.io/badge/version-2.1.28-blue) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20VS%20Code%20%7C%20Trae-green) ![license](https://img.shields.io/badge/license-%E6%9C%AC%E4%BD%93%E5%85%8D%E8%B4%B9%20%7C%20%E6%BA%90%E7%A0%81%E6%8E%88%E6%9D%83-orange)
+![version](https://img.shields.io/badge/version-2.1.29-blue) ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20VS%20Code%20%7C%20Trae-green) ![license](https://img.shields.io/badge/license-%E6%9C%AC%E4%BD%93%E5%85%8D%E8%B4%B9%20%7C%20%E6%BA%90%E7%A0%81%E6%8E%88%E6%9D%83-orange)
 
 MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时候，它已经在替你想下一句；你排版的一撇一捺之间，藏着一套正经的中文排版引擎。同一套编辑内核，两种工作形态——既能作为 Windows 桌面应用开箱即用，也能作为插件装进 VS Code、Trae 等 AI IDE。
 
@@ -106,6 +106,12 @@ MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时�
 
 - `markpilot-Setup-x.x.x.exe`（安装版）或 `markpilot-vx.x.x-portable.exe`（便携版，免安装）
 
+## v2.1.29 更新
+
+- 在行尾按 Shift+Enter 换行、接着用中文输入法打字：光标会跳回上一行、字插进段落开头（笔记第一行标题下面那一句"路边等间隔种树…"就是这么被顶掉的）。现在字老老实实落在新行上。
+- 行内公式（Ctrl+Shift+E）后面接着打字：用右方向键走出公式再输入，字以前会被写进公式源码里、光标跟着跳回公式内；现在落在公式外面。
+- 方向键碰到行内公式不再整块跳过去，而是打开公式源码编辑区、把光标送进公式里（与 Typora 的做法一致）；在源码里再按方向键就一个字符一个字符地走，走到两头自然出来。
+- 公式行尾按 Shift+Enter 换行，接着用输入法打字：换行与字都落在公式外面，不会被 `$` 吸走。
 ## v2.1.28 更新
 
 - 工具栏能收起来了：点工具栏最右边那个「收起」按钮，整条工具栏收成右上角一个小按钮，正文跟着上移、把这块空间让出来；再点一下原样展开。收起状态会记住，下次打开还是收着的。
