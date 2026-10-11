@@ -1,0 +1,191 @@
+
+
+.vditor-outline {
+    font-size: 14px;
+}
+
+.vditor-reset {
+    font-size: 14px;
+}
+
+.vditor-reset img {
+    max-width: calc(100% - 32px);
+}
+
+/* .vditor-reset > p{
+    white-space: normal;
+} */
+
+.vditor-reset p>img {
+    margin: 34px 0;
+}
+
+.vditor-reset h1 {
+    margin-bottom: 20px;
+    font-weight: 500;
+    font-size: 30px;
+    font-family: Avenir, -apple-system, BlinkMacSystemFont, segoe ui, Roboto, helvetica neue, Arial, noto sans, sans-serif, apple color emoji, segoe ui emoji, segoe ui symbol, noto color emoji, sans-serif;
+    line-height: 38px
+}
+
+.vditor-reset h2 {
+    font-size: 24px;
+    line-height: 32px;
+}
+
+.vditor-reset h2,
+.vditor-reset h3,
+.vditor-reset h4,
+.vditor-reset h5,
+.vditor-reset h6 {
+    clear: both;
+    margin: 1.6em 0 .6em;
+    font-weight: 500;
+    font-family: Avenir, -apple-system, BlinkMacSystemFont, segoe ui, Roboto, helvetica neue, Arial, noto sans, sans-serif, apple color emoji, segoe ui emoji, segoe ui symbol, noto color emoji, sans-serif
+}
+
+.vditor-reset h3 {
+    font-size: 18px;
+}
+
+.vditor-reset h4 {
+    font-size: 16px;
+}
+
+.vditor-reset h5 {
+    font-size: 14px;
+}
+
+.vditor-reset h6 {
+    font-size: 12px;
+}
+
+.vditor-reset hr {
+    clear: both;
+    height: 1px;
+    margin: 56px 0;
+    border: 0;
+}
+
+.vditor-reset p,
+.vditor-reset pre {
+    margin: 0 0 16px 0;
+}
+
+.vditor-reset ul>li {
+    margin-left: 12px;
+    padding-left: 4px;
+    list-style-type: circle;
+}
+
+.vditor-reset ol>li {
+    margin-left: 20px;
+    padding-left: 4px;
+    list-style-type: decimal;
+}
+
+.vditor-reset ul,
+.vditor-reset ol {
+  padding-left: 16px;
+  margin-top: 0;
+}
+
+.vditor-reset ul>li>p,
+.vditor-reset ol>li>p {
+    margin: 0.2em 0;
+}
+
+.vditor-reset code {
+    margin: 0 1px;
+    padding: .2em .4em;
+    font-size: .9em;
+    border-radius: 3px;
+    font-family: sfmono-regular, Consolas, liberation mono, Menlo, Courier, monospace;
+}
+
+.vditor-reset pre {
+    font-family: sfmono-regular, Consolas, liberation mono, Menlo, Courier, monospace;
+    border-radius: 2px;
+}
+
+.vditor-reset .language-abc svg,
+.vditor-reset .language-abc path {
+    fill: currentColor;
+}
+
+.vditor-reset .language-graphviz polygon {
+    fill: transparent;
+}
+
+.vditor-reset strong,
+.vditor-reset b {
+    font-weight: 500;
+}
+
+.vditor-reset>table {
+    width: 100%;
+    margin: 8px 0 16px;
+    direction: ltr;
+    empty-cells: show;
+    /* border: 1px solid #f0f0f0; */
+    border-collapse: collapse;
+    border-spacing: 0
+}
+
+.vditor-reset>table th {
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.vditor-reset>table th,
+.vditor-reset>table td {
+    padding: 16px 24px;
+    text-align: left;
+}
+
+.vditor-reset blockquote {
+    margin: 1em 0;
+    padding-left: .8em;
+    font-size: 90%;
+}
+
+.vditor-reset blockquote p {
+    margin: 0;
+}
+
+.vditor-reset .vditor-anchor {
+    margin-left: 8px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.vditor-reset h1:hover .vditor-anchor,
+.vditor-reset h2:hover .vditor-anchor,
+.vditor-reset h3:hover .vditor-anchor,
+.vditor-reset h4:hover .vditor-anchor,
+.vditor-reset h5:hover .vditor-anchor,
+.vditor-reset h6:hover .vditor-anchor {
+    display: inline-block;
+    opacity: 1;
+}
+
+.vditor-reset>br,
+.vditor-reset>p>br {
+    clear: both;
+}
+
+.vditor-reset a,
+.vditor-ir__link {
+    text-decoration: none;
+    outline: none;
+    cursor: pointer;
+}
+
+.vditor-reset>table th, .vditor-reset>table td {
+    padding: 8px 16px;
+}
+
+button[data-type='outline']>svg, button[data-type='headings']>svg, button[data-type='bold']>svg, button[data-type='italic']>svg{
+    width: 12px;
+    height: 12px;
+}

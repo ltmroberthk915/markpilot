@@ -1,0 +1,26 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+// history-selection.js imports scrollIntoViewSafe from large-doc.js, which a vm context
+// cannot resolve (and has been the reason this suite was red since that import landed).
+// Load both modules stripped of their ES syntax, so the assertions exercise real code.
+const load=name=>fs.readFileSync(require.resolve('../../Typora-Editor/extension-src/render/js/'+name),'utf8')
+  .replace(/^import .*$/gm,'').replaceAll('export function ','function ').replaceAll('export const ','const ');
+const source=load('large-doc.js')+'\n'+load('history-selection.js');
+function setup({cellHeight=0,controls=false}={}){
+  const frames=new Map(),timers=new Map(),observers=[],events=new Map();let id=0,current=true,y=550,measurements=0;
+  const node={nodeType:3},root={isConnected:true,scrollTop:0,offsetHeight:500,clientTop:0,clientHeight:500,contains:n=>n===node||n===root,getBoundingClientRect:()=>({top:60,height:500})};
+  const selection={anchorNode:node,anchorOffset:2,focusNode:node,focusOffset:4};
+  const table={offsetTop:700,offsetLeft:20},attrs=new Map(),popover={style:{display:'block',top:'900px',left:'0px'},clientWidth:400,querySelector:()=>({}),getAttribute:k=>attrs.get(k),setAttribute:(k,v)=>attrs.set(k,v)};
+  if(cellHeight){root.clientWidth=640;node.parentElement={closest:()=>({closest:()=>table,getBoundingClientRect:()=>({top:y-root.scrollTop-10,bottom:y-root.scrollTop-10+cellHeight,height:cellHeight}),scrollIntoView(){}})};}
+  const doc={addEventListener(k,f){if(!events.has(k))events.set(k,new Set());events.get(k).add(f);},removeEventListener(k,f){events.get(k)?.delete(f);},createRange:()=>({setStart(){},collapse(){},getClientRects(){measurements++;return[{top:y-root.scrollTop,bottom:y+24-root.scrollTop,height:24}];}})};
+  const observer=class{constructor(fn){this.fn=fn;observers.push(this);}observe(){}disconnect(){this.closed=true;}};
+  const context={getComputedStyle:()=>({contentVisibility:'visible'}),afterPaint:()=>{},document:doc,window:{...doc,__typoraMathStats:{pending:1}},innerHeight:600,getSelection:()=>selection,MutationObserver:observer,ResizeObserver:observer,requestAnimationFrame:fn=>{const key=++id;frames.set(key,fn);return key;},cancelAnimationFrame:key=>frames.delete(key),setTimeout:(fn,ms)=>{const key=++id;timers.set(key,{fn,ms});return key;},clearTimeout:key=>timers.delete(key)};
+  vm.runInNewContext(source+';this.follow=followHistorySelection;',context);
+  const stop=context.follow(root,()=>current,controls?popover:undefined);
+  return{root,selection,stop,context,table,popover,get measurements(){return measurements;},get pending(){return frames.size;},get listeners(){return [...events.values()].reduce((n,s)=>n+s.size,0);},move(n){y=n;},mode(){current=false;},notify(){observers.filter(o=>!o.closed).forEach(o=>o.fn());},frame(){const f=[...frames.values()];frames.clear();f.forEach(fn=>fn());},event(key,target=root){for(const fn of [...events.get(key)||[]])fn({target});},timer(ms){for(const [key,t]of [...timers])if(t.ms===ms){timers.delete(key);t.fn();}}};
+}
+test('async reflow keeps restored focus line visible with coalesced layout reads',()=>{const s=setup();s.frame();assert.equal(s.root.scrollTop,22);s.move(720);for(let i=0;i<50;i++)s.notify();assert.equal(s.pending,1);assert.equal(s.measurements,1);s.frame();assert.equal(s.root.scrollTop,192);assert.equal(s.measurements,2);s.stop();assert.equal(s.listeners,0);});
+for(const event of ['keydown','beforeinput','pointerdown','wheel','compositionstart','blur'])test('new '+event+' cancels queued history following',()=>{const s=setup();s.event(event);s.notify();s.frame();assert.equal(s.measurements,0);assert.equal(s.listeners,0);});
+test('selection changes, mode switches, editor removal and disposal never reclaim viewport',()=>{for(const action of [s=>{s.selection.focusOffset=3;s.event('selectionchange');},s=>s.mode(),s=>{s.root.isConnected=false;},s=>s.stop(),s=>s.event('focusin',{})]){const s=setup();action(s);s.frame();assert.equal(s.root.scrollTop,0);assert.equal(s.listeners,0);}});
+test('settled math releases observers; long queues have a hard deadline',()=>{for(const kind of ['settled','deadline']){const s=setup();s.frame();if(kind==='settled'){s.context.window.__typoraMathStats.pending=0;s.timer(350);}else s.timer(4000);s.move(900);s.notify();s.frame();assert.equal(s.measurements,1);assert.equal(s.listeners,0);}});
+test('a normal-height cell and stale table control anchor both follow reflow',()=>{const s=setup({cellHeight:60,controls:true});s.frame();assert.equal(s.root.scrollTop,48);assert.equal(s.popover.getAttribute('data-top'),'679');assert.equal(s.popover.style.top,'631px');s.table.offsetTop=300;s.notify();s.frame();assert.equal(s.popover.getAttribute('data-top'),'279');assert.equal(s.popover.style.top,'231px');s.event('wheel');s.table.offsetTop=900;s.notify();s.frame();assert.equal(s.popover.style.top,'231px');});
+test('a cell taller than the viewport follows the focused line without jumping to cell edges',()=>{const s=setup({cellHeight:800});s.frame();assert.equal(s.root.scrollTop,22);s.move(900);s.notify();s.frame();assert.equal(s.root.scrollTop,372);s.stop();});

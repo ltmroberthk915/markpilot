@@ -1,0 +1,112 @@
+{
+  "name": "markpilot",
+  "productName": "MarkPilot",
+  "version": "2.3.3",
+  "description": "AI-native Markdown editor beyond Typora: inline AI completion, precise math mapping, large-file performance, plus a VS Code/Trae plugin edition",
+  "main": "app/main/main.js",
+  "private": true,
+  "scripts": {
+    "icons": "node scripts/build-icons.mjs",
+    "sync": "node scripts/sync-renderer.mjs",
+    "start": "electron .",
+    "test:renderer": "node scripts/run-electron-test.mjs regression && node scripts/run-electron-test.mjs consistency && node scripts/run-electron-test.mjs features && node scripts/run-electron-test.mjs repairs && node scripts/run-electron-test.mjs ui && node scripts/run-electron-test.mjs shell && node scripts/run-electron-test.mjs nav-guard",
+    "test:table-context": "node scripts/run-electron-test.mjs table-context",
+    "test:table-context-host": "node scripts/run-electron-test.mjs table-context-host",
+    "test:table-input-host": "node scripts/run-electron-test.mjs table-input-host",
+    "test:source-toggle-host": "node scripts/run-electron-test.mjs source-toggle-host",
+    "test:user-file-host": "node scripts/run-electron-test.mjs user-file-host",
+    "test:media-repro": "node scripts/run-electron-test.mjs media-repro",
+    "test:state": "node --test scripts/recent-state.test.cjs",
+    "test:launch": "node --test scripts/file-open.test.cjs scripts/jump-list.test.cjs scripts/new-document.test.cjs && node scripts/run-file-launch-tests.mjs",
+    "bench:renderer": "node scripts/run-electron-test.mjs optimized",
+    "dist": "electron-builder --win nsis portable",
+    "audit:credentials": "node scripts/audit-credentials.cjs",
+    "test:math": "node --test scripts/math-markdown.test.cjs && node scripts/run-electron-test.mjs math-boundaries",
+    "test:completion": "node --test scripts/completion-platform.test.cjs && node scripts/run-electron-test.mjs completion",
+    "test:reading": "node scripts/run-electron-test.mjs reading",
+    "test:typography": "node --test scripts/knuth-plass.test.mjs && node scripts/run-electron-test.mjs typography",
+    "test:math-colors": "node scripts/run-electron-test.mjs math-colors",
+    "test:math-caret": "node scripts/run-electron-test.mjs math-caret",
+    "bench:headings": "node scripts/benchmark-structure.cjs",
+    "test:math-history": "node scripts/run-electron-test.mjs math-history",
+    "test:protection": "node --test scripts/autosave.test.cjs scripts/snapshots.test.cjs scripts/text-stats.test.cjs && node scripts/run-electron-test.mjs protection",
+    "test:mermaid": "node scripts/run-electron-test.mjs mermaid",
+    "test:export": "node --test scripts/export-assets.test.cjs scripts/server-auth.test.cjs && node scripts/run-electron-test.mjs export && node scripts/run-electron-test.mjs export-entry",
+    "test:media": "node --test scripts/media-core.test.cjs scripts/office-math-pua.test.cjs && node scripts/run-electron-test.mjs media-lifecycle && node scripts/run-electron-test.mjs media-office",
+    "test:pandoc": "node scripts/pandoc-compare.cjs",
+    "dist:fresh": "node scripts/dist-fresh.cjs",
+    "accept": "node scripts/acceptance/run.cjs --app=installed",
+    "accept:dev": "node scripts/acceptance/run.cjs --app=dev",
+    "test:acceptance": "node --test scripts/acceptance/external-resource.test.cjs",
+    "test:export-entry": "node scripts/run-electron-test.mjs export-entry",
+    "test:nav-guard": "node scripts/run-electron-test.mjs nav-guard",
+    "test:windows": "node --test scripts/watch-hub.test.cjs && node scripts/run-electron-test.mjs windows && node scripts/run-electron-test.mjs windows-quit",
+    "test:windows-scale": "node scripts/run-electron-test.mjs windows-scale",
+    "test:toolbar-autohide": "node scripts/run-electron-test.mjs toolbar-autohide",
+    "test:windows-clipboard": "node scripts/run-electron-test.mjs windows-clipboard",
+    "gate": "node --test scripts/disk-encoding.test.cjs && node scripts/verify-typora-themes.cjs"
+  },
+  "devDependencies": {
+    "electron": "^44.2.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "app.personal.markpilot",
+    "productName": "MarkPilot",
+    "compression": "normal",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "app/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "app/**/*.ps1"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "fileAssociations": [
+        {
+          "ext": "md",
+          "name": "Markdown",
+          "description": "Markdown 文档",
+          "icon": "build/markdown.ico",
+          "role": "Editor"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MarkPilot",
+      "artifactName": "markpilot-Setup-${version}.exe",
+      "language": "2052",
+      "installerLanguages": [
+        "zh-CN"
+      ],
+      "uninstallDisplayName": "MarkPilot"
+    },
+    "portable": {
+      "artifactName": "markpilot-v${version}-portable.exe"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+/* 大文档离屏渲染跳过（2026-09-10 落地；探针证据 .perf/cv-probe.json）：
+   仅当 js/large-doc.js 判定 ≥1500 顶层块且初始布局完成后，才给 IR 根加
+   .typora-cv。contain-intrinsic-size 的 auto 前缀让 Chromium 记住每块
+   真实高度，滚动条与锚点定位不跳变；阈值以下文档零规则命中、零开销。
+   实测：最差滚动帧 50–67ms → 17ms，fps 触顶 60，renderer 内存反降
+   ~60–70MB；编辑/撤销/序列化不变式全过。 */
+.vditor-reset.typora-cv > * {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
+/* markpilot: pre-layout CV */
+/* 首屏之前就先跳过大块：顶层块一插进来就带 content-visibility + 估算高度，
+   于是"插入后的第一次排版"只需要排可见的那几块（首次排版是打开长任务里最大的一段）。
+   估算值由 js/large-doc.js 在首屏之后替换成真实高度（它必须先摘掉这两个类再量）。 */
+.typora-cv-pre .vditor-ir .vditor-reset > * {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}

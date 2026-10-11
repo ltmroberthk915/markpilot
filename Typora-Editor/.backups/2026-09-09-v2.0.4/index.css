@@ -1,0 +1,225 @@
+html,
+body,
+#vditor {
+  padding: 0;
+  margin: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.vditor {
+  border: unset;
+  border-radius: unset;
+}
+
+/* Navigation aligns content geometry, so browser anchoring/smooth scrolling
+   must not apply a second correction after the caret has been positioned. */
+.typora-navigation-pane,
+.vditor-preview:has(> .typora-navigation-pane) {
+  overflow-anchor: none;
+  scroll-behavior: auto !important;
+}
+.typora-navigation-pane::before,
+.typora-navigation-pane::after {
+  content: "";
+  display: block;
+  pointer-events: none;
+  width: 1px;
+}
+.typora-navigation-pane::before { height: var(--typora-nav-before, 0px); }
+.typora-navigation-pane::after { height: var(--typora-nav-after, 0px); }
+
+.typora-split-resizable > .vditor-sv {
+  flex: 0 0 var(--typora-source-width, 50%);
+  width: 0;
+  margin-right: 0;
+}
+.typora-split-resizable > .vditor-preview {
+  flex: 1 1 0%;
+  margin-left: 0;
+  border-left: 0;
+}
+.typora-split-divider {
+  flex: 0 0 6px;
+  cursor: col-resize;
+  touch-action: none;
+  background: var(--border-color, #d6d6d6);
+  z-index: 2;
+}
+.typora-split-divider[hidden] { display: none; }
+.typora-split-divider:hover,
+.typora-split-divider:focus-visible,
+.typora-split-dragging > .typora-split-divider {
+  background: var(--toolbar-icon-hover-color, #4285f4);
+  outline: none;
+}
+.typora-split-dragging, .typora-split-dragging * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+.vditor-ir pre.vditor-reset:focus {
+  background-color: var(--panel-background-color);
+}
+
+/* 暗黑模式优化 */
+.vditor--dark {
+  --panel-background-color: #1f1f1f !important;
+  --textarea-background-color: #1f1f1f !important;
+  --toolbar-background-color: #1f1f1f !important;
+}
+
+.vditor--dark pre.vditor-reset blockquote {
+  background-color: #2a2d2e !important;
+}
+
+pre.vditor-reset blockquote {
+  background-color: rgba(27, 31, 35, .05) !important;
+}
+
+
+.vditor--dark .vditor-reset code:not(.hljs):not(.highlight-chroma) {
+  background-color: #2a2d2e !important;
+}
+
+.vditor--dark .vditor-reset .hljs {
+  background-color: #2b2b2b !important;
+}
+
+.vditor--dark .vditor-reset {
+  color: #cccccc !important;
+}
+
+.vditor--dark .vditor-reset table tr {
+  background-color: #2a2d2e !important;
+}
+
+.vditor--dark .vditor-reset table tbody tr:nth-child(2n) {
+  background-color: #2b2b2b !important;
+}
+
+.vditor--dark  .vditor-reset table td,
+.vditor--dark  .vditor-reset table th {
+  border: 1px solid #585858 !important;
+}
+
+/* ===== Typora 式增强（魔改） ===== */
+
+/* Preview is a clickable display, never an editable part of the source line. */
+.vditor-ir .vditor-ir__preview {
+  -webkit-user-select: none;
+  user-select: none;
+  caret-color: transparent;
+}
+
+/* Read-only previews can be selected with a drag; single clicks use source
+   locations to focus the editable formula above. */
+.vditor-ir .vditor-ir__node--expand > .vditor-ir__preview .language-math {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.vditor-ir .vditor-ir__node--expand > .vditor-ir__preview [data-typora-source-start] {
+  cursor: text;
+}
+
+/* Chromium needs a real inline box for hit testing and caret painting next to
+   the absolutely positioned preview. Do not inherit the marker's hidden box. */
+.vditor-ir .vditor-ir__node[data-type="inline-node"]:not(.vditor-ir__node--expand):has(> code[data-type="math-inline"]) > .vditor-ir__marker {
+  /* Vditor's expanded ancestor rule also matches math nested in strong/em/
+     strike/link wrappers. Only this formula's own state may expose source. */
+  display: none;
+}
+.vditor-ir .vditor-ir__node--expand > code[data-type="math-inline"] {
+  display: inline-block;
+  overflow: visible;
+  width: auto;
+  height: auto;
+  transition: none;
+  white-space: pre-wrap;
+  -webkit-user-select: text;
+  user-select: text;
+  color: var(--textarea-text-color);
+  caret-color: var(--textarea-text-color);
+  min-width: .5ch;
+  min-height: 1em;
+}
+
+/* 编辑行内公式时，渲染预览浮动到源码正下方、左对齐、宽度随内容（Typora 式） */
+.vditor-ir .vditor-ir__node--expand[data-type="inline-node"] > .vditor-ir__preview .language-math {
+  display: inline-block;
+  vertical-align: top;
+  margin: 0;
+}
+
+.vditor-ir .vditor-ir__node--expand[data-type="inline-node"] {
+  position: relative;
+}
+
+.vditor-ir .vditor-ir__node--expand[data-type="inline-node"] > .vditor-ir__preview {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  padding: 2px 8px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--panel-background-color, #fff);
+  border: 1px solid var(--border-color, #d1d5da);
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .15);
+  min-height: 0;
+  z-index: 10;
+}
+
+.vditor--dark .vditor-ir .vditor-ir__node--expand[data-type="inline-node"] > .vditor-ir__preview {
+  background: var(--panel-background-color, #1f1f1f);
+  border-color: #585858;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .5);
+}
+
+/* A table scrolls/clips its contents. Reserve real cell height for an active
+   formula's preview, including in the final row, so the table cannot cut the
+   preview off or cover a neighboring cell. Prose keeps its floating preview. */
+.vditor-ir :is(td, th) .vditor-ir__node--expand[data-type="inline-node"]:has(> code[data-type="math-inline"]) {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  max-width: 100%;
+  vertical-align: top;
+}
+
+.vditor-ir :is(td, th) .vditor-ir__node--expand[data-type="inline-node"]:has(> code[data-type="math-inline"]) > .vditor-ir__marker {
+  grid-row: 1;
+}
+
+.vditor-ir :is(td, th) .vditor-ir__node--expand[data-type="inline-node"] > code[data-type="math-inline"] {
+  grid-column: 2;
+}
+
+.vditor-ir :is(td, th) .vditor-ir__node--expand[data-type="inline-node"]:has(> code[data-type="math-inline"]) > .vditor-ir__marker:last-child {
+  grid-column: 3;
+}
+
+.vditor-ir :is(td, th) .vditor-ir__node--expand[data-type="inline-node"]:has(> code[data-type="math-inline"]) > .vditor-ir__preview {
+  position: static;
+  display: block;
+  grid-row: 2;
+  grid-column: 1 / -1;
+  justify-self: start;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* 数学公式增量渲染中，尚未合法的源码尾部红色显示（Typora 式） */
+.vditor-math-error {
+  color: #e03131;
+  font-family: Consolas, Monaco, "Courier New", monospace;
+  font-size: .9em;
+  padding: 0 1px;
+}
+
+::highlight(typora-underline) { text-decoration: underline; text-underline-offset: .18em; }
+.vditor-wysiwyg code.typora-underline-marker { display: none; }

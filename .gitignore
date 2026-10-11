@@ -1,0 +1,53 @@
+# 可再生构建产物与重型缓存（全部锚定仓库根，勿伤 vendored cdn/*/dist）
+/Typora-Editor-App/node_modules/
+/Typora-Editor-App/dist/
+/Typora-Editor-App/.backups/
+.perf/user-data-*/
+*.log
+/Typora-Editor-App/dist-cv/
+# 测试一次性产物（可重跑生成）
+/Typora-Editor-App/.perf/autosave-test-*/
+/Typora-Editor-App/.perf/*workspace*/
+/Typora-Editor-App/.perf/launch-args-*/
+/Typora-Editor-App/.perf/desktop-*/
+/Typora-Editor-App/.perf/dynamic-planning/
+/Typora-Editor-App/.perf/file-launch-*/
+/Typora-Editor-App/.testws/_*-copy.md
+# App 侧 .perf 下的一次性 profile 与套件产物（旧的 .perf/user-data-*/ 带中间斜杠，锚定在仓库根，匹配不到 App 子目录）
+/Typora-Editor-App/.perf/user-data-*/
+/Typora-Editor-App/.perf/desktop-*
+/Typora-Editor-App/.perf/table-input-host/
+/Typora-Editor-App/.perf/table-context-host/
+/Typora-Editor-App/.perf/source-toggle-host/
+/Typora-Editor-App/.perf/user-file-host/
+/Typora-Editor-App/.perf/material-copy/
+
+# 临时构建输出目录（EBUSY 残留的 asar 会锁住，勿入档）
+/Typora-Editor-App/dist-*/
+# VS Code 隔离 profile（一次性，体积巨大；结果 JSON 已抄到 App/.perf）
+/Typora-Editor/test/.runs/
+# 用户受保护测试素材（用户令：原素材只读、任何测试先复制副本用后删除；副本不入档）
+/测试素材_*
+/Typora-Editor-App/.perf/export-fixture/
+/Typora-Editor-App/.perf/**/workspace-*/
+
+# ── 验收/实测运行产物（可再生）：脚本与报告入库，浏览器 profile / 临时夹具不入库 ──
+.mp-verify/**/profile/
+.mp-verify/**/profile-*/
+.mp-verify/**/GPUCache/
+.mp-verify/**/DawnGraphiteCache/
+.mp-verify/**/DawnWebGPUCache/
+.mp-verify/**/Session Storage/
+.mp-verify/**/Shared Dictionary/
+.mp-verify/**/Local Storage/
+.mp-verify/checklist/accept/tmp/
+.mp-verify/**/diag-tmp/
+.mp-verify/**/scan-bench-tmp/
+.mp-verify/**/ablate-tmp/
+
+# 会话/运行期目录（锁文件、ACL 诊断报告、临时抓取），不入库
+/.perf/
+/.dsh-acl-reports/
+**/.zcode-tmp/
+/Typora-Editor-App/.perf/acceptance/
+/Typora-Editor-App/.perf/*.online.md

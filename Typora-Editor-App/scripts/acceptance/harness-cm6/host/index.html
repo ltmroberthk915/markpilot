@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<!-- MarkPilot 验收宿主页 · Tier-1 引擎档（r20 移植设计 §4.2）。
+
+  角色：等价 lib/client.js 的 mount 半边——只负责把产品 renderer iframe 挂起来、
+  用**产品自己的桥协议**（dsh-bridge：{__dshmp, dir, type, content}）喂文档。
+  引擎、投影、桥、看门狗全是产品真身；本页是验收工具，不是产品码。
+
+  同源性：file:// 下由 harness-web 以 --allow-file-access-from-files 起浏览器，
+  父页与 iframe 同源（已实测：可直穿 contentWindow），postMessage 与直穿双通道都可用。
+
+  驱动方式：
+    · URL 参数 engine=cm6|vditor   选引擎（切 iframe src）
+    · URL 参数 src=<file://...>     直接指定 iframe src（覆盖默认相对路径）
+    · URL 参数 text=<urlencoded>    初始文档（boot 后经桥 open 注入）
+    · postMessage {__mpHostCmd:true, type:'set-text', text}   运行中换文档（经桥 setValue）
+    · postMessage {__mpHostCmd:true, type:'request-text'}     拉全文（经桥 requestText → text 事件回缓）
+
+  桥契约（与产品宿主 lib/client.js 逐字段对齐，勿凭直觉改）：
+    · open 下行：{title, content:<string>, language, rootPath}——content 是**对象字段**，
+      不是裸字符串（引擎 on("open", ({content})=>boot(content)) 解构字段）。
+    · setValue 下行：裸字符串。
+    · init 上行可能多次（{again:true}＝引擎看门狗重发）：宿主幂等重发 open 兜底。
+    · 发 open 前必须等到 init（早于 handler 注册的 open 会被静默丢弃）。
+
+  状态面：window.__mpHost = { engine, booted, bridgeReady, text, pendingText, changes[], lastText,
+                               lastOpenContent, sent{open,setValue,requestText}, received{init,change,text,bridgeReady} }
+-->
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>MarkPilot 验收宿主页 Tier-1</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #fff; }
+    #mp-frame { width: 100%; height: 100%; border: 0; display: block; }
+  </style>
+</head>
+
+<body>
+  <!-- 相对路径从本文件出发：host/ → harness-cm6/ → acceptance/ → scripts/ → Typora-Editor-App/ → MarkPilot/ → dsh-markpilot/ -->
+  <iframe id="mp-frame" data-mp-engine="cm6" src="../../../../../dsh-markpilot/renderer-cm6/index.html"></iframe>
+  <script>
+    (function () {
+      var params = new URLSearchParams(location.search);
+      var engine = params.get('engine') || 'cm6';
+      var frame = document.getElementById('mp-frame');
+      var DEFAULT_SRC = {
+        cm6: '../../../../../dsh-markpilot/renderer-cm6/index.html',
+        vditor: '../../../../../dsh-markpilot/renderer/index.html',
+      };
+      frame.dataset.mpEngine = engine;
+      var src = params.get('src');
+      if (src) frame.src = src;
+      else if (DEFAULT_SRC[engine]) frame.src = DEFAULT_SRC[engine];
+
+      var state = window.__mpHost = {
+        engine: engine, href: location.href,
+        booted: false, bridgeReady: false, opened: false,
+        text: null, pendingText: null, lastText: null, lastOpenContent: null,
+        changes: [],
+        sent: { open: 0, setValue: 0, requestText: 0 },
+        received: { init: 0, change: 0, text: 0, bridgeReady: 0 },
+      };
+
+      function down(type, content) {
+        try {
+          frame.contentWindow.postMessage({ __dshmp: true, dir: 'down', type: type, content: content }, '*');
+        } catch (e) { state.lastError = 'down:' + type + ':' + e.message; }
+      }
+
+      // ★ 下行 open 的负载形状＝产品宿主 lib/client.js 的真契约（实测核对）：
+      //   post("open", { title, content: <string>, language, rootPath })。
+      //   引擎侧 src-cm6/main.js 的处理器是 on("open", ({ content }) => boot(content))——
+      //   从「桥传入的 content 实参」里解构 .content 字段。发裸字符串会让解构得到
+      //   undefined → boot("") → 引擎开机即空文档（B1 前代理阵亡根因，handler.on
+      //   包装实测实锤：content 收到 21 字符字符串、view 长度 0）。
+      function openPayload(text) {
+        return { title: 'acceptance.md', content: String(text == null ? '' : text), language: 'zh-cn', rootPath: '.' };
+      }
+      function currentText() { return state.pendingText != null ? state.pendingText : (state.text || ''); }
+      function sendOpen() {
+        state.lastOpenContent = currentText();
+        down('open', openPayload(state.lastOpenContent));
+        state.sent.open++;
+      }
+
+      function engineObject() {
+        try {
+          var w = frame.contentWindow;
+          if (!w) return null;
+          return w.mpEngine || w.vditor || null;
+        } catch (e) { return null; }
+      }
+
+      function applyText(text) {
+        state.text = text;
+        if (state.booted) { down('setValue', text); state.sent.setValue++; }
+        else state.pendingText = text;
+      }
+
+      window.addEventListener('message', function (e) {
+        var d = e.data;
+        if (!d || d.__dshmp !== true || d.dir !== 'up') return;
+        switch (d.type) {
+          case 'bridge-ready': state.bridgeReady = true; state.received.bridgeReady++; break;
+          case 'init':
+            // 渲染器就绪信号（看门狗每 2s 重发直到收到 open/setValue）。
+            // 时序契约（对齐 client.js maybeBoot）：必须等 init 到了才发 open——
+            // open 早于引擎注册 handler.on('open') 会被静默丢弃。
+            state.received.init++;
+            if (!state.opened) {
+              sendOpen();
+              state.opened = true;
+            } else if (d.content && d.content.again === true) {
+              // 看门狗应答（对齐 client.js init(again:true) 分支）：引擎还在重发 init
+              // 说明上一发 open 在注册窗口被丢——幂等重发；引擎 boot() 对重复 open 幂等。
+              sendOpen();
+            }
+            break;
+          case 'change':
+            state.received.change++;
+            state.changes.push({ len: d.content && d.content.len, at: Date.now() });
+            break;
+          case 'text':
+            state.received.text++;
+            state.lastText = d.content;
+            break;
+        }
+      });
+
+      // boot 判定：同源直查引擎对象出现（cm6=mpEngine / vditor=vditor）。
+      // cm6 侧 mpEngine 只在 boot()（即 open 处理）之后才存在，所以这条兜底只是
+      // belt-and-braces；就算它抢跑，引擎看门狗的 init(again:true) 重发路径会自愈。
+      var bootTimer = setInterval(function () {
+        if (state.booted) { clearInterval(bootTimer); return; }
+        if (engineObject()) {
+          state.booted = true;
+          clearInterval(bootTimer);
+          // open 迟迟没发出去（init 从没来过）时兜底直发一次。
+          if (!state.opened) {
+            sendOpen();
+            state.opened = true;
+          }
+        }
+      }, 50);
+
+      // 外部驱动（harness / 人工）：与桥消息用不同标记，避免混淆。
+      window.addEventListener('message', function (e) {
+        var d = e.data;
+        if (!d || d.__mpHostCmd !== true) return;
+        if (d.type === 'set-text') applyText(String(d.text == null ? '' : d.text));
+        if (d.type === 'request-text' && state.booted) { down('requestText', {}); state.sent.requestText++; }
+      });
+
+      var t = params.get('text');
+      if (t != null) state.text = t; // bootTimer/init 路径会在就绪后经桥 open 出去
+    })();
+  </script>
+</body>
+
+</html>

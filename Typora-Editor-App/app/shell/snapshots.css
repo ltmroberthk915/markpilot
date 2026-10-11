@@ -1,0 +1,14 @@
+.snapshots-dialog{width:min(920px,calc(100vw - 32px))}
+.snapshots-dialog .snapshots-file{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.7;font-size:12px}
+.snapshots-body{display:grid;grid-template-columns:minmax(190px,30%) minmax(0,1fr);gap:16px;height:min(58vh,580px);min-height:180px}
+.snapshots-list{display:block;height:100%;max-height:none;padding:2px 4px 2px 2px;box-sizing:border-box}
+.snapshots-list button{display:block;width:100%;margin-bottom:6px}
+.snapshots-list button[aria-pressed="true"]{border-color:#69adf3;background:#69adf320}
+.snapshots-pane{min-height:0;display:flex;flex-direction:column}
+.snapshots-pane>p{flex-shrink:0}
+.snapshots-preview{flex:1;min-height:0;margin:0;padding:12px;border:1px solid #747983;border-radius:4px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.65 Consolas,"Microsoft YaHei",monospace;tab-size:4}
+.snapshots-dialog .snapshots-hint{font-size:12px;opacity:.7}
+.snapshots-dialog .snapshots-message{font-size:12px;overflow-wrap:anywhere}
+.snapshots-dialog button:disabled{opacity:.45;cursor:default}
+.snapshots-dialog footer{flex-wrap:wrap}.snapshots-dialog footer button:first-child{margin-right:auto}
+@media(max-width:620px){.snapshots-body{grid-template-columns:1fr;grid-template-rows:130px minmax(0,1fr);height:60vh}}

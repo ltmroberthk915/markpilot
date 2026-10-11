@@ -1,0 +1,56 @@
+{
+  "desktopVersion": "1.0.4",
+  "vsixVersion": "0.1.11-local",
+  "installedVSCodeFilesVerified": 458,
+  "sharedRendererFilesVerified": 444,
+  "packagedAppFilesVerified": 453,
+  "checks": {
+    "editing": 16,
+    "consistencyAndIME": 154,
+    "shortcutsAndMermaidAudit": 66,
+    "repairs": 58,
+    "desktopHost": 28,
+    "recentState": 2,
+    "katex": 21,
+    "vscodeHost": 38,
+    "uiRefinements": 34
+  },
+  "totalChecks": 417,
+  "packagedDesktopRecheck": 28,
+  "vscodeResults": "D:\\BuyKey\\Typora-Editor\\test\\.runs\\vscode-1788626234318\\results.json",
+  "history": {
+    "ms": 473.40000000596046,
+    "formulas": 5631,
+    "retained": 5631,
+    "reuse": {
+      "retainedBlocks": 2576,
+      "retainedPreviews": 0,
+      "changedBlocks": 1,
+      "ms": 257.2000000178814
+    },
+    "sourceEqual": true,
+    "rerendered": 0,
+    "pending": 0,
+    "search": {
+      "matches": 269,
+      "workerMs": 0.4000000059604645
+    }
+  },
+  "artifacts": [
+    {
+      "path": "D:\\BuyKey\\Typora-Editor-App\\dist\\TyporaEditor-Setup-1.0.4.exe",
+      "bytes": 115507762,
+      "sha256": "a846485a2cbe50ecbc28dc860a09359078aec6c6b29f8fb4040ad8662fa79aa5"
+    },
+    {
+      "path": "D:\\BuyKey\\Typora-Editor-App\\dist\\TyporaEditor-v1.0.4-portable.exe",
+      "bytes": 115357744,
+      "sha256": "6f65c9fb79ce48d8ff0173d5f236f0778b03644f182d9ece5227660f3addcbc3"
+    },
+    {
+      "path": "D:\\BuyKey\\Typora-Editor\\dist\\seepine.md-editor-0.1.11-local.vsix",
+      "bytes": 5760817,
+      "sha256": "6b40eb62c514f716006525a62a2ee76a4fe8591b460bb119a15e8438cdc379d2"
+    }
+  ]
+}

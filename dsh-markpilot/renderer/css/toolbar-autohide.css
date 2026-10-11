@@ -1,0 +1,24 @@
+/* 超小窗口下的工具栏自动收纳（逻辑见 js/toolbar-autohide.js）。
+   只有 html.typora-toolbar-autohide 在时才有任何效果——正常高度的窗口完全不受影响。
+   工具栏本来就是绝对定位的浮层（见 media-tools.css），所以收起只是把它移出视野，
+   正文不会因此重排跳动。 */
+html.typora-toolbar-autohide .vditor > .vditor-toolbar {
+  transform: translateY(calc(-100% - 10px));
+  opacity: 0;
+  pointer-events: none;
+  transition: transform .24s cubic-bezier(.22, .61, .36, 1), opacity .18s ease;
+}
+html.typora-toolbar-autohide.typora-toolbar-revealed .vditor > .vditor-toolbar {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+/* 收起状态下工具栏上的下拉面板（主题、提示）也随之外移，不会浮在正文上 */
+html.typora-toolbar-autohide:not(.typora-toolbar-revealed) .vditor-hint,
+html.typora-toolbar-autohide:not(.typora-toolbar-revealed) .vditor-panel,
+html.typora-toolbar-autohide:not(.typora-toolbar-revealed) .vditor-emojis {
+  display: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.typora-toolbar-autohide .vditor > .vditor-toolbar { transition: none; }
+}

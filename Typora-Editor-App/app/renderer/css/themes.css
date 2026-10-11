@@ -1,0 +1,92 @@
+/* Vditor layout and generated formula boxes use their own dimensions. */
+:root[data-editor-theme="dark"] {--bg-color:#1f1f1f;--text-color:#ccc;--border-color:#585858;--code-bg-color:#2a2d2e;--text-subtle:#b9b9b9;}
+:root[data-editor-theme="light"] {--bg-color:#fff;--text-color:#222;--border-color:#d1d5da;--code-bg-color:#f6f8fa;--text-subtle:#6a737d;}
+/* C1：基础 light/dark 补 --text-subtle（引用文字色基线用，见 index.css 的 C1 块）；
+   --content-rule 是 h1/h2 下边线、hr、引用竖线的基线色。不能用 --border-color 直接
+   代入：vditor--dark 作用域会在更近的祖先上把 --border-color 改写成 #141414
+   （telari.css 同坑的注记），这里在 :root 层取好值再下沉。telari 取其
+   --table-border-color；konayuki 的 h1/h2/引用自有规则覆盖基线，仅 hr 底色消费
+   此值，取其 --border-color 与自身 border-top 同色。 */
+:root[data-editor-theme] {--content-rule:#eaecef;}
+:root[data-editor-theme="dark"] {--content-rule:#585858;}
+:root[data-editor-theme="telari-light"],
+:root[data-editor-theme="telari-dark"] {--content-rule:var(--table-border-color);}
+:root[data-editor-theme="konayuki-light"],
+:root[data-editor-theme="konayuki-dark"] {--content-rule:var(--border-color);}
+#typora-find {background:var(--bg-color,#fff);color:var(--text-color,#222);}
+#typora-find input:not([type=checkbox]),#typora-find button {background:var(--code-bg-color,#f6f8fa);color:inherit;}
+
+/* T5'（R3-C 节）：表格单元格放开折行。vditor dist 与 fontsize.css 都给 td/th 立了
+   nowrap（dist index.css 的 `.vditor-reset table td,th`、fontsize.css 的
+   `.vditor-reset>table th`），长文本表格在标准布局里撑出横向滚动条，在 konayuki
+   （display:table + 圆角裁切）里整列被直接裁没。本规则与那两条同特异性（0,1,2），
+   靠加载顺序取胜（index.html：dist → fontsize → themes）；overflow-wrap:anywhere
+   让 URL/长串这类不可断内容也能在格内折行。编辑器与导出由此同口径（导出本就折行）。 */
+.vditor-reset table td,
+.vditor-reset table th {white-space:normal;overflow-wrap:anywhere;}
+:root[data-editor-theme^="konayuki"] .vditor {
+  --panel-background-color:var(--bg-color)!important;--textarea-background-color:var(--bg-color)!important;
+  --toolbar-background-color:var(--bg-color)!important;--textarea-text-color:var(--text-color);
+  --toolbar-icon-color:var(--text-muted);--toolbar-icon-hover-color:var(--primary-color);--second-color:var(--text-muted);
+  --heading-border-color:var(--border-color);--blockquote-color:var(--text-subtle);
+  --ir-marker-color:var(--text-faint);background:var(--bg-color);color:var(--text-color);
+}
+:root[data-editor-theme^="konayuki"] body {background:var(--bg-color);color:var(--text-color);}
+:root[data-editor-theme^="konayuki"] .vditor-reset {font-family:var(--font-body);color:var(--text-color)!important;line-height:1.8;}
+:root[data-editor-theme^="konayuki"] .vditor-reset strong,:root[data-editor-theme^="konayuki"] .vditor-reset b {font-weight:900;}
+:root[data-editor-theme^="konayuki"] .vditor-reset blockquote {background:var(--callout-note-bg)!important;}
+:root[data-editor-theme^="konayuki"] .vditor-reset code:not(.vditor-ir__marker),:root[data-editor-theme^="konayuki"] .vditor-reset .hljs {background:var(--code-bg-color)!important;color:var(--code-text-color);font-family:var(--font-mono);}
+:root[data-editor-theme^="konayuki"] .vditor-reset table tr {background:var(--bg-color)!important;}
+/* T5' 配套：konayuki 表格圆角原先靠 overflow:hidden 裁（见 konayuki.css 表格规则，
+   该文件由 tools/adapt_konayuki.cjs 生成，改这里便于再生成时不回退）。nowrap 时代它
+   把放不下的列静默裁没了；放开为 visible 后折行表格永不超宽，病态超宽（格内原生 HTML
+   写死 nowrap）也退化为页面级横向滚动可到达。圆角视觉由表自身 border-radius+border
+   绘制（separate 边框模型下表格边框按圆角走），本规则特异性与 konayuki.css 表格规则
+   同为 (0,3,1)，靠 themes.css 更晚加载取胜。 */
+:root[data-editor-theme^="konayuki"] .vditor-reset table {display:table;overflow:visible;}
+:root[data-editor-theme^="konayuki"] .vditor-reset code.hljs {padding:1em;line-height:1.6;}
+:root[data-editor-theme^="konayuki"] .vditor-reset code.hljs.vditor-linenumber {padding-left:3em;}
+:root[data-editor-theme^="konayuki"] .vditor-reset table tbody tr:nth-child(2n) {background:var(--code-bg-color)!important;}
+/* C2：konayuki 表格行悬停。上面两条底色带 !important（对抗 legacy index.css 的
+   .vditor--dark 表格底色），把上游 konayuki.css 的 tbody tr:hover 也一起压死了。
+   这里按同等火力把悬停色接回来：奇数行选择器 (0,4,2) 压过基线 (0,3,2)，偶数行叠
+   nth-child(2n) 后 (0,5,3) 压过斑马纹 (0,4,3)；仅 konayuki 作用域，其它主题的
+   表格底色契约不动。颜色取主题自己的 --table-row-hover-bg（低透明度着色）。 */
+:root[data-editor-theme^="konayuki"] .vditor-reset table tbody tr:hover,
+:root[data-editor-theme^="konayuki"] .vditor-reset table tbody tr:nth-child(2n):hover {background:var(--table-row-hover-bg)!important;}
+:root[data-editor-theme^="konayuki"] .vditor-reset table td,:root[data-editor-theme^="konayuki"] .vditor-reset table th {border-color:var(--table-border-color)!important;}
+:root[data-editor-theme^="konayuki"] .vditor-reset .vditor-ir__marker--pre {padding:0;background:transparent!important;}
+:root[data-editor-theme^="konayuki"] .vditor-reset .hljs-keyword {color:var(--syntax-keyword);}
+:root[data-editor-theme^="konayuki"] .vditor-reset .hljs-string {color:var(--syntax-string);}
+:root[data-editor-theme^="konayuki"] .vditor-reset .hljs-comment {color:var(--syntax-comment);}
+:root[data-editor-theme^="konayuki"] .vditor-reset .hljs-number {color:var(--syntax-number);}
+#typora-themes {width:330px;padding:20px;border:1px solid var(--border-color,#bbb);border-radius:10px;background:var(--bg-color,#fff);color:var(--text-color,#222);font:14px system-ui,sans-serif;}
+#typora-themes::backdrop {background:#0005;}
+#typora-themes h2 {font-size:18px;margin:0 0 15px;}
+#typora-themes .theme-options {display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+#typora-themes button {padding:10px;border:1px solid #8888;border-radius:6px;font:inherit;cursor:pointer;}
+#typora-themes button[aria-pressed=true] {outline:2px solid #4a90e2;outline-offset:1px;}
+#typora-themes [data-theme=light] {background:#fff;color:#333;}
+#typora-themes [data-theme=dark] {background:#1f1f1f;color:#ccc;}
+#typora-themes [data-theme=konayuki-light] {background:#fffdf8;color:#2c3e50;}
+#typora-themes [data-theme=konayuki-dark] {background:#1a1b26;color:#e5e9f0;}
+#typora-themes {max-width:520px;max-height:84vh;overflow:auto;}
+#typora-themes .user-theme {margin-top:18px;border-top:1px solid #8884;padding-top:12px;}
+#typora-themes .user-theme h3 {font-size:15px;margin:0 0 6px;}
+#typora-themes .user-theme-hint {margin:0 0 10px;font-size:12px;line-height:1.5;opacity:.78;}
+#typora-themes .user-theme-hint code {font-family:ui-monospace,Consolas,monospace;font-size:12px;}
+#typora-themes .user-theme-row {display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;}
+#typora-themes .user-theme-row input[type=file] {display:none;}
+#typora-themes .user-theme-row input[type=text],#typora-themes .user-theme-row textarea {flex:1;min-width:0;padding:8px;border:1px solid #8886;border-radius:6px;font:inherit;background:transparent;color:inherit;resize:vertical;}
+#typora-themes .user-theme-list {list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:32vh;overflow:auto;}
+#typora-themes .user-theme-list li {display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid #8884;border-radius:6px;}
+#typora-themes .user-theme-list li[data-active=true] {outline:2px solid #4a90e2;outline-offset:1px;}
+#typora-themes .user-theme-list .name {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#typora-themes .user-theme-list .meta {font-size:11px;opacity:.7;white-space:nowrap;}
+#typora-themes .user-theme-list .empty {border:0;font-size:12px;opacity:.7;padding:0;}
+#typora-themes .user-theme-list button {padding:4px 10px;font-size:12px;}
+#typora-themes .user-theme-status {margin:8px 0 0;font-size:12px;line-height:1.5;opacity:.85;min-height:1.5em;}
+#typora-themes .user-theme-status.bad {color:#d05050;opacity:1;}
+#typora-themes footer {margin-top:16px;text-align:right;}
+:root[data-editor-theme^="konayuki"] #typora-find {background:var(--bg-color);color:var(--text-color);}
+:root[data-editor-theme^="konayuki"] #typora-find input,:root[data-editor-theme^="konayuki"] #typora-find button {background:var(--code-bg-color);color:var(--text-color);}
