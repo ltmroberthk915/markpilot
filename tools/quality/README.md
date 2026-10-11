@@ -55,6 +55,10 @@ node tools/quality/build-check.cjs --out .mp-verify/quality/build
 
 ## 发布小型证据
 
+候选打包：`node tools/quality/package-candidate.cjs --runtime <已验证 runtime> --rcedit <rcedit.exe> --out <空目录> [--builder-cache <离线缓存>]`。它写入图标并回读 PE 版本，保留仓库引擎，生成正常 portable/Setup 与唯一 appId 的隔离测试 Setup。安装器会记录文件 SHA；未设置签名证书时是未签名候选。
+
+`verify-package.cjs --candidate <候选目录> --7zip <7za.exe> --out <空目录>` 拆三个 EXE 的实际载荷，逐个核对内层 exe、asar 和源码哈希。`isolated-install.cjs install|verify|uninstall --candidate <候选目录> --out <.mp-verify下验证目录>` 只准安装隔离测试包，保留既有注册信息；未知结果先 verify，不重复安装。测试完运行 uninstall，再核对原有记录。正常 Setup 的用户升级需要另外验收。
+
 窗口/编码修复可单独运行 `node tools/quality/data-safety.cjs --exe <实际 MarkPilot.exe 或 portable.exe> --scope sessions|encoding|all --out <空目录>`。`stage-app.cjs --runtime <已核验的 Electron runtime> --out <空目录>` 用当前壳源码及仓库 bundle 生成一次性 unpacked/asar；它不下载运行时，也不重建引擎。重封装产物与最终 portable/安装器分别测试和记录身份。
 
 `mutate.cjs on|off --kind window-sessions|receipt-revision|external-conflict|utf16-read|utf16-write --app <一次性源码副本> [--baseline-ref <Git提交>]` 提供可逆负向控制，拒绝直接修改产品工作区。on/off 可重复调用，恢复时核对文件 SHA 防止覆盖后来修改。窗口/codec 回退必须给真实 Git 基线。回执 GUI 可用 `--scope sessions --case save-receipt-does-not-clear-later-edit` 独立复跑；磁盘测试用 `MP_TEST_DOCUMENT_STORE=<副本/shell/document-store.js>` 指向突变副本，不能把预期非零退出当通过。

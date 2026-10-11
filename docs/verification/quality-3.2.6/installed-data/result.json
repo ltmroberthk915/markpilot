@@ -1,0 +1,1125 @@
+{
+  "schema": 1,
+  "scope": "all",
+  "singleCase": null,
+  "startedAt": "2026-10-11T12:00:02.712Z",
+  "cases": [
+    {
+      "id": "secondary-save-preserves-own-bom-eol",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "selection": {
+              "anchor": 41,
+              "head": 41
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 218.6328125,
+              "right": 218.6328125,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "scrollTop": 0,
+            "title": "secondary-lf.md · 41 字 — MarkPilot",
+            "banner": ""
+          },
+          "diskHex": "425f444f43554d454e545f53454e54494e454c0a5345434f4e4420434f4e54454e540a422d45444954"
+        }
+      ],
+      "ms": 1272
+    },
+    {
+      "id": "secondary-save-keeps-both-saved-texts",
+      "status": "pass",
+      "trace": [
+        {
+          "a": {
+            "documentId": "fec14d86-eea2-4667-9ff8-087f3dcc3bc1",
+            "revision": 0,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\primary-bom-crlf.md",
+            "text": "A_DOCUMENT_SENTINEL\nPRIMARY CONTENT\n",
+            "bom": true,
+            "eol": "\r\n",
+            "encoding": "utf8"
+          },
+          "b": {
+            "documentId": "90ab18f3-b709-4bbc-b667-8b477d82d491",
+            "revision": 1,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\secondary-lf.md",
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "bom": false,
+            "eol": "\n",
+            "encoding": "utf8"
+          }
+        }
+      ],
+      "ms": 14
+    },
+    {
+      "id": "focused-primary-native-menu-save",
+      "status": "pass",
+      "trace": [
+        {
+          "key": {
+            "ok": true,
+            "input": {
+              "type": "keyDown",
+              "keyCode": "S",
+              "modifiers": [
+                "control"
+              ]
+            },
+            "wasFocused": false,
+            "focused": true,
+            "focusWaitedMs": 0
+          },
+          "a": {
+            "documentId": "fec14d86-eea2-4667-9ff8-087f3dcc3bc1",
+            "revision": 1,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\primary-bom-crlf.md",
+            "text": "A_DOCUMENT_SENTINEL\nPRIMARY CONTENT\nA-EDIT",
+            "bom": true,
+            "eol": "\r\n",
+            "encoding": "utf8"
+          },
+          "b": {
+            "documentId": "90ab18f3-b709-4bbc-b667-8b477d82d491",
+            "revision": 1,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\secondary-lf.md",
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "bom": false,
+            "eol": "\n",
+            "encoding": "utf8"
+          }
+        }
+      ],
+      "ms": 624
+    },
+    {
+      "id": "primary-pdf-exports-primary-with-secondary-open",
+      "status": "pass",
+      "trace": [
+        {
+          "ok": true,
+          "file": "<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\primary.pdf",
+          "bytes": 53843,
+          "pages": 1,
+          "ms": 413,
+          "printMs": 354,
+          "chunks": 1,
+          "html": {
+            "file": "<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\runtime-temp\\markpilot-pdf-8CoOYa\\MarkPilot 导出.html",
+            "bytes": 373112,
+            "relImages": 0,
+            "dataImages": 0,
+            "remoteImages": 0,
+            "tables": 0,
+            "mathBlocks": 0
+          },
+          "images": {
+            "complete": 0,
+            "natural": 0,
+            "broken": 0,
+            "ms": 270
+          },
+          "gate": {
+            "passed": true,
+            "reasons": [],
+            "inlineDataImages": 0,
+            "relImages": 0
+          },
+          "memory": {
+            "peakMB": 755.3,
+            "lastMB": 755.3,
+            "samples": 3,
+            "intervalMs": 200,
+            "perProc": [
+              {
+                "type": "GPU",
+                "pid": 88856,
+                "peakMB": 272.5
+              },
+              {
+                "type": "Browser",
+                "pid": 44072,
+                "peakMB": 118.2
+              },
+              {
+                "type": "Tab",
+                "pid": 87156,
+                "peakMB": 111.9
+              },
+              {
+                "type": "Tab",
+                "pid": 56340,
+                "peakMB": 107.4
+              },
+              {
+                "type": "Tab",
+                "pid": 71052,
+                "peakMB": 94.8
+              },
+              {
+                "type": "Utility",
+                "pid": 50548,
+                "peakMB": 50.8
+              }
+            ],
+            "seriesMB": [
+              628,
+              725,
+              755,
+              755
+            ]
+          },
+          "phases": [
+            {
+              "bytes": 373112,
+              "relImages": 0,
+              "dataImages": 0,
+              "tables": 0,
+              "phase": "inspect",
+              "ms": 96
+            },
+            {
+              "signal": "dom-ready",
+              "loadMs": 146,
+              "phase": "load",
+              "ms": 262
+            },
+            {
+              "total": 0,
+              "local": 0,
+              "remote": 0,
+              "complete": 0,
+              "natural": 0,
+              "broken": 0,
+              "remotePending": 0,
+              "partial": false,
+              "readyState": "complete",
+              "ms": 270,
+              "phase": "images"
+            },
+            {
+              "mathCssBytes": 369219,
+              "phase": "style",
+              "ms": 277
+            },
+            {
+              "applied": 3,
+              "lines": 3,
+              "blocks": 3,
+              "width": 680.64,
+              "fallback": {},
+              "phase": "typeset",
+              "ms": 287
+            },
+            {
+              "bytes": 53843,
+              "pages": 1,
+              "phase": "print",
+              "ms": 350
+            },
+            {
+              "done": 53843,
+              "bytes": 53843,
+              "chunks": 1,
+              "phase": "write",
+              "ms": 353
+            },
+            {
+              "bytes": 53843,
+              "chunks": 1,
+              "writeMs": 4,
+              "phase": "write-done",
+              "ms": 354
+            }
+          ],
+          "kp": {
+            "applied": 3,
+            "lines": 3,
+            "fallback": {},
+            "blocks": 3,
+            "width": 680.64,
+            "sourceBytes": 126,
+            "sourceChars": 42
+          },
+          "mathCss": {
+            "source": "engine",
+            "bytes": 369219
+          }
+        },
+        {
+          "htmlBody": "\nA_DOCUMENT_SENTINEL\nPRIMARY CONTENT\nA-EDIT\n\n\n\n"
+        }
+      ],
+      "ms": 576
+    },
+    {
+      "id": "secondary-save-as-keeps-primary-path",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "documentId": "fec14d86-eea2-4667-9ff8-087f3dcc3bc1",
+            "revision": 1,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\primary-bom-crlf.md",
+            "text": "A_DOCUMENT_SENTINEL\nPRIMARY CONTENT\nA-EDIT",
+            "bom": true,
+            "eol": "\r\n",
+            "encoding": "utf8"
+          },
+          "after": {
+            "documentId": "fec14d86-eea2-4667-9ff8-087f3dcc3bc1",
+            "revision": 1,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\primary-bom-crlf.md",
+            "text": "A_DOCUMENT_SENTINEL\nPRIMARY CONTENT\nA-EDIT",
+            "bom": true,
+            "eol": "\r\n",
+            "encoding": "utf8"
+          },
+          "b": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "selection": {
+              "anchor": 41,
+              "head": 41
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 218.6328125,
+              "right": 218.6328125,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "scrollTop": 0,
+            "title": "save-as.md · 41 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 594
+    },
+    {
+      "id": "failed-save-as-retains-source-and-dirty-state",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "documentId": "fec14d86-eea2-4667-9ff8-087f3dcc3bc1",
+            "revision": 1,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\primary-bom-crlf.md",
+            "text": "A_DOCUMENT_SENTINEL\nPRIMARY CONTENT\nA-EDIT",
+            "bom": true,
+            "eol": "\r\n",
+            "encoding": "utf8"
+          },
+          "after": {
+            "documentId": "fec14d86-eea2-4667-9ff8-087f3dcc3bc1",
+            "revision": 2,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\primary-bom-crlf.md",
+            "text": "A_DOCUMENT_SENTINEL\nPRIMARY CONTENT\nA-EDIT",
+            "bom": true,
+            "eol": "\r\n",
+            "encoding": "utf8"
+          },
+          "state": {
+            "text": "A_DOCUMENT_SENTINEL\nPRIMARY CONTENT\nA-EDIT SAVE-AS-FAIL",
+            "selection": {
+              "anchor": 55,
+              "head": 55
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 307.3828125,
+              "right": 307.3828125,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 55 字 — MarkPilot",
+            "banner": "保存失败：目标不是普通文件：<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\save-as.md（<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\primary-bom-crlf.md）另存为…重新加载重试"
+          }
+        }
+      ],
+      "ms": 1114
+    },
+    {
+      "id": "same-file-two-windows-conflict-keeps-both-drafts",
+      "status": "pass",
+      "trace": [
+        {
+          "disk": "SHARED BASE\nY-DRAFT",
+          "x": {
+            "text": "SHARED BASE\nX-DRAFT!",
+            "selection": {
+              "anchor": 20,
+              "head": 20
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 237.0625,
+              "right": 237.0625,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "scrollTop": 0,
+            "title": "● shared.md · 20 字 — MarkPilot",
+            "banner": "保存失败：文件已被其他窗口或程序修改，请重新加载或另存为：<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\shared.md（<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\shared.md）另存为…重新加载"
+          },
+          "y": {
+            "text": "SHARED BASE\nY-DRAFT",
+            "selection": {
+              "anchor": 19,
+              "head": 19
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 231.09375,
+              "right": 231.09375,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "scrollTop": 0,
+            "title": "shared.md · 19 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 4907
+    },
+    {
+      "id": "external-change-with-identical-size-and-mtime-is-refused",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "ORIGINAL\nLOCAL",
+            "selection": {
+              "anchor": 14,
+              "head": 14
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 216.1953125,
+              "right": 216.1953125,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "scrollTop": 0,
+            "title": "● external.md · 14 字 — MarkPilot",
+            "banner": "保存失败：文件已被其他窗口或程序修改，请重新加载或另存为：<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\external.md（<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\external.md）另存为…重新加载"
+          },
+          "disk": "EXTERNAL\n"
+        }
+      ],
+      "ms": 2256
+    },
+    {
+      "id": "deleted-original-is-not-silently-recreated",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "DELETE BASE\nLOCAL",
+          "selection": {
+            "anchor": 17,
+            "head": 17
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 216.1953125,
+            "right": 216.1953125,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "● deleted.md · 17 字 — MarkPilot",
+          "banner": "保存失败：原文件已不在磁盘上（可能被重命名或删除）：<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\deleted.md（<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\deleted.md）另存为…重新加载"
+        }
+      ],
+      "ms": 2053
+    },
+    {
+      "id": "save-receipt-does-not-clear-later-edit",
+      "status": "pass",
+      "trace": [
+        {
+          "afterFirst": {
+            "text": "FLIGHT BASE\nFIRSTSECOND",
+            "selection": {
+              "anchor": 23,
+              "head": 23
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 268.3125,
+              "right": 268.3125,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "scrollTop": 0,
+            "title": "● in-flight.md · 23 字 — MarkPilot",
+            "banner": ""
+          },
+          "disk": "FLIGHT BASE\nFIRST"
+        }
+      ],
+      "ms": 2188
+    },
+    {
+      "id": "late-save-receipt-does-not-change-new-document",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "NEW\n",
+            "selection": {
+              "anchor": 4,
+              "head": 4
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 170.5,
+              "y": 79.6953125,
+              "width": 0,
+              "height": 16,
+              "top": 79.6953125,
+              "right": 170.5,
+              "bottom": 95.6953125,
+              "left": 170.5
+            },
+            "scrollTop": 0,
+            "title": "switch-new.md · 4 字 — MarkPilot",
+            "banner": ""
+          },
+          "info": {
+            "documentId": "367a3c26-d4d3-4bc6-9a46-63f0606a2696",
+            "revision": 0,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\switch-new.md",
+            "text": "NEW\n",
+            "bom": false,
+            "eol": "\n",
+            "encoding": "utf8"
+          },
+          "old": "OLD\nSAVING"
+        }
+      ],
+      "ms": 1147
+    },
+    {
+      "id": "clean-view-reload-restores-revision-and-allows-later-save",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "documentId": "c82b3b0b-da8a-452a-a49e-8d4bf4c554b7",
+            "revision": 4,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\view-reload.md",
+            "text": "EDIT0EDIT1EDIT2EDIT3RELOAD BASE\n",
+            "bom": false,
+            "eol": "\n",
+            "encoding": "utf8"
+          },
+          "restored": {
+            "documentId": "c82b3b0b-da8a-452a-a49e-8d4bf4c554b7",
+            "revision": 4,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\view-reload.md",
+            "text": "EDIT0EDIT1EDIT2EDIT3RELOAD BASE\n",
+            "bom": false,
+            "eol": "\n",
+            "encoding": "utf8"
+          },
+          "after": {
+            "text": "EDIT0EDIT1EDIT2EDIT3RELOAD BASE\nAFTER RELOAD",
+            "selection": {
+              "anchor": 44,
+              "head": 44
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 277,
+              "right": 277,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "scrollTop": 0,
+            "title": "view-reload.md · 44 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 3518
+    },
+    {
+      "id": "dirty-view-reload-cancel-preserves-unnamed-draft",
+      "status": "pass",
+      "trace": [
+        {
+          "menu": {
+            "ok": true,
+            "id": "menu-reload-view",
+            "forced": true,
+            "enabled": true
+          },
+          "before": {
+            "text": "UNNAMED RELOAD DRAFT",
+            "selection": {
+              "anchor": 20,
+              "head": 20
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 355.7890625,
+              "right": 355.7890625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "未命名 — MarkPilot",
+            "banner": ""
+          },
+          "after": {
+            "text": "UNNAMED RELOAD DRAFT",
+            "selection": {
+              "anchor": 20,
+              "head": 20
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 355.7890625,
+              "right": 355.7890625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● 未命名 · 20 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 1256
+    },
+    {
+      "id": "secondary-save-does-not-clear-primary-unsaved-close-guard",
+      "status": "pass",
+      "trace": [
+        {
+          "clicked": {
+            "ok": true,
+            "id": "menu-close-window",
+            "forced": true,
+            "enabled": true
+          },
+          "closed": false,
+          "nativeConfirmationRequested": true
+        }
+      ],
+      "ms": 2844
+    },
+    {
+      "id": "save-and-close-with-cancelled-save-as-keeps-draft-and-cancels-close-intent",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "CANCELLED CLOSE DRAFT",
+            "selection": {
+              "anchor": 21,
+              "head": 21
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 342.6484375,
+              "right": 342.6484375,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● 未命名 · 21 字 — MarkPilot",
+            "banner": ""
+          },
+          "dialogSelection": "test-only native response 0; Save As cancellation hook"
+        }
+      ],
+      "ms": 543
+    },
+    {
+      "id": "utf16le-open-edit-reload-save-as-roundtrip",
+      "status": "pass",
+      "trace": [
+        {
+          "loaded": {
+            "text": "中文测试数据记录\nASCII & emoji 😀\n﻿正文\n",
+            "selection": {
+              "anchor": 0,
+              "head": 0
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 160.5,
+              "right": 160.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "utf16le.md · 30 字 — MarkPilot",
+            "banner": ""
+          },
+          "originalHex": "fffe2d4e87654b6dd58b70656e63b08b555f0d000a004100530043004900490020002600200065006d006f006a00690020003dd800de0d000a00fffe636b87650d000a00"
+        },
+        {
+          "afterHex": "fffe2d4e87654b6dd58b70656e63b08b555f0d000a004100530043004900490020002600200065006d006f006a00690020003dd800de0d000a00fffe636b87650d000a00fd8fa052"
+        }
+      ],
+      "ms": 1690
+    },
+    {
+      "id": "utf16be-open-edit-reload-save-as-roundtrip",
+      "status": "pass",
+      "trace": [
+        {
+          "loaded": {
+            "text": "中文测试数据记录\nASCII & emoji 😀\n﻿正文\n",
+            "selection": {
+              "anchor": 30,
+              "head": 30
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 160.5,
+              "y": 130.0859375,
+              "width": 0,
+              "height": 16,
+              "top": 130.0859375,
+              "right": 160.5,
+              "bottom": 146.0859375,
+              "left": 160.5
+            },
+            "scrollTop": 0,
+            "title": "utf16be.md · 30 字 — MarkPilot",
+            "banner": ""
+          },
+          "originalHex": "feff4e2d65876d4b8bd56570636e8bb05f55000a004100530043004900490020002600200065006d006f006a00690020d83dde00000afeff6b636587000a"
+        },
+        {
+          "afterHex": "feff4e2d65876d4b8bd56570636e8bb05f55000a004100530043004900490020002600200065006d006f006a00690020d83dde00000afeff6b636587000a8ffd52a0"
+        }
+      ],
+      "ms": 1642
+    },
+    {
+      "id": "odd-utf16-refused-without-mutating-current-document",
+      "status": "pass",
+      "trace": [
+        {
+          "opened": {
+            "ok": false,
+            "error": "UTF-16 文件字节数不完整，已停止打开以保护原文件：<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\odd-utf16.md"
+          }
+        }
+      ],
+      "ms": 14
+    },
+    {
+      "id": "unpaired-utf16-refused-without-mutating-current-document",
+      "status": "pass",
+      "trace": [
+        {
+          "opened": {
+            "ok": false,
+            "error": "文件不是完整有效的 UTF-16 文本，已停止打开以保护原文件：<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\unpaired-utf16.md"
+          }
+        }
+      ],
+      "ms": 14
+    },
+    {
+      "id": "utf32le-refused-without-mutating-current-document",
+      "status": "pass",
+      "trace": [
+        {
+          "opened": {
+            "ok": false,
+            "error": "暂不支持 UTF-32 文件，请先转换为 UTF-8 或带 BOM 的 UTF-16：<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\utf32le.md"
+          }
+        }
+      ],
+      "ms": 16
+    },
+    {
+      "id": "utf32be-refused-without-mutating-current-document",
+      "status": "pass",
+      "trace": [
+        {
+          "opened": {
+            "ok": false,
+            "error": "暂不支持 UTF-32 文件，请先转换为 UTF-8 或带 BOM 的 UTF-16：<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\utf32be.md"
+          }
+        }
+      ],
+      "ms": 16
+    },
+    {
+      "id": "invalid-utf8-refused-without-mutating-current-document",
+      "status": "pass",
+      "trace": [
+        {
+          "opened": {
+            "ok": false,
+            "error": "文件不是完整有效的 UTF-8 文本，已停止打开以保护原文件：<repo>\\.mp-verify\\codex-audit\\candidate-installed-data\\invalid-utf8.md"
+          }
+        }
+      ],
+      "ms": 14
+    },
+    {
+      "id": "utf8-nul-and-literal-replacement-character-remain-valid",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "合法文字 containing NUL\u0000 and literal �\n继续",
+          "selection": {
+            "anchor": 37,
+            "head": 37
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 188.5,
+            "y": 79.6953125,
+            "width": 0,
+            "height": 16,
+            "top": 79.6953125,
+            "right": 188.5,
+            "bottom": 95.6953125,
+            "left": 188.5
+          },
+          "scrollTop": 0,
+          "title": "utf8-controls.md · 37 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 1018
+    }
+  ],
+  "frames": [
+    {
+      "file": "secondary-save.png",
+      "sha256": "0ba12b8db7ae920798da44de44439b5ae229a1513df7a4657a170f78d3a60863",
+      "caret": {
+        "left": 218.6328125,
+        "right": 218.6328125,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "secondary-save-caret-2x.png",
+        "sha256": "927cbab9cced00b7920117f631ca721d2bbfb53555195c60187414396bc3508c",
+        "clip": {
+          "x": 98.6328125,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "same-file-conflict.png",
+      "sha256": "af2e5b982aa66f8d476171d6a08e38fbbaf8c539b17c3689d831c3e05f204231",
+      "caret": {
+        "left": 237.0625,
+        "right": 237.0625,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "same-file-conflict-caret-2x.png",
+        "sha256": "472d9dbd123eb7c5915fc1b975d467f1e91cc0966eb3e2affb5c781dc9230066",
+        "clip": {
+          "x": 117.0625,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "external-conflict.png",
+      "sha256": "8af582cb65c7c7690a993e622bed9038bc27d0fc259fe56db506c7048b6d6906",
+      "caret": {
+        "left": 216.1953125,
+        "right": 216.1953125,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "external-conflict-caret-2x.png",
+        "sha256": "60ebcafeb6b09d8deb1a5d9f0511e06edb2643a64e22b564de66fce5d6f82992",
+        "clip": {
+          "x": 96.1953125,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "view-reload.png",
+      "sha256": "f8cb42ef8b0fb5bc0c64ac1ca6c64ec990eb0707b619476b9b8164ee89904091",
+      "caret": {
+        "left": 277,
+        "right": 277,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "view-reload-caret-2x.png",
+        "sha256": "12d3ee7df6748152a0124cd957007a8cfd71758da6a2e4f8b6e41813eefdf80d",
+        "clip": {
+          "x": 157,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "unsaved-primary.png",
+      "sha256": "e66ce075decdcd3529e40c07b7c3b59443e24b729b1fbbb07ee19bcfaab918d4",
+      "caret": {
+        "left": 346.1640625,
+        "right": 346.1640625,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "unsaved-primary-caret-2x.png",
+        "sha256": "c8eb00c687eed669ac444c74b285a4c035754d9b5d230333f3d5e54d6e5d06d9",
+        "clip": {
+          "x": 226.1640625,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "utf16le-open.png",
+      "sha256": "a98fb622b2a5ccbae4a85661af1a6ae98e976c763372cddfbf2cd9e6894465b6",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "utf16le-open-caret-2x.png",
+        "sha256": "20fb9cc33b4f91d7f34bb35eb6e648fed74f21ce99b1a1c688d6770b9524ae09",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "utf16be-open.png",
+      "sha256": "ad055ad4cf4a2343ebd02a4a5431670db7495db79920fdfa476a7e67fe592aa0",
+      "caret": {
+        "x": 160.5,
+        "y": 130.0859375,
+        "width": 0,
+        "height": 16,
+        "top": 130.0859375,
+        "right": 160.5,
+        "bottom": 146.0859375,
+        "left": 160.5
+      },
+      "zoom": {
+        "file": "utf16be-open-caret-2x.png",
+        "sha256": "cade959b73de94a639d0db3cca75e002058d5bd348b876800eed90ca828c11ea",
+        "clip": {
+          "x": 40.5,
+          "y": 105.0859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ],
+  "metadata": {
+    "executable": "MarkPilot.exe",
+    "exeSha256": "bdc970e1d67580612ec734f1e635cdf88c65161c0cf19c970987d6246b75f133",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.6",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "bootMs": 842,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "d64901ab8921ab227387679d9988302af9ed6576816c13bf26ad73d87cd123f7",
+        "sourceSha256": "d64901ab8921ab227387679d9988302af9ed6576816c13bf26ad73d87cd123f7"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "a82bfbb9c56c8c355976dec9ad5df6b1f8581d8524b9eab54f818261db7a97fd",
+        "sourceSha256": "a82bfbb9c56c8c355976dec9ad5df6b1f8581d8524b9eab54f818261db7a97fd"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "506a019995027754e35a4ccc53c2400097a65021f812b4401a6c092407d1547c",
+        "sourceSha256": "506a019995027754e35a4ccc53c2400097a65021f812b4401a6c092407d1547c"
+      }
+    ]
+  },
+  "firstCleanup": {
+    "residual": []
+  },
+  "closeGuardCleanup": {
+    "residual": []
+  },
+  "beforeEncodingCleanup": {
+    "residual": []
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T12:00:59.608Z",
+  "passed": true
+}

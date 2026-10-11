@@ -1,0 +1,202 @@
+{
+  "schema": 1,
+  "scope": "encoding",
+  "singleCase": null,
+  "startedAt": "2026-10-11T11:50:15.742Z",
+  "cases": [
+    {
+      "id": "utf16le-open-edit-reload-save-as-roundtrip",
+      "status": "fail",
+      "trace": [],
+      "error": "open succeeded: {\"ok\":false,\"error\":\"这是一个二进制文件，MarkPilot 只打开文本文件：<repo>\\\\.mp-verify\\\\codex-audit\\\\codec-read-revert-run\\\\utf16le.md\"}",
+      "ms": 17
+    },
+    {
+      "id": "utf16be-open-edit-reload-save-as-roundtrip",
+      "status": "fail",
+      "trace": [],
+      "error": "open succeeded: {\"ok\":false,\"error\":\"这是一个二进制文件，MarkPilot 只打开文本文件：<repo>\\\\.mp-verify\\\\codex-audit\\\\codec-read-revert-run\\\\utf16be.md\"}",
+      "ms": 11
+    },
+    {
+      "id": "odd-utf16-refused-without-mutating-current-document",
+      "status": "fail",
+      "trace": [
+        {
+          "opened": {
+            "ok": true
+          }
+        }
+      ],
+      "error": "Expected values to be strictly equal:\n\ntrue !== false\n",
+      "ms": 27
+    },
+    {
+      "id": "unpaired-utf16-refused-without-mutating-current-document",
+      "status": "pass",
+      "trace": [
+        {
+          "opened": {
+            "ok": false,
+            "error": "这是一个二进制文件，MarkPilot 只打开文本文件：<repo>\\.mp-verify\\codex-audit\\codec-read-revert-run\\unpaired-utf16.md"
+          }
+        }
+      ],
+      "ms": 40
+    },
+    {
+      "id": "utf32le-refused-without-mutating-current-document",
+      "status": "pass",
+      "trace": [
+        {
+          "opened": {
+            "ok": false,
+            "error": "这是一个二进制文件，MarkPilot 只打开文本文件：<repo>\\.mp-verify\\codex-audit\\codec-read-revert-run\\utf32le.md"
+          }
+        }
+      ],
+      "ms": 28
+    },
+    {
+      "id": "utf32be-refused-without-mutating-current-document",
+      "status": "pass",
+      "trace": [
+        {
+          "opened": {
+            "ok": false,
+            "error": "这是一个二进制文件，MarkPilot 只打开文本文件：<repo>\\.mp-verify\\codex-audit\\codec-read-revert-run\\utf32be.md"
+          }
+        }
+      ],
+      "ms": 27
+    },
+    {
+      "id": "invalid-utf8-refused-without-mutating-current-document",
+      "status": "fail",
+      "trace": [
+        {
+          "opened": {
+            "ok": true
+          }
+        }
+      ],
+      "error": "Expected values to be strictly equal:\n\ntrue !== false\n",
+      "ms": 25
+    },
+    {
+      "id": "utf8-nul-and-literal-replacement-character-remain-valid",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "合法文字 containing NUL\u0000 and literal �\n继续",
+          "selection": {
+            "anchor": 37,
+            "head": 37
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 188.5,
+            "y": 79.6953125,
+            "width": 0,
+            "height": 16,
+            "top": 79.6953125,
+            "right": 188.5,
+            "bottom": 95.6953125,
+            "left": 188.5
+          },
+          "scrollTop": 0,
+          "title": "utf8-controls.md · 37 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 1055
+    }
+  ],
+  "frames": [],
+  "metadata": {
+    "executable": "MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.6",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "bootMs": 1198,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "d64901ab8921ab227387679d9988302af9ed6576816c13bf26ad73d87cd123f7",
+        "sourceSha256": "d64901ab8921ab227387679d9988302af9ed6576816c13bf26ad73d87cd123f7"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "a82bfbb9c56c8c355976dec9ad5df6b1f8581d8524b9eab54f818261db7a97fd",
+        "sourceSha256": "a82bfbb9c56c8c355976dec9ad5df6b1f8581d8524b9eab54f818261db7a97fd"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "d2aec7daa9391149f65b403c768ab06b0bb0a4fc1fcd424b34a87833476cb2c6",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "506a019995027754e35a4ccc53c2400097a65021f812b4401a6c092407d1547c",
+        "sourceSha256": "506a019995027754e35a4ccc53c2400097a65021f812b4401a6c092407d1547c"
+      }
+    ]
+  },
+  "beforeEncodingCleanup": {
+    "residual": []
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T11:50:33.446Z",
+  "passed": false
+}
