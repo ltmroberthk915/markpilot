@@ -4,6 +4,11 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { ROOT, sleep } = require('./lifecycle.cjs');
+async function waitUntil(predicate, label = 'condition', timeoutMs = 10000) {
+  const end=Date.now()+timeoutMs;
+  do { if(await predicate())return; await sleep(60); } while(Date.now()<end);
+  throw new Error('Timed out waiting for '+label);
+}
 function outputDir(out, label) {
   const dir = path.resolve(out || path.join(ROOT, '.mp-verify/quality', label + '-' + Date.now()));
   fs.mkdirSync(dir, { recursive: true });
@@ -36,9 +41,17 @@ async function frame(page, dir, name) {
     Object.assign(d.style,{position:'fixed',left:r.left+'px',top:r.top+'px',width:'2px',height:(r.bottom-r.top)+'px',background:'#ff3030',zIndex:'2147483646',pointerEvents:'none'});
     document.body.appendChild(d);return r;
   });
+  assert(caret && Number.isFinite(caret.left) && caret.bottom>caret.top,'screenshot must include a measurable caret position');
   try {
     const bytes=await page.screenshot({path:path.join(dir,name+'.png'),animations:'disabled'});
-    return {file:name+'.png',sha256:crypto.createHash('sha256').update(bytes).digest('hex'),caret};
+    const viewport=page.viewportSize()||await page.evaluate(()=>({width:innerWidth,height:innerHeight}));
+    const clip={x:Math.max(0,Math.min(caret.left-120,viewport.width-300)),y:Math.max(0,Math.min(caret.top-25,viewport.height-90)),width:Math.min(300,viewport.width),height:Math.min(90,viewport.height),scale:2};
+    const cdp=await page.context().newCDPSession(page);
+    let zoomBytes;
+    try {const shot=await cdp.send('Page.captureScreenshot',{format:'png',clip,captureBeyondViewport:false});zoomBytes=Buffer.from(shot.data,'base64');}
+    finally {await cdp.detach();}
+    fs.writeFileSync(path.join(dir,name+'-caret-2x.png'),zoomBytes);
+    return {file:name+'.png',sha256:crypto.createHash('sha256').update(bytes).digest('hex'),caret,zoom:{file:name+'-caret-2x.png',sha256:crypto.createHash('sha256').update(zoomBytes).digest('hex'),clip}};
   } finally { await page.evaluate(()=>document.getElementById('quality-caret-marker')?.remove()).catch(()=>{}); }
 }
 async function newWindow(run, owner, file) {
@@ -49,7 +62,7 @@ async function newWindow(run, owner, file) {
     for(const p of run.browser.contexts().flatMap(c=>c.pages())) {
       if(old.has(p))continue;
       if(await p.evaluate(()=>!!window.mpEngine?._view?.()).catch(()=>false)) {
-        await p.waitForFunction(p=>window.mpHost.currentDoc().then(d=>p==null ? d==null : d?.filePath===p),file,{timeout:10000});
+        await waitUntil(()=>p.evaluate(file=>window.mpHost.currentDoc().then(d=>file==null ? d==null : d?.filePath===file),file),'new-window document handshake');
         await sleep(300);return p;
       }
     }
@@ -71,4 +84,4 @@ function recorder(dir, result) {
     if(entry.timeout)throw new Error('Timed out: '+id);
   };
 }
-module.exports={outputDir,snapshot,reset,frame,newWindow,recorder};
+module.exports={outputDir,snapshot,reset,frame,newWindow,recorder,waitUntil};

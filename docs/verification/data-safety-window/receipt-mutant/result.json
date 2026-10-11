@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "scope": "sessions",
+  "singleCase": "save-receipt-does-not-clear-later-edit",
+  "startedAt": "2026-10-11T11:40:32.226Z",
+  "cases": [
+    {
+      "id": "save-receipt-does-not-clear-later-edit",
+      "status": "fail",
+      "trace": [
+        {
+          "afterFirst": {
+            "text": "FLIGHT BASE\nFIRSTSECOND",
+            "selection": {
+              "anchor": 23,
+              "head": 23
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 268.3125,
+              "right": 268.3125,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "scrollTop": 0,
+            "title": "in-flight.md · 23 字 — MarkPilot",
+            "banner": ""
+          },
+          "disk": "FLIGHT BASE\nFIRST"
+        }
+      ],
+      "error": "second edit remains dirty after first receipt",
+      "ms": 1199
+    }
+  ],
+  "frames": [],
+  "metadata": {
+    "executable": "MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.5",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "bootMs": 875,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "9e579d2160be36adf04d2f3e829502710edc3a8449b689dcddb5db3d80995d78",
+        "sourceSha256": "d64901ab8921ab227387679d9988302af9ed6576816c13bf26ad73d87cd123f7"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "2db9d3765fd25872220a7a316aea88dcb99339ed6c0a574e71030dbecad9fd63",
+        "sourceSha256": "a82bfbb9c56c8c355976dec9ad5df6b1f8581d8524b9eab54f818261db7a97fd"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "42a0e04d0369bf03abbd2aafe633a577f794bea1d52116e7d3b48388bb19c308",
+        "sourceSha256": "42a0e04d0369bf03abbd2aafe633a577f794bea1d52116e7d3b48388bb19c308"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "506a019995027754e35a4ccc53c2400097a65021f812b4401a6c092407d1547c",
+        "sourceSha256": "506a019995027754e35a4ccc53c2400097a65021f812b4401a6c092407d1547c"
+      }
+    ]
+  },
+  "firstCleanup": {
+    "residual": []
+  },
+  "closeGuardCleanup": {
+    "residual": []
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T11:40:53.084Z",
+  "passed": false
+}

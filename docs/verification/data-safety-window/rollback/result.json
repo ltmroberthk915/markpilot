@@ -1,0 +1,474 @@
+{
+  "schema": 1,
+  "scope": "sessions",
+  "startedAt": "2026-10-11T11:27:00.174Z",
+  "cases": [
+    {
+      "id": "secondary-save-preserves-own-bom-eol",
+      "status": "fail",
+      "trace": [],
+      "error": "Timed out waiting for saved text and clean title",
+      "ms": 10070
+    },
+    {
+      "id": "secondary-save-keeps-both-saved-texts",
+      "status": "fail",
+      "trace": [
+        {
+          "a": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\window-revert-run\\primary-bom-crlf.md"
+          },
+          "b": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\n",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\window-revert-run\\secondary-lf.md"
+          }
+        }
+      ],
+      "error": "Expected values to be strictly equal:\n+ actual - expected\n\n+ 'B_DOCUMENT_SENTINEL\\nSECOND CONTENT\\nB-EDIT'\n- 'A_DOCUMENT_SENTINEL\\nPRIMARY CONTENT\\n'\n",
+      "ms": 9
+    },
+    {
+      "id": "focused-primary-native-menu-save",
+      "status": "fail",
+      "trace": [],
+      "error": "Timed out waiting for explicit save starts before autosave",
+      "ms": 529
+    },
+    {
+      "id": "primary-pdf-exports-primary-with-secondary-open",
+      "status": "fail",
+      "trace": [
+        {
+          "ok": true,
+          "file": "<repo>\\.mp-verify\\codex-audit\\window-revert-run\\primary.pdf",
+          "bytes": 46541,
+          "pages": 1,
+          "ms": 310,
+          "printMs": 257,
+          "chunks": 1,
+          "html": {
+            "file": "<repo>\\.mp-verify\\codex-audit\\window-revert-run\\runtime-temp\\markpilot-pdf-ONq1Cm\\MarkPilot 导出.html",
+            "bytes": 373111,
+            "relImages": 0,
+            "dataImages": 0,
+            "remoteImages": 0,
+            "tables": 0,
+            "mathBlocks": 0
+          },
+          "images": {
+            "complete": 0,
+            "natural": 0,
+            "broken": 0,
+            "ms": 210
+          },
+          "gate": {
+            "passed": true,
+            "reasons": [],
+            "inlineDataImages": 0,
+            "relImages": 0
+          },
+          "memory": {
+            "peakMB": 722.4,
+            "lastMB": 722.4,
+            "samples": 3,
+            "intervalMs": 200,
+            "perProc": [
+              {
+                "type": "GPU",
+                "pid": 78288,
+                "peakMB": 238.8
+              },
+              {
+                "type": "Browser",
+                "pid": 59840,
+                "peakMB": 119.7
+              },
+              {
+                "type": "Tab",
+                "pid": 76480,
+                "peakMB": 116.1
+              },
+              {
+                "type": "Tab",
+                "pid": 70644,
+                "peakMB": 104.9
+              },
+              {
+                "type": "Tab",
+                "pid": 76036,
+                "peakMB": 93.1
+              },
+              {
+                "type": "Utility",
+                "pid": 83432,
+                "peakMB": 50.4
+              }
+            ],
+            "seriesMB": [
+              600,
+              698,
+              722,
+              722
+            ]
+          },
+          "phases": [
+            {
+              "bytes": 373111,
+              "relImages": 0,
+              "dataImages": 0,
+              "tables": 0,
+              "phase": "inspect",
+              "ms": 95
+            },
+            {
+              "signal": "dom-ready",
+              "loadMs": 96,
+              "phase": "load",
+              "ms": 205
+            },
+            {
+              "total": 0,
+              "local": 0,
+              "remote": 0,
+              "complete": 0,
+              "natural": 0,
+              "broken": 0,
+              "remotePending": 0,
+              "partial": false,
+              "readyState": "complete",
+              "ms": 210,
+              "phase": "images"
+            },
+            {
+              "mathCssBytes": 369219,
+              "phase": "style",
+              "ms": 216
+            },
+            {
+              "applied": 3,
+              "lines": 3,
+              "blocks": 3,
+              "width": 680.64,
+              "fallback": {},
+              "phase": "typeset",
+              "ms": 222
+            },
+            {
+              "bytes": 46541,
+              "pages": 1,
+              "phase": "print",
+              "ms": 255
+            },
+            {
+              "done": 46541,
+              "bytes": 46541,
+              "chunks": 1,
+              "phase": "write",
+              "ms": 256
+            },
+            {
+              "bytes": 46541,
+              "chunks": 1,
+              "writeMs": 2,
+              "phase": "write-done",
+              "ms": 257
+            }
+          ],
+          "kp": {
+            "applied": 3,
+            "lines": 3,
+            "fallback": {},
+            "blocks": 3,
+            "width": 680.64,
+            "sourceBytes": 123,
+            "sourceChars": 41
+          },
+          "mathCss": {
+            "source": "engine",
+            "bytes": 369219
+          }
+        },
+        {
+          "htmlBody": "\nB_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT\n\n\n\n"
+        }
+      ],
+      "error": "The expression evaluated to a falsy value:\n\n  assert(body.includes('A_DOCUMENT_SENTINEL'))\n",
+      "ms": 464
+    },
+    {
+      "id": "secondary-save-as-keeps-primary-path",
+      "status": "fail",
+      "trace": [],
+      "error": "Timed out waiting for saved text and clean title",
+      "ms": 10166
+    },
+    {
+      "id": "failed-save-as-retains-source-and-dirty-state",
+      "status": "fail",
+      "trace": [
+        {
+          "before": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\window-revert-run\\save-as.md"
+          },
+          "after": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\window-revert-run\\save-as.md"
+          },
+          "state": {
+            "text": "A_DOCUMENT_SENTINEL\nPRIMARY CONTENT\nA-EDIT SAVE-AS-FAIL",
+            "selection": {
+              "anchor": 55,
+              "head": 55
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 307.3828125,
+              "right": 307.3828125,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 55 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "error": "The expression evaluated to a falsy value:\n\n  assert(s.banner.includes('失败'))\n",
+      "ms": 406
+    },
+    {
+      "id": "same-file-two-windows-conflict-keeps-both-drafts",
+      "status": "fail",
+      "trace": [],
+      "error": "Timed out waiting for saved text and clean title",
+      "ms": 11705
+    },
+    {
+      "id": "external-change-with-identical-size-and-mtime-is-refused",
+      "status": "fail",
+      "trace": [
+        {
+          "state": {
+            "text": "ORIGINAL\nLOCAL",
+            "selection": {
+              "anchor": 14,
+              "head": 14
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 216.1953125,
+              "right": 216.1953125,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "scrollTop": 0,
+            "title": "external.md · 14 字 — MarkPilot",
+            "banner": ""
+          },
+          "disk": "﻿ORIGINAL\r\nLOCAL"
+        }
+      ],
+      "error": "Expected values to be strictly equal:\n+ actual - expected\n\n+ '﻿ORIGINAL\\r\\nLOCAL'\n- 'EXTERNAL\\n'\n",
+      "ms": 2327
+    },
+    {
+      "id": "deleted-original-is-not-silently-recreated",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "DELETE BASE\nLOCAL",
+          "selection": {
+            "anchor": 17,
+            "head": 17
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 216.1953125,
+            "right": 216.1953125,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "● deleted.md · 17 字 — MarkPilot",
+          "banner": "保存失败：原文件已不在磁盘上（可能被重命名或删除）：<repo>\\.mp-verify\\codex-audit\\window-revert-run\\deleted.md（<repo>\\.mp-verify\\codex-audit\\window-revert-run\\deleted.md）重试另存为…"
+        }
+      ],
+      "ms": 2070
+    },
+    {
+      "id": "save-receipt-does-not-clear-later-edit",
+      "status": "fail",
+      "trace": [],
+      "error": "page.waitForFunction: Timeout 30000ms exceeded.",
+      "ms": 30878
+    },
+    {
+      "id": "late-save-receipt-does-not-change-new-document",
+      "status": "fail",
+      "trace": [
+        {
+          "state": {
+            "text": "NEW\n",
+            "selection": {
+              "anchor": 4,
+              "head": 4
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 170.5,
+              "y": 79.6953125,
+              "width": 0,
+              "height": 16,
+              "top": 79.6953125,
+              "right": 170.5,
+              "bottom": 95.6953125,
+              "left": 170.5
+            },
+            "scrollTop": 0,
+            "title": "switch-new.md · 4 字 — MarkPilot",
+            "banner": ""
+          },
+          "info": {
+            "text": "OLD\n",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\window-revert-run\\switch-new.md"
+          },
+          "old": "﻿OLD\r\nSAVING"
+        }
+      ],
+      "error": "Expected values to be strictly equal:\n\n'OLD\\n' !== 'NEW\\n'\n",
+      "ms": 1654
+    },
+    {
+      "id": "secondary-save-does-not-clear-primary-unsaved-close-guard",
+      "status": "fail",
+      "trace": [],
+      "error": "Timed out waiting for saved text and clean title",
+      "ms": 11221
+    }
+  ],
+  "frames": [
+    {
+      "file": "external-conflict.png",
+      "sha256": "557258572928798273be3596f65c5cba7637e8e4af7814ff2c6fd1ff0f3228e4",
+      "caret": {
+        "left": 216.1953125,
+        "right": 216.1953125,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "external-conflict-caret-2x.png",
+        "sha256": "41cb93fd0ca920578cd0ccc57803410c4a1d87e743a8eef8ad9e2a65634fb8f3",
+        "clip": {
+          "x": 96.1953125,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ],
+  "metadata": {
+    "executable": "MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.5",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "bootMs": 1114,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "10c5a246421416dd77888a757cb0b5c2cc462e898be6bcc1b972f0c4a376adb0",
+        "sourceSha256": "01f176243f80ce4ec1da3ae456bc1ab9ee791778d1a67aa6b6fe7109d529388c"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "70ea6eb5a0f88e5a45b62fed93f6c14f6daad9de3a2a2e5fedfb04eb87baa824",
+        "sourceSha256": "941486935108d3e2fdd12011cff1fb3f13fd551b0b65b5a204d8d9c65b5b8b97"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "97553e188a464b573d309ba63ba7a44db9fd27b8ea18494edcc8558f0f796e1c",
+        "sourceSha256": "de593fcf3d92f83dbc8adc66208feb9a110854405689ae58f892e95acc6c23d3"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "42a0e04d0369bf03abbd2aafe633a577f794bea1d52116e7d3b48388bb19c308",
+        "sourceSha256": "42a0e04d0369bf03abbd2aafe633a577f794bea1d52116e7d3b48388bb19c308"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "506a019995027754e35a4ccc53c2400097a65021f812b4401a6c092407d1547c",
+        "sourceSha256": "506a019995027754e35a4ccc53c2400097a65021f812b4401a6c092407d1547c"
+      }
+    ]
+  },
+  "firstCleanup": {
+    "residual": []
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T11:28:37.982Z",
+  "passed": false
+}

@@ -19,10 +19,10 @@ function publish(input,output,includeFrames=true) {
   const result=JSON.parse(fs.readFileSync(path.join(source,'result.json'),'utf8')),small=sanitize(result);let total=0;
   fs.mkdirSync(dest,{recursive:true});
   if(fs.readdirSync(dest).length)throw new Error('Evidence destination must be empty');
-  for(const f of result.frames||[]) {
+  for(const f of (result.frames||[]).flatMap(f=>f.zoom?[f,f.zoom]:[f])) {
     if(path.basename(f.file)!==f.file||!f.file.endsWith('.png'))throw new Error('Invalid frame path');
     const file=path.join(source,f.file);assertHash(file,f.sha256);
-    if(!includeFrames){small.frames.find(e=>e.file===f.file).published=false;continue;}
+    if(!includeFrames){f.published=false;const entry=small.frames.find(e=>e.file===f.file)||small.frames.find(e=>e.zoom?.file===f.file)?.zoom;if(entry)entry.published=false;continue;}
     const size=fs.statSync(file).size;total+=size;if(size>1048576||total>5242880)throw new Error('Evidence exceeds small-artifact budget');
     fs.copyFileSync(file,path.join(dest,f.file));
   }

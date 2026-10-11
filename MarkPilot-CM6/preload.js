@@ -9,9 +9,12 @@ contextBridge.exposeInMainWorld('mpHost', {
   docReady: () => ipcRenderer.invoke('doc:ready'),
   open: () => ipcRenderer.invoke('file:open'),
   openPath: (p) => ipcRenderer.invoke('file:openPath', p),
-  save: (filePath, text) => ipcRenderer.invoke('file:save', { filePath, text }),
+  save: (filePath, text, metadata = {}) => ipcRenderer.invoke('file:save', { ...metadata, filePath, text }),
+  __save: () => ipcRenderer.invoke('file:requestSave'),
   saveAs: () => ipcRenderer.invoke('file:saveAs'),
   reload: () => ipcRenderer.invoke('file:reload'),   // 「重新加载文件内容」：壳侧重读磁盘（不 pushRecent；脏文档先确认，默认取消）
+  reloadView: () => ipcRenderer.invoke('view:reload'),
+  cancelCloseSave: () => ipcRenderer.invoke('file:cancelCloseSave'),
   stat: (p) => ipcRenderer.invoke('file:stat', p),
   exists: (p) => ipcRenderer.invoke('file:exists', p),
   // 读本地文件为 base64（导出公式排版内联 KaTeX 字体用；本地资源走宿主通道，不走 URL 请求）
@@ -56,9 +59,9 @@ contextBridge.exposeInMainWorld('mpHost', {
   /* Typora 社区主题：选一个 .css（默认落在 Typora 的主题目录）⇒ 读回全文交给渲染侧改写与注入。
      读文件必须走壳层（渲染进程零文件权限）；主题里的相对 url() 由渲染侧的改写层中和掉，不会去打 404。 */
   pickThemeCss: () => ipcRenderer.invoke('theme:pickCss'),
-  docDirty: (dirty) => ipcRenderer.invoke('doc:dirty', dirty),
-  docPath: (filePath) => ipcRenderer.invoke('doc:path', filePath),
-  docSaved: (filePath) => ipcRenderer.invoke('doc:saved', { filePath }),
+  docDirty: (dirty, metadata) => ipcRenderer.invoke('doc:dirty', metadata ? { ...metadata, dirty } : dirty),
+  docPath: (filePath, metadata = {}) => ipcRenderer.invoke('doc:path', filePath, metadata),
+  docSaved: (filePath, receipt = {}) => ipcRenderer.invoke('doc:saved', { ...receipt, filePath }),
   outsideChange: (filePath) => ipcRenderer.invoke('doc:outside-change', { filePath }),
   // 当前文档路径（导出为文件夹时用来解析相对图片路径）
   docInfo: () => ipcRenderer.invoke('doc:info'),
