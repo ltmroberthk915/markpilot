@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>MarkPilot</title>
+  <base href="./" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="cdn/vditor/dist/index.css" />
+  <!-- 与 Typora-Editor-App 同口径：不静态挂 vditor content-theme（C1 基线块见 index.css）。 -->
+  <link rel="stylesheet" href="index.css" />
+  <link rel="stylesheet" href="css/scrollbar.css" />
+  <link rel="stylesheet" href="css/fontsize.css" />
+  <link rel="stylesheet" href="css/edit-shortcuts.css" />
+  <link rel="stylesheet" href="css/find-replace.css" />
+  <link rel="stylesheet" href="css/konayuki.css" />
+  <link rel="stylesheet" href="css/telari.css" />
+  <link rel="stylesheet" href="css/themes.css" />
+  <link rel="stylesheet" href="css/reading-palette.css" />
+  <link rel="stylesheet" href="css/editor-layout.css" />
+  <link rel="stylesheet" href="css/toolbar-autohide.css" />
+  <link rel="stylesheet" href="css/toolbar-collapse.css" />
+  <link rel="stylesheet" href="css/media-tools.css" />
+  <link rel="stylesheet" href="css/zoom.css" />
+  <link rel="stylesheet" href="css/typography.css" />
+  <link rel="stylesheet" href="css/large-doc.css" />
+  <link rel="stylesheet" href="css/reading-mode.css" />
+  <script src="cdn/vditor/dist/index.min.js"></script>
+  <script src="./js/dsh-bridge.js"></script>
+</head>
+
+<body>
+  <div id="vditor"></div>
+</body>
+<script src="index.js" type="module"></script>
+<script id="vditorIconScript" src="cdn/vditor/dist/js/icons/material.js"></script>
+<script>
+  try {
+    const styles = document.querySelectorAll('style')
+    styles[0].remove()
+    styles[1].remove()
+  } catch (e) { }
+</script>
+
+</html>

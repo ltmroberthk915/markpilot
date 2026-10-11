@@ -1,0 +1,89 @@
+{
+  "desktopVersion": "1.0.10",
+  "checkedAt": "2026-09-06T14:46:20.223Z",
+  "packagedFiles": 484,
+  "sharedRendererFiles": 453,
+  "checks": [
+    {
+      "label": "export",
+      "count": 28,
+      "path": "D:\\BuyKey\\Typora-Editor-App\\.perf\\export-packaged-1.0.10.log"
+    },
+    {
+      "label": "snapshots/autosave",
+      "count": 10,
+      "path": "D:\\BuyKey\\Typora-Editor-App\\.perf\\protection-packaged-1.0.10.log"
+    },
+    {
+      "label": "AI/local completion",
+      "count": 17,
+      "path": "D:\\BuyKey\\Typora-Editor-App\\.perf\\completion-packaged-1.0.10.log"
+    },
+    {
+      "label": "shared toolbar/formatting/Mermaid",
+      "count": 66,
+      "path": "D:\\BuyKey\\Typora-Editor-App\\.perf\\features-1.0.10.log"
+    },
+    {
+      "label": "image/edit/save host",
+      "count": 31,
+      "path": "D:\\BuyKey\\Typora-Editor-App\\.perf\\shell-auth.log"
+    },
+    {
+      "label": "file association launch",
+      "count": 22,
+      "path": "D:\\BuyKey\\Typora-Editor-App\\.perf\\file-launch-1.0.10.log"
+    },
+    {
+      "label": "shipping executable",
+      "count": 4,
+      "path": "D:\\BuyKey\\Typora-Editor-App\\.perf\\exe-launch-1.0.10.log"
+    },
+    {
+      "label": "unit tests (71 + 3 image/export units; authentication counted once)",
+      "count": 74,
+      "path": "D:\\BuyKey\\Typora-Editor-App\\.perf\\unit-1.0.10.log"
+    }
+  ],
+  "totalChecks": 254,
+  "bookExport": {
+    "source": "D:/Users/Ming/Desktop/动态规划教材（渲染修复副本）.md",
+    "sourceSHA256": "854c06a50d591c99b53810bcb0951e291b1c7bd495336d22897b855c3748599f",
+    "results": [
+      {
+        "format": "html",
+        "ms": 3495,
+        "bytes": 8946766,
+        "phase": "done",
+        "path": "D:\\BuyKey\\Typora-Editor-App\\.perf\\export-book\\动态规划教材.html",
+        "warnings": [],
+        "formulas": 2844,
+        "diagrams": 0
+      },
+      {
+        "format": "pdf",
+        "ms": 19574,
+        "bytes": 3080398,
+        "phase": "done",
+        "path": "D:\\BuyKey\\Typora-Editor-App\\.perf\\export-book\\动态规划教材.pdf",
+        "warnings": [],
+        "formulas": 2844,
+        "diagrams": 0
+      }
+    ]
+  },
+  "mathBenchmark": "D:\\BuyKey\\Typora-Editor-App\\.perf\\math-engine-benchmark-lean.json",
+  "artifacts": [
+    {
+      "path": "D:\\BuyKey\\Typora-Editor-App\\dist\\TyporaEditor-Setup-1.0.10.exe",
+      "bytes": 116005891,
+      "sha256": "f16b0a509f001ad011da2feb1bfeee841be69312670d323e895173dd5898c6c2"
+    },
+    {
+      "path": "D:\\BuyKey\\Typora-Editor-App\\dist\\TyporaEditor-v1.0.10-portable.exe",
+      "bytes": 115778366,
+      "sha256": "4b817cbc978481d999dc6f2295b12116dfafecc380964122814603a766364ec9"
+    }
+  ],
+  "installation": "Packages generated and tested; production user installation was not launched."
+}

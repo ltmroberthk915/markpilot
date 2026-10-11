@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <title>MarkPilot</title>
+  <!-- 页面级 CSP（壳层的安全边界）
+       · img-src 必须放行 http/https：Markdown 里 ![](https://…) 是常见写法，只留 'self' data: blob:
+         会让请求**根本没发出去**（以 csp 失败，断网联网都一样），等于外链图永远不显示。
+         放行图片不等于放行代码：script-src 仍是 'self'（不放 'unsafe-inline'、不放 https:），
+         图片即便来自恶意页面也只能是像素，读不到文档、发不出请求。
+       · connect-src 'none' 保持：页面自己不发起 fetch/XHR（本地资源走 preload 的 fs 通道）。
+       · object-src/frame-src 由 default-src 'self' 兜住，未放宽。 -->
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; script-src 'self'; connect-src 'none'" />
+  <style>
+    html, body { height: 100%; margin: 0; overflow: hidden; background: var(--mp-bg, #1f2126); }
+    #editor { width: 100%; height: 100%; }
+    /* 错误/提示条：只在保存失败、磁盘外改等需要人决策时出现（平时零占用）
+       【z-index 必须低于工具栏】工具栏是 z-index 45 的浮动岛；改前这里是 99 ⇒ 提示条
+       （rect 0,0,W×≈63）**整条压住工具栏**，实测连「更多」按钮都点不到 ——
+       一旦保存失败（只读/无权限/盘满）或出现外改横幅，用户就没法用工具栏了。
+       取 40：高于正文与格内覆盖层（30）、低于工具栏（45）/气泡（60）/对话框（72）。 */
+    /* 【数据丢失修复·2026-10-10（第三波 path-edge P2）】原来是 z-index:40，而引擎工具栏是 45，
+       两者都 position:fixed 贴顶 ⇒ **提示条的重试/另存为按钮被工具栏盖住**：用户点"重试"实际点到
+       工具栏按钮 ⇒ 保存根本没重试 ⇒ **刚敲的字没落盘**（普查某臂还因此触发撤销 28→26→24 ✗）。
+       抬到 60（高于工具栏 45）⇒ 提示出现期间按钮可点、点击不再穿透。 */
+    #mp-banner { position: fixed; left: 0; right: 0; top: 0; z-index: 60; display: none;
+      font: 13px/1.6 system-ui, "Segoe UI", sans-serif; padding: 8px 12px; color: #fff; background: #a3372f; }
+    #mp-banner button { margin-left: 10px; font: inherit; padding: 2px 10px; border-radius: 4px;
+      border: 1px solid rgba(255,255,255,.5); background: transparent; color: #fff; cursor: pointer; }
+    #mp-banner.info { background: #2c5d8f; }
+  </style>
+  <!-- 宿主桥必须先于引擎加载：引擎在脚本尾部调用 window.handler.on(...) 注册下行处理 -->
+  <script src="host.js"></script>
+  <link rel="stylesheet" href="cm6/app.css" />
+</head>
+
+<body>
+  <div id="mp-banner"></div>
+  <div id="editor" style="width:100%;height:100%"></div>
+  <script src="cm6/app.js"></script>
+</body>
+
+</html>

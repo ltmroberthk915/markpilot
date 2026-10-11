@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <path class="paper" d="M68 24H156L200 68V220Q200 232 188 232H68Q56 232 56 220V36Q56 24 68 24Z" fill="#f5f7f8" stroke="#9fafba" stroke-width="6" stroke-linejoin="round"/>
+  <path class="fold" d="M156 25V56Q156 68 168 68H199" fill="#dde5eb" stroke="#9fafba" stroke-width="6" stroke-linejoin="round"/>
+  <path class="mark" d="M93 168V118L128 147L163 118V168" fill="none" stroke="#708a9e" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+  <path class="rule" d="M94 195H143" fill="none" stroke="#b0bec8" stroke-width="7" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,215 @@
+/*
+ * 宋体-暗 (Telari Songti — Dark)
+ * 拓然宋主题对 · 暗色版 · 供 Typora 使用的第三方主题
+ *
+ * 设计出处：colors 与排版尺度取自 MarkPilot 内置主题「宋体-暗」，
+ * 该主题由 MarkPilot 项目自主设计——依据 Telari 0.4.8 实物解包分析
+ * （配色为六阶 ΔL* 语法梯子，暗色纸 #2E3440，整体提亮后各档相对关系不变），
+ * 设计拆解见 MarkPilot 仓库 docs/TELARI-TYPOGRAPHY-ANALYSIS.md。
+ *
+ * 排版口径：正文中文宋体 + 西文 Georgia；1.8 行距；标题 700；
+ * 正文 0.007em 细描边（宋体单字重，用描边表达"半档加肥"）；
+ * 中文斜体走楷体字面；版心 1280px。
+ * 注：西文栈里不放 serif 假名，否则会截断逐字回落、汉字将进默认衬线。
+ */
+
+:root {
+  --bg-color: #2E3440;
+  --text-color: #C3C7CF;
+  --title-color: #EAEDF3;
+  --md-char-color: #76797F;
+  /* R5-T1：引用文字对比度 AA，与编辑器 telari.css 的 --text-subtle 同步。
+     旧值 #929599 落在引用底 #353C4A 上只有 3.68:1；
+     #A4A8AE 为 4.64:1（对纸面 #2E3440 为 5.23:1）。 */
+  --meta-content-color: #A4A8AE;
+  --primary-color: #28AAF1;
+  --side-bar-bg-color: #232935;
+  --control-text-color: #A4A8AE;
+  --select-text-bg-color: rgba(40, 170, 241, 0.28);
+  --active-file-bg-color: #353B47;
+  --item-hover-bg-color: #353B47;
+  --monospace: 'SF Mono', 'Cascadia Code', Consolas, Monaco, 'Courier New', monospace;
+
+  --telari-latin: Georgia, 'Times New Roman';
+  --telari-han: 'SimSun', '宋体', 'NSimSun', 'Noto Serif CJK SC', 'Source Han Serif SC';
+  --telari-body: var(--telari-latin), var(--telari-han), serif;
+  --telari-kai: 'KaiTi', '楷体', 'STKaiti', '华文楷体';
+
+  --telari-border: #4B505B;
+  --telari-code-bg: #232935;
+  --telari-code-capsule: #353B47;
+  --telari-quote-bg: #353C4A;
+  --telari-quote-border: #53607A;
+  --telari-row-alt: #353C4A;
+  --telari-mark-bg: #4A4433;
+  --telari-mark-text: #EAEDF3;
+}
+
+html {
+  font-size: 16px;
+  background-color: var(--bg-color);
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: var(--telari-body);
+  -webkit-font-smoothing: subpixel-antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#write {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 40px 30px 100px;
+  font-family: var(--telari-body);
+  color: var(--text-color);
+  line-height: 1.8;
+  /* 宋体只有 400 一档，font-weight 表达不了"半档加肥"，用细描边代替 */
+  -webkit-text-stroke: .007em currentColor;
+}
+
+#write p,
+#write li {
+  line-height: 1.8;
+}
+
+#write :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--telari-latin), var(--telari-han), serif;
+  color: var(--title-color);
+  font-weight: 700;
+  -webkit-text-stroke-width: 0;
+}
+
+#write a {
+  color: var(--primary-color);
+}
+
+#write strong {
+  font-weight: 900;
+}
+
+#write em,
+#write i,
+#write cite {
+  font-family: var(--telari-kai), var(--telari-latin), serif;
+  /* 同名义字号下楷体与宋体的**墨迹几乎一样大**（实测：宽 0.998、高 1.017），差别在"轻"——
+     楷体落墨量只有宋体的 0.902（笔画更细，看上去偏小偏淡）。所以放大一档补的是**观感**：
+     1.06em 时斜体只比正文高约 6%，还不够一眼看出；R5-T4 从 1.12em 提到 1.18em
+     （用户口径"再大"），斜体比正文大约 18%，把"细一档"补回来的同时斜体自身
+     仍然是个显眼的层级；与编辑器 telari.css / typography.css 同值。 */
+  font-size: 1.18em;
+  font-style: italic;
+  /* 中文无真斜体，禁用合成倾斜，靠楷体字面表达斜体 */
+  font-synthesis-style: none;
+}
+
+#write blockquote {
+  background: var(--telari-quote-bg);
+  border-left: 3px solid var(--telari-quote-border);
+  color: var(--meta-content-color);
+}
+
+#write hr {
+  border-color: var(--telari-border);
+}
+
+#write mark {
+  background: var(--telari-mark-bg);
+  color: var(--telari-mark-text);
+}
+
+/* 表格：正文行露纸、偶数行用与引用底纹同族的温和差异色 */
+#write table {
+  border-color: var(--telari-border);
+}
+
+#write table th {
+  background: var(--telari-code-bg);
+}
+
+#write table :is(td, th) {
+  border-color: var(--telari-border);
+}
+
+#write table tbody tr:nth-child(2n) {
+  background-color: var(--telari-row-alt);
+}
+
+/* 行内代码：胶囊底色比代码块更亮一档 */
+#write code,
+#write tt {
+  font-family: var(--monospace);
+  background: var(--telari-code-capsule);
+  color: var(--text-color);
+  -webkit-text-stroke-width: 0;
+}
+
+/* 代码块：Typora 的代码区是 CodeMirror（.cm-s-inner） */
+#write .md-fences,
+#write pre.md-fences {
+  font-family: var(--monospace);
+  background: var(--telari-code-bg);
+  color: var(--text-color);
+  -webkit-text-stroke-width: 0;
+}
+
+#write .md-fences .CodeMirror,
+#write .md-fences .cm-s-inner {
+  font-family: var(--monospace);
+  background: var(--telari-code-bg);
+  color: var(--text-color);
+}
+
+/* 六阶语法梯子（面色→外：comment/literal/string/正文/type/keyword） */
+#write .cm-s-inner .cm-keyword,
+#write .cm-s-inner .cm-tag {
+  color: #E4E7FF;
+}
+
+#write .cm-s-inner .cm-string,
+#write .cm-s-inner .cm-string-2 {
+  color: #5EB597;
+}
+
+#write .cm-s-inner .cm-comment,
+#write .cm-s-inner .cm-quote {
+  color: #757E84;
+}
+
+#write .cm-s-inner .cm-number,
+#write .cm-s-inner .cm-atom,
+#write .cm-s-inner .cm-builtin {
+  color: #C97F3D;
+}
+
+#write .cm-s-inner .cm-type,
+#write .cm-s-inner .cm-def,
+#write .cm-s-inner .cm-variable-2,
+#write .cm-s-inner .cm-qualifier {
+  color: #96DCFF;
+}
+
+#write .cm-s-inner .cm-link,
+#write .cm-s-inner .cm-url {
+  color: #5EB597;
+}
+
+#write .cm-s-inner .cm-property,
+#write .cm-s-inner .cm-attribute,
+#write .cm-s-inner .cm-variable,
+#write .cm-s-inner .cm-operator,
+#write .cm-s-inner .cm-bracket,
+#write .cm-s-inner .cm-meta {
+  color: var(--text-color);
+}
+
+/* 源码模式与专注模式跟随同一纸色 */
+#typora-source .CodeMirror-lines {
+  max-width: 1280px;
+  font-family: var(--monospace);
+}
+
+.on-focus-mode blockquote {
+  border-left-color: rgba(83, 96, 122, 0.45);
+}

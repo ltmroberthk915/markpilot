@@ -1,0 +1,39 @@
+/* 阅读模式（融合路线 #3）：Vditor 预览面作为全宽只读阅读面 + 顶层块窗口化。
+   悬浮提示与占位块的样式。行为与实测证据见 docs/READING-MODE-ROUTE3.md。 */
+
+.vditor.typora-reading .vditor-preview {
+  flex: 1 1 100%;
+}
+
+/* Desktop / Tablet / Mobile 预设会改阅读面宽度；占位高度是按当前宽度量出来的，
+   宽度变了必须整篇重新量。直接在阅读模式里收掉这组预设，避免"看着能切、
+   切完滚动条长度不对"的中间态。 */
+.vditor.typora-reading .vditor-preview__action {
+  display: none;
+}
+
+/* 被窗口卸下的块：占位盒的高度与外界距由内联样式给出（逐块实测），
+   这里只负责视觉：文字透明 + 裁切，保证不可见但仍可被原生复制选中。 */
+.vditor-preview .typora-read-slot {
+  color: transparent;
+  overflow: hidden;
+  contain: layout style paint;
+}
+
+.vditor.typora-reading .typora-reading-status {
+  position: fixed;
+  top: calc(var(--typora-toolbar-inner, 56px) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1002;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--textarea-text-color, currentColor);
+  background: var(--panel-background-color, rgba(127, 127, 127, .14));
+  border: 1px solid var(--panel-border-color, rgba(127, 127, 127, .3));
+  opacity: calc(var(--typora-surface-opacity, .66) * 1.2);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .12);
+  pointer-events: none;
+}

@@ -1,0 +1,204 @@
+/* 拓然宋（Telari）主题对 —— v2.0.5。
+   颜色逐项取自 Telari 0.4.8 的 document-themes/telari-{light,dark}.toml
+   （纸 #FAF9F6 / #2B303A 及六阶语法 ΔL* 梯子），设计拆解见
+   docs/TELARI-TYPOGRAPHY-ANALYSIS.md。
+   字体：正文中文宋体 + 西文 Georgia（New York 的 Windows 同气质替代：
+   大 x-height 屏优化衬线 + 老式数字）；斜体中文楷体（markpilot-kai，
+   见 typography.css）、西文 Georgia 真斜体；数学 KaTeX（CM 系，同源气质）。
+   Latin-first 顺序让西文与数字先进 Georgia，汉字回落宋体。 */
+
+:root[data-editor-theme="telari-light"],
+:root[data-editor-theme="telari-dark"] {
+  /* 注意：latin 段不放假名 generic（serif 会截断逐字回落，汉字将进默认衬线
+     而非宋体）；generic 只允许出现在完整栈末尾。 */
+  --font-latin: Georgia, 'Times New Roman';
+  --font-han: 'SimSun', '宋体', 'NSimSun', 'Noto Serif CJK SC', 'Source Han Serif SC';
+  --font-body: var(--font-latin), var(--font-han), serif;
+  --font-heading: var(--font-latin), var(--font-han), serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', Consolas, Monaco, 'Courier New', monospace;
+  --monospace: var(--font-mono);
+}
+
+:root[data-editor-theme="telari-light"] {
+  --bg-color: #FAF9F6;
+  --text-color: #31312F;
+  --heading-color: #242423;
+  /* R5-T1：引用文字（--text-subtle）对比度 AA。旧值 #7C7C7B 落在引用底
+     #F1EFE9 上只有 3.63:1；压深到 #636362 后 5.23:1（对纸面 #FAF9F6 为
+     5.71:1），两处 ≥4.5。--text-muted 同源同值一起走；与导出件
+     typora-themes/宋体-朙.css 的 --meta-content-color 保持同步。 */
+  --text-muted: #636362;
+  --text-subtle: #636362;
+  --text-faint: #9A9A98;
+  --primary-color: #006FB0;
+  --border-color: #D8D7D4;
+  --table-border-color: #D8D7D4;
+  --code-bg-color: #EDECE9;
+  --code-text-color: #31312F;
+  --code-capsule-bg: #E5E4E1;
+  --mark-bg-color: #F5E9C8;
+  --mark-text-color: #31312F;
+}
+
+:root[data-editor-theme="telari-dark"] {
+  /* v2.0.8:整体微提亮（用户："偏乌蒙蒙，稍微加一点点亮，不要太多"）。
+     纸面 +2~5、正文 +7~9、弱化组 +7 左右，各档相对关系保持不变；
+     派生面（代码底/胶囊/引用/边框）随纸面同幅度平移。 */
+  --bg-color: #2E3440;
+  --text-color: #C3C7CF;
+  --heading-color: #EAEDF3;
+  /* R5-T1：引用文字（--text-subtle）对比度 AA。旧值 #929599 落在引用底
+     #353C4A 上只有 3.68:1；提亮到 #A4A8AE 后 4.64:1（对纸面 #2E3440 为
+     5.23:1）。--text-muted 同源同值一起走；与导出件 typora-themes/宋体-暗.css
+     的 --meta-content-color 保持同步。 */
+  --text-muted: #A4A8AE;
+  --text-subtle: #A4A8AE;
+  --text-faint: #76797F;
+  --primary-color: #28AAF1;
+  --border-color: #4B505B;
+  --table-border-color: #4B505B;
+  --code-bg-color: #232935;
+  --code-text-color: #C3C7CF;
+  --code-capsule-bg: #353B47;
+  --mark-bg-color: #4A4433;
+  --mark-text-color: #EAEDF3;
+}
+
+/* 弹窗/菜单表面（media-tools.css 的 --typora-context-* 契约）：纸色一致。 */
+:root[data-editor-theme="telari-light"] {
+  --typora-context-bg: #FAF9F6;
+  --typora-context-fg: #31312F;
+  --typora-context-border: #D8D7D4;
+  --typora-context-hover: #EDECE9;
+  --typora-context-rgb: 250 249 246;
+}
+:root[data-editor-theme="telari-dark"] {
+  --typora-context-bg: #2E3440;
+  --typora-context-fg: #C3C7CF;
+  --typora-context-border: #4B505B;
+  --typora-context-hover: #353B47;
+  --typora-context-rgb: 46 52 64;
+}
+
+/* Telari 六级语法梯子（面色→外：comment/literal/string/正文/type/keyword） */
+:root[data-editor-theme="telari-light"] .vditor-reset .hljs-keyword,
+:root[data-editor-theme="telari-light"] .vditor-reset .hljs-selector-tag { color: #000342; }
+:root[data-editor-theme="telari-light"] .vditor-reset .hljs-string { color: #004E36; }
+:root[data-editor-theme="telari-light"] .vditor-reset .hljs-comment { color: #616A70; }
+:root[data-editor-theme="telari-light"] .vditor-reset .hljs-literal,
+:root[data-editor-theme="telari-light"] .vditor-reset .hljs-number { color: #844500; }
+:root[data-editor-theme="telari-light"] .vditor-reset .hljs-type,
+:root[data-editor-theme="telari-light"] .vditor-reset .hljs-class { color: #001D4B; }
+:root[data-editor-theme="telari-dark"] .vditor-reset .hljs-keyword,
+:root[data-editor-theme="telari-dark"] .vditor-reset .hljs-selector-tag { color: #E4E7FF; }
+:root[data-editor-theme="telari-dark"] .vditor-reset .hljs-string { color: #5EB597; }
+:root[data-editor-theme="telari-dark"] .vditor-reset .hljs-comment { color: #757E84; }
+:root[data-editor-theme="telari-dark"] .vditor-reset .hljs-literal,
+:root[data-editor-theme="telari-dark"] .vditor-reset .hljs-number { color: #C97F3D; }
+:root[data-editor-theme="telari-dark"] .vditor-reset .hljs-type,
+:root[data-editor-theme="telari-dark"] .vditor-reset .hljs-class { color: #96DCFF; }
+
+:root[data-editor-theme^="telari"] .vditor {
+  --panel-background-color: var(--bg-color) !important;
+  --textarea-background-color: var(--bg-color) !important;
+  --toolbar-background-color: var(--bg-color) !important;
+  --textarea-text-color: var(--text-color);
+  --ir-heading-color: var(--heading-color);
+  --ir-bi-color: var(--heading-color);
+  --ir-link-color: var(--primary-color);
+  --ir-bracket-color: var(--primary-color);
+  --ir-paren-color: var(--text-muted);
+  --heading-border-color: var(--border-color);
+  --blockquote-color: var(--text-subtle);
+  --ir-marker-color: var(--text-faint);
+  --toolbar-icon-color: var(--text-muted);
+  --toolbar-icon-hover-color: var(--primary-color);
+  --second-color: var(--text-muted);
+  --editor-background-color: var(--bg-color);
+  background: var(--bg-color);
+  color: var(--text-color);
+}
+:root[data-editor-theme^="telari"] body { background: var(--bg-color); color: var(--text-color); }
+
+/* 正文：宋体+Georgia 衬线、1.8 行距。
+   v2.0.6:版心从 960px 加宽到 1280px（用户反馈每行内容太少、长公式突兀），
+   由 typography.css 的全局版心规则（padding-inline + !important）承担；
+   限宽不再压在 pre.vditor-reset 的 max-width 上——它同时是 IR 滚动容器，
+   max-width 会让滚动条跟着盒子悬在画面中部。 */
+:root[data-editor-theme^="telari"] .vditor-reset {
+  font-family: var(--font-body);
+  color: var(--text-color) !important;
+  line-height: 1.8;
+}
+:root[data-editor-theme^="telari"] .vditor-reset :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--font-heading);
+  color: var(--heading-color);
+  /* v2.0.6:标题半加粗（700）。Georgia 取真 Bold、宋体合成加粗；视觉上仍
+     细于 Ctrl+B 的 strong（typography.css: weight 900 + 细描边加肥）。 */
+  font-weight: 700;
+}
+:root[data-editor-theme^="telari"] .vditor-reset a { color: var(--primary-color); }
+/* v2.0.6:引用底纹显式着色。此前继承 vditor/GitHub 暗色默认，深色纸上是一块
+   近黑 (#2A2D2E) patch，用户反馈难看。取比纸色亮一档、偏蓝灰的温和差异色。
+   index.css 的遗留 blockquote 底纹带 !important，这里必须同级对抗。 */
+:root[data-editor-theme="telari-light"] .vditor-reset blockquote {
+  background: #F1EFE9 !important;
+  border-left: 3px solid #C9C4B8;
+}
+:root[data-editor-theme="telari-dark"] .vditor-reset blockquote {
+  background: #353C4A !important;
+  border-left: 3px solid #53607A;
+}
+/* 注意：这里不再声明 border-color——vditor--dark 作用域会把 --border-color
+   解析成近端 #141414（近水楼台），反而盖掉上面分主题的 border-left 颜色。 */
+:root[data-editor-theme^="telari"] .vditor-reset blockquote { color: var(--text-subtle); }
+:root[data-editor-theme^="telari"] .vditor-reset hr { border-color: var(--border-color); }
+:root[data-editor-theme^="telari"] .vditor-reset th { background: var(--code-bg-color); }
+:root[data-editor-theme^="telari"] .vditor-reset table { border-color: var(--table-border-color); }
+/* v2.0.8:表格与主题协调。legacy index.css 的 .vditor--dark 表格规则带
+   !important（tr #2A2D2E、偶数行 #2B2B2B、单元格边框 #585858——落在宋体暗
+   的纸上就是用户报告的"黑色底纹"），普通声明必败（konayuki 当年同样以
+   !important 对抗，见 themes.css）。telari 接管：正文行透明露纸、偶数行用
+   与引用底纹同族的温和差异色、边框走 --table-border-color；亮暗两版同构。 */
+:root[data-editor-theme^="telari"] .vditor-reset table :is(td, th) { border-color: var(--table-border-color) !important; }
+:root[data-editor-theme^="telari"] .vditor-reset table tr { background-color: transparent !important; }
+:root[data-editor-theme="telari-light"] .vditor-reset table tbody tr:nth-child(2n) { background-color: #F1EFE9 !important; }
+:root[data-editor-theme="telari-dark"] .vditor-reset table tbody tr:nth-child(2n) { background-color: #353C4A !important; }
+:root[data-editor-theme^="telari"] .vditor-reset code:not(.vditor-ir__marker),
+:root[data-editor-theme^="telari"] .vditor-reset .hljs {
+  background: var(--code-bg-color) !important;
+  color: var(--code-text-color);
+  font-family: var(--font-mono);
+}
+:root[data-editor-theme^="telari"] .vditor-reset code:not(pre code):not(.vditor-ir__marker) {
+  background: var(--code-capsule-bg) !important;
+}
+:root[data-editor-theme^="telari"] .vditor-reset mark { background: var(--mark-bg-color); color: var(--mark-text-color); }
+
+/* 斜体衔接（typography.css 的 em 规则自带黑体回落栈，本主题下改回衬线）：
+   中文楷体（markpilot-kai 字面本身只声明 CJK 码位），西文 Georgia 真斜体。 */
+:root[data-editor-theme^="telari"] .vditor-reset :is(em, i, cite) {
+  font-family: 'markpilot-kai', var(--font-latin), serif;
+  font-style: italic;
+  font-synthesis-style: none;
+  /* 楷体与宋体同名义字号下**墨迹几乎一样大**（实测宽 0.998 / 高 1.017），差别在"轻"——
+     楷体落墨量只有宋体的 0.902，看上去偏小偏淡。斜体中文走楷体，所以放大一档补观感：
+     R5-T4 从 1.12em 提到 1.18em（用户口径"再大"），斜体比正文大约 18%；与
+     typography.css 的全局 em 基线、Typora 导出主题 typora-themes/宋体-*.css 同值。 */
+  font-size: 1.18em;
+}
+
+/* v2.0.8:正文宋体微加肥（用户："粗度稍微加点磅数，一点点就好"）。宋体单
+   字重（400），font-weight 表达不了半档，沿用 strong 的细描边手法
+   （fontsize.css 0.015em）作为正文常态。描边随继承覆盖正文级
+   文本；标题(700)/表头(500)/代码自成体系，显式清零保持原对比，因此磅数
+   相对排序不变：正文 400+.007em < 表头 500 < 标题 700 < strong 900+.015em。
+   公式/预览岛在 fontsize.css 已全局清零，不受影响。
+   2026-09-10 用户令：正文描边 0.01em 收敛为 0.007em（14px 正文≈0.098px，
+   亚像素抗锯齿渲染）；仅 telari 双主题，其余主题与零描边体系不动。 */
+:root[data-editor-theme^="telari"] .vditor-reset {
+  -webkit-text-stroke: .007em currentColor;
+}
+:root[data-editor-theme^="telari"] .vditor-reset :is(h1, h2, h3, h4, h5, h6, th, pre, code, .hljs) {
+  -webkit-text-stroke-width: 0;
+}

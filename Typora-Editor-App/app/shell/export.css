@@ -1,0 +1,48 @@
+html { color-scheme: light; background: #fff; }
+body { margin: 0; color: #24292f; background: #fff; }
+#content { box-sizing: border-box; max-width: 900px; margin: 0 auto; padding: 48px; font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; overflow-wrap: break-word; }
+#content strong { font-weight: 900; }
+#content img { max-width: 100%; height: auto; }
+#content pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+#content .language-math { overflow-x: auto; max-width: 100%; }
+#content .export-diagram { text-align: center; break-inside: avoid; }
+#content .export-diagram svg { max-width: 100%; height: auto; }
+#content .export-missing-image { color: #8b4a00; border: 1px dashed #c69457; padding: 8px; display: inline-block; }
+#content .katex-error { white-space: pre-wrap; overflow-wrap: anywhere; }
+/* v2.0.2 排版与编辑器对齐:两端对齐、中英文间距、中文斜体楷书化。
+   PDF 另由 knuth-plass.mjs 做整体断行;此处 CSS 覆盖 HTML 导出与回退场景。
+   Chromium 152 的 text-autospace 仅实现 normal|no-autospace,normal 即开启间距。 */
+#content { text-autospace: normal; }
+#content p, #content li { text-align: justify; }
+#content :is(pre, code, .katex, .language-math) { text-autospace: no-autospace; }
+@font-face {
+  font-family: 'markpilot-kai';
+  src: local('KaiTi'), local('楷体'), local('STKaiti'), local('Kaiti SC'), local('KaiTi SC'), local('DFKai-SB'), local('BiauKai');
+  unicode-range: U+2E80-2FDF, U+3005, U+3007, U+3021-3029, U+3038-303A, U+3041-30FF, U+3105-312F, U+31F0-31FF, U+3190-319F, U+3200-33FF, U+3400-4DBF, U+4E00-9FFF, U+A960-A97F, U+AC00-D7A3, U+F900-FAFF, U+FE10-FE19, U+FE30-FE4F, U+FF00-FFEF, U+20000-2FFFD, U+30000-3FFFD;
+  font-style: italic;
+}
+#content :is(em, i, cite) {
+  font-family: 'markpilot-kai', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
+  font-style: italic;
+  font-synthesis-style: none;
+}
+/* knuth-plass 应用于 PDF 后的行内 token 容器 */
+.kp-token { vertical-align: baseline; }
+@page { size: A4; margin: 18mm 16mm; }
+@media print {
+  #content { padding: 0; max-width: none; font-size: 11pt; }
+  #content h1, #content h2, #content h3, #content h4 { break-after: avoid; }
+  #content p { orphans: 3; widows: 3; }
+  #content table { display: table; width: 100%; table-layout: fixed; overflow-wrap: anywhere; }
+  #content thead { display: table-header-group; }
+  #content th, #content td { white-space: normal; overflow-wrap: anywhere; }
+  #content tr, #content img, #content .katex-display { break-inside: avoid; }
+  #content pre { overflow: visible; }
+  #content .language-math { overflow: visible; white-space: normal; }
+  #content .katex-display { margin: 1em 0; }
+}
+
+/* v2.0.7 图片对齐（编辑器右键写入 data-typora-align），导出 HTML/PDF 一致。 */
+img[data-typora-align="center"]{display:block;margin-left:auto;margin-right:auto}
+img[data-typora-align="right"]{display:block;margin-left:auto;margin-right:0}
+img[data-typora-align="left"]{display:block;margin-left:0;margin-right:auto}

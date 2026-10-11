@@ -1,0 +1,21 @@
+{
+  "exe": "E:\\MarkPilot\\Typora-Editor-App\\node_modules\\electron\\dist\\electron.exe",
+  "args": [
+    "E:\\MarkPilot\\Typora-Editor-App\\app\\main\\main.js",
+    "E:\\MarkPilot\\Typora-Editor-App\\.perf\\brk\\多选\\文件1.md",
+    "E:\\MarkPilot\\Typora-Editor-App\\.perf\\brk\\多选\\文件2.md",
+    "E:\\MarkPilot\\Typora-Editor-App\\.perf\\brk\\多选\\文件3.md",
+    "E:\\MarkPilot\\Typora-Editor-App\\.perf\\brk\\多选\\文件4.md",
+    "E:\\MarkPilot\\Typora-Editor-App\\.perf\\brk\\多选\\文件5.md",
+    "E:\\MarkPilot\\Typora-Editor-App\\.perf\\brk\\多选\\文件6.md",
+    "--user-data-dir=E:\\MarkPilot\\Typora-Editor-App\\.perf\\acceptance\\profiles\\dist-18628-1",
+    "--remote-debugging-port=0",
+    "--inspect-brk=0",
+    "--no-sandbox",
+    "--enable-logging=stderr",
+    "--v=0"
+  ],
+  "waitedForPortMs": 11,
+  "portContention": null,
+  "at": "2026-09-13T02:55:15.127Z"
+}

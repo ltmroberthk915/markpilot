@@ -1,0 +1,16 @@
+{
+  "exe": "E:\\MarkPilot\\Typora-Editor-App\\node_modules\\electron\\dist\\electron.exe",
+  "args": [
+    "E:\\MarkPilot\\Typora-Editor-App\\app\\main\\main.js",
+    "E:\\MarkPilot\\Typora-Editor-App\\.perf\\save-spy\\笔记\\甲.md",
+    "--user-data-dir=E:\\MarkPilot\\Typora-Editor-App\\.perf\\acceptance\\profiles\\dist-33448-2",
+    "--remote-debugging-port=0",
+    "--inspect=0",
+    "--no-sandbox",
+    "--enable-logging=stderr",
+    "--v=0"
+  ],
+  "waitedForPortMs": 0,
+  "portContention": null,
+  "at": "2026-09-13T03:13:14.870Z"
+}

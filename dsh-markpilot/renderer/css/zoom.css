@@ -1,0 +1,20 @@
+/* v2.0.7 内容缩放控件：右下角比例徽章 + 弹出面板（预设下拉 + 自由输入）。
+   悬浮于编辑区之上，但低于工具栏(1001)/补全弹窗(1000)。 */
+.typora-zoom-badge{position:fixed;right:14px;bottom:14px;z-index:999;min-width:46px;padding:3px 10px;border:1px solid var(--typora-context-border,#d0d7de);border-radius:12px;background:var(--typora-context-bg,#ffffff);background-image:none;color:var(--typora-context-fg,#1f2328);font:12px/1.5 system-ui;cursor:pointer;opacity:.72;transition:opacity .15s}
+.typora-zoom-badge:hover,.typora-zoom-badge:focus-visible{opacity:1;border-color:var(--primary-color,#4285f4)}
+.typora-zoom-pop{position:fixed;right:14px;bottom:46px;z-index:999;width:228px;padding:10px 12px;border:1px solid var(--typora-context-border,#d0d7de);border-radius:8px;background:var(--typora-context-bg,#ffffff);background-image:none;color:var(--typora-context-fg,#1f2328);box-shadow:0 8px 22px #0f172a2e;font:13px/1.5 system-ui}
+.typora-zoom-pop[hidden]{display:none}
+.typora-zoom-pop__title{font-weight:600;margin-bottom:8px}
+.typora-zoom-pop__grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px}
+.typora-zoom-pop__preset{padding:4px 0;border:1px solid var(--typora-context-border,#d0d7de);border-radius:5px;background:transparent;color:inherit;font:12px/1.4 system-ui;cursor:pointer;text-align:center}
+.typora-zoom-pop__preset:hover{border-color:var(--primary-color,#4285f4)}
+.typora-zoom-pop__preset.is-active{border-color:var(--primary-color,#4285f4);color:var(--primary-color,#4285f4);font-weight:600}
+.typora-zoom-pop__row{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.typora-zoom-pop__row input{width:64px;padding:3px 6px;border:1px solid var(--typora-context-border,#d0d7de);border-radius:5px;background:transparent;color:inherit;font:13px system-ui}
+.typora-zoom-pop__row input.typora-zoom-pop__invalid{border-color:#d33}
+.typora-zoom-pop__row button{padding:4px 12px;border:1px solid var(--typora-context-border,#d0d7de);border-radius:5px;background:transparent;color:inherit;cursor:pointer}
+.typora-zoom-pop__row button:hover{border-color:var(--primary-color,#4285f4)}
+.typora-zoom-pop__reset{width:100%;padding:5px 0;border:1px dashed var(--typora-context-border,#d0d7de);border-radius:5px;background:transparent;color:inherit;cursor:pointer}
+.typora-zoom-pop__reset:hover{border-color:var(--primary-color,#4285f4)}
+/* 面板配色走 media-tools.css/telari.css 的 --typora-context-* 契约，
+   六套主题各自定义，这里不再重复暗色覆盖。 */

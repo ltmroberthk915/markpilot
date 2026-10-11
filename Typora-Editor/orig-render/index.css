@@ -1,0 +1,58 @@
+html,
+body,
+#vditor {
+  padding: 0;
+  margin: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.vditor {
+  border: unset;
+  border-radius: unset;
+}
+
+.vditor-ir pre.vditor-reset:focus {
+  background-color: var(--panel-background-color);
+}
+
+/* 暗黑模式优化 */
+.vditor--dark {
+  --panel-background-color: #1f1f1f !important;
+  --textarea-background-color: #1f1f1f !important;
+  --toolbar-background-color: #1f1f1f !important;
+}
+
+.vditor--dark pre.vditor-reset blockquote {
+  background-color: #2a2d2e !important;
+}
+
+pre.vditor-reset blockquote {
+  background-color: rgba(27, 31, 35, .05) !important;
+}
+
+
+.vditor--dark .vditor-reset code:not(.hljs):not(.highlight-chroma) {
+  background-color: #2a2d2e !important;
+}
+
+.vditor--dark .vditor-reset .hljs {
+  background-color: #2b2b2b !important;
+}
+
+.vditor--dark .vditor-reset {
+  color: #cccccc !important;
+}
+
+.vditor--dark .vditor-reset table tr {
+  background-color: #2a2d2e !important;
+}
+
+.vditor--dark .vditor-reset table tbody tr:nth-child(2n) {
+  background-color: #2b2b2b !important;
+}
+
+.vditor--dark  .vditor-reset table td,
+.vditor--dark  .vditor-reset table th {
+  border: 1px solid #585858 !important;
+}

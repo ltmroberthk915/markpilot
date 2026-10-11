@@ -1,0 +1,71 @@
+{
+  "name": "markpilot-cm6",
+  "productName": "MarkPilot",
+  "version": "3.2.4",
+  "description": "MarkPilot — Typora 手感的即时渲染 Markdown 编辑器（独立桌面版）",
+  "license": "MIT",
+  "author": "jinxi",
+  "main": "main.js",
+  "type": "commonjs",
+  "private": true,
+  "scripts": {
+    "sync": "node scripts/sync-engine.mjs",
+    "start": "electron .",
+    "dist": "electron-builder --win nsis portable",
+    "dist:fresh": "node scripts/dist-fresh.cjs"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "app.personal.markpilot.cm6",
+    "productName": "MarkPilot",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "export-folder.js",
+      "export-pdf.js",
+      "shell/**/*",
+      "renderer/**/*",
+      "build/icon.ico",
+      "!**/*.map"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "markpilot-${version}-${arch}-${target}.${ext}",
+      "signAndEditExecutable": false
+    },
+    "afterPack": "scripts/after-pack-icon.cjs",
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "markpilot-Setup-${version}.${ext}",
+      "shortcutName": "MarkPilot",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
+    },
+    "portable": {
+      "artifactName": "markpilot-${version}-portable.${ext}",
+      "unpackDirName": "MarkPilotPortable"
+    }
+  }
+}

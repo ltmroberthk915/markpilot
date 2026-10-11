@@ -1,0 +1,101 @@
+{
+  "name": "marcopilot",
+  "displayName": "marcopilot",
+  "description": "全面超越 Typora 的 AI Markdown 编辑器：行内 AI 补全、数学公式精准映射、大文件性能优化，可装进 VS Code / Trae 等 AI IDE。",
+  "publisher": "marcopilot",
+  "version": "2.0.1",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "icon": "icon.png",
+  "keywords": [
+    "md",
+    "marcopilot",
+    "markdown",
+    "typora"
+  ],
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "marcopilot.addSelectionToChat",
+        "title": "marcopilot: 将选区加入 AI 对话"
+      },
+      {
+        "command": "marcopilot.completionSettings",
+        "title": "marcopilot: 补全设置"
+      },
+      {
+        "command": "marcopilot.completionAPIKey",
+        "title": "marcopilot: 填写 API Key"
+      },
+      {
+        "command": "marcopilot.completionModel",
+        "title": "marcopilot: 切换补全模型"
+      },
+      {
+        "command": "marcopilot.outline.reveal",
+        "title": "marcopilot: 跳转到大纲标题"
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "marcopilot.editor",
+        "displayName": "marcopilot",
+        "priority": "default",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          }
+        ]
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "marcopilot-outline",
+          "title": "marcopilot 大纲",
+          "icon": "media/outline-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "marcopilot-outline": [
+        {
+          "type": "tree",
+          "id": "marcopilot.outline",
+          "name": "Markdown 大纲"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "build": "npx vsce package",
+    "publish": "npx vsce publish"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.1",
+    "@types/node": "16.x",
+    "@types/vscode": "^1.60.0",
+    "@typescript-eslint/eslint-plugin": "^6.4.1",
+    "@typescript-eslint/parser": "^6.4.1",
+    "@vscode/test-electron": "^2.3.4",
+    "eslint": "^8.47.0",
+    "glob": "^10.3.3",
+    "mocha": "^10.2.0",
+    "typescript": "^5.1.6",
+    "vsce": "^2.15.0"
+  },
+  "packageManager": "yarn@1.22.22"
+}

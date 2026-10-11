@@ -1,0 +1,63 @@
+/* v2.0.2 排版：CJK 感知的两端对齐、中英文间距、中文斜体楷书化。
+   公式渲染（KaTeX/预览层）明确退出，绝不受这些规则影响。 */
+
+/* 中英文与中文数字之间自动留出 1/8 em 呼吸间距。
+   本机 Chromium 152 的 text-autospace 只实现 normal | no-autospace 两值，
+   其中 normal = 开启 ideograph-alpha/numeric 间距（实测每边界 1/8em）。 */
+.vditor-reset {
+  text-autospace: normal;
+}
+
+/* 公式、代码与源码标记的内部像素布局保持原样。 */
+.vditor-reset :is(pre, code, .katex, .language-math, .vditor-ir__preview, .vditor-wysiwyg__preview, .vditor-ir__marker) {
+  text-autospace: no-autospace;
+}
+
+/* v2.0.6:撤销正文两端对齐（v2.0.2 引入）。实测在含行内公式的段落里，
+   justify 会把编号/文字与公式之间的空隙拉伸出大空档（"(2) $…$" 类行最
+   明显），编辑态打字时行内空隙反复重排也晃眼。Telari 的 Knuth-Plass
+   整齐化保留在导出排版管线（knuth-plass.mjs），编辑器一律左对齐。 */
+
+/* v2.0.6:全局阅读版心 1280px。滚动器(pre.vditor-reset)保持全宽——滚动条
+   永远贴容器右缘；版心居中由左右 padding 承担，窄视口自动退为 28px 边距。
+   !important 双保险：vditor 的 K() 居中逻辑每次 resize 都会重写内联
+   padding（其默认 preview.maxWidth=800 在宽屏会写出 (W-800)/2 的巨量
+   留白）；index.js 已把 preview.maxWidth 调成 1280 保持两者一致，即便
+   style-stripper 剥掉内联，这条 CSS 也兜底。100vw 而非 100%——百分比在
+   max()+calc() 里按包含块解析的实测行为不稳定。
+
+   v2.1.28:左右垫边不再同宽。标题级别角标（H1..H6）是 vditor 画的浮标
+   （`.vditor-ir .vditor-reset > h1:before` 等，float:left; margin-left:-29px），
+   它挂在**内容盒左侧 29px 之外**。左右同为 28px 时，窗口一窄到版心不再
+   留白（100vw ≤ 1336）垫边就退到 28px < 29px——角标被顶出滚动容器左缘，
+   左边一点留空都不剩，而右边的 28px 照旧，看起来就像"左侧留空消失"。
+   所以左侧垫边记住这条 29px 悬挂 + 一圈呼吸位，取 46px；右侧不动
+   （28px 是滚动条一侧的既有观感）。宽窗口下两者都走 (100vw-1280)/2，
+   版心仍严格居中，与 v2.0.6 完全一致。 */
+.vditor-reset {
+  padding-left: max(46px, calc((100vw - 1280px) / 2)) !important;
+  padding-right: max(28px, calc((100vw - 1280px) / 2)) !important;
+}
+
+/* 中文斜体改为正常楷书（v2.0.3 起保持原始字号，不再缩小），西文保持主题真斜体。
+   字面只声明 CJK 码位（unicode-range），因此拉丁字符会径直落入正文字体栈，
+   拿到真正的 Italic 字形；楷体字面被标记为 italic，避免合成倾斜。 */
+@font-face {
+  font-family: 'markpilot-kai';
+  src: local('KaiTi'), local('楷体'), local('STKaiti'), local('Kaiti SC'), local('KaiTi SC'), local('DFKai-SB'), local('BiauKai');
+  unicode-range: U+2E80-2FDF, U+3005, U+3007, U+3021-3029, U+3038-303A, U+3041-30FF, U+3105-312F, U+31F0-31FF, U+3190-319F, U+3200-33FF, U+3400-4DBF, U+4E00-9FFF, U+A960-A97F, U+AC00-D7A3, U+F900-FAFF, U+FE10-FE19, U+FE30-FE4F, U+FF00-FFEF, U+20000-2FFFD, U+30000-3FFFD;
+  font-style: italic;
+}
+.vditor-reset :is(em, i, cite) {
+  font-family: 'markpilot-kai', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Source Han Sans SC', sans-serif;
+  font-style: italic;
+  font-synthesis-style: none;
+  /* R5-T4：斜体放大一档（楷体墨迹偏轻的观感补偿，用户口径"再大"）。
+     本段是全局基线——此前这里没有 font-size，放大只存在于 telari.css 的
+     em 块，不带自有 em 规则的主题斜体完全不放大，两套观感。现在四处声明
+     同值 1.18em：telari.css / 本文件 / typora-themes/宋体-朙.css / 宋体-暗.css。 */
+  font-size: 1.18em;
+  /* v2.0.8:楷体字形偏紧，与相邻中英文的间距显挤；加 1/40 em 微字距
+     （0.025em，14px 正文即 0.35px），只松一点点，不改变视觉密度。 */
+  letter-spacing: .025em;
+}
