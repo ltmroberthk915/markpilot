@@ -13,6 +13,7 @@
  *    ... await S.guard('A1', async () => { ... }) ... await S.finish(0);
  */
 'use strict';
+const path = require('node:path');
 /* ── 自适应头（公开快照专用，自动注入 ✓）──────────────────────────────────
    开发态：本文件在 <repo>/.mp-verify/checklist/；公开快照：<repo>/tools/probes/ ✓
    ⇒ 两种情况下"上溯两级"都是仓库根 ✓，工作目录若不存在就建在**系统临时目录**里 ✓
@@ -23,9 +24,9 @@ const __MP_WORK = process.env.MP_WORK || path.join(__MP_OS.tmpdir(), 'markpilot-
 const __MP_EXE = process.env.MP_EXE || path.join(__MP_REPO, 'MarkPilot-CM6', 'dist', 'win-unpacked', 'MarkPilot.exe');
 try { require('node:fs').mkdirSync(__MP_WORK, { recursive: true }); } catch { /* 建不了就由调用方报错 */ }
 const fs = require('node:fs');
-const path = require('node:path');
+
 const { spawn, execSync } = require('node:child_process');
-const { chromium } = require('C:/Windows/System32/node_modules/playwright-core');
+const { chromium } = require('../quality/dependencies.cjs').playwright();
 const RULER = require(path.join(__dirname, '_probe-common.cjs'));
 
 const OUT = path.join(__MP_WORK, 'math-daily-out');

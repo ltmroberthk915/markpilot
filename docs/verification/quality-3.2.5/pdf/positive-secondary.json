@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "pdfSha256": "c5a434343af52bcb1971bdea9de6f727cdf5531d1a7b07e9b3012624a4861b69",
+  "pages": 1,
+  "extractors": {
+    "pypdf": {
+      "text": "BB__DOCUMENTDOCUMENT__SENTINELSENTINEL\n\nSECONDSECOND  CONTENTCONTENT\n\nB-EDITB-EDIT",
+      "expected": {
+        "B_DOCUMENT_SENTINEL": 0
+      },
+      "forbidden": {
+        "A_DOCUMENT_SENTINEL": 0
+      }
+    },
+    "pdftotext": {
+      "text": "B_DOCUMENT_SENTINEL\r\nB_DOCUMENT_SENTINEL\r\n\r\n       CONTENT\r\nSECOND CONTENT\r\nSECOND\r\n\r\nB-EDIT\r\nB-EDIT\r\n\f",
+      "exitCode": 0,
+      "diagnostics": "\r\n\r\nMiKTeX requires Windows 10 (or greater): https://miktex.org/announcement/legacy-windows-deprecation\r\n",
+      "expected": {
+        "B_DOCUMENT_SENTINEL": 2
+      },
+      "forbidden": {
+        "A_DOCUMENT_SENTINEL": 0
+      }
+    }
+  },
+  "note": "Text anchors supplement visual inspection. Raw extraction is retained; duplicated/interleaved text is not silently normalized.",
+  "passed": true
+}

@@ -136,3 +136,13 @@ node tools/probes/probe-u-accept.cjs "path/to/MarkPilot.exe"
 它整理自开发期的内部工作区（保存了每处改动的判据、读数、以及**踩过的坑**）。
 与源码一起公开，是为了让别人**不用重走一遍**：想做二次开发的话，
 把上面的取证纪律当成默认习惯，能省掉相当多的来回。
+
+## 六、3.2.5 可移植检查入口与误报纠正
+
+运行方法见 [tools/quality](../tools/quality/README.md)，本轮结果见 [审计记录](LOG-3.2.5-AUDIT.md)与[证据索引](verification/quality-3.2.5/README.md)。预检只解析历史 probe，不代表已执行它们。critical 当前保留真实产品失败，不应通过删判据把它改绿。
+
+新的启动器自动独占 app-slot、创建独立 profile 并验证发布文件 SHA；不要再包一层同一把锁。旧 probe 可用 `scripts/acceptance/app-slot.cjs -- node tools/probes/<probe>.cjs ...`。产物、profile、模型会话放 `.mp-verify/`，公开证据工具只接收清单内哈希一致且限额的 PNG。
+
+本轮加入两个尺子约束：Windows 重做用 Ctrl+Y，不能把 Ctrl+Shift+Z 未重做误报为产品缺陷；没有先约定输入中“再次按格式键”的含义，不能把每种格式都记成 bug。空包裹立即取消和已选中文本去格式则有明确判据。
+
+关窗保护使用原生菜单回调 `BrowserWindow.close()`，同时跑“未保存 A 单独关窗仍在”的正向对照；不能用 CDP page.close 证明 beforeunload 有效。PDF 先校验当前文档独有标记与另一文档禁用标记，再打开最终 PDF 页面；文本提取的重复/交错应保留原文，不能偷偷归一化后判绿。

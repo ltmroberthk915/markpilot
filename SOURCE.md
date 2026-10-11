@@ -49,7 +49,7 @@ cd MarkPilot-CM6 && npm start
 |---|---|
 | `node_modules/` | 依赖安装产物，`npm install` 可复原 |
 | `MarkPilot-CM6/dist/`、`Typora-Editor*/dist/` | 构建产物（安装包、解包目录） |
-| 开发期的探针 / 夹具 / 截图 / 历次运行产物 | 属于内部验证脚手架，对二次开发没有价值（它也是本仓库曾经达到 2.5 GB 的原因） |
+| 大体积开发期夹具、完整运行目录、profile 与中间构建 | 避免把用户数据和临时产物入库；可复跑探针与限额合成证据保留在 `tools/`、`docs/verification/` |
 | `*.vsix`、`*.log` | 已打包扩展与日志 |
 
 第三方组件与许可证保留在源码树内（例如 `*/renderer/cdn/vditor/dist/js/mermaid/mermaid.min.js`、
@@ -66,3 +66,22 @@ cd MarkPilot-CM6 && npm start
 
 **程序、插件与全部源码完全免费**——个人用、商业用、改、二次分发、做成自己的编辑器，都可以，不需要另行授权。
 二次分发时请保留原项目的名称与来源说明，并自行确认你所分发内容的合规性。
+
+## 可重复的质量检查入口
+
+`tools/quality/README.md` 提供固定依赖、真实输入验收、Windows 截图粘贴、性能基线和证据发布方法。先运行：
+
+```bash
+npm ci --prefix tools/quality --ignore-scripts --no-audit --no-fund
+npm run preflight --prefix tools/quality
+npm test --prefix tools/quality
+```
+
+引擎侧已补充测试用 NPM lock；无需覆盖仓库发布 bundle 即可比较重建身份：
+
+```bash
+npm ci --prefix dsh-markpilot --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+node tools/quality/build-check.cjs --out .mp-verify/quality/build
+```
+
+3.2.5 的公开依赖重建与发布 bundle 仍有 SHA 差异；`build-check` 会以非零退出码报告这种差异。工具自测通过与产品交互通过是两种判据。详见 `docs/LOG-3.2.5-AUDIT.md`，其中的产品失败项尚未修复。

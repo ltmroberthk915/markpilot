@@ -18,15 +18,7 @@ const { spawn, execSync } = require('node:child_process');
    · 运行目录：落在系统临时目录 ✓（不污染仓库、也不写死路径 ✓）。 */
 const os = require('node:os');
 function resolvePlaywright() {
-  const cands = [
-    process.env.MP_PLAYWRIGHT,                                   // 显式指定优先 ✓
-    path.join(__dirname, 'node_modules', 'playwright-core'),
-    'C:/Windows/System32/node_modules/playwright-core',          // 本机既有位置（可改 ✓）
-    path.join(os.homedir(), 'node_modules', 'playwright-core'),
-  ].filter(Boolean);
-  for (const c of cands) { try { return require(c); } catch { /* 试下一个 */ } }
-  console.error('✗ 找不到 playwright-core。装一个，或设 MP_PLAYWRIGHT=<路径>：npm i -D playwright-core');
-  process.exit(3);
+  return require('../quality/dependencies.cjs').playwright();
 }
 const { chromium } = resolvePlaywright();
 const __RULER = require(path.join(__dirname, '_probe-common.cjs'));

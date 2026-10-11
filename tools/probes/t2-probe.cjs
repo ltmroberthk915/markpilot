@@ -6,7 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
-const { chromium } = require('C:/Windows/System32/node_modules/playwright-core');   // 与其它探针同一处解析（本仓没有本地 playwright-core）
+const { chromium } = require('../quality/dependencies.cjs').playwright();   // 与其它探针同一处解析（本仓没有本地 playwright-core）
 
 const EXE = process.argv[2];
 const TAG = process.argv[3] || 'run';
