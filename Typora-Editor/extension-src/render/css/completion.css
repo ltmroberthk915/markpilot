@@ -1,0 +1,71 @@
+.md-completion,.md-completion-preview,.md-completion-settings {
+  /* v2.0.3:候选/预览/设置面板表面不透明度跟随全局设置(默认66%,
+     --typora-surface-opacity,工具栏⋮菜单"界面透明度"可调)。
+     不再使用 backdrop-filter:模糊回读纹理在 iframe 内随文本重排移动会留像素
+     残迹;改为独立合成层(will-change)避免与正文图层交叠重绘。
+     注意:公式编辑的 KaTeX 预渲染框(.vditor-ir__preview 浮层)不受本文件影响。 */
+  --completion-bg:rgb(from var(--vscode-editorSuggestWidget-background,#25272d) r g b/var(--typora-surface-opacity,.66));
+  --completion-fg:var(--vscode-editorSuggestWidget-foreground,#e5e7ec);
+  --completion-border:var(--vscode-editorSuggestWidget-border,#535763);
+  position:fixed;z-index:1000;max-width:min(420px,calc(100vw - 16px));
+  color:var(--completion-fg)!important;background:var(--completion-bg)!important;
+  border:1px solid var(--completion-border)!important;border-radius:6px;
+  box-shadow:0 5px 22px #0004;font:13px/1.5 system-ui,sans-serif;
+  text-align:left;overflow:auto;box-sizing:border-box;will-change:transform;
+}
+:root[data-editor-theme$="light"] :is(.md-completion,.md-completion-preview,.md-completion-settings) {
+  --completion-bg:rgb(255 255 255/var(--typora-surface-opacity,.66));--completion-fg:#24272d;--completion-border:#bec3cd;
+}
+.md-completion[hidden],.md-completion-preview[hidden]{display:none!important}
+/* The toolbar owns the strip above the editing canvas and always paints over
+   the completion popups, so even a geometry edge case that slips past the
+   position clamp can never visually cover the toolbar or steal its clicks. */
+.vditor-toolbar{z-index:1001}
+.md-completion{width:350px;max-height:min(360px,calc(100vh - 16px));padding:4px}
+.md-completion button {
+  display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;
+  padding:6px 8px;border:0!important;border-radius:3px;cursor:pointer;text-align:left;
+  background:transparent!important;color:var(--completion-fg)!important;font:inherit;
+}
+.md-completion button[aria-selected="true"],.md-completion button:hover {
+  background:var(--vscode-editorSuggestWidget-selectedBackground,#3467a455)!important;
+}
+.md-completion button span,.md-completion button small,.md-completion footer,
+.md-completion-preview div,.md-completion-preview small {background:transparent!important;color:inherit!important}
+.md-completion button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.md-completion button[data-source="ai"] span{white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.md-completion button[data-source="ai"]{border-bottom:1px solid var(--completion-border)!important}
+.md-completion button small{opacity:.65;flex-shrink:0;max-width:48%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.md-completion footer{padding:7px 8px 3px;opacity:.65;font-size:11px}
+/* AI 建议框（灰字预览）：内容长的时候自己滚，而不是把整页顶出去。
+   2026-09-15 用户实测的两个毛病都出在这一条上：
+   ① pointer-events:none（原意是"别挡着点正文"）让滚轮事件穿到编辑器，框自己滚不动；
+   ② hardcode 的 max-height:180px 把多行建议截断，截掉的部分也没有滚动条可拉。
+   现在框本身可点、可滚（press 落在框里不落光标、不关框，见 completion.js 的 mousedown
+   守卫），真正的高度上限由 position() 按光标上下可用空间算，这里的 max-height 只是兜底。 */
+.md-completion-preview{padding:8px 10px;max-height:min(56vh,440px);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;pointer-events:auto}
+.md-completion-preview::-webkit-scrollbar{width:10px}
+.md-completion-preview::-webkit-scrollbar-thumb{background:rgba(128,128,128,.45);border-radius:6px}
+.md-completion-preview::-webkit-scrollbar-track{background:transparent}
+.md-completion-preview .md-completion-ghost{opacity:.65;white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--vscode-editor-font-family,monospace)}
+.md-completion-preview small{display:block;margin-top:5px;opacity:.65;font:11px/1.4 system-ui,sans-serif}
+.md-completion-tool button{display:flex;align-items:center;justify-content:center;width:25px;height:var(--toolbar-height,35px);padding:0 5px;border:0!important;border-radius:4px;background:transparent!important;color:var(--toolbar-icon-color,var(--vscode-editor-foreground,#aeb1b8))!important;cursor:pointer}
+.md-completion-tool svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.md-completion-tool button:hover{background:var(--vscode-toolbar-hoverBackground,#8883)!important}
+.md-completion-tool button:focus-visible{outline:2px solid var(--toolbar-icon-hover-color,#4a90e2);outline-offset:-2px}
+.md-completion-settings{width:320px;max-height:calc(100vh - 16px);margin:0;padding:5px}
+.md-completion-settings:not([open]){display:none!important}
+.md-completion-settings header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 9px;background:transparent!important;color:inherit!important}
+.md-completion-settings strong,.md-completion-settings span,.md-completion-settings small{background:transparent!important;color:inherit!important}
+.md-completion-settings button{display:block;width:100%;box-sizing:border-box;border:0!important;border-radius:4px;padding:8px 9px;font:inherit;text-align:left;cursor:pointer;background:transparent!important;color:inherit!important}
+.md-completion-settings button small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;font-size:11px;opacity:.65}
+.md-completion-settings button:hover,.md-completion-settings button:focus-visible{background:var(--vscode-list-hoverBackground,#8883)!important;outline:none}
+.md-completion-settings button:disabled{opacity:.5;cursor:default}
+.md-completion-profiles{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px;padding:0 3px;background:transparent!important}
+.md-completion-profiles button{min-width:0;padding:7px 6px}
+.md-completion-profiles button>span{font-size:12px;white-space:nowrap}
+.md-completion-profiles button[aria-checked="true"]{background:var(--vscode-editorSuggestWidget-selectedBackground,#3467a455)!important;box-shadow:inset 0 0 0 1px var(--vscode-focusBorder,#73b9ff)}
+.md-completion-settings [role="menuitemcheckbox"][aria-checked="true"]>span::before{content:'✓ ';color:var(--vscode-textLink-foreground,#73b9ff)}
+.md-completion-settings [data-api-field="key"] span{font-weight:600}
+.md-completion-settings hr{border:0!important;border-top:1px solid var(--completion-border)!important;margin:5px 3px}
+.md-completion-api-status{opacity:.65;font-size:11px}

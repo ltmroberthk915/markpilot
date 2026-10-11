@@ -1,0 +1,36 @@
+{
+  "desktopVersion": "1.0.6",
+  "checkedAt": "2026-09-05T17:45:31.015Z",
+  "packagedAppFilesVerified": 455,
+  "sharedRendererFilesVerified": 445,
+  "sharedRendererUnchangedSince": "1.0.5 / VSIX 0.1.12-local",
+  "checks": {
+    "fileOpenUnits": 11,
+    "recentState": 2,
+    "desktopLaunch": 22,
+    "desktopHost": 30,
+    "actualExecutable": 4
+  },
+  "packagedRecheck": {
+    "desktopLaunch": 22,
+    "desktopHost": 30
+  },
+  "launchReports": [
+    "D:\\BuyKey\\Typora-Editor-App\\.perf\\file-launch-1788629977922\\results.json",
+    "D:\\BuyKey\\Typora-Editor-App\\.perf\\file-launch-1788630180367\\results.json",
+    "D:\\BuyKey\\Typora-Editor-App\\.perf\\exe-launch-1788630169073\\results.json"
+  ],
+  "clipboardAndExplorerActions": "Exercised through real menu/IPC handlers with system sinks stubbed; no clipboard writes or Explorer windows during these tests.",
+  "artifacts": [
+    {
+      "path": "D:\\BuyKey\\Typora-Editor-App\\dist\\TyporaEditor-Setup-1.0.6.exe",
+      "bytes": 115510212,
+      "sha256": "538af907ba55e8775ba2a322ea19e71d76cb9eed2bab112075932147cb727656"
+    },
+    {
+      "path": "D:\\BuyKey\\Typora-Editor-App\\dist\\TyporaEditor-v1.0.6-portable.exe",
+      "bytes": 115360188,
+      "sha256": "51e848b419b18da2fdf919cd27e0fbcc06a3238f08fab774d7aafac192941faf"
+    }
+  ]
+}

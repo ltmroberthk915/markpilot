@@ -1,0 +1,15 @@
+{
+  "exe": "E:\\MarkPilot\\Typora-Editor-App\\node_modules\\electron\\dist\\electron.exe",
+  "args": [
+    "E:\\MarkPilot\\Typora-Editor-App\\app\\main\\main.js",
+    "E:\\MarkPilot\\Typora-Editor-App\\.perf\\probe-r1-media\\r1-media.md",
+    "--user-data-dir=E:\\MarkPilot\\Typora-Editor-App\\.perf\\acceptance\\profiles\\probe-r1-media-11404-1",
+    "--remote-debugging-port=0",
+    "--no-sandbox",
+    "--enable-logging=stderr",
+    "--v=0"
+  ],
+  "waitedForPortMs": 10,
+  "portContention": null,
+  "at": "2026-10-02T14:32:20.759Z"
+}

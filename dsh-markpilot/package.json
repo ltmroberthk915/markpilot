@@ -1,0 +1,73 @@
+{
+  "name": "dsh-markpilot",
+  "version": "0.1.0",
+  "description": "MarkPilot for DeepSeek Harness：右侧栏 Markdown 编辑器（Typora 手感的即时渲染编辑面），带防抖守卫保存与 @mp 引用源，人与 Agent 在同一编辑面上协作。",
+  "license": "MIT",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "icon": "./icon.svg",
+  "files": [
+    "icon.svg",
+    "cordis.patch.yml",
+    "lib/index.js",
+    "lib/client.js",
+    "renderer"
+  ],
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "markdown",
+    "editor",
+    "markpilot"
+  ],
+  "engines": {
+    "dsh": ">=0.2.0-rc.2"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
+        "@deepseek-ai/dsh-client-ui-input-trigger"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": "0.2.0-rc.2"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/search": "^6.7.2",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.13",
+    "@lezer/common": "^1.5.3",
+    "@lezer/highlight": "^1.2.5",
+    "@lezer/markdown": "^1.7.2",
+    "codemirror": "^6.0.2",
+    "esbuild": "^0.28.2",
+    "katex": "^0.19.0"
+  },
+  "dependencies": {
+    "@codemirror/legacy-modes": "^6.5.4"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "appVersion": "2.1.25",
+  "extension": "2.1.25",
+  "manifestVersion": "2.1.25",
+  "vsix": {
+    "path": "E:/MarkPilot/Typora-Editor/dist/markpilot-2.1.25.vsix",
+    "bytes": 6426225,
+    "sha256": "34b815c1a9a3008bc11539d497cac24bf166a7c6f266b2424d74e371ca32489b"
+  },
+  "appAsar": {
+    "path": "E:/MarkPilot/Typora-Editor-App/dist-2.1.25/win-unpacked/resources/app.asar",
+    "bytes": 23655694,
+    "sha256": "ef47555e6efd5c3841857eeac4f771fa85c707ee561942810239206d2ad755c4"
+  },
+  "extensionFilesVerified": 518,
+  "sharedRendererFilesVerified": 496,
+  "chain": "extension-src/render == app/renderer == app.asar(app/renderer) == VSIX(extension/render)",
+  "verified": true
+}

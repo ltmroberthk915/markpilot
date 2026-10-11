@@ -1,0 +1,15 @@
+.typora-media-dialog{color:var(--vditor-color);background:var(--vditor-panel-background,var(--vditor-background-color));border:1px solid var(--vditor-border-color);border-radius:10px;padding:20px;max-width:520px;box-shadow:0 12px 45px #0003;font:14px/1.6 system-ui}
+.typora-media-dialog::backdrop{background:#0004}.typora-media-dialog h3{margin:0 0 14px}.typora-media-dialog input{width:85px}.typora-media-dialog button,.typora-media-dialog input{font:inherit;color:inherit;background:var(--vditor-background-color);border:1px solid var(--vditor-border-color);border-radius:5px;padding:5px 10px}.typora-media-dialog button{cursor:pointer}.media-presets,.media-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.typora-media-dialog p{font-size:12px;margin:10px 0}.media-error{color:var(--vditor-color)}
+:root{--typora-context-bg:#fff;--typora-context-fg:#1f2933;--typora-context-border:#cbd5e1;--typora-context-hover:#e8f1ff;--typora-context-surface:rgba(255,255,255,.7)}
+:root[data-editor-theme="dark"]{--typora-context-bg:#252a31;--typora-context-fg:#eef2f7;--typora-context-border:#4b5563;--typora-context-hover:#34465b;--typora-context-surface:rgba(37,42,49,.7)}
+:root[data-editor-theme="konayuki-light"]{--typora-context-bg:#fffdf8;--typora-context-fg:#2c3e50;--typora-context-border:#d8cfc0;--typora-context-hover:#f2eadb;--typora-context-surface:rgba(255,253,248,.7)}
+:root[data-editor-theme="konayuki-dark"]{--typora-context-bg:#1a1b26;--typora-context-fg:#e5e9f0;--typora-context-border:#454b63;--typora-context-hover:#2b3146;--typora-context-surface:rgba(26,27,38,.7)}
+/* v2.0.2:右键菜单表面 70% 不透明 + 毛玻璃模糊,文字保持全不透明。
+   toast 仍是瞬时提示,保持实底以保证可读性。 */
+.typora-editor-context-menu{position:fixed;z-index:10000;min-width:168px;max-width:260px;padding:5px;background:var(--typora-context-surface);background-image:none;color:var(--typora-context-fg);border:1px solid var(--typora-context-border);border-radius:8px;box-shadow:0 14px 36px #0f172a38,0 3px 10px #0f172a1c;opacity:1;backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3);isolation:isolate;font:13px/1.4 system-ui}
+.typora-editor-context-menu button{display:block;width:100%;padding:6px 12px;border:0;border-radius:4px;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer;white-space:nowrap}
+.typora-editor-context-menu button:hover,.typora-editor-context-menu button:focus{background:var(--typora-context-hover);outline:0}
+.typora-context-title{padding:4px 12px 5px;color:var(--typora-context-fg);font-size:11px;font-weight:600;opacity:.78}
+.typora-context-separator{height:1px;margin:5px 3px;background:var(--typora-context-border)}
+.typora-context-toast{position:fixed;left:50%;bottom:24px;z-index:10001;transform:translateX(-50%);padding:7px 12px;border:1px solid var(--typora-context-border);border-radius:6px;background:var(--typora-context-bg);background-image:none;color:var(--typora-context-fg);box-shadow:0 8px 22px #0f172a2e;opacity:1;backdrop-filter:none;font:13px/1.4 system-ui}
+.vditor-toolbar .typora-source-toggle--active{color:var(--primary-color,#4285f4);background:var(--typora-context-hover)}

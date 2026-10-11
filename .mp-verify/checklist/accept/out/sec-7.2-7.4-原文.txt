@@ -1,0 +1,48 @@
+### 7.2 图片策略（默认 inline）：插入即 data URI，换目录仍显示
+
+**期望看到**：默认策略是 **inline**：用「图片」按钮插入一张本地图后，**文档源码里是 data URI**（`data:image/png;base64,…`），不是文件路径；**把这份 .md 拷到另一个目录（甚至另一个盘）再打开，图照常显示**；把原图删掉也不影响显示。
+
+**夹具**（下面就是原文）：
+
+本地素材（96×64 彩色小图）：`E:\MarkPilot\.mp-verify\checklist\assets\small.png`
+
+（下面是本清单里已存在的一张内联图，可当作"inline 形态长什么样"的对照；7.2 要验的是**插入动作**产生的形态。）
+
+![inline 形态对照](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABACAIAAABqVuVZAAABtklEQVR42u3csY3CQBCFYUq46EpAroCQBpAowU3QAdJFVHAtWHJEBY4vg1LIcHKBJQstszvekzzvnfRWE270BbDzB9586BTPRgSLgLaXmzvH63Oe9e73Q9MPzdf3xp3p5nr364BidCYgBp1+aCqAwnSO1yeJTgVQpM72ciPRWQoUrOMCheksAorXKQNF6vg/0hCdAlCwjgOE0skBxeuUgIA6JhBEJwuE1XkHQunYQHCdBAioYwAx6LwCYXVSIBKdGQiukwWCb60kOjYQw05PomMAkRQPEp3q3KEepB6kHqQepB6kHqQepB6kHqQepB6kHqQepB6kHkTWg8a2G9vuvju7M91c7/7jtJ/n5/Dpznr3UyAGnbHtSHRSIBKdGQiuUw0UozMBMeg8TvsKoDCdse1IdCqAInXuuzOJzlKgYB0XKPI/zgeK1ykDBb8AHCCITgEo/n1UAkLp5IAgr8csEFDHBEK9rW0grM47EHDzMIDgOgkQdi9LgRh0XoHgW6uxzTPs9CQ6WSD41kqiYwOpB6kHqQepB6kHqQepB6kHqQepB6kHqQepB6kHqQf9nx6ko6+//PH8AuyVzQKMGfu7AAAAAElFTkSuQmCC)
+
+**怎么试**：1) 设置里确认图片策略是 inline（默认值）；2) 点工具栏「图片」按钮，选上面那张 `small.png` 插入；3) 把光标放进新插入的那一行，看源码是不是 `data:image/png;base64,…`；4) 把这份 .md 复制到 `%TEMP%\mp310\` 再打开，确认图还在。
+
+**判据**：插入后在**源码**里是 `data:image/`；换目录打开仍显示；删掉原图后仍显示。
+
+### 7.3 图片策略（assets）：落盘到 assets\ + 相对路径正确
+
+**期望看到**：把图片策略切成 **assets** 后再插入同一张图：①图**被复制到文档同级的 `assets\` 目录**（重名不覆盖，会自动改名）；②文档里写的是**相对路径**（形如 `assets/xxx.png`）；③**插入后立刻显示**（不要求手动刷新）；④把 `.md` 与 `assets\` **一起**拷到别的目录仍然显示（只拷 .md 不显示属正常）。
+
+**夹具**（下面就是原文）：
+
+素材同上：`E:\MarkPilot\.mp-verify\checklist\assets\small.png`
+
+（本条验的是**插入动作**在 assets 策略下的结果。手工对照的做法：把文档保存到 `%TEMP%\mp310\`，在同级建 `assets\` 放一张图，正文里写相对地址 `assets/你的图.png`，看它能不能显示。）
+
+**怎么试**：1) 设置里把图片策略切成 assets；2) 保存文档到 `%TEMP%\mp310\验收.md`；3) 用「图片」按钮插入 `small.png`；4) 看文档同级的 `assets\` 是否多了文件、源码里是不是相对路径；5) 把 `%TEMP%\mp310\` 整个目录拷到 `%TEMP%\mp310-copy\` 再打开。
+
+**判据**：磁盘出现 `assets\<名字>.png`；源码是相对路径；插入后立刻出图（96×64）；整目录拷走后仍出图。
+
+### 7.4 图片两条命令：「内联全部图片」/「抽出到 assets」+ 一次撤销 + 往返幂等
+
+**期望看到**：两条命令都能对**当前文档**批量转换：①**「内联全部图片」**——文档里**本地路径**的图全部变成 data URI（`http(s)` 外链拉不下来，保持原样）；②**「抽出到 assets」**——文档里的 data URI 图全部落盘到 `assets\`，文档改写为相对路径；③每条命令**一次 Ctrl+Z 就能整体回退**（不是撤 N 次）；④**往返幂等**：inline → assets → inline 之后，文档源码与第一次 inline 的结果**逐字节相同**。
+
+**夹具**（下面就是原文）：
+
+起点（下面这张已经是内联形态，可直接用来试「抽出到 assets」）：
+
+![内联起点](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABACAIAAABqVuVZAAABtklEQVR42u3csY3CQBCFYUq46EpAroCQBpAowU3QAdJFVHAtWHJEBY4vg1LIcHKBJQstszvekzzvnfRWE270BbDzB9586BTPRgSLgLaXmzvH63Oe9e73Q9MPzdf3xp3p5nr364BidCYgBp1+aCqAwnSO1yeJTgVQpM72ciPRWQoUrOMCheksAorXKQNF6vg/0hCdAlCwjgOE0skBxeuUgIA6JhBEJwuE1XkHQunYQHCdBAioYwAx6LwCYXVSIBKdGQiukwWCb60kOjYQw05PomMAkRQPEp3q3KEepB6kHqQepB6kHqQepB6kHqQepB6kHqQepB6kHkTWg8a2G9vuvju7M91c7/7jtJ/n5/Dpznr3UyAGnbHtSHRSIBKdGQiuUw0UozMBMeg8TvsKoDCdse1IdCqAInXuuzOJzlKgYB0XKPI/zgeK1ykDBb8AHCCITgEo/n1UAkLp5IAgr8csEFDHBEK9rW0grM47EHDzMIDgOgkQdi9LgRh0XoHgW6uxzTPs9CQ6WSD41kqiYwOpB6kHqQepB6kHqQepB6kHqQepB6kHqQepB6kHqQf9nx6ko6+//PH8AuyVzQKMGfu7AAAAAElFTkSuQmCC)
+
+第二张内联图（验"批量"，两张应一起被处理）：
+
+![内联第二张](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABACAIAAABqVuVZAAABtklEQVR42u3csY3CQBCFYUq46EpAroCQBpAowU3QAdJFVHAtWHJEBY4vg1LIcHKBJQstszvekzzvnfRWE270BbDzB9586BTPRgSLgLaXmzvH63Oe9e73Q9MPzdf3xp3p5nr364BidCYgBp1+aCqAwnSO1yeJTgVQpM72ciPRWQoUrOMCheksAorXKQNF6vg/0hCdAlCwjgOE0skBxeuUgIA6JhBEJwuE1XkHQunYQHCdBAioYwAx6LwCYXVSIBKdGQiukwWCb60kOjYQw05PomMAkRQPEp3q3KEepB6kHqQepB6kHqQepB6kHqQepB6kHqQepB6kHkTWg8a2G9vuvju7M91c7/7jtJ/n5/Dpznr3UyAGnbHtSHRSIBKdGQiuUw0UozMBMeg8TvsKoDCdse1IdCqAInXuuzOJzlKgYB0XKPI/zgeK1ykDBb8AHCCITgEo/n1UAkLp5IAgr8csEFDHBEK9rW0grM47EHDzMIDgOgkQdi9LgRh0XoHgW6uxzTPs9CQ6WSD41kqiYwOpB6kHqQepB6kHqQepB6kHqQepB6kHqQepB6kHqQf9nx6ko6+//PH8AuyVzQKMGfu7AAAAAElFTkSuQmCC)
+
+**怎么试**：1) 把本节这两行连同上下文拷到一个新文档（或直接在本文档试，注意别保存覆盖本清单）；2) 光标放文档里 → 执行「抽出到 assets」→ 看文档是否变成相对路径、磁盘 `assets\` 是否出现两张图；3) Ctrl+Z 一次，看是否整体还原；4) 再执行「内联全部图片」，与起点比对（我会用脚本比对字节）。
+
+**判据**：两条命令可执行且转换形态正确；一次撤销整体回退；往返后源码与起点**逐字节等价**（sha256 相同）。
+

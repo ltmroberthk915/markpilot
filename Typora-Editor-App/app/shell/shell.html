@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>MarkPilot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="/shell/shell.css" />
+  <link rel="stylesheet" href="/shell/completion-settings.css" />
+  <link rel="stylesheet" href="/shell/snapshots.css" />
+  <link rel="stylesheet" href="/render/css/edit-shortcuts.css" />
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <div id="sb-head">
+        <span id="ws-name" title="">未打开文件夹</span>
+        <div class="sb-actions">
+          <button id="btn-new-md" title="新建 Markdown 文件"></button>
+          <button id="btn-new-dir" title="新建文件夹"></button>
+          <button id="btn-refresh" title="刷新"></button>
+          <button id="btn-expand" title="展开全部（已加载层）"></button>
+          <button id="btn-collapse" title="收起全部"></button>
+          <button id="btn-mdonly" title="只显示 Markdown 文件">MD</button>
+        </div>
+      </div>
+      <button id="btn-recent" title="最近 50 个文件和 50 个文件夹（Ctrl+Alt+O）">最近打开…</button>
+      <div id="sb-error" role="alert" hidden></div>
+      <!-- 保存类失败的常驻提示。它比 #sb-error 重要：树操作失败顶多这一下没做成，
+           而"文件没存进去"是数据安全问题，不许 8 秒后自己消失、更不许只藏在 title 里。 -->
+      <div id="sb-save" role="alert" hidden>
+        <span id="sb-save-text"></span>
+        <button id="sb-save-close" type="button" title="隐藏这条提示（保存问题本身不会因此消失）">×</button>
+      </div>
+      <div id="tree" tabindex="0"></div>
+      <div id="sb-empty">
+        <div>尚未打开文件夹</div>
+        <button id="sb-empty-open">打开文件夹</button>
+      </div>
+    </aside>
+    <div id="splitter" title="拖动调整宽度"></div>
+    <main id="main">
+      <div id="welcome">
+        <div class="w-card">
+          <div class="w-logo">
+            <svg viewBox="0 0 16 16" width="44" height="44"><rect x="1" y="1" width="14" height="14" rx="3" fill="#388e5c"/><text x="8" y="11.5" text-anchor="middle" font-size="7.5" font-weight="700" fill="#fff" font-family="Georgia, serif">M↓</text></svg>
+          </div>
+          <h1>MarkPilot</h1>
+          <p class="w-sub">个人版 Markdown 编辑器 · Typora 式即时渲染</p>
+          <div class="w-btns">
+            <button id="w-open-folder">打开文件夹</button>
+            <button id="w-open-file">打开文件</button>
+          </div>
+          <p class="w-hint" id="w-hint-ws" style="display:none">已打开工作区，从左侧文件树选择或新建 Markdown 文件；也可以直接把文件/文件夹拖进窗口。</p>
+          <div id="w-recent"></div>
+          <button id="w-recent-all" class="recent-more">查看全部最近记录…</button>
+        </div>
+      </div>
+      <iframe id="editor" style="display:none" title="editor"></iframe>
+    </main>
+    <footer id="statusbar" style="display:none">
+      <span id="st-actions" class="st-actions" role="group" aria-label="面板开关">
+        <button id="st-files" type="button" class="st-btn" aria-label="打开或收起文件夹侧边栏" title="文件夹侧边栏（Ctrl+Alt+B）"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M1.5 4.2c0-.7.6-1.2 1.2-1.2h2.9l1.5 1.8h6.2c.7 0 1.2.6 1.2 1.2v6.8c0 .7-.6 1.2-1.2 1.2H2.7c-.7 0-1.2-.6-1.2-1.2z"/></svg></button>
+        <button id="st-outline" type="button" class="st-btn" aria-label="打开或收起当前文档的目录结构" title="当前文档目录结构（大纲）"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M2 3.5h8M2 8h12M2 12.5h5.5"/><path d="M12.5 2v3M11 3.5h3"/></svg></button>
+      </span>
+      <span id="st-save" class="st-item"></span>
+      <span id="st-words" class="st-item" title="字数（中文逐字、英文按词）"></span>
+      <span id="st-chars" class="st-item" title="字符数（不含空白）"></span>
+      <span id="st-lines" class="st-item" title="行数"></span>
+      <span id="st-read" class="st-item" title="阅读时间（按 400 字/分钟）"></span>
+    </footer>
+  </div>
+  <div id="drag-overlay">松开以打开</div>
+  <div id="ctxmenu"></div>
+  <dialog id="recent-dialog" aria-labelledby="recent-title">
+    <div class="recent-heading"><h2 id="recent-title">最近打开</h2><button id="recent-close" aria-label="关闭">×</button></div>
+    <p class="recent-hint">文件和文件夹各保留 50 项，最近打开的排在最前。</p>
+    <input id="recent-search" type="search" placeholder="搜索名称或路径" aria-label="搜索最近打开的文件和文件夹" />
+    <p id="recent-error" role="alert"></p>
+    <div class="recent-columns">
+      <section><h3 id="recent-files-title">文件</h3><div id="recent-files" class="recent-list"></div></section>
+      <section><h3 id="recent-folders-title">文件夹</h3><div id="recent-folders" class="recent-list"></div></section>
+    </div>
+  </dialog>
+  <script src="/shell/shell.js"></script>
+  <script src="/shell/completion-settings.js"></script>
+  <script src="/shell/snapshots.js"></script>
+  <script src="/shell/export-status.js"></script>
+</body>
+</html>

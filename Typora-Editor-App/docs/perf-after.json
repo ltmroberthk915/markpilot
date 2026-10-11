@@ -1,0 +1,238 @@
+{
+  "mode": "optimized",
+  "versions": {
+    "node": "24.20.0",
+    "acorn": "8.18.0",
+    "ada": "4.0.0",
+    "amaro": "1.1.11",
+    "ares": "1.34.8",
+    "brotli": "1.2.0",
+    "cldr": "48.0",
+    "icu": "78.2",
+    "llhttp": "9.4.3",
+    "merve": "1.2.2",
+    "modules": "149",
+    "napi": "10",
+    "nbytes": "0.1.4",
+    "ncrypto": "0.0.1",
+    "nghttp2": "1.70.0",
+    "nghttp3": "",
+    "ngtcp2": "",
+    "openssl": "0.0.0",
+    "simdjson": "4.6.6",
+    "simdutf": "7.7.0",
+    "sqlite": "3.53.4",
+    "tz": "2025c",
+    "undici": "7.29.0",
+    "unicode": "17.0",
+    "uv": "1.52.1",
+    "uvwasi": "0.0.23",
+    "v8": "15.2.124.19-electron.0",
+    "zlib": "1.3.2.1-motley",
+    "zstd": "1.6.0",
+    "electron": "44.2.0",
+    "chrome": "152.0.7977.76"
+  },
+  "readyMs": 3563,
+  "samples": [
+    {
+      "paintMs": 89,
+      "calls": [
+        {
+          "key": "SpinVditorIRDOM",
+          "chars": 41,
+          "ms": 0.8999999761581421
+        },
+        {
+          "key": "SpinVditorIRDOM",
+          "chars": 121776,
+          "ms": 49.19999998807907
+        }
+      ],
+      "wallMs": 209,
+      "withHistory": [
+        {
+          "key": "SpinVditorIRDOM",
+          "chars": 41,
+          "ms": 0.8999999761581421
+        },
+        {
+          "key": "SpinVditorIRDOM",
+          "chars": 121776,
+          "ms": 49.19999998807907
+        },
+        {
+          "key": "VditorIRDOM2Md",
+          "chars": 7102,
+          "ms": 1.7000000178813934
+        }
+      ]
+    },
+    {
+      "paintMs": 28.400000005960464,
+      "calls": [
+        {
+          "key": "SpinVditorIRDOM",
+          "chars": 297,
+          "ms": 0.800000011920929
+        }
+      ],
+      "wallMs": 85,
+      "withHistory": [
+        {
+          "key": "SpinVditorIRDOM",
+          "chars": 297,
+          "ms": 0.800000011920929
+        },
+        {
+          "key": "VditorIRDOM2Md",
+          "chars": 7104,
+          "ms": 1.7999999821186066
+        }
+      ]
+    },
+    {
+      "paintMs": 48.5,
+      "calls": [
+        {
+          "key": "SpinVditorIRDOM",
+          "chars": 58,
+          "ms": 0.7000000178813934
+        }
+      ],
+      "wallMs": 169,
+      "withHistory": [
+        {
+          "key": "SpinVditorIRDOM",
+          "chars": 58,
+          "ms": 0.7000000178813934
+        },
+        {
+          "key": "VditorIRDOM2Md",
+          "chars": 7106,
+          "ms": 2
+        }
+      ]
+    },
+    {
+      "paintMs": 53.19999998807907,
+      "calls": [
+        {
+          "key": "SpinVditorIRDOM",
+          "chars": 133,
+          "ms": 0.7000000178813934
+        }
+      ],
+      "wallMs": 140,
+      "withHistory": [
+        {
+          "key": "SpinVditorIRDOM",
+          "chars": 133,
+          "ms": 0.7000000178813934
+        },
+        {
+          "key": "VditorIRDOM2Md",
+          "chars": 7108,
+          "ms": 1.800000011920929
+        }
+      ]
+    }
+  ],
+  "dom": {
+    "nodes": 175169,
+    "formulas": 3080,
+    "scripts": 13,
+    "blocks": 2576
+  },
+  "completeMs": 25657,
+  "completeDOM": {
+    "nodes": 272436,
+    "formulas": 5686,
+    "math": {
+      "rendered": 5686,
+      "slices": 292,
+      "commits": 89,
+      "maxSliceMs": 12.699999988079071,
+      "maxCommitMs": 1.199999988079071,
+      "pending": 0
+    },
+    "sourceCache": {
+      "calibrations": 1,
+      "blockParses": 165,
+      "version": 8
+    }
+  },
+  "steadyInput": {
+    "paintMs": 77.09999999403954,
+    "calls": [
+      {
+        "key": "SpinVditorIRDOM",
+        "chars": 46,
+        "ms": 0.9000000059604645
+      }
+    ],
+    "wallMs": 195,
+    "withHistory": [
+      {
+        "key": "SpinVditorIRDOM",
+        "chars": 46,
+        "ms": 0.9000000059604645
+      },
+      {
+        "key": "VditorIRDOM2Md",
+        "chars": 7110,
+        "ms": 1.9000000059604645
+      }
+    ]
+  },
+  "savedMarkdownMatches": true,
+  "formulaClicks": [
+    {
+      "fraction": 0.5,
+      "ms": 260.30000001192093,
+      "caretInSource": true,
+      "sourceVisible": true
+    },
+    {
+      "fraction": 0.75,
+      "ms": 205.59999999403954,
+      "caretInSource": true,
+      "sourceVisible": true
+    },
+    {
+      "fraction": 0.95,
+      "ms": 172.30000001192093,
+      "caretInSource": true,
+      "sourceVisible": true
+    }
+  ],
+  "scroll": {
+    "fps": 55.56487149135122,
+    "p95FrameMs": 16.80000000000291
+  },
+  "idleStart": [
+    {
+      "pid": 49628,
+      "cpu": {
+        "cumulativeCPUUsage": 28.572553,
+        "percentCPUUsage": 0,
+        "idleWakeupsPerSecond": 0
+      }
+    }
+  ],
+  "idleEnd": [
+    {
+      "pid": 49628,
+      "cpu": {
+        "cumulativeCPUUsage": 28.572798,
+        "percentCPUUsage": 0.0009043669258028582,
+        "idleWakeupsPerSecond": 0
+      }
+    }
+  ],
+  "scriptRequests": [
+    "http://127.0.0.1:52708/render/cdn/vditor/dist/js/katex/katex.min.js?v=0.16.9",
+    "http://127.0.0.1:52708/render/cdn/vditor/dist/js/katex/mhchem.min.js?v=0.16.9"
+  ],
+  "errors": []
+}

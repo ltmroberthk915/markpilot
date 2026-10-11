@@ -1,0 +1,112 @@
+{
+  "version": "1.0.7",
+  "applicationFiles": 470,
+  "rendererFiles": 451,
+  "completionCoreFiles": 4,
+  "artifacts": [
+    {
+      "path": "D:\\BuyKey\\Typora-Editor-App\\dist\\TyporaEditor-Setup-1.0.7.exe",
+      "bytes": 115535180,
+      "sha256": "53b017b50473ba8209103bc6ca56cb5f8f0e3645d35b16ab265ca6c264a30dd7"
+    },
+    {
+      "path": "D:\\BuyKey\\Typora-Editor-App\\dist\\TyporaEditor-v1.0.7-portable.exe",
+      "bytes": 115385161,
+      "sha256": "b5ad24484a5479c78feea28e8cab3188244c0955bcc2ef4143488da8b348c662"
+    },
+    {
+      "path": "D:\\BuyKey\\Typora-Editor\\dist\\seepine.md-editor-0.1.19-local.vsix",
+      "bytes": 5794007,
+      "sha256": "c995825c01bee94a24383bd9a6d00c7e1b0f160c7b078af37c5fb31e2558632c"
+    }
+  ],
+  "installedPlugins": {
+    "VS Code": {
+      "version": "0.1.19-local",
+      "files": 468,
+      "path": "C:\\Users\\Ming\\.vscode\\extensions\\seepine.md-editor-0.1.19-local"
+    },
+    "Trae": {
+      "version": "0.1.19-local",
+      "files": 468,
+      "path": "C:\\Users\\Ming\\.trae\\extensions\\seepine.md-editor-0.1.19-local"
+    }
+  },
+  "completionMigration": ".perf/completion-import-1788674462935/result.json",
+  "desktopInstallation": "Installer and portable executable built; existing desktop profile migrated. Windows default application association preserved.",
+  "harness": {
+    "model": "deepseek-v4-flash-vision-exp",
+    "math": 70,
+    "text": 30,
+    "requests": 100,
+    "extraLLMJudges": 0,
+    "report": "../Typora-Editor/docs/autocomplete-harness-100.md",
+    "results": "../Typora-Editor/test/.runs/harness-100-flash-0.1.18/results.json",
+    "review": "../Typora-Editor/test/.runs/harness-100-flash-0.1.18/review.json"
+  },
+  "tests": {
+    "extensionUnit": {
+      "passed": 24,
+      "log": "../Typora-Editor/test/.runs/completion-unit-0.1.19.log"
+    },
+    "desktopUnit": {
+      "passed": 40,
+      "log": ".perf/unit-1.0.7.log"
+    },
+    "vscode": {
+      "passed": 57,
+      "result": "../Typora-Editor/test/.runs/vscode-1788674538496/results.json"
+    },
+    "trae": {
+      "passed": 57,
+      "result": "../Typora-Editor/test/.runs/vscode-1788674976451/results.json"
+    },
+    "mathHistory": {
+      "passed": 8,
+      "result": ".perf/math-history.json"
+    },
+    "renderer": {
+      "log": ".perf/renderer-1.0.7.log",
+      "passed": {
+        "regression.txt": 16,
+        "consistency.txt": 154,
+        "features.txt": 66,
+        "repairs.json": 58,
+        "ui.json": 34,
+        "shell.txt": 31
+      }
+    },
+    "largeHistory": {
+      "ms": 311.5,
+      "formulas": 5634,
+      "retained": 5634,
+      "reuse": {
+        "retainedBlocks": 2576,
+        "retainedPreviews": 0,
+        "changedBlocks": 1,
+        "ms": 136.5
+      },
+      "sourceEqual": true,
+      "rerendered": 0,
+      "pending": 0,
+      "search": {
+        "matches": 269,
+        "workerMs": 0.3999999761581421
+      }
+    },
+    "desktopCompletion": {
+      "passed": 16,
+      "log": ".perf/desktop-completion-packaged.log"
+    },
+    "desktopShell": {
+      "passed": 31,
+      "log": ".perf/shell-packaged-1.0.7.log"
+    },
+    "fileLaunch": {
+      "passed": 22,
+      "log": ".perf/launch-1.0.7.log",
+      "result": ".perf/file-launch-1788675546818/results.json"
+    }
+  },
+  "finalVerifiedAt": "2026-09-06T06:21:56.076Z"
+}

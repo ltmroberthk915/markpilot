@@ -1,0 +1,361 @@
+/* 外壳样式：侧边栏 + 编辑器 iframe，跟随系统明暗 */
+:root {
+  --bg: #f3f3f3;
+  --bg-2: #fafafa;
+  --fg: #333;
+  --fg-2: #888;
+  --border: #ddd;
+  --accent: #2f7d4f;
+  --accent-weak: rgba(47, 125, 79, 0.12);
+  --hover: rgba(0, 0, 0, 0.06);
+  --input-bg: #fff;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1f22;
+    --bg-2: #25262b;
+    --fg: #d5d7da;
+    --fg-2: #7f8388;
+    --border: #33353a;
+    --accent: #4caf7d;
+    --accent-weak: rgba(76, 175, 125, 0.16);
+    --hover: rgba(255, 255, 255, 0.07);
+    --input-bg: #1a1b1e;
+    --shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  }
+}
+
+* { box-sizing: border-box; }
+:root[data-editor-theme="konayuki-light"] {--bg:#fffdf8;--bg-2:#f8f5f0;--fg:#2c3e50;--fg-2:#6f7f90;--border:#e4ded4;--accent:#4a90e2;--accent-weak:#4a90e229;--hover:#4a90e214;--input-bg:#fffdf8;}
+:root[data-editor-theme="konayuki-dark"] {--bg:#1a1b26;--bg-2:#1f2233;--fg:#e5e9f0;--fg-2:#9aa5ce;--border:#2a2f45;--accent:#7aa2f7;--accent-weak:#7aa2f72e;--hover:#7aa2f71f;--input-bg:#1a1b26;}
+:root[data-editor-theme="light"] {--bg:#f3f3f3;--bg-2:#fafafa;--fg:#333;--fg-2:#888;--border:#ddd;--accent:#2f7d4f;--accent-weak:#2f7d4f1f;--hover:#0000000f;--input-bg:#fff;}
+:root[data-editor-theme="dark"] {--bg:#1e1f22;--bg-2:#25262b;--fg:#d5d7da;--fg-2:#7f8388;--border:#33353a;--accent:#4caf7d;--accent-weak:#4caf7d29;--hover:#ffffff12;--input-bg:#1a1b1e;}
+html, body { height: 100%; margin: 0; }
+body {
+  font: 13px/1.5 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+/* 网格布局：侧边栏/分隔条/主区在第一行，状态栏独占第二行并横跨整行——
+   展开或收起文件夹侧边栏时，状态栏及其按钮、统计信息位置固定不动。 */
+#app {
+  display: grid;
+  height: 100vh;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+#app.sb-hidden #sidebar, #app.sb-hidden #splitter { display: none; }
+#sidebar, #splitter, #main { grid-row: 1; min-height: 0; }
+#main { grid-column: 3; }
+#statusbar { grid-column: 1 / -1; grid-row: 2; }
+
+/* ---------- 侧边栏 ---------- */
+#sidebar {
+  width: var(--sb-width, 240px);
+  min-width: 180px;
+  max-width: 520px;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#sb-head {
+  padding: 6px 8px 4px;
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+#ws-name {
+  display: block;
+  font-weight: 600;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 2px 2px 6px;
+  cursor: default;
+}
+.sb-actions { display: flex; gap: 2px; }
+.sb-actions button {
+  width: 26px; height: 24px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent;
+  color: var(--fg-2);
+  border: none; border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px; font-weight: 700;
+}
+.sb-actions button:hover { background: var(--hover); color: var(--fg); }
+.sb-actions button.on { background: var(--accent-weak); color: var(--accent); }
+#btn-recent { flex: none; margin: 6px 8px; padding: 5px 8px; text-align: left; color: var(--fg); background: var(--bg-2); border: 1px solid var(--border); border-radius: 4px; font: inherit; cursor: pointer; }
+#btn-recent:hover { background: var(--accent-weak); }
+.sb-actions svg { width: 14px; height: 14px; }
+
+/* 文件树里的失败提示。以前这些位置用 window.confirm / window.alert，而 Electron 的外壳页
+   里它们恒为 false / 不显示任何东西（实测），于是"新建失败、重命名失败、删除失败"用户
+   一条都看不到。改成侧栏里的可见提示条。 */
+#sb-error {
+  margin: 2px 8px 4px;
+  padding: 6px 8px;
+  border: 1px solid #cd5555;
+  border-radius: 4px;
+  color: #cd5555;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* 保存类失败的常驻提示条。与 #sb-error 的区别是**不自动消失**——"文件没存进去"要一直
+   摆在用户眼前，直到问题解决或用户自己关掉；关掉之后同一条不再自动弹回来，避免刷屏。 */
+#sb-save {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 2px 8px 4px;
+  padding: 6px 8px;
+  border: 1px solid #cd5555;
+  border-radius: 4px;
+  background: #cd55551a;
+  color: #cd5555;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+#sb-save[hidden] { display: none; }
+#sb-save-text { flex: 1; }
+#sb-save-close {
+  flex: none;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+#st-save.problem { color: #cd5555; }
+
+#tree {
+  flex: 1;
+  overflow: auto;
+  padding: 4px 0 30px;
+  outline: none;
+}
+#tree::-webkit-scrollbar { width: 8px; }
+#tree::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.row {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding-right: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+.row:hover { background: var(--hover); }
+.row.selected { background: var(--accent-weak); }
+.row.active { background: var(--accent-weak); }
+.row.active .name { color: var(--accent); font-weight: 600; }
+.row .tw {
+  width: 16px; flex: none;
+  text-align: center;
+  color: var(--fg-2);
+  font-size: 9px;
+  transition: transform 0.08s;
+}
+.row.expanded .tw { transform: rotate(90deg); }
+.row .icon { width: 17px; flex: none; display: inline-flex; }
+.row .icon svg { width: 15px; height: 15px; }
+.row .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+.row .name input {
+  width: 100%;
+  font: inherit;
+  color: var(--fg);
+  background: var(--input-bg);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 0 3px;
+  outline: none;
+}
+.ic-dir { color: #d9a144; }
+.ic-file { color: var(--fg-2); }
+.ic-md { color: var(--accent); }
+
+#sb-empty {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-2);
+  font-size: 12px;
+}
+#sb-empty button {
+  font: inherit;
+  padding: 4px 14px;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  cursor: pointer;
+}
+#sb-empty button:hover { background: var(--accent-weak); }
+
+#splitter {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  flex: none;
+}
+#splitter:hover, #splitter.drag { background: var(--accent); }
+
+/* ---------- 主区域 ---------- */
+#main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-2); }
+#editor { flex: 1; border: none; width: 100%; min-height: 0; background: #fff; }
+@media (prefers-color-scheme: dark) { #editor { background: #2f3033; } }
+
+/* ---------- 状态栏 ---------- */
+#statusbar {
+  flex: none;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg-2);
+  font-size: 12px;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+#statusbar .st-item:empty { display: none; }
+/* 固定在最左下角的面板开关：不随统计项增减移动 */
+#statusbar .st-actions { display: flex; gap: 2px; margin-left: -4px; flex: none; }
+#statusbar .st-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 18px; min-width: 24px; padding: 0 4px; border: none; border-radius: 4px;
+  background: transparent; color: inherit; cursor: pointer;
+}
+#statusbar .st-btn:hover { background: var(--border); }
+#statusbar .st-btn:active { background: var(--accent); color: var(--bg); }
+#statusbar .st-btn svg { width: 14px; height: 14px; display: block; }
+#st-save.dirty { color: #d9a144; }
+#st-words { color: var(--fg); font-weight: 600; }
+
+#welcome {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.w-card { text-align: center; max-width: 460px; padding: 24px; }
+.w-card { max-height: 100%; }
+.w-logo { margin-bottom: 6px; }
+.w-card h1 { font-size: 26px; margin: 8px 0 4px; font-weight: 650; }
+.w-sub { color: var(--fg-2); margin: 0 0 22px; }
+.w-btns { display: flex; gap: 12px; justify-content: center; margin-bottom: 18px; }
+.w-btns button {
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 22px;
+  border-radius: 5px;
+  cursor: pointer;
+  border: 1px solid var(--accent);
+}
+#w-open-folder { background: var(--accent); color: #fff; }
+#w-open-folder:hover { filter: brightness(1.08); }
+#w-open-file { background: transparent; color: var(--accent); }
+#w-open-file:hover { background: var(--accent-weak); }
+.w-hint { color: var(--fg-2); font-size: 12px; }
+
+#w-recent { text-align: left; margin-top: 10px; }
+#w-recent button { font: inherit; background: transparent; color: inherit; border: 0; text-align: left; width: 100%; }
+.recent-more { margin-top: 12px; padding: 6px 10px; color: var(--accent); background: transparent; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font: inherit; }
+#recent-dialog { width: min(900px, 92vw); padding: 22px; border: 1px solid var(--border); border-radius: 10px; color: var(--fg); background: var(--bg-2); box-shadow: var(--shadow); }
+#recent-dialog::backdrop { background: #0006; }
+.recent-heading { display: flex; align-items: center; justify-content: space-between; }
+.recent-heading h2 { font-size: 20px; margin: 0; }
+#recent-close { border: 0; background: transparent; color: var(--fg-2); font-size: 26px; cursor: pointer; padding: 0 5px; }
+.recent-hint { color: var(--fg-2); margin: 6px 0 14px; }
+#recent-search { width: 100%; padding: 9px 12px; background: var(--input-bg); color: var(--fg); border: 1px solid var(--border); border-radius: 5px; font: inherit; }
+#recent-error { min-height: 16px; margin: 6px 0; color: #cd5555; font-size: 12px; overflow-wrap: anywhere; }
+.recent-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.recent-columns section { min-width: 0; }
+.recent-columns h3 { margin: 0 0 8px; color: var(--fg-2); font-size: 12px; }
+.recent-list { max-height: min(55vh, 480px); overflow: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.recent-link { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; border-radius: 4px; padding: 8px; background: transparent; color: var(--fg); text-align: left; cursor: pointer; font: inherit; }
+.recent-link:hover, .recent-link:focus-visible { background: var(--accent-weak); }
+.recent-link .icon { flex: none; width: 18px; color: var(--accent); }
+.recent-link > span:last-child { min-width: 0; }
+.recent-link strong, .recent-link small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recent-link strong { font-weight: 500; }
+.recent-link small { color: var(--fg-2); font-size: 11px; }
+@media (max-width: 620px) { .recent-columns { grid-template-columns: 1fr; } .recent-list { max-height: 24vh; } }
+#w-recent h3 {
+  font-size: 12px; color: var(--fg-2);
+  margin: 14px 0 4px; font-weight: 600;
+}
+#w-recent .r-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+#w-recent .r-item:hover { background: var(--hover); }
+#w-recent .r-item svg { width: 14px; height: 14px; flex: none; }
+#w-recent .r-item span {
+  overflow: hidden; text-overflow: ellipsis;
+}
+#w-recent .r-none { color: var(--fg-2); font-size: 12px; padding: 2px 6px; }
+
+/* ---------- 拖放遮罩 ---------- */
+#drag-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  z-index: 90;
+  background: rgba(47, 125, 79, 0.12);
+  border: 2px dashed var(--accent);
+  color: var(--accent);
+  font-size: 18px;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+body.dragging #drag-overlay { display: flex; }
+
+/* ---------- 右键菜单 ---------- */
+#ctxmenu {
+  display: none;
+  position: fixed;
+  z-index: 100;
+  min-width: 180px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  padding: 4px;
+  user-select: none;
+}
+#ctxmenu .mi {
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+#ctxmenu .mi:hover { background: var(--accent-weak); color: var(--accent); }
+#ctxmenu .mi.danger:hover { color: #d64545; background: rgba(214, 69, 69, 0.1); }
+#ctxmenu .sep { height: 1px; background: var(--border); margin: 4px 8px; }

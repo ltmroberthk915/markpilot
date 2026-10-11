@@ -1,0 +1,42 @@
+/* scroll bar */
+/* scroll bar */
+*::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+    background: #ffffff;
+    border: 1px solid #eaecef;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: #abacad;
+    border-radius: 5px;
+}
+
+/* 兼容Firefox、IE */
+* {
+    /* scrollbar-width: 10px; */
+    scrollbar-base-color: green;
+    scrollbar-track-color: red;
+    scrollbar-arrow-color: blue;
+}
+
+
+
+
+
+
+.vditor--dark *::-webkit-scrollbar {
+    background: #1f1f1f;
+    border: 1px solid #151515;
+}
+
+.vditor--dark *::-webkit-scrollbar-thumb {
+    background: #343434;
+}
+
+/* 兼容Firefox、IE */
+.vditor--dark {
+    scrollbar-base-color: green;
+    scrollbar-track-color: red;
+    scrollbar-arrow-color: blue;
+}
