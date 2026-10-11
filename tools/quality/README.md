@@ -36,6 +36,7 @@ node tools/quality/performance.cjs --exe C:/artifacts/markpilot-3.2.5-portable.e
 | tests/ | 工具加载、SHA 拒绝、真实 TDZ 突变、锁归属、空套件、证据发布防串路径 | 不是产品功能验收 |
 | acceptance.cjs | 真实键鼠、格式、Unicode、固定种子输入模型、公式、Mermaid、任务列表、拖选、保存、双窗口、输入延迟 | 不覆盖原生输入法合成、实际文件对话框或全部 Markdown 方言 |
 | critical.cjs | Windows Bitmap→Ctrl+V→PNG→MD→重开；围栏/补全/导出；BOM/EOL/已保存内容/路径隔离；UTF-16 安全；未保存关窗保护 | 一个失败用例不等于一个独立根因 |
+| data-safety.cjs | 窗口文档身份、保存回执、磁盘冲突、另存为、刷新/关闭、UTF-16 字节往返与无损拒绝 | 不覆盖所有 OS 对话框交互、崩溃恢复或跨进程文件锁 |
 | performance.cjs | 1千/1万/10万行普通文本，1千/1万行公式；每档 5 次预热、30 个有效输入样本 | 没有 Typora 对照；含 CDP 往返和帧调度开销 |
 | build-check.cjs | 在临时目录打包，比较重建 bundle 与仓库 bundle 的完整 SHA256 | SHA 不同不能直接证明行为不同，也不能证明行为等价 |
 
@@ -53,6 +54,12 @@ node tools/quality/build-check.cjs --out .mp-verify/quality/build
 `setValue`/选区事务只用于准备夹具。被测动作使用 CDP 键鼠或已标明的原生菜单挂点，禁止构造 DOM 的 KeyboardEvent/PasteEvent 来冒充用户操作。截图中的红条是按 caret 坐标画的取证标记，不代表 CDP 拍到了原生光标。
 
 ## 发布小型证据
+
+窗口/编码修复可单独运行 `node tools/quality/data-safety.cjs --exe <实际 MarkPilot.exe 或 portable.exe> --scope sessions|encoding|all --out <空目录>`。`stage-app.cjs --runtime <已核验的 Electron runtime> --out <空目录>` 用当前壳源码及仓库 bundle 生成一次性 unpacked/asar；它不下载运行时，也不重建引擎。重封装产物与最终 portable/安装器分别测试和记录身份。
+
+`mutate.cjs on|off --kind window-sessions|receipt-revision|external-conflict|utf16-read|utf16-write --app <一次性源码副本> [--baseline-ref <Git提交>]` 提供可逆负向控制，拒绝直接修改产品工作区。on/off 可重复调用，恢复时核对文件 SHA 防止覆盖后来修改。窗口/codec 回退必须给真实 Git 基线。回执 GUI 可用 `--scope sessions --case save-receipt-does-not-clear-later-edit` 独立复跑；磁盘测试用 `MP_TEST_DOCUMENT_STORE=<副本/shell/document-store.js>` 指向突变副本，不能把预期非零退出当通过。
+
+截图现在同时保存全图及 2 倍 caret 局部图，必须有可测的 caret 坐标；`publish-evidence.cjs` 核对两类图片哈希。跨 IPC 的异步等待使用 `waitUntil` 真正 await 每次谓词，避免 Promise 本身为真而提前放行。
 
 ```powershell
 node tools/quality/publish-evidence.cjs --in .mp-verify/quality/critical --out docs/verification/quality-3.2.5/critical

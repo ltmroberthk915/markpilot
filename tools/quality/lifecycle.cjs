@@ -108,7 +108,7 @@ async function launch(o, doc, runDir, extraEnv = {}) {
     await page.waitForFunction(() => window.mpEngine._view().state.doc.length > 0, null, { timeout: 15000 });
     const info = await page.evaluate(() => window.mpHost.info());
     const artifactFiles=[];
-    for(const name of ['main.js','preload.js','renderer/host.js','renderer/cm6/app.js']) {
+    for(const name of ['main.js','preload.js','renderer/host.js','shell/document-store.js','shell/text-codec.js','renderer/cm6/app.js']) {
       const bytes=await page.evaluate(async name=>{
         const u=new URL('../'+name,location.href);
         const p=decodeURIComponent(u.pathname).replace(/^\/(?=[A-Za-z]:\/)/,'');

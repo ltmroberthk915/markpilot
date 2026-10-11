@@ -1,0 +1,894 @@
+{
+  "schema": 1,
+  "scope": "sessions",
+  "singleCase": null,
+  "startedAt": "2026-10-11T11:41:34.435Z",
+  "cases": [
+    {
+      "id": "secondary-save-preserves-own-bom-eol",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "selection": {
+              "anchor": 41,
+              "head": 41
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 218.6328125,
+              "right": 218.6328125,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "scrollTop": 0,
+            "title": "secondary-lf.md · 41 字 — MarkPilot",
+            "banner": ""
+          },
+          "diskHex": "425f444f43554d454e545f53454e54494e454c0a5345434f4e4420434f4e54454e540a422d45444954"
+        }
+      ],
+      "ms": 1312
+    },
+    {
+      "id": "secondary-save-keeps-both-saved-texts",
+      "status": "pass",
+      "trace": [
+        {
+          "a": {
+            "documentId": "d6e39b4b-5a36-425a-8a8c-fac3c1639e69",
+            "revision": 0,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\window-asar-5\\primary-bom-crlf.md",
+            "text": "A_DOCUMENT_SENTINEL\nPRIMARY CONTENT\n",
+            "bom": true,
+            "eol": "\r\n",
+            "encoding": "utf8"
+          },
+          "b": {
+            "documentId": "5ab09da4-1ac4-4d4f-baaf-ac7eab3ce4f8",
+            "revision": 1,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\window-asar-5\\secondary-lf.md",
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "bom": false,
+            "eol": "\n",
+            "encoding": "utf8"
+          }
+        }
+      ],
+      "ms": 12
+    },
+    {
+      "id": "focused-primary-native-menu-save",
+      "status": "pass",
+      "trace": [
+        {
+          "key": {
+            "ok": true,
+            "input": {
+              "type": "keyDown",
+              "keyCode": "S",
+              "modifiers": [
+                "control"
+              ]
+            },
+            "wasFocused": false,
+            "focused": true,
+            "focusWaitedMs": 0
+          },
+          "a": {
+            "documentId": "d6e39b4b-5a36-425a-8a8c-fac3c1639e69",
+            "revision": 1,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\window-asar-5\\primary-bom-crlf.md",
+            "text": "A_DOCUMENT_SENTINEL\nPRIMARY CONTENT\nA-EDIT",
+            "bom": true,
+            "eol": "\r\n",
+            "encoding": "utf8"
+          },
+          "b": {
+            "documentId": "5ab09da4-1ac4-4d4f-baaf-ac7eab3ce4f8",
+            "revision": 1,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\window-asar-5\\secondary-lf.md",
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "bom": false,
+            "eol": "\n",
+            "encoding": "utf8"
+          }
+        }
+      ],
+      "ms": 640
+    },
+    {
+      "id": "primary-pdf-exports-primary-with-secondary-open",
+      "status": "pass",
+      "trace": [
+        {
+          "ok": true,
+          "file": "<repo>\\.mp-verify\\codex-audit\\window-asar-5\\primary.pdf",
+          "bytes": 53843,
+          "pages": 1,
+          "ms": 486,
+          "printMs": 396,
+          "chunks": 1,
+          "html": {
+            "file": "<repo>\\.mp-verify\\codex-audit\\window-asar-5\\runtime-temp\\markpilot-pdf-RIzvsm\\MarkPilot 导出.html",
+            "bytes": 373112,
+            "relImages": 0,
+            "dataImages": 0,
+            "remoteImages": 0,
+            "tables": 0,
+            "mathBlocks": 0
+          },
+          "images": {
+            "complete": 0,
+            "natural": 0,
+            "broken": 0,
+            "ms": 326
+          },
+          "gate": {
+            "passed": true,
+            "reasons": [],
+            "inlineDataImages": 0,
+            "relImages": 0
+          },
+          "memory": {
+            "peakMB": 746.4,
+            "lastMB": 746.4,
+            "samples": 4,
+            "intervalMs": 200,
+            "perProc": [
+              {
+                "type": "GPU",
+                "pid": 3840,
+                "peakMB": 263.1
+              },
+              {
+                "type": "Browser",
+                "pid": 84188,
+                "peakMB": 118.2
+              },
+              {
+                "type": "Tab",
+                "pid": 76868,
+                "peakMB": 112
+              },
+              {
+                "type": "Tab",
+                "pid": 38568,
+                "peakMB": 107.9
+              },
+              {
+                "type": "Tab",
+                "pid": 76560,
+                "peakMB": 96.8
+              },
+              {
+                "type": "Utility",
+                "pid": 43852,
+                "peakMB": 50.5
+              }
+            ],
+            "seriesMB": [
+              624,
+              633,
+              744,
+              746,
+              746
+            ]
+          },
+          "phases": [
+            {
+              "bytes": 373112,
+              "relImages": 0,
+              "dataImages": 0,
+              "tables": 0,
+              "phase": "inspect",
+              "ms": 149
+            },
+            {
+              "signal": "dom-ready",
+              "loadMs": 146,
+              "phase": "load",
+              "ms": 318
+            },
+            {
+              "total": 0,
+              "local": 0,
+              "remote": 0,
+              "complete": 0,
+              "natural": 0,
+              "broken": 0,
+              "remotePending": 0,
+              "partial": false,
+              "readyState": "complete",
+              "ms": 326,
+              "phase": "images"
+            },
+            {
+              "mathCssBytes": 369219,
+              "phase": "style",
+              "ms": 333
+            },
+            {
+              "applied": 3,
+              "lines": 3,
+              "blocks": 3,
+              "width": 680.64,
+              "fallback": {},
+              "phase": "typeset",
+              "ms": 341
+            },
+            {
+              "bytes": 53843,
+              "pages": 1,
+              "phase": "print",
+              "ms": 394
+            },
+            {
+              "done": 53843,
+              "bytes": 53843,
+              "chunks": 1,
+              "phase": "write",
+              "ms": 395
+            },
+            {
+              "bytes": 53843,
+              "chunks": 1,
+              "writeMs": 2,
+              "phase": "write-done",
+              "ms": 396
+            }
+          ],
+          "kp": {
+            "applied": 3,
+            "lines": 3,
+            "fallback": {},
+            "blocks": 3,
+            "width": 680.64,
+            "sourceBytes": 126,
+            "sourceChars": 42
+          },
+          "mathCss": {
+            "source": "engine",
+            "bytes": 369219
+          }
+        },
+        {
+          "htmlBody": "\nA_DOCUMENT_SENTINEL\nPRIMARY CONTENT\nA-EDIT\n\n\n\n"
+        }
+      ],
+      "ms": 638
+    },
+    {
+      "id": "secondary-save-as-keeps-primary-path",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "documentId": "d6e39b4b-5a36-425a-8a8c-fac3c1639e69",
+            "revision": 1,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\window-asar-5\\primary-bom-crlf.md",
+            "text": "A_DOCUMENT_SENTINEL\nPRIMARY CONTENT\nA-EDIT",
+            "bom": true,
+            "eol": "\r\n",
+            "encoding": "utf8"
+          },
+          "after": {
+            "documentId": "d6e39b4b-5a36-425a-8a8c-fac3c1639e69",
+            "revision": 1,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\window-asar-5\\primary-bom-crlf.md",
+            "text": "A_DOCUMENT_SENTINEL\nPRIMARY CONTENT\nA-EDIT",
+            "bom": true,
+            "eol": "\r\n",
+            "encoding": "utf8"
+          },
+          "b": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "selection": {
+              "anchor": 41,
+              "head": 41
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 218.6328125,
+              "right": 218.6328125,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "scrollTop": 0,
+            "title": "save-as.md · 41 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 599
+    },
+    {
+      "id": "failed-save-as-retains-source-and-dirty-state",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "documentId": "d6e39b4b-5a36-425a-8a8c-fac3c1639e69",
+            "revision": 1,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\window-asar-5\\primary-bom-crlf.md",
+            "text": "A_DOCUMENT_SENTINEL\nPRIMARY CONTENT\nA-EDIT",
+            "bom": true,
+            "eol": "\r\n",
+            "encoding": "utf8"
+          },
+          "after": {
+            "documentId": "d6e39b4b-5a36-425a-8a8c-fac3c1639e69",
+            "revision": 2,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\window-asar-5\\primary-bom-crlf.md",
+            "text": "A_DOCUMENT_SENTINEL\nPRIMARY CONTENT\nA-EDIT",
+            "bom": true,
+            "eol": "\r\n",
+            "encoding": "utf8"
+          },
+          "state": {
+            "text": "A_DOCUMENT_SENTINEL\nPRIMARY CONTENT\nA-EDIT SAVE-AS-FAIL",
+            "selection": {
+              "anchor": 55,
+              "head": 55
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 307.3828125,
+              "right": 307.3828125,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 55 字 — MarkPilot",
+            "banner": "保存失败：目标不是普通文件：<repo>\\.mp-verify\\codex-audit\\window-asar-5\\save-as.md（<repo>\\.mp-verify\\codex-audit\\window-asar-5\\primary-bom-crlf.md）另存为…重新加载重试"
+          }
+        }
+      ],
+      "ms": 1103
+    },
+    {
+      "id": "same-file-two-windows-conflict-keeps-both-drafts",
+      "status": "pass",
+      "trace": [
+        {
+          "disk": "SHARED BASE\nY-DRAFT",
+          "x": {
+            "text": "SHARED BASE\nX-DRAFT!",
+            "selection": {
+              "anchor": 20,
+              "head": 20
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 237.0625,
+              "right": 237.0625,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "scrollTop": 0,
+            "title": "● shared.md · 20 字 — MarkPilot",
+            "banner": "保存失败：文件已被其他窗口或程序修改，请重新加载或另存为：<repo>\\.mp-verify\\codex-audit\\window-asar-5\\shared.md（<repo>\\.mp-verify\\codex-audit\\window-asar-5\\shared.md）另存为…重新加载"
+          },
+          "y": {
+            "text": "SHARED BASE\nY-DRAFT",
+            "selection": {
+              "anchor": 19,
+              "head": 19
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 231.09375,
+              "right": 231.09375,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "scrollTop": 0,
+            "title": "shared.md · 19 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 4587
+    },
+    {
+      "id": "external-change-with-identical-size-and-mtime-is-refused",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "ORIGINAL\nLOCAL",
+            "selection": {
+              "anchor": 14,
+              "head": 14
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 216.1953125,
+              "right": 216.1953125,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "scrollTop": 0,
+            "title": "● external.md · 14 字 — MarkPilot",
+            "banner": "保存失败：文件已被其他窗口或程序修改，请重新加载或另存为：<repo>\\.mp-verify\\codex-audit\\window-asar-5\\external.md（<repo>\\.mp-verify\\codex-audit\\window-asar-5\\external.md）另存为…重新加载"
+          },
+          "disk": "EXTERNAL\n"
+        }
+      ],
+      "ms": 2273
+    },
+    {
+      "id": "deleted-original-is-not-silently-recreated",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "DELETE BASE\nLOCAL",
+          "selection": {
+            "anchor": 17,
+            "head": 17
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 216.1953125,
+            "right": 216.1953125,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "● deleted.md · 17 字 — MarkPilot",
+          "banner": "保存失败：原文件已不在磁盘上（可能被重命名或删除）：<repo>\\.mp-verify\\codex-audit\\window-asar-5\\deleted.md（<repo>\\.mp-verify\\codex-audit\\window-asar-5\\deleted.md）另存为…重新加载"
+        }
+      ],
+      "ms": 1974
+    },
+    {
+      "id": "save-receipt-does-not-clear-later-edit",
+      "status": "pass",
+      "trace": [
+        {
+          "afterFirst": {
+            "text": "FLIGHT BASE\nFIRSTSECOND",
+            "selection": {
+              "anchor": 23,
+              "head": 23
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 268.3125,
+              "right": 268.3125,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "scrollTop": 0,
+            "title": "● in-flight.md · 23 字 — MarkPilot",
+            "banner": ""
+          },
+          "disk": "FLIGHT BASE\nFIRST"
+        }
+      ],
+      "ms": 2111
+    },
+    {
+      "id": "late-save-receipt-does-not-change-new-document",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "NEW\n",
+            "selection": {
+              "anchor": 4,
+              "head": 4
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 170.5,
+              "y": 79.6953125,
+              "width": 0,
+              "height": 16,
+              "top": 79.6953125,
+              "right": 170.5,
+              "bottom": 95.6953125,
+              "left": 170.5
+            },
+            "scrollTop": 0,
+            "title": "switch-new.md · 4 字 — MarkPilot",
+            "banner": ""
+          },
+          "info": {
+            "documentId": "e5159fb0-4de1-4a0e-8b69-a5577aa34fca",
+            "revision": 0,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\window-asar-5\\switch-new.md",
+            "text": "NEW\n",
+            "bom": false,
+            "eol": "\n",
+            "encoding": "utf8"
+          },
+          "old": "OLD\nSAVING"
+        }
+      ],
+      "ms": 1193
+    },
+    {
+      "id": "clean-view-reload-restores-revision-and-allows-later-save",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "documentId": "271cfba3-170f-44d6-a581-c584ecba636b",
+            "revision": 4,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\window-asar-5\\view-reload.md",
+            "text": "EDIT0EDIT1EDIT2EDIT3RELOAD BASE\n",
+            "bom": false,
+            "eol": "\n",
+            "encoding": "utf8"
+          },
+          "restored": {
+            "documentId": "271cfba3-170f-44d6-a581-c584ecba636b",
+            "revision": 4,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\window-asar-5\\view-reload.md",
+            "text": "EDIT0EDIT1EDIT2EDIT3RELOAD BASE\n",
+            "bom": false,
+            "eol": "\n",
+            "encoding": "utf8"
+          },
+          "after": {
+            "text": "EDIT0EDIT1EDIT2EDIT3RELOAD BASE\nAFTER RELOAD",
+            "selection": {
+              "anchor": 44,
+              "head": 44
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 277,
+              "right": 277,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "scrollTop": 0,
+            "title": "view-reload.md · 44 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 3626
+    },
+    {
+      "id": "dirty-view-reload-cancel-preserves-unnamed-draft",
+      "status": "pass",
+      "trace": [
+        {
+          "menu": {
+            "ok": true,
+            "id": "menu-reload-view",
+            "forced": true,
+            "enabled": true
+          },
+          "before": {
+            "text": "UNNAMED RELOAD DRAFT",
+            "selection": {
+              "anchor": 20,
+              "head": 20
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 355.7890625,
+              "right": 355.7890625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "未命名 — MarkPilot",
+            "banner": ""
+          },
+          "after": {
+            "text": "UNNAMED RELOAD DRAFT",
+            "selection": {
+              "anchor": 20,
+              "head": 20
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 355.7890625,
+              "right": 355.7890625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● 未命名 · 20 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 1233
+    },
+    {
+      "id": "secondary-save-does-not-clear-primary-unsaved-close-guard",
+      "status": "pass",
+      "trace": [
+        {
+          "clicked": {
+            "ok": true,
+            "id": "menu-close-window",
+            "forced": true,
+            "enabled": true
+          },
+          "closed": false,
+          "nativeConfirmationRequested": true
+        }
+      ],
+      "ms": 2761
+    },
+    {
+      "id": "save-and-close-with-cancelled-save-as-keeps-draft-and-cancels-close-intent",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "CANCELLED CLOSE DRAFT",
+            "selection": {
+              "anchor": 21,
+              "head": 21
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 342.6484375,
+              "right": 342.6484375,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● 未命名 · 21 字 — MarkPilot",
+            "banner": ""
+          },
+          "dialogSelection": "test-only native response 0; Save As cancellation hook"
+        }
+      ],
+      "ms": 566
+    }
+  ],
+  "frames": [
+    {
+      "file": "secondary-save.png",
+      "sha256": "0ba12b8db7ae920798da44de44439b5ae229a1513df7a4657a170f78d3a60863",
+      "caret": {
+        "left": 218.6328125,
+        "right": 218.6328125,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "secondary-save-caret-2x.png",
+        "sha256": "927cbab9cced00b7920117f631ca721d2bbfb53555195c60187414396bc3508c",
+        "clip": {
+          "x": 98.6328125,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "same-file-conflict.png",
+      "sha256": "857cf69caa10a91a77a570e6b8a26567584f33df41c872ed8445c452958a9fc1",
+      "caret": {
+        "left": 237.0625,
+        "right": 237.0625,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "same-file-conflict-caret-2x.png",
+        "sha256": "472d9dbd123eb7c5915fc1b975d467f1e91cc0966eb3e2affb5c781dc9230066",
+        "clip": {
+          "x": 117.0625,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "external-conflict.png",
+      "sha256": "b29dcf9175409af52754986477798c76ee10a0427bfe3bfed2e952e089348484",
+      "caret": {
+        "left": 216.1953125,
+        "right": 216.1953125,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "external-conflict-caret-2x.png",
+        "sha256": "60ebcafeb6b09d8deb1a5d9f0511e06edb2643a64e22b564de66fce5d6f82992",
+        "clip": {
+          "x": 96.1953125,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "view-reload.png",
+      "sha256": "f8cb42ef8b0fb5bc0c64ac1ca6c64ec990eb0707b619476b9b8164ee89904091",
+      "caret": {
+        "left": 277,
+        "right": 277,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "view-reload-caret-2x.png",
+        "sha256": "12d3ee7df6748152a0124cd957007a8cfd71758da6a2e4f8b6e41813eefdf80d",
+        "clip": {
+          "x": 157,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "unsaved-primary.png",
+      "sha256": "e66ce075decdcd3529e40c07b7c3b59443e24b729b1fbbb07ee19bcfaab918d4",
+      "caret": {
+        "left": 346.1640625,
+        "right": 346.1640625,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "unsaved-primary-caret-2x.png",
+        "sha256": "c8eb00c687eed669ac444c74b285a4c035754d9b5d230333f3d5e54d6e5d06d9",
+        "clip": {
+          "x": 226.1640625,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "executable": "MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.5",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "bootMs": 731,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "d64901ab8921ab227387679d9988302af9ed6576816c13bf26ad73d87cd123f7",
+        "sourceSha256": "d64901ab8921ab227387679d9988302af9ed6576816c13bf26ad73d87cd123f7"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "a82bfbb9c56c8c355976dec9ad5df6b1f8581d8524b9eab54f818261db7a97fd",
+        "sourceSha256": "a82bfbb9c56c8c355976dec9ad5df6b1f8581d8524b9eab54f818261db7a97fd"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "42a0e04d0369bf03abbd2aafe633a577f794bea1d52116e7d3b48388bb19c308",
+        "sourceSha256": "42a0e04d0369bf03abbd2aafe633a577f794bea1d52116e7d3b48388bb19c308"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "506a019995027754e35a4ccc53c2400097a65021f812b4401a6c092407d1547c",
+        "sourceSha256": "506a019995027754e35a4ccc53c2400097a65021f812b4401a6c092407d1547c"
+      }
+    ]
+  },
+  "firstCleanup": {
+    "residual": []
+  },
+  "closeGuardCleanup": {
+    "residual": []
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T11:42:21.112Z",
+  "passed": true
+}
