@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "isolatedAppId": "app.markpilot.quality.a1b96307e4a7410887fa7dc12515ae56",
+  "target": "<repo>\\.mp-verify\\codex-audit\\candidate-installation\\installed",
+  "before": [
+    {
+      "version": "3.2.4",
+      "name": "MarkPilot 3.2.4",
+      "uninstall": "\"<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\Uninstall MarkPilot.exe\" /currentuser",
+      "location": null,
+      "key": "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\c7cfe331-3064-5e20-909b-958fa99b0722"
+    },
+    {
+      "version": "2.3.3",
+      "name": "MarkPilot",
+      "uninstall": "\"<user>\\AppData\\Local\\Programs\\MarkPilot\\Uninstall MarkPilot.exe\" /currentuser",
+      "location": null,
+      "key": "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\f8c700c9-e6c1-5634-8ed3-d3105fe9c6ee"
+    }
+  ],
+  "installed": true,
+  "after": [
+    {
+      "key": "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\6a92285d-97ea-5d4e-97e6-a4dcc6c05574",
+      "uninstall": "\"<repo>\\.mp-verify\\codex-audit\\candidate-installation\\installed\\Uninstall MarkPilot.exe\" /currentuser",
+      "location": null,
+      "version": "3.2.6",
+      "name": "MarkPilot 3.2.6"
+    },
+    {
+      "key": "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\c7cfe331-3064-5e20-909b-958fa99b0722",
+      "uninstall": "\"<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\Uninstall MarkPilot.exe\" /currentuser",
+      "location": null,
+      "version": "3.2.4",
+      "name": "MarkPilot 3.2.4"
+    },
+    {
+      "key": "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\f8c700c9-e6c1-5634-8ed3-d3105fe9c6ee",
+      "uninstall": "\"<user>\\AppData\\Local\\Programs\\MarkPilot\\Uninstall MarkPilot.exe\" /currentuser",
+      "location": null,
+      "version": "2.3.3",
+      "name": "MarkPilot"
+    }
+  ],
+  "added": [
+    {
+      "key": "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\6a92285d-97ea-5d4e-97e6-a4dcc6c05574",
+      "uninstall": "\"<repo>\\.mp-verify\\codex-audit\\candidate-installation\\installed\\Uninstall MarkPilot.exe\" /currentuser",
+      "location": null,
+      "version": "3.2.6",
+      "name": "MarkPilot 3.2.6"
+    }
+  ],
+  "exeSha256": "bdc970e1d67580612ec734f1e635cdf88c65161c0cf19c970987d6246b75f133",
+  "asarSha256": "acacc54935ff9a22d5af8d2ac89ebf9de17b73a8b9d9f1f1075a69276e9f47ba",
+  "at": "2026-10-11T12:00:01.973Z",
+  "uninstalled": true,
+  "afterUninstall": [
+    {
+      "key": "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\c7cfe331-3064-5e20-909b-958fa99b0722",
+      "uninstall": "\"<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\Uninstall MarkPilot.exe\" /currentuser",
+      "name": "MarkPilot 3.2.4",
+      "version": "3.2.4",
+      "location": null
+    },
+    {
+      "key": "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\f8c700c9-e6c1-5634-8ed3-d3105fe9c6ee",
+      "uninstall": "\"<user>\\AppData\\Local\\Programs\\MarkPilot\\Uninstall MarkPilot.exe\" /currentuser",
+      "name": "MarkPilot",
+      "version": "2.3.3",
+      "location": null
+    }
+  ],
+  "finishedAt": "2026-10-11T12:02:47.696Z"
+}

@@ -25,3 +25,13 @@ test('wrong screenshot hash and traversal cannot be published',()=>{
     assert.throws(()=>publish(input,dest),/must be empty/);
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+test('caret zoom has its own verified hash and traversal protection',()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'mp-quality-zoom-'));
+  try {
+    const input=path.join(dir,'input');fs.mkdirSync(input);const frame=path.join(input,'frame.png'),zoom=path.join(input,'zoom.png');fs.writeFileSync(frame,'frame');fs.writeFileSync(zoom,'zoom');
+    const data={frames:[{file:'frame.png',sha256:sha256(frame),zoom:{file:'zoom.png',sha256:'0'.repeat(64)}}]};
+    fs.writeFileSync(path.join(input,'result.json'),JSON.stringify(data));assert.throws(()=>publish(input,path.join(dir,'bad-hash')),/SHA256 mismatch/);
+    data.frames[0].zoom.file='../zoom.png';fs.writeFileSync(path.join(input,'result.json'),JSON.stringify(data));assert.throws(()=>publish(input,path.join(dir,'bad-path')),/Invalid frame path/);
+    data.frames[0].zoom={file:'zoom.png',sha256:sha256(zoom)};fs.writeFileSync(path.join(input,'result.json'),JSON.stringify(data));publish(input,path.join(dir,'valid'));assert.equal(fs.readFileSync(path.join(dir,'valid/zoom.png'),'utf8'),'zoom');
+  } finally {const resolved=fs.realpathSync(dir);assert.equal(path.dirname(resolved),fs.realpathSync(os.tmpdir()));assert(path.basename(resolved).startsWith('mp-quality-zoom-'));fs.rmSync(resolved,{recursive:true,force:true});}
+});

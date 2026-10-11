@@ -11,12 +11,18 @@ async function fixture(t,options){
 function edit(store,S,revision){store.markDirty(S,{documentId:S.documentId,revision,dirty:true});}
 function save(store,S,text,revision,grant){return store.save(S,{filePath:grant?.filePath||S.filePath,text,documentId:S.documentId,revision,...(grant?{saveAsToken:grant.saveAsToken}:{})});}
 const code=c=>e=>e.code===c;
+for(const encoding of ['utf8','utf16le','utf16be'])test(encoding+' refuses an invalid editor surrogate without losing disk or draft metadata',async t=>{
+ const {store,file,S,dir}=await fixture(t);S.encoding=encoding;edit(store,S,1);const before=await fs.readFile(file),id=S.documentId;
+ await assert.rejects(save(store,S,'invalid\ud800',1),code('MP_ENCODING'));assert((await fs.readFile(file)).equals(before));assert.equal(S.documentId,id);assert.equal(S.savedText,'original\n');assert(S.dirty);assert.deepEqual((await fs.readdir(dir)).filter(n=>n.includes('.mp-tmp-')),[]);
+ await save(store,S,'recovered',1);assert(!S.dirty);
+});
 test('separate windows retain independent BOM, EOL and saved snapshots',async t=>{
  const {dir,store,file,S}=await fixture(t),b=path.join(dir,'b.md'),B=createSession();await fs.writeFile(file,'\ufeffA\r\n');await store.load(S,file);await fs.writeFile(b,'B\n');await store.load(B,b);edit(store,B,1);await save(store,B,'B\nedit',1);assert.equal(await fs.readFile(file,'utf8'),'\ufeffA\r\n');assert.equal(await fs.readFile(b,'utf8'),'B\nedit');assert.equal(S.savedText,'A\n');assert.equal(B.savedText,'B\nedit');
 });
 test('same-file concurrent independent drafts accept one writer and preserve the loser',async t=>{
  const {store,file,S}=await fixture(t),B=createSession();await store.load(B,file);edit(store,S,1);edit(store,B,1);
- const results=await Promise.allSettled([save(store,S,'first\n',1),save(store,B,'second\n',1)]);assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.find(r=>r.status==='rejected').reason.code,'MP_FILE_CONFLICT');assert.equal(await fs.readFile(file,'utf8'),'first\n');assert(B.dirty);assert.equal(B.savedText,'original\n');
+ const results=await Promise.allSettled([save(store,S,'first\n',1),save(store,B,'second\n',1)]);assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.find(r=>r.status==='rejected').reason.code,'MP_FILE_CONFLICT');
+ const winner=results.findIndex(r=>r.status==='fulfilled'),loser=winner===0?B:S;assert.equal(await fs.readFile(file,'utf8'),winner===0?'first\n':'second\n');assert(loser.dirty);assert.equal(loser.savedText,'original\n');
 });
 test('own queued newer revision follows earlier write and late older requests cannot roll back',async t=>{
  const {store,file,S}=await fixture(t);edit(store,S,2);const r=await Promise.allSettled([save(store,S,'one',1),save(store,S,'two',2)]);assert.equal(r[1].status,'fulfilled');if(r[0].status==='rejected')assert.equal(r[0].reason.code,'MP_DOC_MISMATCH');assert.equal(await fs.readFile(file,'utf8'),'two');assert.equal(S.savedText,'two');assert.equal(S.dirty,false);await assert.rejects(save(store,S,'old',1),code('MP_DOC_MISMATCH'));assert.equal(await fs.readFile(file,'utf8'),'two');

@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "controls": [
+    {
+      "kind": "utf16-read",
+      "restored": true,
+      "files": [
+        {
+          "file": "shell/text-codec.js",
+          "originalSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+          "mutantSha256": "d2aec7daa9391149f65b403c768ab06b0bb0a4fc1fcd424b34a87833476cb2c6",
+          "restoredSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+        }
+      ]
+    },
+    {
+      "kind": "utf16-write",
+      "restored": true,
+      "files": [
+        {
+          "file": "shell/text-codec.js",
+          "originalSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+          "mutantSha256": "235e00938cc9fbe860e42e588126cdec9f084f880727a859822885fdd5cbb479",
+          "restoredSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+        }
+      ]
+    }
+  ],
+  "read": {
+    "cases": 8,
+    "expectedFail": 4
+  },
+  "write": {
+    "cases": 8,
+    "expectedFail": 2
+  }
+}
