@@ -1,0 +1,16 @@
+{
+  "name": "markpilot-quality",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Private corpus CM6 input workflow testing for MarkPilot",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "corpus-math": "node corpus-math-workflows.cjs"
+  },
+  "devDependencies": {
+    "acorn": "8.15.0",
+    "playwright-core": "1.64.0"
+  }
+}
