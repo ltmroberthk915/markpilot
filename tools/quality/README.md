@@ -25,3 +25,15 @@ Manifest 格式如下；`corpusSha256` 对应原文件完整字节，`span` 是 
 ```
 
 输入链只确认进入目标公式源码范围，并按实际原生选区核对编辑结果；不独立证明字形的精确落点。保存不等于重开，语料扫描数量不等于渲染成功数量，CDP 输入不等于系统 IME。本工具不声称拖拽、跨屏、所有环境内部编辑或性能已覆盖。报告不记录正文，但 fixture、manifest.text、截图仍含原文，应留在私有输出；公开的是工具源码与合成夹具。[统一交互方案与实测边界](../../docs/LOG-3.2.13-REGION-ARCHITECTURE.md)
+
+### Formula preview layout workflow
+
+`float-layout-workflows.cjs` generates eight fixtures: long and nested quotes, block math, lists, fractions, a two-row matrix, split view, and a short-formula control. It uses actual renderer keyboard/mouse input to check fixed plain-glyph source positions, immediate edits, Undo/Redo, scrollbar reading, local wheel endpoints, Shift-click selection and narrow/wide layout. Each scroll phase records its own geometry and trusted-event trace.
+
+```powershell
+node tools/quality/float-layout-workflows.cjs --exe <compatible-CM6.exe> --expected-sha256 <complete-SHA256> --out <empty-private-directory>
+```
+
+`MP_QUALITY_CASES` filters case IDs; zero selected cases fail. Optional `--sample <local-copy.md>` adds one private excerpt arm, requiring UTF-8 LF text whose first target inline formula starts with the ordinary mapped letter `e`. This is a bounded snippet contract, not arbitrary corpus support; use the corpus workflow for manifest-bound samples. Keep excerpts, fixtures, screenshots, profiles and receipts private.
+
+Window sizing uses Chromium viewport emulation, not native OS resizing. Recorded inputs do not establish OS IME or physical accelerator behavior; caret markers show measured CM coordinates. The probe requires a compatible desktop artifact and does not ship editor implementation or installers. [Layout scope and verified delivery](../../docs/LOG-3.2.14-FLOAT-LAYOUT.md).
