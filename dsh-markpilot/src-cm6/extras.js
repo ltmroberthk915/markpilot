@@ -11,6 +11,7 @@
 import { tableLead, withTableLead, isFenceAt, isSeparatorBody } from "./tables.js";
 import { codeBlockAt, quoteLead, scanFenceLines, codeBody } from './markdown-context.js';
 import { EditorSelection } from '@codemirror/state';
+import { SearchQuery, getSearchQuery, setSearchQuery } from '@codemirror/search';
 import { reserveImageInsertion, captureImageDocument } from './image-insertion.js';
 import { mathSourcePosition } from './math-source-map.js';
 /* 【Typora 社区主题·2026-10-09】用户想直接用 Typora 的主题 CSS。
@@ -138,6 +139,22 @@ const PALETTES = [
 const EMOJI = ['😀','😄','😁','😅','😂','🙂','😉','😊','😍','🤔','😐','😴','😭','😡','👍','👎','👏','🙏','💪','🎉','✨','🔥','💡','✅','❌','⚠️','❓','❗','⭐','📌','📎','📝','📖','📊','📈','📉','🔍','🔧','⚙️','🚀','🐛','🌱','🌸','☕','🍵','🎯','⏰','🧠','💬','📅','🔒','🔑'];
 
 export function installExtras(deps) {
+  // The stock panel commits on keyup/change. Text input and IME commits must
+  // update the same query before the next Enter, without touching source/history.
+  function syncSearchInput(event) {
+    const input = event.target;
+    if (input?.tagName !== 'INPUT' || (input.name !== 'search' && input.name !== 'replace') || event.isComposing) return;
+    const panel = input.closest('.cm-search'), v = deps.getView();
+    if (!panel || !v?.dom.contains(panel)) return;
+    const current = getSearchQuery(v.state);
+    const query = new SearchQuery({ ...current,
+      search: panel.querySelector('input[name="search"]').value,
+      replace: panel.querySelector('input[name="replace"]').value,
+    });
+    if (!query.eq(current)) v.dispatch({ effects: setSearchQuery.of(query) });
+  }
+  document.addEventListener('input', syncSearchInput, true);
+  document.addEventListener('compositionend', syncSearchInput, true);
   const { EditorView, getView, getImageAt, imageSource, lineStylesField, mathSpansField, scrollOffset, exportTypoCss } = deps;
   /* 【贴底/贴边翻转·2026-10-10（zoom-extremes 族 M6/M7）】三套右键菜单（图片 1567／表格 1643／表格行列 1734）
      都是**先定位、后加条目** ⇒ 定位那一刻菜单高度≈0，"下方放不下"根本判不出来 ⇒ 贴近视口底部右键时
@@ -1535,10 +1552,14 @@ export function installExtras(deps) {
   function onDocContextMenu(event) {
     const v = getView();
     if (!v) return;
+    const target = event.target, source = window.mpSplit?._slave?.();
+    const cell = target?.closest?.('.mp-cell-overlay-text');
+    const inCell = cell?.isConnected && cell === document.querySelector('.mp-cell-overlay-text');
+    if (!v.scrollDOM.contains(target) && !source?.scrollDOM.contains(target) && !inCell) return;
     menuAnchor = null;                                            // 每次右键都从干净状态开始
-    const cell = cellFromPoint(event.clientX, event.clientY);
-    if (cell) {
-      const pos = anchorPosInCell(cell.rowFrom, cell.col);
+    const hitCell = cellFromPoint(event.clientX, event.clientY);
+    if (hitCell) {
+      const pos = anchorPosInCell(hitCell.rowFrom, hitCell.col);
       if (pos != null && tableAt(pos)) {
         event.preventDefault();
         menuAnchor = pos;                                         // 命令锚到**被点的那一格**

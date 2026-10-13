@@ -75,6 +75,8 @@ export function installSplit(deps) {
     scheduleCorrect(() => { if (slave) alignSlaveToMaster(); });
     // 点击从视图（源码）→ 主视图落位并聚焦
     slave.dom.addEventListener('mousedown', (e) => {
+      // Context menus retain the master's range; only a primary click locates it.
+      if (e.button !== 0) { e.preventDefault(); return; }
       let pos = null;
       try { pos = slave.posAtCoords({ x: e.clientX, y: e.clientY }); } catch { pos = null; }
       if (pos == null) return;
