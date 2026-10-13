@@ -1,0 +1,1752 @@
+{
+  "suite": "document-workflows",
+  "schema": 1,
+  "startedAt": "2026-10-11T20:10:24.030Z",
+  "cases": [
+    {
+      "id": "same-text-other-file-starts-empty-history",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "same-text-01-before-edit",
+          "text": "A base\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 160.5,
+            "y": 79.6953125,
+            "width": 0,
+            "height": 16,
+            "top": 79.6953125,
+            "right": 160.5,
+            "bottom": 95.6953125,
+            "left": 160.5
+          },
+          "scrollTop": 0,
+          "title": "history-A.md · 7 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "a4c32ce2-5077-4de3-a07b-7c56c74425d4",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\history-A.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "same-text-01-before-edit.png",
+            "sha256": "f1b7900edcacc79957de4b7e76caf81169fd63b41a05ddb48433169b469b72ad",
+            "caret": {
+              "x": 160.5,
+              "y": 79.6953125,
+              "width": 0,
+              "height": 16,
+              "top": 79.6953125,
+              "right": 160.5,
+              "bottom": 95.6953125,
+              "left": 160.5
+            },
+            "zoom": {
+              "file": "same-text-01-before-edit-caret-2x.png",
+              "sha256": "42d82e0338d76ba214ae3585cb3da87a3c76d950b43d544e4aabe868475d5517",
+              "clip": {
+                "x": 40.5,
+                "y": 54.6953125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "same-text-02-A-edited",
+          "text": "A base\nFROM_A",
+          "selection": {
+            "anchor": 13,
+            "head": 13
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 220.5,
+            "right": 220.5,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "history-A.md · 13 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "a4c32ce2-5077-4de3-a07b-7c56c74425d4",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\history-A.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "same-text-02-A-edited.png",
+            "sha256": "d83afca2e759a93fec96d90276e037679e74cd50466b0b979ead3d767a24eaec",
+            "caret": {
+              "left": 220.5,
+              "right": 220.5,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "zoom": {
+              "file": "same-text-02-A-edited-caret-2x.png",
+              "sha256": "6f6c0219182699c40aadf7480755d8e0688938ab60ffd65c3435293e3d961d0b",
+              "clip": {
+                "x": 100.5,
+                "y": 54.6953125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "same-text-03-B-before-undo",
+          "text": "A base\nFROM_A",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 160.5,
+            "right": 160.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "history-B.md · 13 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "fb846220-af57-496e-a21b-800724f6c24a",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\history-B.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "same-text-03-B-before-undo.png",
+            "sha256": "0f39df31d6cd0edaf6ca286b063cba507d71d6b5f14c4cf1d7997da986c4a90d",
+            "caret": {
+              "left": 160.5,
+              "right": 160.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "same-text-03-B-before-undo-caret-2x.png",
+              "sha256": "61379eec73d592d741aa9ee92c3816d32022e6a927e739de1f3eafa76014f162",
+              "clip": {
+                "x": 40.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "same-text-04-B-after-undo",
+          "text": "A base\nFROM_A",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 160.5,
+            "right": 160.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "history-B.md · 13 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "fb846220-af57-496e-a21b-800724f6c24a",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\history-B.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "same-text-04-B-after-undo.png",
+            "sha256": "0f39df31d6cd0edaf6ca286b063cba507d71d6b5f14c4cf1d7997da986c4a90d",
+            "caret": {
+              "left": 160.5,
+              "right": 160.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "same-text-04-B-after-undo-caret-2x.png",
+              "sha256": "61379eec73d592d741aa9ee92c3816d32022e6a927e739de1f3eafa76014f162",
+              "clip": {
+                "x": 40.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "disk-after-undo",
+          "A": "A base\nFROM_A",
+          "B": "A base\nFROM_A"
+        }
+      ],
+      "detail": {
+        "historyIsolated": true,
+        "documentIdentityChanged": true
+      },
+      "ms": 2440
+    },
+    {
+      "id": "new-empty-document-cannot-undo-deletion-in-old-file",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "new-01-old-empty",
+          "text": "",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 54.5,
+            "width": 0,
+            "height": 16,
+            "top": 54.5,
+            "right": 170.5,
+            "bottom": 70.5,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "delete-then-new.md — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "1faebd74-dde1-433d-b07f-20b3b5f60883",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\delete-then-new.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "new-01-old-empty.png",
+            "sha256": "19c4e19bd7eafa3d786b4d4a685ea2dfa8378ba4094d4df4f57c5912145cbf65",
+            "caret": {
+              "x": 170.5,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 170.5,
+              "bottom": 70.5,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "new-01-old-empty-caret-2x.png",
+              "sha256": "9809b2a40ba5f20ec78c507d772489cf9afb427e20e7c7c43afd817168bc6e90",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "new-02-after-undo",
+          "text": "",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 54.5,
+            "width": 0,
+            "height": 16,
+            "top": 54.5,
+            "right": 170.5,
+            "bottom": 70.5,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "未命名 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "4766af7b-befa-4623-8435-93a058bb5f50",
+            "filePath": null,
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "new-02-after-undo.png",
+            "sha256": "19c4e19bd7eafa3d786b4d4a685ea2dfa8378ba4094d4df4f57c5912145cbf65",
+            "caret": {
+              "x": 170.5,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 170.5,
+              "bottom": 70.5,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "new-02-after-undo-caret-2x.png",
+              "sha256": "9809b2a40ba5f20ec78c507d772489cf9afb427e20e7c7c43afd817168bc6e90",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "historyIsolated": true
+      },
+      "ms": 2161
+    },
+    {
+      "id": "new-file-cannot-redo-old-file-edit",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "redo-01-after",
+          "text": "COMMON\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "redo-new.md · 7 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "b63ac295-2495-4aa6-bd96-21e736519694",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\redo-new.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "redo-01-after.png",
+            "sha256": "146c4fe1eaf376fbf41fc74fa8075d6295d1da0e8bfd4d0dff5bdf13f3a0e842",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "redo-01-after-caret-2x.png",
+              "sha256": "37e19ce17914e2035dafadfc7efcfcbd3f3a83c3ada66fd49e4e5ade081b4e6e",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "redoIsolated": true
+      },
+      "ms": 2901
+    },
+    {
+      "id": "different-text-open-does-not-undo-previous-file",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "different-01-after",
+          "text": "COMMON\nSECOND_DOCUMENT\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "different-new.md · 23 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "963659ab-32db-477e-8841-0bd4faa680bc",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\different-new.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "different-01-after.png",
+            "sha256": "de56e46a6ccc9642101651354ca09c50a3d86c19bffe19386c28f7d89aba3bc4",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "different-01-after-caret-2x.png",
+              "sha256": "2332f6cdaa5f16b98266329f1ddcb89eb7f955189b167da49ead1705a53343c8",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "historyIsolated": true
+      },
+      "ms": 2314
+    },
+    {
+      "id": "same-file-reload-preserves-undo-identical-bytes",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "reload-false-01-before-undo",
+          "text": "alpha\nomega\nLOCAL_EDIT",
+          "selection": {
+            "anchor": 22,
+            "head": 22
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 258.9453125,
+            "right": 258.9453125,
+            "top": 104.890625,
+            "bottom": 120.890625
+          },
+          "scrollTop": 0,
+          "title": "reload-false.md · 22 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "8cd6887f-2eea-49e8-b3d9-4c952fdc2ece",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\reload-false.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "reload-false-01-before-undo.png",
+            "sha256": "3f8dcd3a3562bf724b81749eb27ab336a7c387e83a68cc3da1a1b7184385e8d8",
+            "caret": {
+              "left": 258.9453125,
+              "right": 258.9453125,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "zoom": {
+              "file": "reload-false-01-before-undo-caret-2x.png",
+              "sha256": "028e627b73c21a3681d4ec1528ac6948aa3c5d943c992195dcac7cc2b25344a8",
+              "clip": {
+                "x": 138.9453125,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "reload-false-02-after-undo",
+          "text": "alpha\nomega\n",
+          "selection": {
+            "anchor": 12,
+            "head": 12
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "reload-false.md · 12 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "8cd6887f-2eea-49e8-b3d9-4c952fdc2ece",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\reload-false.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "reload-false-02-after-undo.png",
+            "sha256": "877c4042f4e3cb01067fb47be25ae3998e9c33ee25889dfa10f21853118b6e36",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "reload-false-02-after-undo-caret-2x.png",
+              "sha256": "6d5fc7d15fe275252032430416e3e0a4fad5ec7b35fbbcad431c9448d1845d6b",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "sameFileUndoRetained": true,
+        "externalContentRetained": false
+      },
+      "ms": 2494
+    },
+    {
+      "id": "same-file-reload-preserves-undo-external-prefix",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "reload-true-01-before-undo",
+          "text": "EXTERNAL_PREFIX\nalpha\nomega\nLOCAL_EDIT",
+          "selection": {
+            "anchor": 38,
+            "head": 38
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 258.9453125,
+            "right": 258.9453125,
+            "top": 130.0859375,
+            "bottom": 146.0859375
+          },
+          "scrollTop": 0,
+          "title": "reload-true.md · 38 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "ee2b0b0f-a532-4e64-946d-8c1d94c098fc",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\reload-true.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "reload-true-01-before-undo.png",
+            "sha256": "2ebbc7fc011f41649a74271c885c492d6dd861b2a7b8dbbc6dda0284aba13f68",
+            "caret": {
+              "left": 258.9453125,
+              "right": 258.9453125,
+              "top": 130.0859375,
+              "bottom": 146.0859375
+            },
+            "zoom": {
+              "file": "reload-true-01-before-undo-caret-2x.png",
+              "sha256": "b95e7cf027619d9ace1f6f03b63eafe5a63e665c96e168eb21a306bb91031a90",
+              "clip": {
+                "x": 138.9453125,
+                "y": 105.0859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "reload-true-02-after-undo",
+          "text": "EXTERNAL_PREFIX\nalpha\nomega\n",
+          "selection": {
+            "anchor": 28,
+            "head": 28
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 130.0859375,
+            "width": 0,
+            "height": 16,
+            "top": 130.0859375,
+            "right": 170.5,
+            "bottom": 146.0859375,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "reload-true.md · 28 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "ee2b0b0f-a532-4e64-946d-8c1d94c098fc",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\reload-true.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "reload-true-02-after-undo.png",
+            "sha256": "bc0da32817966b49e05128a8a713d19a75bf3f059231619422b4f1bc4815ddee",
+            "caret": {
+              "x": 170.5,
+              "y": 130.0859375,
+              "width": 0,
+              "height": 16,
+              "top": 130.0859375,
+              "right": 170.5,
+              "bottom": 146.0859375,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "reload-true-02-after-undo-caret-2x.png",
+              "sha256": "f349f72185b2e543854a416cdb3f07796a79df5a0acd8de9d5a23c4688ac4a30",
+              "clip": {
+                "x": 50.5,
+                "y": 105.0859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "sameFileUndoRetained": true,
+        "externalContentRetained": true
+      },
+      "ms": 2557
+    },
+    {
+      "id": "explicit-reopen-same-path-starts-new-history",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "reopen-01-after-undo",
+          "text": "REOPEN\nSAVED_EDIT",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "reopen.md · 17 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "2dc0887a-22ad-4b0a-a30c-50c9ede8f667",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\reopen.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "reopen-01-after-undo.png",
+            "sha256": "efe2274431b336cba4c2e2efc938008c9a9e183ac9619efcb9781afb9e766745",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "reopen-01-after-undo-caret-2x.png",
+              "sha256": "d54daebcf012cccc53eeabfa63697b70c01dc45c7f3b7c02986fec42b38bb829",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "historyIsolated": true
+      },
+      "ms": 2408
+    },
+    {
+      "id": "open-from-active-cell-immediately-types-in-new-document",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "cell-click-target",
+          "box": {
+            "x": 171,
+            "y": 93.6953125,
+            "width": 407.5,
+            "height": 42.1953125
+          },
+          "cell": {
+            "text": "alpha",
+            "row": "31",
+            "col": "0"
+          }
+        },
+        {
+          "name": "active-cell-01-before-open",
+          "text": "| Name | Value |\n| --- | --- |\n| alpha | one |\n\nEnd\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": false,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 50,
+            "bottom": 93.1953125
+          },
+          "scrollTop": 0,
+          "title": "active-cell-old.md · 52 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "a56ce1c0-27b1-4253-8706-80a1f8b2fd9a",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\active-cell-old.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "active-cell-01-before-open.png",
+            "sha256": "48dccc7c6d278da09792f595bc754768435364b925239191daa2a3a570ca00af",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 50,
+              "bottom": 93.1953125
+            },
+            "zoom": {
+              "file": "active-cell-01-before-open-caret-2x.png",
+              "sha256": "0bbcadfa732270c2ff674215baa257c2ef6d7708d39cc2ae29b3115050cd0bab",
+              "clip": {
+                "x": 50.5,
+                "y": 25,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "active-cell-02-after-open",
+          "text": "B second document\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "active-cell-new.md · 18 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "7d72c7d2-242e-466c-938e-f57720b69087",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\active-cell-new.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "active-cell-02-after-open.png",
+            "sha256": "948345d9ee71c2ecec4c3249efde846a4aad850aa9691097a9dcbf5ac949128a",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "active-cell-02-after-open-caret-2x.png",
+              "sha256": "9384c3db6b4d7d57679e8876343cb940f48564e66ebd6677972076ca57ff4a6f",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "active-cell-03-immediate-typing",
+          "text": "NEW_B second document\n",
+          "selection": {
+            "anchor": 4,
+            "head": 4
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 213.046875,
+            "right": 213.046875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● active-cell-new.md · 22 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "7d72c7d2-242e-466c-938e-f57720b69087",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\active-cell-new.md",
+            "dirty": true,
+            "saveInFlight": false,
+            "saveTimer": true
+          },
+          "screenshot": {
+            "file": "active-cell-03-immediate-typing.png",
+            "sha256": "2feabdf63533089e1b38cdeb9d1a24cc9a39a306bf766be3fa376719e5668e37",
+            "caret": {
+              "left": 213.046875,
+              "right": 213.046875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "active-cell-03-immediate-typing-caret-2x.png",
+              "sha256": "366a147b04cfb211d1be8864024590159b75abb3530b737e28fe34f65abb81f9",
+              "clip": {
+                "x": 93.046875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "inputFocus": true,
+        "oldOverlayRetired": true
+      },
+      "ms": 2301
+    },
+    {
+      "id": "replacement-keeps-custom-keys-extras-and-open-source-pane",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "configured-00-key-before-switch",
+          "text": "*A_ONLY*\nLong A paragraph 0 with words.\n\nLong A paragraph 1 with words.\n\nLong A paragraph 2 with words.\n\nLong A paragraph 3 with words.\n\nLong A paragraph 4 with words.\n\nLong A paragraph 5 with words.\n\nLong A paragraph 6 with words.\n\nLong A paragraph 7 with words.\n\nLong A paragraph 8 with words.\n\nLong A paragraph 9 with words.\n\nLong A paragraph 10 with words.\n\nLong A paragraph 11 with words.\n\nLong A paragraph 12 with words.\n\nLong A paragraph 13 with words.\n\nLong A paragraph 14 with words.\n\nLong A paragraph 15 with words.\n\nLong A paragraph 16 with words.\n\nLong A paragraph 17 with words.\n\nLong A paragraph 18 with words.\n\nLong A paragraph 19 with words.\n\nLong A paragraph 20 with words.\n\nLong A paragraph 21 with words.\n\nLong A paragraph 22 with words.\n\nLong A paragraph 23 with words.\n\nLong A paragraph 24 with words.\n\nLong A paragraph 25 with words.\n\nLong A paragraph 26 with words.\n\nLong A paragraph 27 with words.\n\nLong A paragraph 28 with words.\n\nLong A paragraph 29 with words.\n\nLong A paragraph 30 with words.\n\nLong A paragraph 31 with words.\n\nLong A paragraph 32 with words.\n\nLong A paragraph 33 with words.\n\nLong A paragraph 34 with words.\n\nLong A paragraph 35 with words.\n\nLong A paragraph 36 with words.\n\nLong A paragraph 37 with words.\n\nLong A paragraph 38 with words.\n\nLong A paragraph 39 with words.\n\nLong A paragraph 40 with words.\n\nLong A paragraph 41 with words.\n\nLong A paragraph 42 with words.\n\nLong A paragraph 43 with words.\n\nLong A paragraph 44 with words.\n\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 247.78125,
+            "right": 247.78125,
+            "top": 55.5,
+            "bottom": 74
+          },
+          "scrollTop": 0,
+          "title": "● configured-old.md · 1484 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "331489fa-6f9c-4f6d-9246-988722c6068d",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\configured-old.md",
+            "dirty": true,
+            "saveInFlight": false,
+            "saveTimer": true
+          },
+          "screenshot": {
+            "file": "configured-00-key-before-switch.png",
+            "sha256": "e0ee6296df6e17d1f6f8259a2c7412f7ccd5418db401ffe7a94c579ff0d2acff",
+            "caret": {
+              "left": 247.78125,
+              "right": 247.78125,
+              "top": 55.5,
+              "bottom": 74
+            },
+            "zoom": {
+              "file": "configured-00-key-before-switch-caret-2x.png",
+              "sha256": "fa5aef25942a3e96efcd9de2c14da99286395fdde3bd41f904f1eecf95bc86a1",
+              "clip": {
+                "x": 127.78125,
+                "y": 30.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "custom-key-positive-control",
+          "beforeSwitchCorrect": true,
+          "event": {
+            "trusted": true,
+            "key": "U",
+            "code": "KeyU",
+            "shiftKey": true,
+            "ctrlKey": true
+          }
+        },
+        {
+          "name": "configured-01-switched",
+          "text": "B_ONLY\nalpha beta\n\n```text\nx\n```\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 24,
+            "right": 24,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "configured-new.md · 33 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "06ba367a-d0d9-4623-a26c-078a2bb26413",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\configured-new.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "configured-01-switched.png",
+            "sha256": "c40f410fa09145d70cfb2d3ea215747535b42eeeff4381618a33a7f84045a3ce",
+            "caret": {
+              "left": 24,
+              "right": 24,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "configured-01-switched-caret-2x.png",
+              "sha256": "399adca58e26f54fdf025eda228869d82f1fc5e53cbb93f2fd175e0195d12bd5",
+              "clip": {
+                "x": 0,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "pane-after-open",
+          "open": true,
+          "sameText": true,
+          "text": "B_ONLY\nalpha beta\n\n```text\nx\n```\n",
+          "readOnly": true
+        },
+        {
+          "name": "configured-02-custom-key",
+          "text": "B_ONLY\n*alpha beta*\n\n```text\nx\n```\n",
+          "selection": {
+            "anchor": 18,
+            "head": 18
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 114.953125,
+            "right": 114.953125,
+            "top": 80.6953125,
+            "bottom": 99.1953125
+          },
+          "scrollTop": 0,
+          "title": "● configured-new.md · 35 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "06ba367a-d0d9-4623-a26c-078a2bb26413",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\configured-new.md",
+            "dirty": true,
+            "saveInFlight": false,
+            "saveTimer": true
+          },
+          "screenshot": {
+            "file": "configured-02-custom-key.png",
+            "sha256": "93c39248e5fbf84fdb5ddd7526109f7b6461468e15dbf0eaaf0e6df6c2d86ee7",
+            "caret": {
+              "left": 114.953125,
+              "right": 114.953125,
+              "top": 80.6953125,
+              "bottom": 99.1953125
+            },
+            "zoom": {
+              "file": "configured-02-custom-key-caret-2x.png",
+              "sha256": "dddcfa09c4fa20ccfe64851adbb3182897bd6f81ee115d45c0f8b09d23186d35",
+              "clip": {
+                "x": 0,
+                "y": 55.6953125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "configured-03-code-tab",
+          "text": "B_ONLY\n*alpha beta*\n\n```text\n  x\n```\n",
+          "selection": {
+            "anchor": 31,
+            "head": 31
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 37.546875,
+            "right": 37.546875,
+            "top": 151.5703125,
+            "bottom": 164.0703125
+          },
+          "scrollTop": 0,
+          "title": "● configured-new.md · 37 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "06ba367a-d0d9-4623-a26c-078a2bb26413",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final\\configured-new.md",
+            "dirty": true,
+            "saveInFlight": false,
+            "saveTimer": true
+          },
+          "screenshot": {
+            "file": "configured-03-code-tab.png",
+            "sha256": "d24dab350e001d61b827119585a48dd16d408ed6e97c2faa47e9053328f870ca",
+            "caret": {
+              "left": 37.546875,
+              "right": 37.546875,
+              "top": 151.5703125,
+              "bottom": 164.0703125
+            },
+            "zoom": {
+              "file": "configured-03-code-tab-caret-2x.png",
+              "sha256": "bc3d3d92f26357098afb193075efecf17af301d31e98ff7e9437f1c0ce4b3ab6",
+              "clip": {
+                "x": 0,
+                "y": 126.5703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "customKeysPreserved": true,
+        "extrasPreserved": true,
+        "openSourcePaneMirrored": true
+      },
+      "ms": 4527
+    }
+  ],
+  "input": "CDP real key events and insertText; file opening uses real host IPC",
+  "artifact": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-final-source-3.2.9\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-final-source-3.2.9\\unpacked\\MarkPilot.exe",
+    "runtimeExecutableSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-final-source-3.2.9\\unpacked\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.9",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-final-source-3.2.9\\unpacked\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-final-source-3.2.9\\unpacked\\resources\\app.asar",
+    "asarSha256": "dae852488c3b63e86d807c043f9b46f150ba869b4fe2d5bc5c782a3150e3d0bc",
+    "bootMs": 1061,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "07f56591e566c4ceebfc2c49db57cf89eaebcf3b6f7188f00f7240617760059d",
+        "sourceSha256": "07f56591e566c4ceebfc2c49db57cf89eaebcf3b6f7188f00f7240617760059d"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "b4b11d263b9bbbe69a2651ecd4be37e0279b443a3061a47b0f0318952df66a7d",
+        "sourceSha256": "b4b11d263b9bbbe69a2651ecd4be37e0279b443a3061a47b0f0318952df66a7d"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T20:11:01.031Z",
+  "passed": true,
+  "frames": [
+    {
+      "file": "same-text-01-before-edit.png",
+      "sha256": "f1b7900edcacc79957de4b7e76caf81169fd63b41a05ddb48433169b469b72ad",
+      "caret": {
+        "x": 160.5,
+        "y": 79.6953125,
+        "width": 0,
+        "height": 16,
+        "top": 79.6953125,
+        "right": 160.5,
+        "bottom": 95.6953125,
+        "left": 160.5
+      },
+      "zoom": {
+        "file": "same-text-01-before-edit-caret-2x.png",
+        "sha256": "42d82e0338d76ba214ae3585cb3da87a3c76d950b43d544e4aabe868475d5517",
+        "clip": {
+          "x": 40.5,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "same-text-02-A-edited.png",
+      "sha256": "d83afca2e759a93fec96d90276e037679e74cd50466b0b979ead3d767a24eaec",
+      "caret": {
+        "left": 220.5,
+        "right": 220.5,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "same-text-02-A-edited-caret-2x.png",
+        "sha256": "6f6c0219182699c40aadf7480755d8e0688938ab60ffd65c3435293e3d961d0b",
+        "clip": {
+          "x": 100.5,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "same-text-03-B-before-undo.png",
+      "sha256": "0f39df31d6cd0edaf6ca286b063cba507d71d6b5f14c4cf1d7997da986c4a90d",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "same-text-03-B-before-undo-caret-2x.png",
+        "sha256": "61379eec73d592d741aa9ee92c3816d32022e6a927e739de1f3eafa76014f162",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "same-text-04-B-after-undo.png",
+      "sha256": "0f39df31d6cd0edaf6ca286b063cba507d71d6b5f14c4cf1d7997da986c4a90d",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "same-text-04-B-after-undo-caret-2x.png",
+        "sha256": "61379eec73d592d741aa9ee92c3816d32022e6a927e739de1f3eafa76014f162",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "new-01-old-empty.png",
+      "sha256": "19c4e19bd7eafa3d786b4d4a685ea2dfa8378ba4094d4df4f57c5912145cbf65",
+      "caret": {
+        "x": 170.5,
+        "y": 54.5,
+        "width": 0,
+        "height": 16,
+        "top": 54.5,
+        "right": 170.5,
+        "bottom": 70.5,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "new-01-old-empty-caret-2x.png",
+        "sha256": "9809b2a40ba5f20ec78c507d772489cf9afb427e20e7c7c43afd817168bc6e90",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "new-02-after-undo.png",
+      "sha256": "19c4e19bd7eafa3d786b4d4a685ea2dfa8378ba4094d4df4f57c5912145cbf65",
+      "caret": {
+        "x": 170.5,
+        "y": 54.5,
+        "width": 0,
+        "height": 16,
+        "top": 54.5,
+        "right": 170.5,
+        "bottom": 70.5,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "new-02-after-undo-caret-2x.png",
+        "sha256": "9809b2a40ba5f20ec78c507d772489cf9afb427e20e7c7c43afd817168bc6e90",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "redo-01-after.png",
+      "sha256": "146c4fe1eaf376fbf41fc74fa8075d6295d1da0e8bfd4d0dff5bdf13f3a0e842",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "redo-01-after-caret-2x.png",
+        "sha256": "37e19ce17914e2035dafadfc7efcfcbd3f3a83c3ada66fd49e4e5ade081b4e6e",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "different-01-after.png",
+      "sha256": "de56e46a6ccc9642101651354ca09c50a3d86c19bffe19386c28f7d89aba3bc4",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "different-01-after-caret-2x.png",
+        "sha256": "2332f6cdaa5f16b98266329f1ddcb89eb7f955189b167da49ead1705a53343c8",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "reload-false-01-before-undo.png",
+      "sha256": "3f8dcd3a3562bf724b81749eb27ab336a7c387e83a68cc3da1a1b7184385e8d8",
+      "caret": {
+        "left": 258.9453125,
+        "right": 258.9453125,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "reload-false-01-before-undo-caret-2x.png",
+        "sha256": "028e627b73c21a3681d4ec1528ac6948aa3c5d943c992195dcac7cc2b25344a8",
+        "clip": {
+          "x": 138.9453125,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "reload-false-02-after-undo.png",
+      "sha256": "877c4042f4e3cb01067fb47be25ae3998e9c33ee25889dfa10f21853118b6e36",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "reload-false-02-after-undo-caret-2x.png",
+        "sha256": "6d5fc7d15fe275252032430416e3e0a4fad5ec7b35fbbcad431c9448d1845d6b",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "reload-true-01-before-undo.png",
+      "sha256": "2ebbc7fc011f41649a74271c885c492d6dd861b2a7b8dbbc6dda0284aba13f68",
+      "caret": {
+        "left": 258.9453125,
+        "right": 258.9453125,
+        "top": 130.0859375,
+        "bottom": 146.0859375
+      },
+      "zoom": {
+        "file": "reload-true-01-before-undo-caret-2x.png",
+        "sha256": "b95e7cf027619d9ace1f6f03b63eafe5a63e665c96e168eb21a306bb91031a90",
+        "clip": {
+          "x": 138.9453125,
+          "y": 105.0859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "reload-true-02-after-undo.png",
+      "sha256": "bc0da32817966b49e05128a8a713d19a75bf3f059231619422b4f1bc4815ddee",
+      "caret": {
+        "x": 170.5,
+        "y": 130.0859375,
+        "width": 0,
+        "height": 16,
+        "top": 130.0859375,
+        "right": 170.5,
+        "bottom": 146.0859375,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "reload-true-02-after-undo-caret-2x.png",
+        "sha256": "f349f72185b2e543854a416cdb3f07796a79df5a0acd8de9d5a23c4688ac4a30",
+        "clip": {
+          "x": 50.5,
+          "y": 105.0859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "reopen-01-after-undo.png",
+      "sha256": "efe2274431b336cba4c2e2efc938008c9a9e183ac9619efcb9781afb9e766745",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "reopen-01-after-undo-caret-2x.png",
+        "sha256": "d54daebcf012cccc53eeabfa63697b70c01dc45c7f3b7c02986fec42b38bb829",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "active-cell-01-before-open.png",
+      "sha256": "48dccc7c6d278da09792f595bc754768435364b925239191daa2a3a570ca00af",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 50,
+        "bottom": 93.1953125
+      },
+      "zoom": {
+        "file": "active-cell-01-before-open-caret-2x.png",
+        "sha256": "0bbcadfa732270c2ff674215baa257c2ef6d7708d39cc2ae29b3115050cd0bab",
+        "clip": {
+          "x": 50.5,
+          "y": 25,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "active-cell-02-after-open.png",
+      "sha256": "948345d9ee71c2ecec4c3249efde846a4aad850aa9691097a9dcbf5ac949128a",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "active-cell-02-after-open-caret-2x.png",
+        "sha256": "9384c3db6b4d7d57679e8876343cb940f48564e66ebd6677972076ca57ff4a6f",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "active-cell-03-immediate-typing.png",
+      "sha256": "2feabdf63533089e1b38cdeb9d1a24cc9a39a306bf766be3fa376719e5668e37",
+      "caret": {
+        "left": 213.046875,
+        "right": 213.046875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "active-cell-03-immediate-typing-caret-2x.png",
+        "sha256": "366a147b04cfb211d1be8864024590159b75abb3530b737e28fe34f65abb81f9",
+        "clip": {
+          "x": 93.046875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "configured-00-key-before-switch.png",
+      "sha256": "e0ee6296df6e17d1f6f8259a2c7412f7ccd5418db401ffe7a94c579ff0d2acff",
+      "caret": {
+        "left": 247.78125,
+        "right": 247.78125,
+        "top": 55.5,
+        "bottom": 74
+      },
+      "zoom": {
+        "file": "configured-00-key-before-switch-caret-2x.png",
+        "sha256": "fa5aef25942a3e96efcd9de2c14da99286395fdde3bd41f904f1eecf95bc86a1",
+        "clip": {
+          "x": 127.78125,
+          "y": 30.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "configured-01-switched.png",
+      "sha256": "c40f410fa09145d70cfb2d3ea215747535b42eeeff4381618a33a7f84045a3ce",
+      "caret": {
+        "left": 24,
+        "right": 24,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "configured-01-switched-caret-2x.png",
+        "sha256": "399adca58e26f54fdf025eda228869d82f1fc5e53cbb93f2fd175e0195d12bd5",
+        "clip": {
+          "x": 0,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "configured-02-custom-key.png",
+      "sha256": "93c39248e5fbf84fdb5ddd7526109f7b6461468e15dbf0eaaf0e6df6c2d86ee7",
+      "caret": {
+        "left": 114.953125,
+        "right": 114.953125,
+        "top": 80.6953125,
+        "bottom": 99.1953125
+      },
+      "zoom": {
+        "file": "configured-02-custom-key-caret-2x.png",
+        "sha256": "dddcfa09c4fa20ccfe64851adbb3182897bd6f81ee115d45c0f8b09d23186d35",
+        "clip": {
+          "x": 0,
+          "y": 55.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "configured-03-code-tab.png",
+      "sha256": "d24dab350e001d61b827119585a48dd16d408ed6e97c2faa47e9053328f870ca",
+      "caret": {
+        "left": 37.546875,
+        "right": 37.546875,
+        "top": 151.5703125,
+        "bottom": 164.0703125
+      },
+      "zoom": {
+        "file": "configured-03-code-tab-caret-2x.png",
+        "sha256": "bc3d3d92f26357098afb193075efecf17af301d31e98ff7e9437f1c0ce4b3ab6",
+        "clip": {
+          "x": 0,
+          "y": 126.5703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ]
+}

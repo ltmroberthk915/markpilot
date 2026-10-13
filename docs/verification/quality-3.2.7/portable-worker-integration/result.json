@@ -1,0 +1,2303 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T15:55:14.413Z",
+  "scope": "Worker full-tree and pending command integration",
+  "cases": [
+    {
+      "id": "large-paragraph-final-tree-eof",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 1,
+          "resets": 1,
+          "deltas": 0,
+          "completed": 0,
+          "discarded": 0,
+          "nativeFallback": 0,
+          "commandFallback": 0,
+          "error": null,
+          "revision": 1,
+          "status": "pending",
+          "length": 3588889,
+          "treeLength": 3588889,
+          "available": false
+        },
+        {
+          "requests": 1,
+          "resets": 1,
+          "deltas": 0,
+          "completed": 1,
+          "discarded": 0,
+          "nativeFallback": 0,
+          "commandFallback": 0,
+          "error": null,
+          "revision": 1,
+          "status": "ready",
+          "length": 3588889,
+          "treeLength": 3588889,
+          "available": true
+        }
+      ],
+      "detail": {
+        "requests": 1,
+        "resets": 1,
+        "deltas": 0,
+        "completed": 1,
+        "discarded": 0,
+        "nativeFallback": 0,
+        "commandFallback": 0,
+        "error": null,
+        "revision": 1,
+        "status": "ready",
+        "length": 3588889,
+        "treeLength": 3588889,
+        "available": true
+      },
+      "ms": 2202
+    },
+    {
+      "id": "large-paragraph-final-tree-newline",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 2,
+          "resets": 1,
+          "deltas": 1,
+          "completed": 1,
+          "discarded": 0,
+          "nativeFallback": 0,
+          "commandFallback": 0,
+          "error": null,
+          "revision": 2,
+          "status": "pending",
+          "length": 3588890,
+          "treeLength": 3588890,
+          "available": false
+        },
+        {
+          "requests": 2,
+          "resets": 1,
+          "deltas": 1,
+          "completed": 2,
+          "discarded": 0,
+          "nativeFallback": 0,
+          "commandFallback": 0,
+          "error": null,
+          "revision": 2,
+          "status": "ready",
+          "length": 3588890,
+          "treeLength": 3588890,
+          "available": true
+        }
+      ],
+      "detail": {
+        "requests": 2,
+        "resets": 1,
+        "deltas": 1,
+        "completed": 2,
+        "discarded": 0,
+        "nativeFallback": 0,
+        "commandFallback": 0,
+        "error": null,
+        "revision": 2,
+        "status": "ready",
+        "length": 3588890,
+        "treeLength": 3588890,
+        "available": true
+      },
+      "ms": 1857
+    },
+    {
+      "id": "rapid-input-undo-redo-keeps-current-revision",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 37,
+          "resets": 1,
+          "deltas": 36,
+          "completed": 3,
+          "discarded": 0,
+          "nativeFallback": 0,
+          "commandFallback": 0,
+          "error": null,
+          "revision": 37,
+          "status": "ready",
+          "length": 3588943,
+          "treeLength": 3588943,
+          "available": true
+        },
+        {
+          "requests": 38,
+          "resets": 1,
+          "deltas": 37,
+          "completed": 4,
+          "discarded": 0,
+          "nativeFallback": 0,
+          "commandFallback": 0,
+          "error": null,
+          "revision": 38,
+          "status": "ready",
+          "length": 3588890,
+          "treeLength": 3588890,
+          "available": true
+        },
+        {
+          "requests": 39,
+          "resets": 1,
+          "deltas": 38,
+          "completed": 5,
+          "discarded": 0,
+          "nativeFallback": 0,
+          "commandFallback": 0,
+          "error": null,
+          "revision": 39,
+          "status": "ready",
+          "length": 3588943,
+          "treeLength": 3588943,
+          "available": true
+        }
+      ],
+      "detail": {
+        "requests": 39,
+        "resets": 1,
+        "deltas": 38,
+        "completed": 5,
+        "discarded": 0,
+        "nativeFallback": 0,
+        "commandFallback": 0,
+        "error": null,
+        "revision": 39,
+        "status": "ready",
+        "length": 3588943,
+        "treeLength": 3588943,
+        "available": true
+      },
+      "ms": 3808
+    },
+    {
+      "id": "large-mixed-document-preserves-nested-languages",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 40,
+          "resets": 1,
+          "deltas": 39,
+          "completed": 6,
+          "discarded": 0,
+          "nativeFallback": 0,
+          "commandFallback": 0,
+          "error": null,
+          "revision": 40,
+          "status": "ready",
+          "length": 3589064,
+          "treeLength": 3589064,
+          "available": true
+        }
+      ],
+      "ms": 1900
+    },
+    {
+      "id": "pending-cdp-composition-preserves-unicode-and-quotes",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 41,
+          "resets": 1,
+          "deltas": 40,
+          "completed": 6,
+          "discarded": 0,
+          "nativeFallback": 0,
+          "commandFallback": 0,
+          "error": null,
+          "revision": 41,
+          "status": "pending",
+          "length": 3588895,
+          "treeLength": 3588895,
+          "available": false
+        },
+        {
+          "events": [
+            {
+              "type": "compositionstart",
+              "trusted": true
+            },
+            {
+              "type": "compositionupdate",
+              "trusted": true
+            },
+            {
+              "type": "compositionupdate",
+              "trusted": true
+            },
+            {
+              "type": "compositionupdate",
+              "trusted": true
+            },
+            {
+              "type": "compositionend",
+              "trusted": false
+            }
+          ],
+          "tail": "9 abcdefghijklmnopqrstuvwxyz\n\nIME \"中文😀\"",
+          "scope": "Chromium CDP composition updates followed by Input.insertText; this does not verify the operating-system candidate window or a compositionend event"
+        }
+      ],
+      "detail": {
+        "requests": 44,
+        "resets": 1,
+        "deltas": 43,
+        "completed": 7,
+        "discarded": 0,
+        "nativeFallback": 0,
+        "commandFallback": 0,
+        "error": null,
+        "revision": 44,
+        "status": "ready",
+        "length": 3588901,
+        "treeLength": 3588901,
+        "available": true
+      },
+      "ms": 1433
+    },
+    {
+      "id": "pending-math-completion-keeps-priority-and-fast-path",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 45,
+          "resets": 1,
+          "deltas": 44,
+          "completed": 7,
+          "discarded": 0,
+          "nativeFallback": 0,
+          "commandFallback": 0,
+          "error": null,
+          "revision": 45,
+          "status": "pending",
+          "length": 3588899,
+          "treeLength": 3588899,
+          "available": false
+        },
+        {
+          "requests": 45,
+          "resets": 1,
+          "deltas": 44,
+          "completed": 7,
+          "discarded": 0,
+          "nativeFallback": 0,
+          "commandFallback": 0,
+          "error": null,
+          "revision": 45,
+          "status": "pending",
+          "length": 3588899,
+          "treeLength": 3588899,
+          "available": false
+        }
+      ],
+      "detail": {
+        "requests": 46,
+        "resets": 1,
+        "deltas": 45,
+        "completed": 8,
+        "discarded": 1,
+        "nativeFallback": 0,
+        "commandFallback": 0,
+        "error": null,
+        "revision": 46,
+        "status": "ready",
+        "length": 3588904,
+        "treeLength": 3588904,
+        "available": true
+      },
+      "ms": 1919
+    },
+    {
+      "id": "pending-quote-enter-preserves-native-command",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 47,
+          "resets": 1,
+          "deltas": 46,
+          "completed": 8,
+          "discarded": 1,
+          "nativeFallback": 0,
+          "commandFallback": 0,
+          "error": null,
+          "revision": 47,
+          "status": "pending",
+          "length": 3588898,
+          "treeLength": 3588898,
+          "available": false
+        },
+        {
+          "tail": "9 abcdefghijklmnopqrstuvwxyz\n\n> quote\n> ",
+          "selection": {
+            "anchor": 3588901,
+            "head": 3588901
+          },
+          "focus": true,
+          "status": {
+            "requests": 48,
+            "resets": 1,
+            "deltas": 47,
+            "completed": 8,
+            "discarded": 1,
+            "nativeFallback": 2,
+            "commandFallback": 1,
+            "error": null,
+            "revision": 48,
+            "status": "pending",
+            "length": 3588901,
+            "treeLength": 3588901,
+            "available": true
+          }
+        }
+      ],
+      "detail": {
+        "requests": 48,
+        "resets": 1,
+        "deltas": 47,
+        "completed": 9,
+        "discarded": 2,
+        "nativeFallback": 2,
+        "commandFallback": 1,
+        "error": null,
+        "revision": 48,
+        "status": "ready",
+        "length": 3588901,
+        "treeLength": 3588901,
+        "available": true
+      },
+      "ms": 1958
+    },
+    {
+      "id": "pending-quote-backspace-preserves-native-command",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 49,
+          "resets": 1,
+          "deltas": 48,
+          "completed": 9,
+          "discarded": 2,
+          "nativeFallback": 2,
+          "commandFallback": 1,
+          "error": null,
+          "revision": 49,
+          "status": "pending",
+          "length": 3588893,
+          "treeLength": 3588893,
+          "available": false
+        },
+        {
+          "tail": "yz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\n",
+          "selection": {
+            "anchor": 3588891,
+            "head": 3588891
+          },
+          "focus": true,
+          "status": {
+            "requests": 50,
+            "resets": 1,
+            "deltas": 49,
+            "completed": 9,
+            "discarded": 2,
+            "nativeFallback": 4,
+            "commandFallback": 2,
+            "error": null,
+            "revision": 50,
+            "status": "pending",
+            "length": 3588891,
+            "treeLength": 3588891,
+            "available": true
+          }
+        }
+      ],
+      "detail": {
+        "requests": 50,
+        "resets": 1,
+        "deltas": 49,
+        "completed": 10,
+        "discarded": 3,
+        "nativeFallback": 4,
+        "commandFallback": 2,
+        "error": null,
+        "revision": 50,
+        "status": "ready",
+        "length": 3588891,
+        "treeLength": 3588891,
+        "available": true
+      },
+      "ms": 2017
+    },
+    {
+      "id": "pending-lazy-quote-enter",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 51,
+          "resets": 1,
+          "deltas": 50,
+          "completed": 10,
+          "discarded": 3,
+          "nativeFallback": 4,
+          "commandFallback": 2,
+          "error": null,
+          "revision": 51,
+          "status": "pending",
+          "length": 3588908,
+          "treeLength": 3588908,
+          "available": false
+        },
+        {
+          "tail": "ghijklmnopqrstuvwxyz\n正文 99997 abcdefghijklmnopqrstuvwxyz\n正文 99998 abcdefghijklmnopqrstuvwxyz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\n> quote\ncontinued\n> ",
+          "selection": {
+            "anchor": 3588911,
+            "head": 3588911
+          },
+          "ms": 276.90719999999783,
+          "focus": true,
+          "status": {
+            "requests": 52,
+            "resets": 1,
+            "deltas": 51,
+            "completed": 10,
+            "discarded": 3,
+            "nativeFallback": 6,
+            "commandFallback": 3,
+            "error": null,
+            "revision": 52,
+            "status": "pending",
+            "length": 3588911,
+            "treeLength": 3588911,
+            "available": true
+          }
+        }
+      ],
+      "detail": {
+        "requests": 52,
+        "resets": 1,
+        "deltas": 51,
+        "completed": 11,
+        "discarded": 4,
+        "nativeFallback": 6,
+        "commandFallback": 3,
+        "error": null,
+        "revision": 52,
+        "status": "ready",
+        "length": 3588911,
+        "treeLength": 3588911,
+        "available": true
+      },
+      "ms": 3071
+    },
+    {
+      "id": "pending-js-backtick-pair",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 53,
+          "resets": 1,
+          "deltas": 52,
+          "completed": 11,
+          "discarded": 4,
+          "nativeFallback": 6,
+          "commandFallback": 3,
+          "error": null,
+          "revision": 53,
+          "status": "pending",
+          "length": 3588915,
+          "treeLength": 3588915,
+          "available": false
+        },
+        {
+          "tail": "mnopqrstuvwxyz\n正文 99997 abcdefghijklmnopqrstuvwxyz\n正文 99998 abcdefghijklmnopqrstuvwxyz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\n```js\nconst value = ``\n```",
+          "selection": {
+            "anchor": 3588912,
+            "head": 3588912
+          },
+          "ms": 7.240000000001601,
+          "focus": true,
+          "status": {
+            "requests": 54,
+            "resets": 1,
+            "deltas": 53,
+            "completed": 11,
+            "discarded": 4,
+            "nativeFallback": 8,
+            "commandFallback": 4,
+            "error": null,
+            "revision": 54,
+            "status": "pending",
+            "length": 3588917,
+            "treeLength": 3588917,
+            "available": true
+          }
+        }
+      ],
+      "detail": {
+        "requests": 54,
+        "resets": 1,
+        "deltas": 53,
+        "completed": 12,
+        "discarded": 5,
+        "nativeFallback": 8,
+        "commandFallback": 4,
+        "error": null,
+        "revision": 54,
+        "status": "ready",
+        "length": 3588917,
+        "treeLength": 3588917,
+        "available": true
+      },
+      "ms": 2993
+    },
+    {
+      "id": "pending-js-string-quote",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 55,
+          "resets": 1,
+          "deltas": 54,
+          "completed": 12,
+          "discarded": 5,
+          "nativeFallback": 8,
+          "commandFallback": 4,
+          "error": null,
+          "revision": 55,
+          "status": "pending",
+          "length": 3588926,
+          "treeLength": 3588926,
+          "available": false
+        },
+        {
+          "tail": "wxyz\n正文 99997 abcdefghijklmnopqrstuvwxyz\n正文 99998 abcdefghijklmnopqrstuvwxyz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\n```js\nconst value = \"one \" two\";\n```",
+          "selection": {
+            "anchor": 3588917,
+            "head": 3588917
+          },
+          "ms": 3.2722000000030675,
+          "focus": true,
+          "status": {
+            "requests": 56,
+            "resets": 1,
+            "deltas": 55,
+            "completed": 12,
+            "discarded": 5,
+            "nativeFallback": 10,
+            "commandFallback": 5,
+            "error": null,
+            "revision": 56,
+            "status": "pending",
+            "length": 3588927,
+            "treeLength": 3588927,
+            "available": true
+          }
+        }
+      ],
+      "detail": {
+        "requests": 56,
+        "resets": 1,
+        "deltas": 55,
+        "completed": 13,
+        "discarded": 5,
+        "nativeFallback": 10,
+        "commandFallback": 5,
+        "error": null,
+        "revision": 56,
+        "status": "ready",
+        "length": 3588927,
+        "treeLength": 3588927,
+        "available": true
+      },
+      "ms": 2539
+    },
+    {
+      "id": "pending-python-third-quote",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 57,
+          "resets": 1,
+          "deltas": 56,
+          "completed": 13,
+          "discarded": 5,
+          "nativeFallback": 10,
+          "commandFallback": 5,
+          "error": null,
+          "revision": 57,
+          "status": "pending",
+          "length": 3588903,
+          "treeLength": 3588903,
+          "available": false
+        },
+        {
+          "tail": "cdefghijklmnopqrstuvwxyz\n正文 99997 abcdefghijklmnopqrstuvwxyz\n正文 99998 abcdefghijklmnopqrstuvwxyz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\n```py\n\"\"\"\"\"\"\n```",
+          "selection": {
+            "anchor": 3588900,
+            "head": 3588900
+          },
+          "ms": 5.3245999999999185,
+          "focus": true,
+          "status": {
+            "requests": 58,
+            "resets": 1,
+            "deltas": 57,
+            "completed": 13,
+            "discarded": 5,
+            "nativeFallback": 12,
+            "commandFallback": 6,
+            "error": null,
+            "revision": 58,
+            "status": "pending",
+            "length": 3588907,
+            "treeLength": 3588907,
+            "available": true
+          }
+        }
+      ],
+      "detail": {
+        "requests": 58,
+        "resets": 1,
+        "deltas": 57,
+        "completed": 14,
+        "discarded": 5,
+        "nativeFallback": 12,
+        "commandFallback": 6,
+        "error": null,
+        "revision": 58,
+        "status": "ready",
+        "length": 3588907,
+        "treeLength": 3588907,
+        "available": true
+      },
+      "ms": 2489
+    },
+    {
+      "id": "pending-js-closing-brace-indent",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 59,
+          "resets": 1,
+          "deltas": 58,
+          "completed": 14,
+          "discarded": 5,
+          "nativeFallback": 12,
+          "commandFallback": 6,
+          "error": null,
+          "revision": 59,
+          "status": "pending",
+          "length": 3588918,
+          "treeLength": 3588918,
+          "available": false
+        },
+        {
+          "tail": "mnopqrstuvwxyz\n正文 99997 abcdefghijklmnopqrstuvwxyz\n正文 99998 abcdefghijklmnopqrstuvwxyz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\n```js\nfunction f() {\n}\n```",
+          "selection": {
+            "anchor": 3588913,
+            "head": 3588913
+          },
+          "ms": 3.738199999999779,
+          "focus": true,
+          "status": {
+            "requests": 60,
+            "resets": 1,
+            "deltas": 59,
+            "completed": 14,
+            "discarded": 5,
+            "nativeFallback": 15,
+            "commandFallback": 7,
+            "error": null,
+            "revision": 61,
+            "status": "pending",
+            "length": 3588917,
+            "treeLength": 3588917,
+            "available": true
+          }
+        }
+      ],
+      "detail": {
+        "requests": 60,
+        "resets": 1,
+        "deltas": 59,
+        "completed": 15,
+        "discarded": 5,
+        "nativeFallback": 15,
+        "commandFallback": 7,
+        "error": null,
+        "revision": 61,
+        "status": "ready",
+        "length": 3588917,
+        "treeLength": 3588917,
+        "available": true
+      },
+      "ms": 2450
+    },
+    {
+      "id": "pending-plain-leading-quote",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 61,
+          "resets": 1,
+          "deltas": 60,
+          "completed": 15,
+          "discarded": 5,
+          "nativeFallback": 15,
+          "commandFallback": 7,
+          "error": null,
+          "revision": 62,
+          "status": "pending",
+          "length": 3588901,
+          "treeLength": 3588901,
+          "available": false
+        },
+        {
+          "tail": "96 abcdefghijklmnopqrstuvwxyz\n正文 99997 abcdefghijklmnopqrstuvwxyz\n正文 99998 abcdefghijklmnopqrstuvwxyz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\n\"one \" two\"",
+          "selection": {
+            "anchor": 3588897,
+            "head": 3588897
+          },
+          "ms": 4.68119999999908,
+          "focus": true,
+          "status": {
+            "requests": 62,
+            "resets": 1,
+            "deltas": 61,
+            "completed": 15,
+            "discarded": 5,
+            "nativeFallback": 17,
+            "commandFallback": 8,
+            "error": null,
+            "revision": 63,
+            "status": "pending",
+            "length": 3588902,
+            "treeLength": 3588902,
+            "available": true
+          }
+        }
+      ],
+      "detail": {
+        "requests": 62,
+        "resets": 1,
+        "deltas": 61,
+        "completed": 16,
+        "discarded": 5,
+        "nativeFallback": 17,
+        "commandFallback": 8,
+        "error": null,
+        "revision": 63,
+        "status": "ready",
+        "length": 3588902,
+        "treeLength": 3588902,
+        "available": true
+      },
+      "ms": 1985
+    },
+    {
+      "id": "pending-js-backtick-delete-pair",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 63,
+          "resets": 1,
+          "deltas": 62,
+          "completed": 16,
+          "discarded": 5,
+          "nativeFallback": 17,
+          "commandFallback": 8,
+          "error": null,
+          "revision": 64,
+          "status": "pending",
+          "length": 3588918,
+          "treeLength": 3588918,
+          "available": false
+        },
+        {
+          "tail": "lmnopqrstuvwxyz\n正文 99997 abcdefghijklmnopqrstuvwxyz\n正文 99998 abcdefghijklmnopqrstuvwxyz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\n```js\nconst value = ;\n```",
+          "selection": {
+            "anchor": 3588911,
+            "head": 3588911
+          },
+          "ms": 272.5414000000019,
+          "focus": true,
+          "status": {
+            "requests": 64,
+            "resets": 1,
+            "deltas": 63,
+            "completed": 16,
+            "discarded": 5,
+            "nativeFallback": 19,
+            "commandFallback": 9,
+            "error": null,
+            "revision": 65,
+            "status": "pending",
+            "length": 3588916,
+            "treeLength": 3588916,
+            "available": true
+          }
+        }
+      ],
+      "detail": {
+        "requests": 64,
+        "resets": 1,
+        "deltas": 63,
+        "completed": 17,
+        "discarded": 6,
+        "nativeFallback": 19,
+        "commandFallback": 9,
+        "error": null,
+        "revision": 65,
+        "status": "ready",
+        "length": 3588916,
+        "treeLength": 3588916,
+        "available": true
+      },
+      "ms": 3111
+    },
+    {
+      "id": "pending-js-word-delete",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 65,
+          "resets": 1,
+          "deltas": 64,
+          "completed": 17,
+          "discarded": 6,
+          "nativeFallback": 19,
+          "commandFallback": 9,
+          "error": null,
+          "revision": 66,
+          "status": "pending",
+          "length": 3588913,
+          "treeLength": 3588913,
+          "available": false
+        },
+        {
+          "tail": "cdefghijklmnopqrstuvwxyz\n正文 99997 abcdefghijklmnopqrstuvwxyz\n正文 99998 abcdefghijklmnopqrstuvwxyz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\n```js\nconst \n```",
+          "selection": {
+            "anchor": 3588903,
+            "head": 3588903
+          },
+          "ms": 249.3660000000018,
+          "focus": true,
+          "status": {
+            "requests": 66,
+            "resets": 1,
+            "deltas": 65,
+            "completed": 17,
+            "discarded": 6,
+            "nativeFallback": 21,
+            "commandFallback": 10,
+            "error": null,
+            "revision": 67,
+            "status": "pending",
+            "length": 3588907,
+            "treeLength": 3588907,
+            "available": true
+          }
+        }
+      ],
+      "detail": {
+        "requests": 66,
+        "resets": 1,
+        "deltas": 65,
+        "completed": 18,
+        "discarded": 7,
+        "nativeFallback": 21,
+        "commandFallback": 10,
+        "error": null,
+        "revision": 67,
+        "status": "ready",
+        "length": 3588907,
+        "treeLength": 3588907,
+        "available": true
+      },
+      "ms": 3371
+    },
+    {
+      "id": "pending-js-blank-line-indent",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 67,
+          "resets": 1,
+          "deltas": 66,
+          "completed": 18,
+          "discarded": 7,
+          "nativeFallback": 21,
+          "commandFallback": 10,
+          "error": null,
+          "revision": 68,
+          "status": "pending",
+          "length": 3588917,
+          "treeLength": 3588917,
+          "available": false
+        },
+        {
+          "tail": "pqrstuvwxyz\n正文 99997 abcdefghijklmnopqrstuvwxyz\n正文 99998 abcdefghijklmnopqrstuvwxyz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\n```js\nfunction f() {\n  \n}\n```",
+          "selection": {
+            "anchor": 3588914,
+            "head": 3588914
+          },
+          "ms": 315.17899999999645,
+          "focus": true,
+          "status": {
+            "requests": 68,
+            "resets": 1,
+            "deltas": 67,
+            "completed": 18,
+            "discarded": 7,
+            "nativeFallback": 23,
+            "commandFallback": 11,
+            "error": null,
+            "revision": 69,
+            "status": "pending",
+            "length": 3588920,
+            "treeLength": 3588920,
+            "available": true
+          }
+        }
+      ],
+      "detail": {
+        "requests": 68,
+        "resets": 1,
+        "deltas": 67,
+        "completed": 19,
+        "discarded": 8,
+        "nativeFallback": 23,
+        "commandFallback": 11,
+        "error": null,
+        "revision": 69,
+        "status": "ready",
+        "length": 3588920,
+        "treeLength": 3588920,
+        "available": true
+      },
+      "ms": 2867
+    },
+    {
+      "id": "pending-js-reindent",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 69,
+          "resets": 1,
+          "deltas": 68,
+          "completed": 19,
+          "discarded": 8,
+          "nativeFallback": 23,
+          "commandFallback": 11,
+          "error": null,
+          "revision": 70,
+          "status": "pending",
+          "length": 3588936,
+          "treeLength": 3588936,
+          "available": false
+        },
+        {
+          "tail": "9997 abcdefghijklmnopqrstuvwxyz\n正文 99998 abcdefghijklmnopqrstuvwxyz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\n```js\nfunction f() {\n  const value = 1;\n}\n```",
+          "selection": {
+            "anchor": 3588914,
+            "head": 3588914
+          },
+          "ms": 18.53519999999844,
+          "focus": true,
+          "status": {
+            "requests": 69,
+            "resets": 1,
+            "deltas": 68,
+            "completed": 19,
+            "discarded": 8,
+            "nativeFallback": 24,
+            "commandFallback": 12,
+            "error": null,
+            "revision": 70,
+            "status": "pending",
+            "length": 3588936,
+            "treeLength": 3588936,
+            "available": true
+          }
+        }
+      ],
+      "detail": {
+        "requests": 69,
+        "resets": 1,
+        "deltas": 68,
+        "completed": 20,
+        "discarded": 8,
+        "nativeFallback": 24,
+        "commandFallback": 12,
+        "error": null,
+        "revision": 70,
+        "status": "ready",
+        "length": 3588936,
+        "treeLength": 3588936,
+        "available": true
+      },
+      "ms": 1962
+    },
+    {
+      "id": "pending-js-block-comment",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 70,
+          "resets": 1,
+          "deltas": 69,
+          "completed": 20,
+          "discarded": 8,
+          "nativeFallback": 24,
+          "commandFallback": 12,
+          "error": null,
+          "revision": 71,
+          "status": "pending",
+          "length": 3588917,
+          "treeLength": 3588917,
+          "available": false
+        },
+        {
+          "tail": "stuvwxyz\n正文 99997 abcdefghijklmnopqrstuvwxyz\n正文 99998 abcdefghijklmnopqrstuvwxyz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\n```js\n/* const */ value = 1;\n```",
+          "selection": {
+            "anchor": 3588900,
+            "head": 3588905
+          },
+          "ms": 217.5017000000007,
+          "focus": true,
+          "status": {
+            "requests": 71,
+            "resets": 1,
+            "deltas": 70,
+            "completed": 20,
+            "discarded": 8,
+            "nativeFallback": 26,
+            "commandFallback": 13,
+            "error": null,
+            "revision": 72,
+            "status": "pending",
+            "length": 3588923,
+            "treeLength": 3588923,
+            "available": true
+          }
+        }
+      ],
+      "detail": {
+        "requests": 71,
+        "resets": 1,
+        "deltas": 70,
+        "completed": 21,
+        "discarded": 9,
+        "nativeFallback": 26,
+        "commandFallback": 13,
+        "error": null,
+        "revision": 72,
+        "status": "ready",
+        "length": 3588923,
+        "treeLength": 3588923,
+        "available": true
+      },
+      "ms": 2342
+    },
+    {
+      "id": "pending-js-matching-parenthesis",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 72,
+          "resets": 1,
+          "deltas": 71,
+          "completed": 21,
+          "discarded": 9,
+          "nativeFallback": 26,
+          "commandFallback": 13,
+          "error": null,
+          "revision": 73,
+          "status": "pending",
+          "length": 3588921,
+          "treeLength": 3588921,
+          "available": false
+        },
+        {
+          "tail": "qrstuvwxyz\n正文 99997 abcdefghijklmnopqrstuvwxyz\n正文 99998 abcdefghijklmnopqrstuvwxyz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\n```js\nconst value = (\")\");\n```",
+          "selection": {
+            "anchor": 3588916,
+            "head": 3588916
+          },
+          "ms": 11.376200000006065,
+          "focus": true,
+          "status": {
+            "requests": 72,
+            "resets": 1,
+            "deltas": 71,
+            "completed": 21,
+            "discarded": 9,
+            "nativeFallback": 27,
+            "commandFallback": 14,
+            "error": null,
+            "revision": 73,
+            "status": "pending",
+            "length": 3588921,
+            "treeLength": 3588921,
+            "available": true
+          }
+        }
+      ],
+      "detail": {
+        "requests": 72,
+        "resets": 1,
+        "deltas": 71,
+        "completed": 22,
+        "discarded": 9,
+        "nativeFallback": 27,
+        "commandFallback": 14,
+        "error": null,
+        "revision": 73,
+        "status": "ready",
+        "length": 3588921,
+        "treeLength": 3588921,
+        "available": true
+      },
+      "ms": 1927
+    },
+    {
+      "id": "pending-syntax-right",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 73,
+          "resets": 1,
+          "deltas": 72,
+          "completed": 22,
+          "discarded": 9,
+          "nativeFallback": 27,
+          "commandFallback": 14,
+          "error": null,
+          "revision": 74,
+          "status": "pending",
+          "length": 3588909,
+          "treeLength": 3588909,
+          "available": false
+        },
+        {
+          "tail": "efghijklmnopqrstuvwxyz\n正文 99997 abcdefghijklmnopqrstuvwxyz\n正文 99998 abcdefghijklmnopqrstuvwxyz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\none **bold** after",
+          "selection": {
+            "anchor": 3588903,
+            "head": 3588903
+          },
+          "ms": 17.07940000000235,
+          "focus": true,
+          "status": {
+            "requests": 73,
+            "resets": 1,
+            "deltas": 72,
+            "completed": 22,
+            "discarded": 9,
+            "nativeFallback": 28,
+            "commandFallback": 15,
+            "error": null,
+            "revision": 74,
+            "status": "pending",
+            "length": 3588909,
+            "treeLength": 3588909,
+            "available": true
+          }
+        }
+      ],
+      "detail": {
+        "requests": 73,
+        "resets": 1,
+        "deltas": 72,
+        "completed": 23,
+        "discarded": 9,
+        "nativeFallback": 28,
+        "commandFallback": 15,
+        "error": null,
+        "revision": 74,
+        "status": "ready",
+        "length": 3588909,
+        "treeLength": 3588909,
+        "available": true
+      },
+      "ms": 2014
+    },
+    {
+      "id": "pending-html-enter-indent",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 74,
+          "resets": 1,
+          "deltas": 73,
+          "completed": 23,
+          "discarded": 9,
+          "nativeFallback": 28,
+          "commandFallback": 15,
+          "error": null,
+          "revision": 75,
+          "status": "pending",
+          "length": 3588896,
+          "treeLength": 3588896,
+          "available": false
+        },
+        {
+          "tail": "99996 abcdefghijklmnopqrstuvwxyz\n正文 99997 abcdefghijklmnopqrstuvwxyz\n正文 99998 abcdefghijklmnopqrstuvwxyz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\n<div>\n  ",
+          "selection": {
+            "anchor": 3588899,
+            "head": 3588899
+          },
+          "ms": 234.38319999999658,
+          "focus": true,
+          "status": {
+            "requests": 75,
+            "resets": 1,
+            "deltas": 74,
+            "completed": 23,
+            "discarded": 9,
+            "nativeFallback": 30,
+            "commandFallback": 16,
+            "error": null,
+            "revision": 76,
+            "status": "pending",
+            "length": 3588899,
+            "treeLength": 3588899,
+            "available": true
+          }
+        }
+      ],
+      "detail": {
+        "requests": 75,
+        "resets": 1,
+        "deltas": 74,
+        "completed": 24,
+        "discarded": 10,
+        "nativeFallback": 30,
+        "commandFallback": 16,
+        "error": null,
+        "revision": 76,
+        "status": "ready",
+        "length": 3588899,
+        "treeLength": 3588899,
+        "available": true
+      },
+      "ms": 2376
+    },
+    {
+      "id": "pending-html-input-keeps-automatic-completion",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 76,
+          "resets": 1,
+          "deltas": 75,
+          "completed": 24,
+          "discarded": 10,
+          "nativeFallback": 30,
+          "commandFallback": 16,
+          "error": null,
+          "revision": 77,
+          "status": "pending",
+          "length": 3588894,
+          "treeLength": 3588894,
+          "available": false
+        },
+        {
+          "requests": 77,
+          "resets": 1,
+          "deltas": 76,
+          "completed": 25,
+          "discarded": 10,
+          "nativeFallback": 32,
+          "commandFallback": 17,
+          "error": null,
+          "revision": 78,
+          "status": "ready",
+          "length": 3588895,
+          "treeLength": 3588895,
+          "available": true
+        }
+      ],
+      "detail": {
+        "requests": 77,
+        "resets": 1,
+        "deltas": 76,
+        "completed": 25,
+        "discarded": 10,
+        "nativeFallback": 32,
+        "commandFallback": 17,
+        "error": null,
+        "revision": 78,
+        "status": "ready",
+        "length": 3588895,
+        "treeLength": 3588895,
+        "available": true
+      },
+      "ms": 1420
+    },
+    {
+      "id": "pending-python-explicit-completion",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 78,
+          "resets": 1,
+          "deltas": 77,
+          "completed": 25,
+          "discarded": 10,
+          "nativeFallback": 32,
+          "commandFallback": 17,
+          "error": null,
+          "revision": 79,
+          "status": "pending",
+          "length": 3588927,
+          "treeLength": 3588927,
+          "available": false
+        },
+        {
+          "requests": 78,
+          "resets": 1,
+          "deltas": 77,
+          "completed": 25,
+          "discarded": 10,
+          "nativeFallback": 33,
+          "commandFallback": 18,
+          "error": null,
+          "revision": 79,
+          "status": "pending",
+          "length": 3588927,
+          "treeLength": 3588927,
+          "available": true
+        }
+      ],
+      "detail": {
+        "requests": 78,
+        "resets": 1,
+        "deltas": 77,
+        "completed": 26,
+        "discarded": 10,
+        "nativeFallback": 33,
+        "commandFallback": 18,
+        "error": null,
+        "revision": 79,
+        "status": "ready",
+        "length": 3588927,
+        "treeLength": 3588927,
+        "available": true
+      },
+      "ms": 1345
+    },
+    {
+      "id": "pending-python-automatic-completion",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 79,
+          "resets": 1,
+          "deltas": 78,
+          "completed": 26,
+          "discarded": 10,
+          "nativeFallback": 33,
+          "commandFallback": 18,
+          "error": null,
+          "revision": 80,
+          "status": "pending",
+          "length": 3588928,
+          "treeLength": 3588928,
+          "available": false
+        },
+        {
+          "requests": 80,
+          "resets": 1,
+          "deltas": 79,
+          "completed": 27,
+          "discarded": 10,
+          "nativeFallback": 35,
+          "commandFallback": 19,
+          "error": null,
+          "revision": 81,
+          "status": "ready",
+          "length": 3588929,
+          "treeLength": 3588929,
+          "available": true
+        }
+      ],
+      "detail": {
+        "requests": 80,
+        "resets": 1,
+        "deltas": 79,
+        "completed": 27,
+        "discarded": 10,
+        "nativeFallback": 35,
+        "commandFallback": 19,
+        "error": null,
+        "revision": 81,
+        "status": "ready",
+        "length": 3588929,
+        "treeLength": 3588929,
+        "available": true
+      },
+      "ms": 1215
+    },
+    {
+      "id": "pending-fold-heading",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 81,
+          "resets": 1,
+          "deltas": 80,
+          "completed": 27,
+          "discarded": 10,
+          "nativeFallback": 35,
+          "commandFallback": 19,
+          "error": null,
+          "revision": 82,
+          "status": "pending",
+          "length": 3588912,
+          "treeLength": 3588912,
+          "available": false
+        },
+        {
+          "keys": [
+            "Escape",
+            "Control",
+            " ",
+            "Escape",
+            "Escape",
+            "Control",
+            "Shift+shift",
+            "{+shift"
+          ],
+          "folds": 1
+        }
+      ],
+      "detail": {
+        "requests": 81,
+        "resets": 1,
+        "deltas": 80,
+        "completed": 28,
+        "discarded": 10,
+        "nativeFallback": 36,
+        "commandFallback": 20,
+        "error": null,
+        "revision": 82,
+        "status": "ready",
+        "length": 3588912,
+        "treeLength": 3588912,
+        "available": true
+      },
+      "ms": 1632
+    },
+    {
+      "id": "pending-fold-code",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 82,
+          "resets": 1,
+          "deltas": 81,
+          "completed": 28,
+          "discarded": 10,
+          "nativeFallback": 36,
+          "commandFallback": 20,
+          "error": null,
+          "revision": 83,
+          "status": "pending",
+          "length": 3588917,
+          "treeLength": 3588917,
+          "available": false
+        },
+        {
+          "keys": [
+            "Shift+shift",
+            "{+shift",
+            "Control",
+            "Shift+shift",
+            "}+shift",
+            "Control",
+            "Shift+shift",
+            "{+shift"
+          ],
+          "folds": 1
+        }
+      ],
+      "detail": {
+        "requests": 82,
+        "resets": 1,
+        "deltas": 81,
+        "completed": 29,
+        "discarded": 10,
+        "nativeFallback": 37,
+        "commandFallback": 21,
+        "error": null,
+        "revision": 83,
+        "status": "ready",
+        "length": 3588917,
+        "treeLength": 3588917,
+        "available": true
+      },
+      "ms": 1368
+    },
+    {
+      "id": "pending-url-paste-over-selection",
+      "status": "pass",
+      "trace": [
+        {
+          "clipboardBefore": {
+            "matches": true,
+            "length": 24
+          }
+        },
+        {
+          "requests": 83,
+          "resets": 1,
+          "deltas": 82,
+          "completed": 29,
+          "discarded": 10,
+          "nativeFallback": 37,
+          "commandFallback": 21,
+          "error": null,
+          "revision": 84,
+          "status": "pending",
+          "length": 3588904,
+          "treeLength": 3588904,
+          "available": false
+        },
+        {
+          "tail": "fghijklmnopqrstuvwxyz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\n[selected](https://example.invalid/) text",
+          "selection": {
+            "anchor": 3588892,
+            "head": 3588900
+          },
+          "status": {
+            "requests": 84,
+            "resets": 1,
+            "deltas": 83,
+            "completed": 30,
+            "discarded": 10,
+            "nativeFallback": 39,
+            "commandFallback": 22,
+            "error": null,
+            "revision": 85,
+            "status": "ready",
+            "length": 3588932,
+            "treeLength": 3588932,
+            "available": true
+          },
+          "clipboardAfter": {
+            "matches": true,
+            "length": 24
+          }
+        },
+        {
+          "clipboardBefore": {
+            "matches": true,
+            "length": 24
+          }
+        },
+        {
+          "requests": 85,
+          "resets": 1,
+          "deltas": 84,
+          "completed": 30,
+          "discarded": 10,
+          "nativeFallback": 39,
+          "commandFallback": 22,
+          "error": null,
+          "revision": 86,
+          "status": "pending",
+          "length": 3588914,
+          "treeLength": 3588914,
+          "available": false
+        },
+        {
+          "tail": "defghijklmnopqrstuvwxyz\n正文 99999 abcdefghijklmnopqrstuvwxyz\n\n```js\nhttps://example.invalid/ text\n```",
+          "status": {
+            "requests": 86,
+            "resets": 1,
+            "deltas": 85,
+            "completed": 31,
+            "discarded": 10,
+            "nativeFallback": 41,
+            "commandFallback": 23,
+            "error": null,
+            "revision": 87,
+            "status": "ready",
+            "length": 3588930,
+            "treeLength": 3588930,
+            "available": true
+          },
+          "clipboardAfter": {
+            "matches": true,
+            "length": 24
+          }
+        }
+      ],
+      "detail": {
+        "requests": 86,
+        "resets": 1,
+        "deltas": 85,
+        "completed": 31,
+        "discarded": 10,
+        "nativeFallback": 41,
+        "commandFallback": 23,
+        "error": null,
+        "revision": 87,
+        "status": "ready",
+        "length": 3588930,
+        "treeLength": 3588930,
+        "available": true
+      },
+      "ms": 12118
+    }
+  ],
+  "frames": [
+    {
+      "file": "worker-mixed-code.png",
+      "sha256": "0bcf7824272641e874213a5bd323d135e47cb6a8ec65af10687b41ceeac8313a",
+      "caret": {
+        "left": 161.5,
+        "right": 161.5,
+        "top": 341.046875,
+        "bottom": 355.046875
+      },
+      "zoom": {
+        "file": "worker-mixed-code-caret-2x.png",
+        "sha256": "72a25d139cfa16dc1f866f619b2c5aaa51c464c9210f59444305dd1cbe65c4e1",
+        "clip": {
+          "x": 41.5,
+          "y": 316.046875,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-math-priority.png",
+      "sha256": "10c9b75dbb75c61990cb0fe8a443b973b651fa874973fe6191f4532ee38aea5c",
+      "caret": {
+        "left": 236.703125,
+        "right": 236.703125,
+        "top": 642.078125,
+        "bottom": 658.078125
+      },
+      "zoom": {
+        "file": "worker-math-priority-caret-2x.png",
+        "sha256": "8bf37f1479d906e8d9d173bff975fb9ea208e2886415e48cfe8dd3807a09b047",
+        "clip": {
+          "x": 116.703125,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-quote-enter.png",
+      "sha256": "3f5f5d7c6486184a3ee525f9d3bec8cdf1b683921b7bbd45a5be602827a91ad3",
+      "caret": {
+        "x": 176.578125,
+        "y": 663.1640625,
+        "width": 0,
+        "height": 12.59375,
+        "top": 663.1640625,
+        "right": 176.578125,
+        "bottom": 675.7578125,
+        "left": 176.578125
+      },
+      "zoom": {
+        "file": "worker-quote-enter-caret-2x.png",
+        "sha256": "ffdec5724435b8d67f58a699c770b4f95c5dda9d68c1d5173f8309a2e7d4d974",
+        "clip": {
+          "x": 56.578125,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-quote-backspace.png",
+      "sha256": "2dd023add8f16054bd18e6f3f74999294c8bf28932de6214eecfb93688eefc33",
+      "caret": {
+        "x": 160.5,
+        "y": 642.078125,
+        "width": 0,
+        "height": 16,
+        "top": 642.078125,
+        "right": 160.5,
+        "bottom": 658.078125,
+        "left": 160.5
+      },
+      "zoom": {
+        "file": "worker-quote-backspace-caret-2x.png",
+        "sha256": "4e5145ba56e168aa43919d89de80eadffd178444edf0e04e13ea3e1c64125540",
+        "clip": {
+          "x": 40.5,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-lazy-quote-enter.png",
+      "sha256": "b07ea94a4fa1523ae01c91acea825c5d5cc99348d78a6c8c2d29325ab1ec10a9",
+      "caret": {
+        "x": 176.578125,
+        "y": 688.359375,
+        "width": 0,
+        "height": 12.59375,
+        "top": 688.359375,
+        "right": 176.578125,
+        "bottom": 700.953125,
+        "left": 176.578125
+      },
+      "zoom": {
+        "file": "worker-lazy-quote-enter-caret-2x.png",
+        "sha256": "a9c2fc302a6b393c47084e0deb7f17fce0e15c935910590627092df1b7ae6357",
+        "clip": {
+          "x": 56.578125,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-js-backtick-pair.png",
+      "sha256": "57de6fb0ac5c564aae1eb4c2aeebb70378a44516ae8d552146c01746e54cd42d",
+      "caret": {
+        "left": 266.09375,
+        "right": 266.09375,
+        "top": 658.015625,
+        "bottom": 672.015625
+      },
+      "zoom": {
+        "file": "worker-js-backtick-pair-caret-2x.png",
+        "sha256": "ef54b78663d91a924dc9e174513dd5c27497b640804e3803eeeeb72ef3a622f3",
+        "clip": {
+          "x": 146.09375,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-js-string-quote.png",
+      "sha256": "81c20c81a9f9be53ca16b1d067dc8a0ba207579995f83bfd06ec71e189f7f4a2",
+      "caret": {
+        "left": 300.9609375,
+        "right": 300.9609375,
+        "top": 658.015625,
+        "bottom": 672.015625
+      },
+      "zoom": {
+        "file": "worker-js-string-quote-caret-2x.png",
+        "sha256": "da71e275999a55d2489a506b4d97551d91889b0a40dddd76678acbd64a5f2e9a",
+        "clip": {
+          "x": 180.9609375,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-python-third-quote.png",
+      "sha256": "ef981f5c5a40e86acb09a9602840bf6c80ece4d4f958bf133d64c0e739939014",
+      "caret": {
+        "left": 182.4140625,
+        "right": 182.4140625,
+        "top": 658.015625,
+        "bottom": 672.015625
+      },
+      "zoom": {
+        "file": "worker-python-third-quote-caret-2x.png",
+        "sha256": "9a0957a560b6f577fcca7ea8766d14f0980d7562581cac6d9a2824fb0b0e2208",
+        "clip": {
+          "x": 62.4140625,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-js-closing-brace-indent.png",
+      "sha256": "20adafa709b1ce0c12d1c8173957c03b29d802f5c7cb61d98429f47836c58e1a",
+      "caret": {
+        "left": 168.46875,
+        "right": 168.46875,
+        "top": 676.453125,
+        "bottom": 690.453125
+      },
+      "zoom": {
+        "file": "worker-js-closing-brace-indent-caret-2x.png",
+        "sha256": "7c7ba74f32673a276f6ac14fde782661bbb85194ca2337ccb4b5cee4abe05afd",
+        "clip": {
+          "x": 48.46875,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-plain-leading-quote.png",
+      "sha256": "f106b04e7a296249894ee07697ec59c7e206b48817aaf885027457f8ed8c7cb2",
+      "caret": {
+        "left": 197.984375,
+        "right": 197.984375,
+        "top": 642.078125,
+        "bottom": 658.078125
+      },
+      "zoom": {
+        "file": "worker-plain-leading-quote-caret-2x.png",
+        "sha256": "5fe1da3b1c02091fb666202936a661ac7bc0d3087e42a7dc081aeb31a3a51d70",
+        "clip": {
+          "x": 77.984375,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-js-backtick-delete-pair.png",
+      "sha256": "c4b853424932693020d95e9174d576130e7ebbb48a644ce82fc250c0fe6c919d",
+      "caret": {
+        "left": 259.1171875,
+        "right": 259.1171875,
+        "top": 658.015625,
+        "bottom": 672.015625
+      },
+      "zoom": {
+        "file": "worker-js-backtick-delete-pair-caret-2x.png",
+        "sha256": "72cc6a27fbbc3ac1a9de96be83b911d9b1ebbe62b61eab7b45c8fcd036dd56cc",
+        "clip": {
+          "x": 139.1171875,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-js-word-delete.png",
+      "sha256": "3130cd266e169e56be5a748e15d327d14999ea3dfd82a5aa96ddc4e50b6862c0",
+      "caret": {
+        "left": 203.3359375,
+        "right": 203.3359375,
+        "top": 658.015625,
+        "bottom": 672.015625
+      },
+      "zoom": {
+        "file": "worker-js-word-delete-caret-2x.png",
+        "sha256": "18b4873020f69e703188d939b86ac13614235d9c6b4e57aed5b5aa241d743156",
+        "clip": {
+          "x": 83.3359375,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-js-blank-line-indent.png",
+      "sha256": "e36433417a3861d69fc7f3f66f5c50fcca4958a6798e3b8cd05ef9d0dd032f2d",
+      "caret": {
+        "x": 175.4453125,
+        "y": 676.453125,
+        "width": 0,
+        "height": 14,
+        "top": 676.453125,
+        "right": 175.4453125,
+        "bottom": 690.453125,
+        "left": 175.4453125
+      },
+      "zoom": {
+        "file": "worker-js-blank-line-indent-caret-2x.png",
+        "sha256": "2033360de3730697cd455953f304ce29381f22c6948d0d19fa42729dfd9c3906",
+        "clip": {
+          "x": 55.4453125,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-js-reindent.png",
+      "sha256": "cfd3e6be8c9bdf9b31aecf291c0f80d620412f658ad45a8129049f2504f299c3",
+      "caret": {
+        "left": 175.4453125,
+        "right": 175.4453125,
+        "top": 676.453125,
+        "bottom": 690.453125
+      },
+      "zoom": {
+        "file": "worker-js-reindent-caret-2x.png",
+        "sha256": "eaf59df5ad784df826ef096b7fbcd975fc22c7a414ab74d646a20f5920a2ad5b",
+        "clip": {
+          "x": 55.4453125,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-js-block-comment.png",
+      "sha256": "4895eadd6f2a9833c60eeb86aa762e07b0371cf327e7ca5033529d93583c1b89",
+      "caret": {
+        "left": 217.28125,
+        "right": 217.28125,
+        "top": 658.015625,
+        "bottom": 672.015625
+      },
+      "zoom": {
+        "file": "worker-js-block-comment-caret-2x.png",
+        "sha256": "cb4202f1d55b8bc54426d602781c3e7f41388e99404097cbafb9dc64952590a1",
+        "clip": {
+          "x": 97.28125,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-js-matching-parenthesis.png",
+      "sha256": "4d1e0466501d480d55cd4673b1a041a642ce3e9b622c1bf8cf5e371d240b18c4",
+      "caret": {
+        "left": 294,
+        "right": 294,
+        "top": 658.015625,
+        "bottom": 672.015625
+      },
+      "zoom": {
+        "file": "worker-js-matching-parenthesis-caret-2x.png",
+        "sha256": "a49876327cee1f103bccc3cb6c418756c3ae69c0c24cb58cee5269f89ebcdae6",
+        "clip": {
+          "x": 174,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-syntax-right.png",
+      "sha256": "557efa02b5c2696990ad0100bafc36b1ebc6a02691e49361ad8ced24197c4b8d",
+      "caret": {
+        "left": 232.015625,
+        "right": 232.015625,
+        "top": 642.078125,
+        "bottom": 658.078125
+      },
+      "zoom": {
+        "file": "worker-syntax-right-caret-2x.png",
+        "sha256": "4cf5840890e71a3f72d30c4db7bf5deee3c41de99991c2609ee12ecb6ed675ee",
+        "clip": {
+          "x": 112.015625,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-html-enter-indent.png",
+      "sha256": "37914fa425875b8770adaef916acc28b90e87bbd20c7d8152d46764656efafad",
+      "caret": {
+        "left": 167.25,
+        "right": 167.25,
+        "top": 667.2734375,
+        "bottom": 683.2734375
+      },
+      "zoom": {
+        "file": "worker-html-enter-indent-caret-2x.png",
+        "sha256": "b15eec7bc070ae9c0c3a6f436ff49f14a8f6ece33f12007c2fdb65995cec2d57",
+        "clip": {
+          "x": 47.25,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-html-auto-completion.png",
+      "sha256": "fbbf372d26ac6ab7215ede1966aa97c214ba588c9374c3126fa1b962aeaf4e05",
+      "caret": {
+        "left": 190.6015625,
+        "right": 190.6015625,
+        "top": 642.078125,
+        "bottom": 658.078125
+      },
+      "zoom": {
+        "file": "worker-html-auto-completion-caret-2x.png",
+        "sha256": "f035eef95c353fb4c58d03c675372d7fb370595225357fcb3f1230c23c9db240",
+        "clip": {
+          "x": 70.6015625,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-python-explicit-completion.png",
+      "sha256": "c39c2d9df49301468923898d9cfbf898db70ede54bfd427772663541255575fb",
+      "caret": {
+        "left": 182.4140625,
+        "right": 182.4140625,
+        "top": 732.2109375,
+        "bottom": 746.2109375
+      },
+      "zoom": {
+        "file": "worker-python-explicit-completion-caret-2x.png",
+        "sha256": "4bdd894e3d93b7cae8d82953fc36ec87bb43e6119753ff2f677431a21902e10d",
+        "clip": {
+          "x": 62.4140625,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-python-automatic-completion.png",
+      "sha256": "8997de97a11c9a6dc12edcc981c7521f014784dc1edc058b458e44ce3bff4cba",
+      "caret": {
+        "x": 189.390625,
+        "y": 732.2109375,
+        "width": 0,
+        "height": 14,
+        "top": 732.2109375,
+        "right": 189.390625,
+        "bottom": 746.2109375,
+        "left": 189.390625
+      },
+      "zoom": {
+        "file": "worker-python-automatic-completion-caret-2x.png",
+        "sha256": "980dbb8c9322be68e924b31fca8642ec540603a684810e07fd4c4bce7941bb67",
+        "clip": {
+          "x": 69.390625,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-url-paste.png",
+      "sha256": "62f1e1c4fb788536121c19c55e745728f92c1be000fa4d1e8afabde360407fe2",
+      "caret": {
+        "left": 215.34375,
+        "right": 215.34375,
+        "top": 642.078125,
+        "bottom": 658.078125
+      },
+      "zoom": {
+        "file": "worker-url-paste-caret-2x.png",
+        "sha256": "1804e0f2e204ddbd441330c4977d8ef773aa3546db58e6784d70955be58ce7c7",
+        "clip": {
+          "x": 95.34375,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "worker-code-url-paste.png",
+      "sha256": "47ef668509cf6c726ed0813d5bd077346e193ccd7e766dab21a26ccb07fee0b4",
+      "caret": {
+        "left": 328.84375,
+        "right": 328.84375,
+        "top": 658.015625,
+        "bottom": 672.015625
+      },
+      "zoom": {
+        "file": "worker-code-url-paste-caret-2x.png",
+        "sha256": "4fb69a9e42f3b4253f1cc260947b456d960120868f8f076d11a4c70de94c5bc3",
+        "clip": {
+          "x": 208.84375,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ],
+  "errors": [],
+  "metadata": {
+    "executable": "markpilot-3.2.7-portable.exe",
+    "exeSha256": "ae824eb37cc0082a2c7876284fa4e03d99474f3dad42197e89e33324a940ccf7",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.7",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "bootMs": 5455,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "d64901ab8921ab227387679d9988302af9ed6576816c13bf26ad73d87cd123f7",
+        "sourceSha256": "d64901ab8921ab227387679d9988302af9ed6576816c13bf26ad73d87cd123f7"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "a82bfbb9c56c8c355976dec9ad5df6b1f8581d8524b9eab54f818261db7a97fd",
+        "sourceSha256": "a82bfbb9c56c8c355976dec9ad5df6b1f8581d8524b9eab54f818261db7a97fd"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "ee74a82702b50d9f261701df6e24f108cf27176ca79541fc0cc95af33f74bc5d",
+        "sourceSha256": "ee74a82702b50d9f261701df6e24f108cf27176ca79541fc0cc95af33f74bc5d"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "clipboard": {
+    "ready": true,
+    "formats": [
+      "Bitmap",
+      "System.Drawing.Bitmap"
+    ]
+  },
+  "clipboardCleanup": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T15:56:36.778Z",
+  "passed": true
+}

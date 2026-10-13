@@ -1,0 +1,2501 @@
+{
+  "schema": 1,
+  "suite": "math-entry-workflows",
+  "kind": "actual-ui-probe",
+  "startedAt": "2026-10-11T22:41:21.049Z",
+  "cases": [
+    {
+      "id": "plain-down-immediate-type-undo-redo",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "plain-down-01-before",
+          "text": "TOP\n$$\nx+y\n$$\nEND\n",
+          "selection": {
+            "anchor": 3,
+            "head": 3
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 198.1171875,
+            "y": 54.5,
+            "width": 0,
+            "height": 16,
+            "top": 54.5,
+            "right": 198.1171875,
+            "bottom": 70.5,
+            "left": 198.1171875
+          },
+          "scrollTop": 0,
+          "title": "plain-down.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "plain-down-01-before.png",
+            "sha256": "509a77c0b121bd7cce170d45a7864747c76bb4e0ce08eed2a41f2905ee2b3151",
+            "caret": {
+              "x": 198.1171875,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 198.1171875,
+              "bottom": 70.5,
+              "left": 198.1171875
+            },
+            "zoom": {
+              "file": "plain-down-01-before-caret-2x.png",
+              "sha256": "f3752c1b549b2a1850b361218fdde14ae32ec6dbc78d2f127adf36e4011ea3cd",
+              "clip": {
+                "x": 78.1171875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "after-vertical-key-before-Z",
+          "event": {
+            "key": "ArrowDown",
+            "code": "ArrowDown",
+            "trusted": true
+          },
+          "text": "TOP\n$$\nx+y\n$$\nEND\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          }
+        },
+        {
+          "name": "plain-down-02-edited",
+          "text": "TOP\n$$\nZx+y\n$$\nEND\n",
+          "selection": {
+            "anchor": 8,
+            "head": 8
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 571.2265625,
+            "right": 571.2265625,
+            "top": 104.890625,
+            "bottom": 120.890625
+          },
+          "scrollTop": 0,
+          "title": "● plain-down.md · 19 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowDown",
+              "code": "ArrowDown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "plain-down-02-edited.png",
+            "sha256": "70fe27a4eba9cd80dc9717dfa2a74fa5666683c58039b3f51b85e262a1b16a14",
+            "caret": {
+              "left": 571.2265625,
+              "right": 571.2265625,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "zoom": {
+              "file": "plain-down-02-edited-caret-2x.png",
+              "sha256": "1f9cbbf93800072c15462720ba8c000c1d621d6d156661839f3f7b8c730e3a5d",
+              "clip": {
+                "x": 451.2265625,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "plain-down-03-undo",
+          "text": "TOP\n$$\nx+y\n$$\nEND\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 567.015625,
+            "right": 567.015625,
+            "top": 104.890625,
+            "bottom": 120.890625
+          },
+          "scrollTop": 0,
+          "title": "● plain-down.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowDown",
+              "code": "ArrowDown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "plain-down-03-undo.png",
+            "sha256": "529a67a927eb51ac581c47057d2f6d2d83fa79b247e48029d88df6fef87fd1c3",
+            "caret": {
+              "left": 567.015625,
+              "right": 567.015625,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "zoom": {
+              "file": "plain-down-03-undo-caret-2x.png",
+              "sha256": "ccbe4678122fd237357db622adafa738bcdd458c9f7a2775dd40c86672331cd7",
+              "clip": {
+                "x": 447.015625,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "plain-down-04-redo",
+          "text": "TOP\n$$\nZx+y\n$$\nEND\n",
+          "selection": {
+            "anchor": 8,
+            "head": 8
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 571.2265625,
+            "right": 571.2265625,
+            "top": 104.890625,
+            "bottom": 120.890625
+          },
+          "scrollTop": 0,
+          "title": "● plain-down.md · 19 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowDown",
+              "code": "ArrowDown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "plain-down-04-redo.png",
+            "sha256": "70fe27a4eba9cd80dc9717dfa2a74fa5666683c58039b3f51b85e262a1b16a14",
+            "caret": {
+              "left": 571.2265625,
+              "right": 571.2265625,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "zoom": {
+              "file": "plain-down-04-redo-caret-2x.png",
+              "sha256": "1f9cbbf93800072c15462720ba8c000c1d621d6d156661839f3f7b8c730e3a5d",
+              "clip": {
+                "x": 451.2265625,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "plain-down-05-restart",
+          "text": "TOP\n$$\nZx+y\n$$\nEND\n",
+          "selection": {
+            "anchor": 3,
+            "head": 3
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 198.1171875,
+            "y": 54.5,
+            "width": 0,
+            "height": 16,
+            "top": 54.5,
+            "right": 198.1171875,
+            "bottom": 70.5,
+            "left": 198.1171875
+          },
+          "scrollTop": 0,
+          "title": "plain-down.md · 19 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "ArrowDown",
+              "code": "ArrowDown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "plain-down-05-restart.png",
+            "sha256": "ccb7aaf38fe3353564da27b4ea967b5a726bab658b5a276dc44720418482f3e3",
+            "caret": {
+              "x": 198.1171875,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 198.1171875,
+              "bottom": 70.5,
+              "left": 198.1171875
+            },
+            "zoom": {
+              "file": "plain-down-05-restart-caret-2x.png",
+              "sha256": "f3752c1b549b2a1850b361218fdde14ae32ec6dbc78d2f127adf36e4011ea3cd",
+              "clip": {
+                "x": 78.1171875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "plain-down-06-returned",
+          "text": "TOP\n$$\nZx+y\n$$\nEND\n",
+          "selection": {
+            "anchor": 3,
+            "head": 3
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 198.1171875,
+            "y": 54.5,
+            "width": 0,
+            "height": 16,
+            "top": 54.5,
+            "right": 198.1171875,
+            "bottom": 70.5,
+            "left": 198.1171875
+          },
+          "scrollTop": 0,
+          "title": "plain-down.md · 19 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowDown",
+              "code": "ArrowDown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowUp",
+              "code": "ArrowUp",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "plain-down-06-returned.png",
+            "sha256": "ccb7aaf38fe3353564da27b4ea967b5a726bab658b5a276dc44720418482f3e3",
+            "caret": {
+              "x": 198.1171875,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 198.1171875,
+              "bottom": 70.5,
+              "left": 198.1171875
+            },
+            "zoom": {
+              "file": "plain-down-06-returned-caret-2x.png",
+              "sha256": "f3752c1b549b2a1850b361218fdde14ae32ec6dbc78d2f127adf36e4011ea3cd",
+              "clip": {
+                "x": 78.1171875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "prefix": "",
+        "direction": "down",
+        "contentFrom": 7,
+        "firstLineTo": 3,
+        "openingFrom": 4,
+        "adjacentGap": "\n",
+        "expectedSource": "TOP\n$$\nZx+y\n$$\nEND\n",
+        "undoRedo": "native Control+z / Control+y",
+        "screenshotStages": [
+          "before",
+          "edited",
+          "undo",
+          "redo"
+        ],
+        "entryEvidence": "real keyup snapshot; intentionally no entry screenshot before immediate Z"
+      },
+      "ms": 2739
+    },
+    {
+      "id": "plain-up-immediate-type-undo-redo",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "plain-up-01-before",
+          "text": "TOP\n$$\nx+y\n$$\nEND\n",
+          "selection": {
+            "anchor": 14,
+            "head": 14
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 105.703125,
+            "bottom": 121.703125
+          },
+          "scrollTop": 0,
+          "title": "plain-up.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "plain-up-01-before.png",
+            "sha256": "21610d22969357cb552fde05a40e7e8f2596ff2ea18498139f5a60991ccf99db",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 105.703125,
+              "bottom": 121.703125
+            },
+            "zoom": {
+              "file": "plain-up-01-before-caret-2x.png",
+              "sha256": "dfd37840ce0685ef72651ded91195aa71fd853c237b99bbd45df5db93ab323bd",
+              "clip": {
+                "x": 50.5,
+                "y": 80.703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "after-vertical-key-before-Z",
+          "event": {
+            "key": "ArrowUp",
+            "code": "ArrowUp",
+            "trusted": true
+          },
+          "text": "TOP\n$$\nx+y\n$$\nEND\n",
+          "selection": {
+            "anchor": 10,
+            "head": 10
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          }
+        },
+        {
+          "name": "plain-up-02-edited",
+          "text": "TOP\n$$\nx+yZ\n$$\nEND\n",
+          "selection": {
+            "anchor": 11,
+            "head": 11
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 594.1875,
+            "right": 594.1875,
+            "top": 104.890625,
+            "bottom": 120.890625
+          },
+          "scrollTop": 0,
+          "title": "● plain-up.md · 19 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowUp",
+              "code": "ArrowUp",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "plain-up-02-edited.png",
+            "sha256": "c5e0d2343069ba814fe4ed02d23461ef1ec3008c68d837c65332197f99799f32",
+            "caret": {
+              "left": 594.1875,
+              "right": 594.1875,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "zoom": {
+              "file": "plain-up-02-edited-caret-2x.png",
+              "sha256": "d59093c034ae8c0ad27340b2d763406068f7dd923c4c975d476651c28828083f",
+              "clip": {
+                "x": 474.1875,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "plain-up-03-undo",
+          "text": "TOP\n$$\nx+y\n$$\nEND\n",
+          "selection": {
+            "anchor": 10,
+            "head": 10
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 589.9765625,
+            "right": 589.9765625,
+            "top": 104.890625,
+            "bottom": 120.890625
+          },
+          "scrollTop": 0,
+          "title": "● plain-up.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowUp",
+              "code": "ArrowUp",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "plain-up-03-undo.png",
+            "sha256": "24628a3f0a27619ffc75ad61a7be9b3865bf64e6ceb078e932b0877cdaa99678",
+            "caret": {
+              "left": 589.9765625,
+              "right": 589.9765625,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "zoom": {
+              "file": "plain-up-03-undo-caret-2x.png",
+              "sha256": "d5d5028919f28e9413e5d3007f3549675b57b411a214400d052e8b3409acfc7c",
+              "clip": {
+                "x": 469.9765625,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "plain-up-04-redo",
+          "text": "TOP\n$$\nx+yZ\n$$\nEND\n",
+          "selection": {
+            "anchor": 11,
+            "head": 11
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 594.1875,
+            "right": 594.1875,
+            "top": 104.890625,
+            "bottom": 120.890625
+          },
+          "scrollTop": 0,
+          "title": "● plain-up.md · 19 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowUp",
+              "code": "ArrowUp",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "plain-up-04-redo.png",
+            "sha256": "c5e0d2343069ba814fe4ed02d23461ef1ec3008c68d837c65332197f99799f32",
+            "caret": {
+              "left": 594.1875,
+              "right": 594.1875,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "zoom": {
+              "file": "plain-up-04-redo-caret-2x.png",
+              "sha256": "d59093c034ae8c0ad27340b2d763406068f7dd923c4c975d476651c28828083f",
+              "clip": {
+                "x": 474.1875,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "plain-up-05-restart",
+          "text": "TOP\n$$\nx+yZ\n$$\nEND\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 105.703125,
+            "bottom": 121.703125
+          },
+          "scrollTop": 0,
+          "title": "plain-up.md · 19 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "plain-up-05-restart.png",
+            "sha256": "838236227fb03013fcd916544f0f680e0fc44df0856250e1ea55a5aaa7bae425",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 105.703125,
+              "bottom": 121.703125
+            },
+            "zoom": {
+              "file": "plain-up-05-restart-caret-2x.png",
+              "sha256": "dfd37840ce0685ef72651ded91195aa71fd853c237b99bbd45df5db93ab323bd",
+              "clip": {
+                "x": 50.5,
+                "y": 80.703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "plain-up-06-returned",
+          "text": "TOP\n$$\nx+yZ\n$$\nEND\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 105.703125,
+            "bottom": 121.703125
+          },
+          "scrollTop": 0,
+          "title": "plain-up.md · 19 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowUp",
+              "code": "ArrowUp",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowDown",
+              "code": "ArrowDown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "plain-up-06-returned.png",
+            "sha256": "838236227fb03013fcd916544f0f680e0fc44df0856250e1ea55a5aaa7bae425",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 105.703125,
+              "bottom": 121.703125
+            },
+            "zoom": {
+              "file": "plain-up-06-returned-caret-2x.png",
+              "sha256": "dfd37840ce0685ef72651ded91195aa71fd853c237b99bbd45df5db93ab323bd",
+              "clip": {
+                "x": 50.5,
+                "y": 80.703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "prefix": "",
+        "direction": "up",
+        "contentFrom": 10,
+        "firstLineTo": 3,
+        "openingFrom": 4,
+        "adjacentGap": "\n",
+        "expectedSource": "TOP\n$$\nx+yZ\n$$\nEND\n",
+        "undoRedo": "native Control+z / Control+y",
+        "screenshotStages": [
+          "before",
+          "edited",
+          "undo",
+          "redo"
+        ],
+        "entryEvidence": "real keyup snapshot; intentionally no entry screenshot before immediate Z"
+      },
+      "ms": 3087
+    },
+    {
+      "id": "quoted-down-immediate-type-undo-redo",
+      "status": "fail",
+      "trace": [
+        {
+          "name": "quoted-down-01-before",
+          "text": "> TOP\n> $$\n> x+y\n> $$\n> END\n",
+          "selection": {
+            "anchor": 5,
+            "head": 5
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 211.4296875,
+            "right": 211.4296875,
+            "top": 54,
+            "bottom": 68.5
+          },
+          "scrollTop": 0,
+          "title": "quoted-down.md · 28 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "quoted-down-01-before.png",
+            "sha256": "662004b75ab4aba5b11e39f1192765c71bd222ad6f92de0840202fbda6cd7051",
+            "caret": {
+              "left": 211.4296875,
+              "right": 211.4296875,
+              "top": 54,
+              "bottom": 68.5
+            },
+            "zoom": {
+              "file": "quoted-down-01-before-caret-2x.png",
+              "sha256": "f3d6464778b9b5adff3d1a5b121019f9c955f44a1825e9959b2c29ca41ecec07",
+              "clip": {
+                "x": 91.4296875,
+                "y": 29,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "after-vertical-key-before-Z",
+          "event": {
+            "key": "ArrowDown",
+            "code": "ArrowDown",
+            "trusted": true
+          },
+          "text": "> TOP\n> $$\n> x+y\n> $$\n> END\n",
+          "selection": {
+            "anchor": 11,
+            "head": 11
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          }
+        },
+        {
+          "name": "quoted-down-02-edited",
+          "text": "> TOP\n> $$\nZ> x+y\n> $$\n> END\n",
+          "selection": {
+            "anchor": 12,
+            "head": 12
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 565.0390625,
+            "right": 565.0390625,
+            "top": 99.859375,
+            "bottom": 115.859375
+          },
+          "scrollTop": 0,
+          "title": "● quoted-down.md · 29 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowDown",
+              "code": "ArrowDown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "quoted-down-02-edited.png",
+            "sha256": "5f16bca99279e4e660d3230839adfb89ef761b4707673ae7b53b39228be48e98",
+            "caret": {
+              "left": 565.0390625,
+              "right": 565.0390625,
+              "top": 99.859375,
+              "bottom": 115.859375
+            },
+            "zoom": {
+              "file": "quoted-down-02-edited-caret-2x.png",
+              "sha256": "49e498b7405ff22abe1eedf871d90f7cc0e3d4afb496a80b89425ca1da088af0",
+              "clip": {
+                "x": 445.0390625,
+                "y": 74.859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "quoted-down-03-undo",
+          "text": "> TOP\n> $$\n> x+y\n> $$\n> END\n",
+          "selection": {
+            "anchor": 11,
+            "head": 11
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 577.703125,
+            "y": 98.265625,
+            "width": 0,
+            "height": 12.59375,
+            "top": 98.265625,
+            "right": 577.703125,
+            "bottom": 110.859375,
+            "left": 577.703125
+          },
+          "scrollTop": 0,
+          "title": "● quoted-down.md · 28 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowDown",
+              "code": "ArrowDown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "quoted-down-03-undo.png",
+            "sha256": "97a659bca5cab7249b24dd13d94c6642b4220729eaa6ad27e235981fcfd45a69",
+            "caret": {
+              "x": 577.703125,
+              "y": 98.265625,
+              "width": 0,
+              "height": 12.59375,
+              "top": 98.265625,
+              "right": 577.703125,
+              "bottom": 110.859375,
+              "left": 577.703125
+            },
+            "zoom": {
+              "file": "quoted-down-03-undo-caret-2x.png",
+              "sha256": "41f69fb1c37a7fd50f0c499db7009331521c939e97038330f4a9bc8d60fa369b",
+              "clip": {
+                "x": 457.703125,
+                "y": 73.265625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "quoted-down-04-redo",
+          "text": "> TOP\n> $$\nZ> x+y\n> $$\n> END\n",
+          "selection": {
+            "anchor": 12,
+            "head": 12
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 565.0390625,
+            "right": 565.0390625,
+            "top": 99.859375,
+            "bottom": 115.859375
+          },
+          "scrollTop": 0,
+          "title": "● quoted-down.md · 29 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowDown",
+              "code": "ArrowDown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "quoted-down-04-redo.png",
+            "sha256": "5f16bca99279e4e660d3230839adfb89ef761b4707673ae7b53b39228be48e98",
+            "caret": {
+              "left": 565.0390625,
+              "right": 565.0390625,
+              "top": 99.859375,
+              "bottom": 115.859375
+            },
+            "zoom": {
+              "file": "quoted-down-04-redo-caret-2x.png",
+              "sha256": "49e498b7405ff22abe1eedf871d90f7cc0e3d4afb496a80b89425ca1da088af0",
+              "clip": {
+                "x": 445.0390625,
+                "y": 74.859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "error": "vertical entry lands at the mapped formula token, past quote prefixes and delimiters\n+ actual - expected\n\n  {\n+   anchor: 11,\n+   head: 11\n-   anchor: 13,\n-   head: 13\n  }\n",
+      "ms": 2054
+    },
+    {
+      "id": "nested-quoted-down-immediate-type-undo-redo",
+      "status": "fail",
+      "trace": [
+        {
+          "name": "nested-quoted-down-01-before",
+          "text": "> > TOP\n> > $$\n> > x+y\n> > $$\n> > END\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 224.03125,
+            "right": 224.03125,
+            "top": 54,
+            "bottom": 68.5
+          },
+          "scrollTop": 0,
+          "title": "nested-quoted-down.md · 38 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "nested-quoted-down-01-before.png",
+            "sha256": "cec9352c44be7cbdcdb0adaf1f547ae0f6960660c557702b5f9804690362b05e",
+            "caret": {
+              "left": 224.03125,
+              "right": 224.03125,
+              "top": 54,
+              "bottom": 68.5
+            },
+            "zoom": {
+              "file": "nested-quoted-down-01-before-caret-2x.png",
+              "sha256": "23517a97590f8c4afab7e9277760699ec4c64c02696bcd5658d5943a8e2823fc",
+              "clip": {
+                "x": 104.03125,
+                "y": 29,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "after-vertical-key-before-Z",
+          "event": {
+            "key": "ArrowDown",
+            "code": "ArrowDown",
+            "trusted": true
+          },
+          "text": "> > TOP\n> > $$\n> > x+y\n> > $$\n> > END\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          }
+        },
+        {
+          "name": "nested-quoted-down-02-edited",
+          "text": "> > TOP\n> > $$\nZ> > x+y\n> > $$\n> > END\n",
+          "selection": {
+            "anchor": 16,
+            "head": 16
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 558.84375,
+            "right": 558.84375,
+            "top": 99.859375,
+            "bottom": 115.859375
+          },
+          "scrollTop": 0,
+          "title": "● nested-quoted-down.md · 39 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowDown",
+              "code": "ArrowDown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "nested-quoted-down-02-edited.png",
+            "sha256": "1a6067c04602fc10aff84cda5554e954d2782fff88d68ea747b1d70c8ab36a27",
+            "caret": {
+              "left": 558.84375,
+              "right": 558.84375,
+              "top": 99.859375,
+              "bottom": 115.859375
+            },
+            "zoom": {
+              "file": "nested-quoted-down-02-edited-caret-2x.png",
+              "sha256": "c2a06025ae4fc28a7bdeb20ce3ceb1b9361426bed99c80074bfd23f97ac7aee7",
+              "clip": {
+                "x": 438.84375,
+                "y": 74.859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "nested-quoted-down-03-undo",
+          "text": "> > TOP\n> > $$\n> > x+y\n> > $$\n> > END\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 584,
+            "y": 98.265625,
+            "width": 0,
+            "height": 12.59375,
+            "top": 98.265625,
+            "right": 584,
+            "bottom": 110.859375,
+            "left": 584
+          },
+          "scrollTop": 0,
+          "title": "● nested-quoted-down.md · 38 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowDown",
+              "code": "ArrowDown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "nested-quoted-down-03-undo.png",
+            "sha256": "777a1c066964bec66ae401c49ffc0ae2cb4faffa7568ff982d79793c316bf556",
+            "caret": {
+              "x": 584,
+              "y": 98.265625,
+              "width": 0,
+              "height": 12.59375,
+              "top": 98.265625,
+              "right": 584,
+              "bottom": 110.859375,
+              "left": 584
+            },
+            "zoom": {
+              "file": "nested-quoted-down-03-undo-caret-2x.png",
+              "sha256": "d08e61cce110221a0769745fba294587d04d58d14bf4ad840460a6443429eb66",
+              "clip": {
+                "x": 464,
+                "y": 73.265625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "nested-quoted-down-04-redo",
+          "text": "> > TOP\n> > $$\nZ> > x+y\n> > $$\n> > END\n",
+          "selection": {
+            "anchor": 16,
+            "head": 16
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 558.84375,
+            "right": 558.84375,
+            "top": 99.859375,
+            "bottom": 115.859375
+          },
+          "scrollTop": 0,
+          "title": "● nested-quoted-down.md · 39 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowDown",
+              "code": "ArrowDown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "nested-quoted-down-04-redo.png",
+            "sha256": "1a6067c04602fc10aff84cda5554e954d2782fff88d68ea747b1d70c8ab36a27",
+            "caret": {
+              "left": 558.84375,
+              "right": 558.84375,
+              "top": 99.859375,
+              "bottom": 115.859375
+            },
+            "zoom": {
+              "file": "nested-quoted-down-04-redo-caret-2x.png",
+              "sha256": "c2a06025ae4fc28a7bdeb20ce3ceb1b9361426bed99c80074bfd23f97ac7aee7",
+              "clip": {
+                "x": 438.84375,
+                "y": 74.859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "error": "vertical entry lands at the mapped formula token, past quote prefixes and delimiters\n+ actual - expected\n\n  {\n+   anchor: 15,\n+   head: 15\n-   anchor: 19,\n-   head: 19\n  }\n",
+      "ms": 2162
+    }
+  ],
+  "errors": [],
+  "coverage": "Mapped block source entry in both directions, immediate input, native history, return to the preceding line and exact saved source.",
+  "source": {
+    "file": "dsh-markpilot/src-cm6/main.js",
+    "sha256": "9785673e49995f2c35333e06539054cc4e75b27b4af2b1e6d45f573ce260ecfe"
+  },
+  "probe": {
+    "file": "tools/quality/math-entry-workflows.cjs",
+    "sha256": "c1142dbcf235b10d8cb7e6b82b0823bdc448e00774b5d46369394f8b6dff279e"
+  },
+  "artifact": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-common-mutations-3.2.11\\stage-math-entry\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-common-mutations-3.2.11\\stage-math-entry\\unpacked\\MarkPilot.exe",
+    "runtimeExecutableSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-common-mutations-3.2.11\\stage-math-entry\\unpacked\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.11",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-common-mutations-3.2.11\\stage-math-entry\\unpacked\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-common-mutations-3.2.11\\stage-math-entry\\unpacked\\resources\\app.asar",
+    "asarSha256": "d3644a4419768e965607c428f9ff763f62926ccca3946bd43968a8c1cce02912",
+    "bootMs": 974,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "2e0b07933d169491391b5a14febb254e06afc599dccc708e65e3f0c2d16c708f",
+        "sourceSha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "clipboard": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T22:41:40.221Z",
+  "passed": false,
+  "frames": [
+    {
+      "file": "plain-down-01-before.png",
+      "sha256": "509a77c0b121bd7cce170d45a7864747c76bb4e0ce08eed2a41f2905ee2b3151",
+      "caret": {
+        "x": 198.1171875,
+        "y": 54.5,
+        "width": 0,
+        "height": 16,
+        "top": 54.5,
+        "right": 198.1171875,
+        "bottom": 70.5,
+        "left": 198.1171875
+      },
+      "zoom": {
+        "file": "plain-down-01-before-caret-2x.png",
+        "sha256": "f3752c1b549b2a1850b361218fdde14ae32ec6dbc78d2f127adf36e4011ea3cd",
+        "clip": {
+          "x": 78.1171875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-down-02-edited.png",
+      "sha256": "70fe27a4eba9cd80dc9717dfa2a74fa5666683c58039b3f51b85e262a1b16a14",
+      "caret": {
+        "left": 571.2265625,
+        "right": 571.2265625,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "plain-down-02-edited-caret-2x.png",
+        "sha256": "1f9cbbf93800072c15462720ba8c000c1d621d6d156661839f3f7b8c730e3a5d",
+        "clip": {
+          "x": 451.2265625,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-down-03-undo.png",
+      "sha256": "529a67a927eb51ac581c47057d2f6d2d83fa79b247e48029d88df6fef87fd1c3",
+      "caret": {
+        "left": 567.015625,
+        "right": 567.015625,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "plain-down-03-undo-caret-2x.png",
+        "sha256": "ccbe4678122fd237357db622adafa738bcdd458c9f7a2775dd40c86672331cd7",
+        "clip": {
+          "x": 447.015625,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-down-04-redo.png",
+      "sha256": "70fe27a4eba9cd80dc9717dfa2a74fa5666683c58039b3f51b85e262a1b16a14",
+      "caret": {
+        "left": 571.2265625,
+        "right": 571.2265625,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "plain-down-04-redo-caret-2x.png",
+        "sha256": "1f9cbbf93800072c15462720ba8c000c1d621d6d156661839f3f7b8c730e3a5d",
+        "clip": {
+          "x": 451.2265625,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-down-05-restart.png",
+      "sha256": "ccb7aaf38fe3353564da27b4ea967b5a726bab658b5a276dc44720418482f3e3",
+      "caret": {
+        "x": 198.1171875,
+        "y": 54.5,
+        "width": 0,
+        "height": 16,
+        "top": 54.5,
+        "right": 198.1171875,
+        "bottom": 70.5,
+        "left": 198.1171875
+      },
+      "zoom": {
+        "file": "plain-down-05-restart-caret-2x.png",
+        "sha256": "f3752c1b549b2a1850b361218fdde14ae32ec6dbc78d2f127adf36e4011ea3cd",
+        "clip": {
+          "x": 78.1171875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-down-06-returned.png",
+      "sha256": "ccb7aaf38fe3353564da27b4ea967b5a726bab658b5a276dc44720418482f3e3",
+      "caret": {
+        "x": 198.1171875,
+        "y": 54.5,
+        "width": 0,
+        "height": 16,
+        "top": 54.5,
+        "right": 198.1171875,
+        "bottom": 70.5,
+        "left": 198.1171875
+      },
+      "zoom": {
+        "file": "plain-down-06-returned-caret-2x.png",
+        "sha256": "f3752c1b549b2a1850b361218fdde14ae32ec6dbc78d2f127adf36e4011ea3cd",
+        "clip": {
+          "x": 78.1171875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-up-01-before.png",
+      "sha256": "21610d22969357cb552fde05a40e7e8f2596ff2ea18498139f5a60991ccf99db",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 105.703125,
+        "bottom": 121.703125
+      },
+      "zoom": {
+        "file": "plain-up-01-before-caret-2x.png",
+        "sha256": "dfd37840ce0685ef72651ded91195aa71fd853c237b99bbd45df5db93ab323bd",
+        "clip": {
+          "x": 50.5,
+          "y": 80.703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-up-02-edited.png",
+      "sha256": "c5e0d2343069ba814fe4ed02d23461ef1ec3008c68d837c65332197f99799f32",
+      "caret": {
+        "left": 594.1875,
+        "right": 594.1875,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "plain-up-02-edited-caret-2x.png",
+        "sha256": "d59093c034ae8c0ad27340b2d763406068f7dd923c4c975d476651c28828083f",
+        "clip": {
+          "x": 474.1875,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-up-03-undo.png",
+      "sha256": "24628a3f0a27619ffc75ad61a7be9b3865bf64e6ceb078e932b0877cdaa99678",
+      "caret": {
+        "left": 589.9765625,
+        "right": 589.9765625,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "plain-up-03-undo-caret-2x.png",
+        "sha256": "d5d5028919f28e9413e5d3007f3549675b57b411a214400d052e8b3409acfc7c",
+        "clip": {
+          "x": 469.9765625,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-up-04-redo.png",
+      "sha256": "c5e0d2343069ba814fe4ed02d23461ef1ec3008c68d837c65332197f99799f32",
+      "caret": {
+        "left": 594.1875,
+        "right": 594.1875,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "plain-up-04-redo-caret-2x.png",
+        "sha256": "d59093c034ae8c0ad27340b2d763406068f7dd923c4c975d476651c28828083f",
+        "clip": {
+          "x": 474.1875,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-up-05-restart.png",
+      "sha256": "838236227fb03013fcd916544f0f680e0fc44df0856250e1ea55a5aaa7bae425",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 105.703125,
+        "bottom": 121.703125
+      },
+      "zoom": {
+        "file": "plain-up-05-restart-caret-2x.png",
+        "sha256": "dfd37840ce0685ef72651ded91195aa71fd853c237b99bbd45df5db93ab323bd",
+        "clip": {
+          "x": 50.5,
+          "y": 80.703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-up-06-returned.png",
+      "sha256": "838236227fb03013fcd916544f0f680e0fc44df0856250e1ea55a5aaa7bae425",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 105.703125,
+        "bottom": 121.703125
+      },
+      "zoom": {
+        "file": "plain-up-06-returned-caret-2x.png",
+        "sha256": "dfd37840ce0685ef72651ded91195aa71fd853c237b99bbd45df5db93ab323bd",
+        "clip": {
+          "x": 50.5,
+          "y": 80.703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "quoted-down-01-before.png",
+      "sha256": "662004b75ab4aba5b11e39f1192765c71bd222ad6f92de0840202fbda6cd7051",
+      "caret": {
+        "left": 211.4296875,
+        "right": 211.4296875,
+        "top": 54,
+        "bottom": 68.5
+      },
+      "zoom": {
+        "file": "quoted-down-01-before-caret-2x.png",
+        "sha256": "f3d6464778b9b5adff3d1a5b121019f9c955f44a1825e9959b2c29ca41ecec07",
+        "clip": {
+          "x": 91.4296875,
+          "y": 29,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "quoted-down-02-edited.png",
+      "sha256": "5f16bca99279e4e660d3230839adfb89ef761b4707673ae7b53b39228be48e98",
+      "caret": {
+        "left": 565.0390625,
+        "right": 565.0390625,
+        "top": 99.859375,
+        "bottom": 115.859375
+      },
+      "zoom": {
+        "file": "quoted-down-02-edited-caret-2x.png",
+        "sha256": "49e498b7405ff22abe1eedf871d90f7cc0e3d4afb496a80b89425ca1da088af0",
+        "clip": {
+          "x": 445.0390625,
+          "y": 74.859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "quoted-down-03-undo.png",
+      "sha256": "97a659bca5cab7249b24dd13d94c6642b4220729eaa6ad27e235981fcfd45a69",
+      "caret": {
+        "x": 577.703125,
+        "y": 98.265625,
+        "width": 0,
+        "height": 12.59375,
+        "top": 98.265625,
+        "right": 577.703125,
+        "bottom": 110.859375,
+        "left": 577.703125
+      },
+      "zoom": {
+        "file": "quoted-down-03-undo-caret-2x.png",
+        "sha256": "41f69fb1c37a7fd50f0c499db7009331521c939e97038330f4a9bc8d60fa369b",
+        "clip": {
+          "x": 457.703125,
+          "y": 73.265625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "quoted-down-04-redo.png",
+      "sha256": "5f16bca99279e4e660d3230839adfb89ef761b4707673ae7b53b39228be48e98",
+      "caret": {
+        "left": 565.0390625,
+        "right": 565.0390625,
+        "top": 99.859375,
+        "bottom": 115.859375
+      },
+      "zoom": {
+        "file": "quoted-down-04-redo-caret-2x.png",
+        "sha256": "49e498b7405ff22abe1eedf871d90f7cc0e3d4afb496a80b89425ca1da088af0",
+        "clip": {
+          "x": 445.0390625,
+          "y": 74.859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "nested-quoted-down-01-before.png",
+      "sha256": "cec9352c44be7cbdcdb0adaf1f547ae0f6960660c557702b5f9804690362b05e",
+      "caret": {
+        "left": 224.03125,
+        "right": 224.03125,
+        "top": 54,
+        "bottom": 68.5
+      },
+      "zoom": {
+        "file": "nested-quoted-down-01-before-caret-2x.png",
+        "sha256": "23517a97590f8c4afab7e9277760699ec4c64c02696bcd5658d5943a8e2823fc",
+        "clip": {
+          "x": 104.03125,
+          "y": 29,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "nested-quoted-down-02-edited.png",
+      "sha256": "1a6067c04602fc10aff84cda5554e954d2782fff88d68ea747b1d70c8ab36a27",
+      "caret": {
+        "left": 558.84375,
+        "right": 558.84375,
+        "top": 99.859375,
+        "bottom": 115.859375
+      },
+      "zoom": {
+        "file": "nested-quoted-down-02-edited-caret-2x.png",
+        "sha256": "c2a06025ae4fc28a7bdeb20ce3ceb1b9361426bed99c80074bfd23f97ac7aee7",
+        "clip": {
+          "x": 438.84375,
+          "y": 74.859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "nested-quoted-down-03-undo.png",
+      "sha256": "777a1c066964bec66ae401c49ffc0ae2cb4faffa7568ff982d79793c316bf556",
+      "caret": {
+        "x": 584,
+        "y": 98.265625,
+        "width": 0,
+        "height": 12.59375,
+        "top": 98.265625,
+        "right": 584,
+        "bottom": 110.859375,
+        "left": 584
+      },
+      "zoom": {
+        "file": "nested-quoted-down-03-undo-caret-2x.png",
+        "sha256": "d08e61cce110221a0769745fba294587d04d58d14bf4ad840460a6443429eb66",
+        "clip": {
+          "x": 464,
+          "y": 73.265625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "nested-quoted-down-04-redo.png",
+      "sha256": "1a6067c04602fc10aff84cda5554e954d2782fff88d68ea747b1d70c8ab36a27",
+      "caret": {
+        "left": 558.84375,
+        "right": 558.84375,
+        "top": 99.859375,
+        "bottom": 115.859375
+      },
+      "zoom": {
+        "file": "nested-quoted-down-04-redo-caret-2x.png",
+        "sha256": "c2a06025ae4fc28a7bdeb20ce3ceb1b9361426bed99c80074bfd23f97ac7aee7",
+        "clip": {
+          "x": 438.84375,
+          "y": 74.859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ]
+}

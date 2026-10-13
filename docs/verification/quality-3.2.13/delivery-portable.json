@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "version": "3.2.13",
+  "tag": "portable",
+  "passed": true,
+  "asarSha256": "08a6de1a9b6be8a6b8033ec5c8dbf5b6fd3f8277a674ed4c35bcc6b58dad4e51",
+  "sha256": "81eba347d75f8c01a4f403827da5d1d6441ddbcbd91f28c722bd2224690ff2ec",
+  "expectedCases": 6,
+  "runtimeIdentity": {
+    "completePackagedPayload": true,
+    "liveDllEnumeration": false,
+    "scope": "Actual wrapper/inner EXE/full ASAR/runtime versions plus every extracted runtime/resource byte; native inspector/physical accelerators not claimed on wrapper."
+  },
+  "results": [
+    {
+      "suite": "split-source-workflows",
+      "scope": "split-source",
+      "total": 2,
+      "passed": true,
+      "caseIds": [
+        "active-cell-source-pane-click-immediate-edit-history-continue",
+        "active-cell-source-pane-plain-click-immediate-edit-history-continue"
+      ],
+      "resultSha256": "2e2726ccc21bdd08c998dc57b9f161387895c43cb2c017d89d414c7302623788"
+    },
+    {
+      "suite": "selection-workflows",
+      "scope": "selection",
+      "total": 3,
+      "passed": true,
+      "caseIds": [
+        "boot-open-document-direct-typing-needs-no-click",
+        "early-cell-focus-survives-boot-fallback",
+        "cell-tab-home-keeps-caret-before-next-input"
+      ],
+      "resultSha256": "b6d7e499e67927b76278d1454cd930bb6157c86df51a1ea9139bf44c924ccf61"
+    },
+    {
+      "suite": "images",
+      "scope": "saved-screenshot",
+      "total": 1,
+      "passed": true,
+      "caseIds": [
+        "saved-screenshot-immediate"
+      ],
+      "resultSha256": "b8bb5c9445a9f311e2aa534299baf8bbee0ad84622e1fe1c82b7a98371b34122"
+    }
+  ],
+  "payloadIdentitySha256": "23ff6eaf118b4c8ab4dfc55cc2603fc51e01eddb5687f35fb784f75cfc2abe6a"
+}

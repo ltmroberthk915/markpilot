@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "at": "2026-10-11T11:45:29.217Z",
+  "controls": [
+    {
+      "kind": "external-conflict",
+      "restored": true,
+      "files": [
+        {
+          "file": "shell/document-store.js",
+          "originalSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+          "mutantSha256": "493a4fd25c9933de26476d2b28913eb1a64d8936d0dab4bc7d1fdd7465d5be57",
+          "restoredSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+        }
+      ]
+    },
+    {
+      "kind": "receipt-revision",
+      "restored": true,
+      "files": [
+        {
+          "file": "renderer/host.js",
+          "originalSha256": "a82bfbb9c56c8c355976dec9ad5df6b1f8581d8524b9eab54f818261db7a97fd",
+          "mutantSha256": "2db9d3765fd25872220a7a316aea88dcb99339ed6c0a574e71030dbecad9fd63",
+          "restoredSha256": "a82bfbb9c56c8c355976dec9ad5df6b1f8581d8524b9eab54f818261db7a97fd"
+        }
+      ]
+    },
+    {
+      "kind": "window-sessions",
+      "restored": true,
+      "files": [
+        {
+          "file": "main.js",
+          "originalSha256": "22f908c6297f946ef76565c5e68d2ed53cc80078624f40cd928d784f91a1fb69",
+          "mutantSha256": "10c5a246421416dd77888a757cb0b5c2cc462e898be6bcc1b972f0c4a376adb0",
+          "restoredSha256": "22f908c6297f946ef76565c5e68d2ed53cc80078624f40cd928d784f91a1fb69"
+        },
+        {
+          "file": "preload.js",
+          "originalSha256": "941486935108d3e2fdd12011cff1fb3f13fd551b0b65b5a204d8d9c65b5b8b97",
+          "mutantSha256": "70ea6eb5a0f88e5a45b62fed93f6c14f6daad9de3a2a2e5fedfb04eb87baa824",
+          "restoredSha256": "941486935108d3e2fdd12011cff1fb3f13fd551b0b65b5a204d8d9c65b5b8b97"
+        },
+        {
+          "file": "renderer/host.js",
+          "originalSha256": "de593fcf3d92f83dbc8adc66208feb9a110854405689ae58f892e95acc6c23d3",
+          "mutantSha256": "97553e188a464b573d309ba63ba7a44db9fd27b8ea18494edcc8558f0f796e1c",
+          "restoredSha256": "de593fcf3d92f83dbc8adc66208feb9a110854405689ae58f892e95acc6c23d3"
+        }
+      ]
+    }
+  ],
+  "externalConflict": {
+    "total": 17,
+    "pass": 13,
+    "fail": 4,
+    "expectedRed": true,
+    "failed": [
+      "same-file concurrent independent drafts accept one writer and preserve the loser",
+      "external change with restored mtime and equal byte length is still detected",
+      "external modification between temporary write and rename is preserved",
+      "Save As refuses a target created after selection and retains source state"
+    ]
+  }
+}

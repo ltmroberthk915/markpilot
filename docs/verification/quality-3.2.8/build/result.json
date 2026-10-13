@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "at": "2026-10-11T18:34:35.084Z",
+  "node": "v24.14.1",
+  "sourceCommit": "d360a37d6e50986e1f64371a315e8bb5ba10d5ca",
+  "versions": {
+    "@codemirror/legacy-modes": "6.5.5",
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/lang-markdown": "6.5.2",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/search": "6.7.2",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.14",
+    "@lezer/common": "1.5.3",
+    "@lezer/highlight": "1.2.5",
+    "@lezer/markdown": "1.8.0",
+    "codemirror": "6.0.2",
+    "esbuild": "0.28.2",
+    "katex": "0.19.0"
+  },
+  "built": {
+    "sha256": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+    "bytes": 1306915
+  },
+  "checkedIn": {
+    "sha256": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+    "bytes": 1306915
+  },
+  "worker": {
+    "built": {
+      "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+      "bytes": 63411
+    },
+    "checkedIn": {
+      "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+      "bytes": 63411
+    }
+  },
+  "matches": true
+}

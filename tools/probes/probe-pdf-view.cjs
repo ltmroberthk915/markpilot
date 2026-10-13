@@ -5,7 +5,7 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
-const { chromium } = require('C:/Windows/System32/node_modules/playwright-core');
+const { chromium } = require('../quality/dependencies.cjs').playwright();
 const PDF = process.argv[2];
 const OUT = process.argv[3] || path.join(path.dirname(PDF), 'view.png');
 (async () => {

@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "version": "3.2.11",
+  "at": "2026-10-11T23:19:17.907Z",
+  "frameBytes": 3315994,
+  "sourceCases": 322,
+  "negativeControlKinds": 5,
+  "deliveryBoundaryCases": {
+    "portable": 20,
+    "isolated": 50,
+    "installed": 50
+  },
+  "openedReviewFrames": 102,
+  "installed": true,
+  "pushed": false,
+  "released": false,
+  "invalidRunsExcluded": [
+    "query insertText without SearchPanel keyup commit: entry unconfirmed; replaced by actual typed query",
+    "quoted Up Home expectation before hidden prefix: oracle calibrated to actual body boundary"
+  ],
+  "fixtureScope": "Synthetic fixtures only. Personal documents, profiles, original clipboard and large intermediate outputs remain private."
+}

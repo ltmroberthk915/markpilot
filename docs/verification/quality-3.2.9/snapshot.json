@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "version": "3.2.9",
+  "at": "2026-10-11T20:22:01.039Z",
+  "frameBytes": 1062977,
+  "sourceCases": 255,
+  "negativeControlKinds": 3,
+  "deliveryBoundaryCases": {
+    "portable": 30,
+    "isolated": 30,
+    "installed": 33
+  },
+  "installed": true,
+  "pushed": false,
+  "released": false,
+  "invalidRunsExcluded": [
+    "history-source-green: empty failed source runtime startup",
+    "Control+Shift+u alias: does not represent the actual custom Shift+U key",
+    "initial worker bitmap URL arm: no editor input"
+  ],
+  "duplicateFrames": "Mixed and wrapper render identically; only mixed selected."
+}

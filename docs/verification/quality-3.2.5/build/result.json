@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "at": "2026-10-11T10:23:21.169Z",
+  "node": "v24.14.1",
+  "sourceCommit": "f10e74a525440fd27ec88066a997e9400f7c89ab",
+  "versions": {
+    "@codemirror/legacy-modes": "6.5.5",
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/lang-markdown": "6.5.2",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/search": "6.7.2",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.14",
+    "@lezer/common": "1.5.3",
+    "@lezer/highlight": "1.2.5",
+    "@lezer/markdown": "1.8.0",
+    "codemirror": "6.0.2",
+    "esbuild": "0.28.2",
+    "katex": "0.19.0"
+  },
+  "built": {
+    "sha256": "ac61b3ad79774f4272e7383801cd37dba68c98891c8a951ffa4eef660dc00c8f",
+    "bytes": 1292936
+  },
+  "checkedIn": {
+    "sha256": "506a019995027754e35a4ccc53c2400097a65021f812b4401a6c092407d1547c",
+    "bytes": 1292120
+  },
+  "matches": false
+}

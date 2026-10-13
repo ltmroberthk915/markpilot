@@ -13,7 +13,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn, execFileSync, execSync } = require('node:child_process');
-const { chromium } = require('C:/Windows/System32/node_modules/playwright-core');
+const { chromium } = require('../quality/dependencies.cjs').playwright();
 const RULER = require(path.join(__dirname, '_probe-common.cjs'));
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

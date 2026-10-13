@@ -51,3 +51,10 @@
 **/.zcode-tmp/
 /Typora-Editor-App/.perf/acceptance/
 /Typora-Editor-App/.perf/*.online.md
+
+# Portable quality tools: dependencies and private audit output
+node_modules/
+/.mp-verify/
+
+# Local packaged products and upgrade delivery copies
+/dist/

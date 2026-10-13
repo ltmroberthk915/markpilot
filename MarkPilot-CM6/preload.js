@@ -9,9 +9,12 @@ contextBridge.exposeInMainWorld('mpHost', {
   docReady: () => ipcRenderer.invoke('doc:ready'),
   open: () => ipcRenderer.invoke('file:open'),
   openPath: (p) => ipcRenderer.invoke('file:openPath', p),
-  save: (filePath, text) => ipcRenderer.invoke('file:save', { filePath, text }),
+  save: (filePath, text, metadata = {}) => ipcRenderer.invoke('file:save', { ...metadata, filePath, text }),
+  __save: () => ipcRenderer.invoke('file:requestSave'),
   saveAs: () => ipcRenderer.invoke('file:saveAs'),
-  reload: () => ipcRenderer.invoke('file:reload'),   // 「重新加载文件内容」：壳侧重读磁盘（不 pushRecent；脏文档先确认，默认取消）
+  reload: (opts = {}) => ipcRenderer.invoke('file:reload', opts),
+  reloadView: () => ipcRenderer.invoke('view:reload'),
+  cancelCloseSave: () => ipcRenderer.invoke('file:cancelCloseSave'),
   stat: (p) => ipcRenderer.invoke('file:stat', p),
   exists: (p) => ipcRenderer.invoke('file:exists', p),
   // 读本地文件为 base64（导出公式排版内联 KaTeX 字体用；本地资源走宿主通道，不走 URL 请求）
@@ -42,6 +45,7 @@ contextBridge.exposeInMainWorld('mpHost', {
   debugNativeTheme: () => ipcRenderer.invoke('debug:native-theme'),
   /* 【文件多开】在新窗口里打开一个文件（不传则用当前文件）。 */
   openInNewWindow: (filePath) => ipcRenderer.invoke('win:openInNewWindow', filePath),
+  openDocument: (filePath) => ipcRenderer.invoke('file:openDocument', filePath),
   settingGet: (key) => ipcRenderer.invoke('setting:get', key),
   settingSet: (key, value) => ipcRenderer.invoke('setting:set', { key, value }),
   /* 图片右键：图片进剪贴板 / 另存为（都在主进程做，渲染侧不碰文件系统）。 */
@@ -51,14 +55,15 @@ contextBridge.exposeInMainWorld('mpHost', {
   saveImageAs: (payload) => ipcRenderer.invoke('image:saveAs', payload || {}),
   /* 右键菜单的「粘贴」：交给主进程执行（渲染进程的 execCommand('paste') 在 Electron 里不可靠）。 */
   paste: () => ipcRenderer.invoke('edit:paste'),
+  history: (cmd) => ipcRenderer.invoke('edit:history', cmd),
   themeGet: () => ipcRenderer.invoke('theme:get'),
   themeSet: (mode) => ipcRenderer.invoke('theme:set', mode),
   /* Typora 社区主题：选一个 .css（默认落在 Typora 的主题目录）⇒ 读回全文交给渲染侧改写与注入。
      读文件必须走壳层（渲染进程零文件权限）；主题里的相对 url() 由渲染侧的改写层中和掉，不会去打 404。 */
   pickThemeCss: () => ipcRenderer.invoke('theme:pickCss'),
-  docDirty: (dirty) => ipcRenderer.invoke('doc:dirty', dirty),
-  docPath: (filePath) => ipcRenderer.invoke('doc:path', filePath),
-  docSaved: (filePath) => ipcRenderer.invoke('doc:saved', { filePath }),
+  docDirty: (dirty, metadata) => ipcRenderer.invoke('doc:dirty', metadata ? { ...metadata, dirty } : dirty),
+  docPath: (filePath, metadata = {}) => ipcRenderer.invoke('doc:path', filePath, metadata),
+  docSaved: (filePath, receipt = {}) => ipcRenderer.invoke('doc:saved', { ...receipt, filePath }),
   outsideChange: (filePath) => ipcRenderer.invoke('doc:outside-change', { filePath }),
   // 当前文档路径（导出为文件夹时用来解析相对图片路径）
   docInfo: () => ipcRenderer.invoke('doc:info'),
@@ -99,6 +104,7 @@ contextBridge.exposeInMainWorld('mpHost', {
   // 全屏切换（工具栏「全屏」按钮）：壳层负责，返回新状态供渲染侧提示
   toggleFullscreen: () => ipcRenderer.invoke('win:fullscreen'),
   onMenu: (cb) => ipcRenderer.on('menu', (_e, cmd) => cb(cmd)),
+  onSetting: (cb) => ipcRenderer.on('setting', (_e, payload) => cb(payload)),
   onDoc: (cb) => ipcRenderer.on('doc', (_e, payload) => cb(payload)),
   onTheme: (cb) => ipcRenderer.on('theme', (_e, payload) => cb(payload)),
 });

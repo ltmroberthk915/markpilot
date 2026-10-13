@@ -1,0 +1,4280 @@
+{
+  "schema": 1,
+  "suite": "split-source-workflows",
+  "version": "3.2.13",
+  "passed": true,
+  "actualCaseCount": 2,
+  "sourceReportSha256": "cc9dd54c74176557b86a7a877fc62c78f821b7d93f138b09f86a5e39b04ef810",
+  "artifact": {
+    "sourceMode": false,
+    "asarSha256": "08a6de1a9b6be8a6b8033ec5c8dbf5b6fd3f8277a674ed4c35bcc6b58dad4e51",
+    "exeSha256": "d300992b1003765f2f64417269c124f0c7b14af65ce415ad2488d166e6f63e13",
+    "runtimeExecutableSha256": "d300992b1003765f2f64417269c124f0c7b14af65ce415ad2488d166e6f63e13",
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "be105040e75e3707d9b5d978eaffa6d17151004e0f46fac4cc87bab829ec3f33"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "5d58d02e672705f4bb5c1475aa8be667b04a2cb9cb4111d285b9efead54a1521"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "4517f08c0f305d08c361c2079157e587b5a9e8097dc161ab748c26960a8c40f5"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "5c5ad94957ce94902176664182afbb1d578c42bf2347119bbbb58739c64abcb8"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": [],
+    "cleanupErrors": [],
+    "errors": []
+  },
+  "clipboard": {
+    "touched": false
+  },
+  "cases": [
+    {
+      "id": "active-cell-source-pane-click-immediate-edit-history-continue",
+      "status": "pass",
+      "stage": "complete",
+      "productReached": true,
+      "target": "table",
+      "fixtureSha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3",
+      "detail": {
+        "initial": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+        "edited": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+        "final": "Before\n\n|H|K|\n|---|---|\n|a\\|R1b|KEEP|\n\nAfter\n",
+        "target": "table",
+        "sourcePoint": 28,
+        "legalOwners": [
+          "cm",
+          "cell"
+        ],
+        "clipboardTouched": false,
+        "finalSha256": "c883766462616b021420fcd033ea48923d0a858608bf37f260b7c39493677b29"
+      },
+      "inputBoundary": {
+        "down": {
+          "type": "mousedown",
+          "ctrl": false,
+          "shift": false,
+          "trusted": true,
+          "inMaster": false,
+          "inCell": false,
+          "inSlave": true,
+          "sourceHit": 28,
+          "button": 0,
+          "buttons": 1,
+          "x": 646,
+          "y": 135,
+          "defaultPrevented": false,
+          "defaultPreventedAfter": true,
+          "bubbleSeen": true,
+          "before": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "sourceSelection": {
+              "anchor": 28,
+              "head": 28
+            },
+            "cmFocus": false,
+            "cellFocus": true,
+            "owner": "cell",
+            "cellText": "a|b",
+            "domSelection": {
+              "anchor": 2,
+              "head": 2
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "mp-cell-overlay-text"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+            }
+          },
+          "after": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "sourceSelection": {
+              "anchor": 28,
+              "head": 28
+            },
+            "cmFocus": false,
+            "cellFocus": true,
+            "owner": "cell",
+            "cellText": "a|b",
+            "domSelection": {
+              "anchor": 2,
+              "head": 2
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "mp-cell-overlay-text"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+            }
+          }
+        },
+        "up": {
+          "type": "mouseup",
+          "ctrl": false,
+          "shift": false,
+          "trusted": true,
+          "inMaster": false,
+          "inCell": false,
+          "inSlave": true,
+          "sourceHit": 28,
+          "button": 0,
+          "buttons": 0,
+          "x": 646,
+          "y": 135,
+          "defaultPrevented": false,
+          "defaultPreventedAfter": false,
+          "bubbleSeen": true,
+          "before": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "sourceSelection": {
+              "anchor": 28,
+              "head": 28
+            },
+            "cmFocus": false,
+            "cellFocus": true,
+            "owner": "cell",
+            "cellText": "a|b",
+            "domSelection": {
+              "anchor": 2,
+              "head": 2
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "mp-cell-overlay-text"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+            }
+          },
+          "after": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "sourceSelection": {
+              "anchor": 28,
+              "head": 28
+            },
+            "cmFocus": false,
+            "cellFocus": true,
+            "owner": "cell",
+            "cellText": "a|b",
+            "domSelection": {
+              "anchor": 2,
+              "head": 2
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "mp-cell-overlay-text"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+            }
+          }
+        },
+        "beforeinput": {
+          "type": "beforeinput",
+          "ctrl": false,
+          "shift": false,
+          "data": "R",
+          "inputType": "insertText",
+          "trusted": true,
+          "inMaster": false,
+          "inCell": true,
+          "inSlave": false,
+          "sourceHit": null,
+          "defaultPrevented": false,
+          "defaultPreventedAfter": false,
+          "bubbleSeen": true,
+          "before": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "sourceSelection": {
+              "anchor": 28,
+              "head": 28
+            },
+            "cmFocus": false,
+            "cellFocus": true,
+            "owner": "cell",
+            "cellText": "a|b",
+            "domSelection": {
+              "anchor": 2,
+              "head": 2
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "mp-cell-overlay-text"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+            }
+          },
+          "after": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "sourceSelection": {
+              "anchor": 28,
+              "head": 28
+            },
+            "cmFocus": false,
+            "cellFocus": true,
+            "owner": "cell",
+            "cellText": "a|b",
+            "domSelection": {
+              "anchor": 2,
+              "head": 2
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "mp-cell-overlay-text"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+            }
+          }
+        },
+        "input": {
+          "type": "input",
+          "ctrl": false,
+          "shift": false,
+          "data": "R",
+          "inputType": "insertText",
+          "trusted": true,
+          "inMaster": false,
+          "inCell": true,
+          "inSlave": false,
+          "sourceHit": null,
+          "defaultPrevented": false,
+          "defaultPreventedAfter": false,
+          "bubbleSeen": true,
+          "before": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "sourceSelection": {
+              "anchor": 28,
+              "head": 28
+            },
+            "cmFocus": false,
+            "cellFocus": true,
+            "owner": "cell",
+            "cellText": "a|Rb",
+            "domSelection": {
+              "anchor": 3,
+              "head": 3
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "mp-cell-overlay-text"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+            }
+          },
+          "after": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+            "sourceSelection": {
+              "anchor": 29,
+              "head": 29
+            },
+            "cmFocus": false,
+            "cellFocus": true,
+            "owner": "cell",
+            "cellText": "a|Rb",
+            "domSelection": {
+              "anchor": 3,
+              "head": 3
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "mp-cell-overlay-text"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+            }
+          }
+        }
+      },
+      "trace": [
+        {
+          "name": "03-active-cell",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 28,
+            "head": 28
+          },
+          "cmFocus": false,
+          "cellFocus": true,
+          "owner": "cell",
+          "cellText": "a|b",
+          "domSelection": {
+            "anchor": 2,
+            "head": 2
+          },
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "pane": {
+            "open": true,
+            "readOnly": true,
+            "sameText": true,
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+          },
+          "disk": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+          "diskSha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3"
+        },
+        {
+          "name": "04-immediate-R",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 29,
+            "head": 29
+          },
+          "cmFocus": false,
+          "cellFocus": true,
+          "owner": "cell",
+          "cellText": "a|Rb",
+          "domSelection": {
+            "anchor": 3,
+            "head": 3
+          },
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "pane": {
+            "open": true,
+            "readOnly": true,
+            "sameText": true,
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+          },
+          "disk": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+          "diskSha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3"
+        },
+        {
+          "name": "05-undo",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 28,
+            "head": 28
+          },
+          "cmFocus": false,
+          "cellFocus": true,
+          "owner": "cell",
+          "cellText": "a|b",
+          "domSelection": {
+            "anchor": 2,
+            "head": 2
+          },
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "pane": {
+            "open": true,
+            "readOnly": true,
+            "sameText": true,
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+          },
+          "disk": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+          "diskSha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3"
+        },
+        {
+          "name": "07-continued-one",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|R1b|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 30,
+            "head": 30
+          },
+          "cmFocus": false,
+          "cellFocus": true,
+          "owner": "cell",
+          "cellText": "a|R1b",
+          "domSelection": {
+            "anchor": 4,
+            "head": 4
+          },
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "pane": {
+            "open": true,
+            "readOnly": true,
+            "sameText": true,
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|R1b|KEEP|\n\nAfter\n"
+          },
+          "disk": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+          "diskSha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3"
+        },
+        {
+          "name": "06-passive-redo-boundary",
+          "state": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+            "sourceSelection": {
+              "anchor": 29,
+              "head": 29
+            },
+            "cmFocus": false,
+            "cellFocus": true,
+            "owner": "cell",
+            "cellText": "a|Rb",
+            "domSelection": {
+              "anchor": 3,
+              "head": 3
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "mp-cell-overlay-text"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+            }
+          }
+        },
+        {
+          "name": "08-saved",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|R1b|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 30,
+            "head": 30
+          },
+          "cmFocus": false,
+          "cellFocus": true,
+          "owner": "cell",
+          "cellText": "a|R1b",
+          "domSelection": {
+            "anchor": 4,
+            "head": 4
+          },
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "pane": {
+            "open": true,
+            "readOnly": true,
+            "sameText": true,
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|R1b|KEEP|\n\nAfter\n"
+          },
+          "disk": "Before\n\n|H|K|\n|---|---|\n|a\\|R1b|KEEP|\n\nAfter\n",
+          "diskSha256": "c883766462616b021420fcd033ea48923d0a858608bf37f260b7c39493677b29",
+          "events": [
+            {
+              "type": "mousedown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "button": 0,
+              "buttons": 1,
+              "x": 929,
+              "y": 22,
+              "defaultPrevented": false,
+              "bubbleSeen": false,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": false,
+                  "sameText": false
+                }
+              }
+            },
+            {
+              "type": "mouseup",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "button": 0,
+              "buttons": 0,
+              "x": 929,
+              "y": 22,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "click",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "button": 0,
+              "buttons": 0,
+              "x": 929,
+              "y": 22,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "mousedown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "button": 0,
+              "buttons": 1,
+              "x": 155,
+              "y": 165,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "focusout",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": false,
+                "cellFocus": false,
+                "owner": "other",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": false,
+                "cellFocus": false,
+                "owner": "other",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "focusin",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "mouseup",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "button": 0,
+              "buttons": 0,
+              "x": 155,
+              "y": 165,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "mousedown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": false,
+              "inSlave": true,
+              "sourceHit": 28,
+              "button": 0,
+              "buttons": 1,
+              "x": 646,
+              "y": 135,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "focusout",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": false,
+                "owner": "other",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": false,
+                "owner": "other",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "focusin",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "mouseup",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": false,
+              "inSlave": true,
+              "sourceHit": 28,
+              "button": 0,
+              "buttons": 0,
+              "x": 646,
+              "y": 135,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "click",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": false,
+              "inSlave": true,
+              "sourceHit": 28,
+              "button": 0,
+              "buttons": 0,
+              "x": 646,
+              "y": 135,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "shift": false,
+              "data": "R",
+              "inputType": "insertText",
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "shift": false,
+              "data": "R",
+              "inputType": "insertText",
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|Rb",
+                "domSelection": {
+                  "anchor": 3,
+                  "head": 3
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 29,
+                  "head": 29
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|Rb",
+                "domSelection": {
+                  "anchor": 3,
+                  "head": 3
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 29,
+                  "head": 29
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|Rb",
+                "domSelection": {
+                  "anchor": 3,
+                  "head": 3
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 29,
+                  "head": 29
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|Rb",
+                "domSelection": {
+                  "anchor": 3,
+                  "head": 3
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 29,
+                  "head": 29
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|Rb",
+                "domSelection": {
+                  "anchor": 3,
+                  "head": 3
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 29,
+                  "head": 29
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|Rb",
+                "domSelection": {
+                  "anchor": 3,
+                  "head": 3
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 29,
+                  "head": 29
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|Rb",
+                "domSelection": {
+                  "anchor": 3,
+                  "head": 3
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 29,
+                  "head": 29
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|Rb",
+                "domSelection": {
+                  "anchor": 3,
+                  "head": 3
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 29,
+                  "head": 29
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|Rb",
+                "domSelection": {
+                  "anchor": 3,
+                  "head": 3
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 29,
+                  "head": 29
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|Rb",
+                "domSelection": {
+                  "anchor": 3,
+                  "head": 3
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "keydown",
+              "key": "1",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 29,
+                  "head": 29
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|Rb",
+                "domSelection": {
+                  "anchor": 3,
+                  "head": 3
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 29,
+                  "head": 29
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|Rb",
+                "domSelection": {
+                  "anchor": 3,
+                  "head": 3
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "shift": false,
+              "data": "1",
+              "inputType": "insertText",
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 29,
+                  "head": 29
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|Rb",
+                "domSelection": {
+                  "anchor": 3,
+                  "head": 3
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 29,
+                  "head": 29
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|Rb",
+                "domSelection": {
+                  "anchor": 3,
+                  "head": 3
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "shift": false,
+              "data": "1",
+              "inputType": "insertText",
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 29,
+                  "head": 29
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|R1b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|Rb|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|R1b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|R1b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|R1b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "keyup",
+              "key": "1",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|R1b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|R1b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|R1b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|R1b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|R1b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|R1b|KEEP|\n\nAfter\n"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "active-cell-source-pane-plain-click-immediate-edit-history-continue",
+      "status": "pass",
+      "stage": "complete",
+      "productReached": true,
+      "target": "plain",
+      "fixtureSha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3",
+      "detail": {
+        "initial": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+        "edited": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+        "final": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftR1er\n",
+        "target": "plain",
+        "sourcePoint": 40,
+        "legalOwners": [
+          "cm"
+        ],
+        "clipboardTouched": false,
+        "finalSha256": "6d7c726d1d433fc7bfa1cfaca817979ad886fb1c03e14edcc1fa95ae458dbc98"
+      },
+      "inputBoundary": {
+        "down": {
+          "type": "mousedown",
+          "ctrl": false,
+          "shift": false,
+          "trusted": true,
+          "inMaster": false,
+          "inCell": false,
+          "inSlave": true,
+          "sourceHit": 40,
+          "button": 0,
+          "buttons": 1,
+          "x": 638,
+          "y": 181,
+          "defaultPrevented": false,
+          "defaultPreventedAfter": true,
+          "bubbleSeen": true,
+          "before": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "sourceSelection": {
+              "anchor": 28,
+              "head": 28
+            },
+            "cmFocus": false,
+            "cellFocus": true,
+            "owner": "cell",
+            "cellText": "a|b",
+            "domSelection": {
+              "anchor": 2,
+              "head": 2
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "mp-cell-overlay-text"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+            }
+          },
+          "after": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "sourceSelection": {
+              "anchor": 40,
+              "head": 40
+            },
+            "cmFocus": true,
+            "cellFocus": false,
+            "owner": "cm",
+            "cellText": "a|b",
+            "domSelection": {
+              "anchor": null,
+              "head": null
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+            }
+          }
+        },
+        "up": {
+          "type": "mouseup",
+          "ctrl": false,
+          "shift": false,
+          "trusted": true,
+          "inMaster": false,
+          "inCell": false,
+          "inSlave": true,
+          "sourceHit": 40,
+          "button": 0,
+          "buttons": 0,
+          "x": 638,
+          "y": 181,
+          "defaultPrevented": false,
+          "defaultPreventedAfter": false,
+          "bubbleSeen": true,
+          "before": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "sourceSelection": {
+              "anchor": 40,
+              "head": 40
+            },
+            "cmFocus": true,
+            "cellFocus": false,
+            "owner": "cm",
+            "cellText": "a|b",
+            "domSelection": {
+              "anchor": null,
+              "head": null
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+            }
+          },
+          "after": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "sourceSelection": {
+              "anchor": 40,
+              "head": 40
+            },
+            "cmFocus": true,
+            "cellFocus": false,
+            "owner": "cm",
+            "cellText": "a|b",
+            "domSelection": {
+              "anchor": null,
+              "head": null
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+            }
+          }
+        },
+        "beforeinput": {
+          "type": "beforeinput",
+          "ctrl": false,
+          "shift": false,
+          "data": "R",
+          "inputType": "insertText",
+          "trusted": true,
+          "inMaster": true,
+          "inCell": false,
+          "inSlave": false,
+          "sourceHit": null,
+          "defaultPrevented": false,
+          "defaultPreventedAfter": false,
+          "bubbleSeen": true,
+          "before": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "sourceSelection": {
+              "anchor": 40,
+              "head": 40
+            },
+            "cmFocus": true,
+            "cellFocus": false,
+            "owner": "cm",
+            "cellText": "a|b",
+            "domSelection": {
+              "anchor": null,
+              "head": null
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+            }
+          },
+          "after": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "sourceSelection": {
+              "anchor": 40,
+              "head": 40
+            },
+            "cmFocus": true,
+            "cellFocus": false,
+            "owner": "cm",
+            "cellText": "a|b",
+            "domSelection": {
+              "anchor": null,
+              "head": null
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+            }
+          }
+        },
+        "input": {
+          "type": "input",
+          "ctrl": false,
+          "shift": false,
+          "data": "R",
+          "inputType": "insertText",
+          "trusted": true,
+          "inMaster": true,
+          "inCell": false,
+          "inSlave": false,
+          "sourceHit": null,
+          "defaultPrevented": false,
+          "defaultPreventedAfter": false,
+          "bubbleSeen": true,
+          "before": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "sourceSelection": {
+              "anchor": 40,
+              "head": 40
+            },
+            "cmFocus": true,
+            "cellFocus": false,
+            "owner": "cm",
+            "cellText": "a|b",
+            "domSelection": {
+              "anchor": null,
+              "head": null
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+            }
+          },
+          "after": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+            "sourceSelection": {
+              "anchor": 41,
+              "head": 41
+            },
+            "cmFocus": true,
+            "cellFocus": false,
+            "owner": "cm",
+            "cellText": "a|b",
+            "domSelection": {
+              "anchor": null,
+              "head": null
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+            }
+          }
+        }
+      },
+      "trace": [
+        {
+          "name": "03-active-cell",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 28,
+            "head": 28
+          },
+          "cmFocus": false,
+          "cellFocus": true,
+          "owner": "cell",
+          "cellText": "a|b",
+          "domSelection": {
+            "anchor": 2,
+            "head": 2
+          },
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "pane": {
+            "open": true,
+            "readOnly": true,
+            "sameText": true,
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+          },
+          "disk": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+          "diskSha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3"
+        },
+        {
+          "name": "04-immediate-R",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+          "sourceSelection": {
+            "anchor": 41,
+            "head": 41
+          },
+          "cmFocus": true,
+          "cellFocus": false,
+          "owner": "cm",
+          "cellText": "a|b",
+          "domSelection": {
+            "anchor": null,
+            "head": null
+          },
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "pane": {
+            "open": true,
+            "readOnly": true,
+            "sameText": true,
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+          },
+          "disk": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+          "diskSha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3"
+        },
+        {
+          "name": "05-undo",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 40,
+            "head": 40
+          },
+          "cmFocus": true,
+          "cellFocus": false,
+          "owner": "cm",
+          "cellText": "a|b",
+          "domSelection": {
+            "anchor": null,
+            "head": null
+          },
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "pane": {
+            "open": true,
+            "readOnly": true,
+            "sameText": true,
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+          },
+          "disk": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+          "diskSha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3"
+        },
+        {
+          "name": "07-continued-one",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftR1er\n",
+          "sourceSelection": {
+            "anchor": 42,
+            "head": 42
+          },
+          "cmFocus": true,
+          "cellFocus": false,
+          "owner": "cm",
+          "cellText": "a|b",
+          "domSelection": {
+            "anchor": null,
+            "head": null
+          },
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "pane": {
+            "open": true,
+            "readOnly": true,
+            "sameText": true,
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftR1er\n"
+          },
+          "disk": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+          "diskSha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3"
+        },
+        {
+          "name": "06-passive-redo-boundary",
+          "state": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+            "sourceSelection": {
+              "anchor": 41,
+              "head": 41
+            },
+            "cmFocus": true,
+            "cellFocus": false,
+            "owner": "cm",
+            "cellText": "a|b",
+            "domSelection": {
+              "anchor": null,
+              "head": null
+            },
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "pane": {
+              "open": true,
+              "readOnly": true,
+              "sameText": true,
+              "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+            }
+          }
+        },
+        {
+          "name": "08-saved",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftR1er\n",
+          "sourceSelection": {
+            "anchor": 42,
+            "head": 42
+          },
+          "cmFocus": true,
+          "cellFocus": false,
+          "owner": "cm",
+          "cellText": "a|b",
+          "domSelection": {
+            "anchor": null,
+            "head": null
+          },
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "pane": {
+            "open": true,
+            "readOnly": true,
+            "sameText": true,
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftR1er\n"
+          },
+          "disk": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftR1er\n",
+          "diskSha256": "6d7c726d1d433fc7bfa1cfaca817979ad886fb1c03e14edcc1fa95ae458dbc98",
+          "events": [
+            {
+              "type": "mousedown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "button": 0,
+              "buttons": 1,
+              "x": 929,
+              "y": 22,
+              "defaultPrevented": false,
+              "bubbleSeen": false,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": false,
+                  "sameText": false
+                }
+              }
+            },
+            {
+              "type": "mouseup",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "button": 0,
+              "buttons": 0,
+              "x": 929,
+              "y": 22,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "click",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "button": 0,
+              "buttons": 0,
+              "x": 929,
+              "y": 22,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "mousedown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "button": 0,
+              "buttons": 1,
+              "x": 155,
+              "y": 165,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "focusout",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": false,
+                "cellFocus": false,
+                "owner": "other",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": false,
+                "cellFocus": false,
+                "owner": "other",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "focusin",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "mouseup",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "button": 0,
+              "buttons": 0,
+              "x": 155,
+              "y": 165,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "mousedown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": false,
+              "inSlave": true,
+              "sourceHit": 40,
+              "button": 0,
+              "buttons": 1,
+              "x": 638,
+              "y": 181,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": true,
+                "owner": "cell",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "focusout",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": true,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": false,
+                "owner": "other",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "cmFocus": false,
+                "cellFocus": false,
+                "owner": "other",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "focusin",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "mouseup",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": false,
+              "inSlave": true,
+              "sourceHit": 40,
+              "button": 0,
+              "buttons": 0,
+              "x": 638,
+              "y": 181,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "click",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": false,
+              "inCell": false,
+              "inSlave": true,
+              "sourceHit": 40,
+              "button": 0,
+              "buttons": 0,
+              "x": 638,
+              "y": 181,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "shift": false,
+              "data": "R",
+              "inputType": "insertText",
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "shift": false,
+              "data": "R",
+              "inputType": "insertText",
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+                "sourceSelection": {
+                  "anchor": 41,
+                  "head": 41
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+                }
+              }
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+                "sourceSelection": {
+                  "anchor": 41,
+                  "head": 41
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+                "sourceSelection": {
+                  "anchor": 41,
+                  "head": 41
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+                }
+              }
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+                "sourceSelection": {
+                  "anchor": 41,
+                  "head": 41
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              }
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 40,
+                  "head": 40
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+                "sourceSelection": {
+                  "anchor": 41,
+                  "head": 41
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+                }
+              }
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+                "sourceSelection": {
+                  "anchor": 41,
+                  "head": 41
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+                "sourceSelection": {
+                  "anchor": 41,
+                  "head": 41
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+                }
+              }
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+                "sourceSelection": {
+                  "anchor": 41,
+                  "head": 41
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+                "sourceSelection": {
+                  "anchor": 41,
+                  "head": 41
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+                }
+              }
+            },
+            {
+              "type": "keydown",
+              "key": "1",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+                "sourceSelection": {
+                  "anchor": 41,
+                  "head": 41
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+                "sourceSelection": {
+                  "anchor": 41,
+                  "head": 41
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+                }
+              }
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "shift": false,
+              "data": "1",
+              "inputType": "insertText",
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+                "sourceSelection": {
+                  "anchor": 41,
+                  "head": 41
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+                "sourceSelection": {
+                  "anchor": 41,
+                  "head": 41
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+                }
+              }
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "shift": false,
+              "data": "1",
+              "inputType": "insertText",
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n",
+                "sourceSelection": {
+                  "anchor": 41,
+                  "head": 41
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftRer\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftR1er\n",
+                "sourceSelection": {
+                  "anchor": 42,
+                  "head": 42
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftR1er\n"
+                }
+              }
+            },
+            {
+              "type": "keyup",
+              "key": "1",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inMaster": true,
+              "inCell": false,
+              "inSlave": false,
+              "sourceHit": null,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftR1er\n",
+                "sourceSelection": {
+                  "anchor": 42,
+                  "head": 42
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftR1er\n"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftR1er\n",
+                "sourceSelection": {
+                  "anchor": 42,
+                  "head": 42
+                },
+                "cmFocus": true,
+                "cellFocus": false,
+                "owner": "cm",
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                },
+                "pane": {
+                  "open": true,
+                  "readOnly": true,
+                  "sameText": true,
+                  "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAftR1er\n"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scope": "Only explicit synthetic split-source fixtures. Trusted actual inputs/history/owner/disk trace preserved; these images have not received independent visual approval."
+}

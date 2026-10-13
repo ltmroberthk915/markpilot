@@ -1,0 +1,543 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T09:48:04.626Z",
+  "seed": 325,
+  "cases": [
+    {
+      "id": "startup-exact-bytes-and-focus",
+      "status": "pass",
+      "ms": 2,
+      "detail": {
+        "selection": {
+          "anchor": 0,
+          "head": 0
+        },
+        "focus": true
+      }
+    },
+    {
+      "id": "real-unicode-input-autosave",
+      "status": "pass",
+      "ms": 644,
+      "detail": {
+        "characters": 43,
+        "diskSha256": "45feb1a8f50f1bc7c75a7f1f849f9a7751f9c45a630f93e061d030ed33d14d3b"
+      }
+    },
+    {
+      "id": "format-bold-typing-and-toggle",
+      "status": "pass",
+      "ms": 202,
+      "detail": {
+        "text": "词体",
+        "selection": {
+          "anchor": 0,
+          "head": 0
+        }
+      }
+    },
+    {
+      "id": "format-italic-typing-and-toggle",
+      "status": "pass",
+      "ms": 199,
+      "detail": {
+        "text": "词体",
+        "selection": {
+          "anchor": 0,
+          "head": 0
+        }
+      }
+    },
+    {
+      "id": "format-underline-typing-and-toggle",
+      "status": "fail",
+      "ms": 158,
+      "error": "immediate empty toggle removes markers\n\n'>' !== ''\n"
+    },
+    {
+      "id": "format-strike-typing-and-toggle",
+      "status": "pass",
+      "ms": 232,
+      "detail": {
+        "text": "词体",
+        "selection": {
+          "anchor": 0,
+          "head": 0
+        }
+      }
+    },
+    {
+      "id": "format-code-typing-and-toggle",
+      "status": "pass",
+      "ms": 202,
+      "detail": {
+        "text": "词体",
+        "selection": {
+          "anchor": 0,
+          "head": 0
+        }
+      }
+    },
+    {
+      "id": "format-selection-undo-redo",
+      "status": "pass",
+      "ms": 173
+    },
+    {
+      "id": "plain-input-model-fixed-seed",
+      "status": "pass",
+      "ms": 638,
+      "detail": {
+        "seed": 325,
+        "operations": [
+          "甲",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a"
+        ],
+        "characters": 35
+      }
+    },
+    {
+      "id": "markdown-projection-and-source-fidelity",
+      "status": "pass",
+      "ms": 618,
+      "detail": {
+        "underline": [
+          {
+            "text": "下划线",
+            "style": "underline"
+          }
+        ],
+        "math": 1
+      }
+    },
+    {
+      "id": "mermaid-render-and-content-update",
+      "status": "pass",
+      "ms": 2611,
+      "detail": {
+        "svg": true,
+        "updated": true
+      }
+    },
+    {
+      "id": "task-list-widget-after-offset-shift",
+      "status": "pass",
+      "ms": 228,
+      "detail": {
+        "text": "前缀\n前文\n- [x] task\n后文\n"
+      }
+    },
+    {
+      "id": "mouse-drag-selection-and-shift-key-extension",
+      "status": "pass",
+      "ms": 367,
+      "detail": {
+        "before": {
+          "anchor": 1,
+          "head": 6
+        },
+        "after": {
+          "anchor": 1,
+          "head": 7
+        }
+      }
+    },
+    {
+      "id": "save-as-real-menu-and-disk",
+      "status": "pass",
+      "ms": 980,
+      "detail": {
+        "file": "mp-quality-save-as.md",
+        "bytes": 22
+      }
+    },
+    {
+      "id": "secondary-window-eol-and-session-isolation",
+      "status": "pass",
+      "ms": 1979,
+      "detail": {
+        "primary": "mp-quality-save-as.md",
+        "secondary": "mp-quality-b.md"
+      }
+    },
+    {
+      "id": "large-document-real-input-latency",
+      "status": "pass",
+      "ms": 3557,
+      "detail": [
+        {
+          "lines": 1000,
+          "characters": 33890,
+          "p50Ms": 17,
+          "p95Ms": 18,
+          "samples": 30,
+          "metric": "CDP input through next renderer animation frame; excludes whole-document serialization",
+          "rawMs": [
+            13.766500000001543,
+            15.361100000000079,
+            15.416000000001077,
+            15.559500000001208,
+            15.745100000000093,
+            16.138300000000527,
+            16.225899999999456,
+            16.269000000000233,
+            16.402499999998327,
+            16.50669999999991,
+            16.527200000000448,
+            16.530699999999342,
+            16.536200000000463,
+            16.54609999999957,
+            16.549400000001697,
+            16.654700000000958,
+            16.70550000000003,
+            16.722200000000157,
+            16.784700000000157,
+            16.794700000000375,
+            16.898200000001452,
+            16.950700000001234,
+            17.070600000000923,
+            17.169400000000678,
+            17.1788000000015,
+            17.320099999999,
+            17.34809999999925,
+            17.58519999999953,
+            17.8783999999996,
+            19.504499999999098
+          ]
+        },
+        {
+          "lines": 10000,
+          "characters": 348890,
+          "p50Ms": 57,
+          "p95Ms": 104,
+          "samples": 30,
+          "metric": "CDP input through next renderer animation frame; excludes whole-document serialization",
+          "rawMs": [
+            49.09929999999986,
+            49.274100000000544,
+            49.66780000000108,
+            50.02860000000146,
+            50.136499999998705,
+            52.68709999999919,
+            52.68949999999859,
+            53.40380000000005,
+            53.55699999999888,
+            53.60159999999996,
+            54.78700000000026,
+            55.33879999999954,
+            55.89599999999882,
+            57.12090000000171,
+            57.16100000000006,
+            58.0599000000002,
+            58.48160000000098,
+            61.76480000000083,
+            65.38949999999932,
+            69.4974000000002,
+            79.19720000000052,
+            86.58630000000085,
+            90.21830000000045,
+            90.44390000000021,
+            94.14050000000134,
+            97.79509999999937,
+            98.40599999999904,
+            99.57669999999962,
+            103.73719999999958,
+            109.39400000000023
+          ]
+        }
+      ]
+    },
+    {
+      "id": "no-renderer-exceptions",
+      "status": "pass",
+      "ms": 0,
+      "detail": {
+        "errors": []
+      }
+    }
+  ],
+  "frames": [
+    {
+      "file": "01-boot.png",
+      "sha256": "f0cf592a243a677bbe7d48716885bad20b270c63761be04cfa034503a1a0fa8d",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 57,
+        "bottom": 91
+      },
+      "published": false
+    },
+    {
+      "file": "02-markdown.png",
+      "sha256": "4250ca72ba7abaa16b7f00b942e58f40e573dffbda7875e61e96bac942601fec",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "published": false
+    },
+    {
+      "file": "03-mermaid.png",
+      "sha256": "a082c6cba474cfea276dc032a5d40f80d2a4bc8203e48d5052d89869f7534fd8",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "published": false
+    },
+    {
+      "file": "04-mermaid-updated.png",
+      "sha256": "f7a80931dca4d03a8ab2d4f34b5adc1fe29890093565c5ad3b9a8afdcbeca8db",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "published": false
+    },
+    {
+      "file": "05-selection.png",
+      "sha256": "3c3784485a031e88c7c33797296ed89e3fcb4f75030ad2bedd6d318ef0a1ee32",
+      "caret": {
+        "left": 208.2421875,
+        "right": 208.2421875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "published": false
+    },
+    {
+      "file": "06-second-window.png",
+      "sha256": "c919f5b05d6805e8ba19e3e0a25cca05b4eba70db636835525afecb71b2159dd",
+      "caret": {
+        "x": 267.1171875,
+        "y": 79.6953125,
+        "width": 0,
+        "height": 16,
+        "top": 79.6953125,
+        "right": 267.1171875,
+        "bottom": 95.6953125,
+        "left": 267.1171875
+      },
+      "published": false
+    },
+    {
+      "file": "07-final.png",
+      "sha256": "458dac996f4c24583190ce08751fc567fd70bd12a5b9e3fe983006b6974ad3c6",
+      "caret": {
+        "x": 372.546875,
+        "y": 642.3515625,
+        "width": 0,
+        "height": 16,
+        "top": 642.3515625,
+        "right": 372.546875,
+        "bottom": 658.3515625,
+        "left": 372.546875
+      },
+      "published": false
+    }
+  ],
+  "warnings": [],
+  "performance": [
+    {
+      "lines": 1000,
+      "characters": 33890,
+      "p50Ms": 17,
+      "p95Ms": 18,
+      "samples": 30,
+      "metric": "CDP input through next renderer animation frame; excludes whole-document serialization",
+      "rawMs": [
+        13.766500000001543,
+        15.361100000000079,
+        15.416000000001077,
+        15.559500000001208,
+        15.745100000000093,
+        16.138300000000527,
+        16.225899999999456,
+        16.269000000000233,
+        16.402499999998327,
+        16.50669999999991,
+        16.527200000000448,
+        16.530699999999342,
+        16.536200000000463,
+        16.54609999999957,
+        16.549400000001697,
+        16.654700000000958,
+        16.70550000000003,
+        16.722200000000157,
+        16.784700000000157,
+        16.794700000000375,
+        16.898200000001452,
+        16.950700000001234,
+        17.070600000000923,
+        17.169400000000678,
+        17.1788000000015,
+        17.320099999999,
+        17.34809999999925,
+        17.58519999999953,
+        17.8783999999996,
+        19.504499999999098
+      ]
+    },
+    {
+      "lines": 10000,
+      "characters": 348890,
+      "p50Ms": 57,
+      "p95Ms": 104,
+      "samples": 30,
+      "metric": "CDP input through next renderer animation frame; excludes whole-document serialization",
+      "rawMs": [
+        49.09929999999986,
+        49.274100000000544,
+        49.66780000000108,
+        50.02860000000146,
+        50.136499999998705,
+        52.68709999999919,
+        52.68949999999859,
+        53.40380000000005,
+        53.55699999999888,
+        53.60159999999996,
+        54.78700000000026,
+        55.33879999999954,
+        55.89599999999882,
+        57.12090000000171,
+        57.16100000000006,
+        58.0599000000002,
+        58.48160000000098,
+        61.76480000000083,
+        65.38949999999932,
+        69.4974000000002,
+        79.19720000000052,
+        86.58630000000085,
+        90.21830000000045,
+        90.44390000000021,
+        94.14050000000134,
+        97.79509999999937,
+        98.40599999999904,
+        99.57669999999962,
+        103.73719999999958,
+        109.39400000000023
+      ]
+    }
+  ],
+  "metadata": {
+    "executable": "electron.exe",
+    "exeSha256": "07b043bf9b0a0ac14a82fac0b612b7b7ed13cde727d706d74e41a45278ab51f1",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.5",
+      "platform": "win32",
+      "versions": {
+        "node": "24.20.0",
+        "acorn": "8.18.0",
+        "ada": "4.0.0",
+        "amaro": "1.1.11",
+        "ares": "1.34.8",
+        "brotli": "1.2.0",
+        "cldr": "48.0",
+        "icu": "78.2",
+        "llhttp": "9.4.3",
+        "merve": "1.2.2",
+        "modules": "149",
+        "napi": "10",
+        "nbytes": "0.1.4",
+        "ncrypto": "0.0.1",
+        "nghttp2": "1.70.0",
+        "nghttp3": "",
+        "ngtcp2": "",
+        "openssl": "0.0.0",
+        "simdjson": "4.6.6",
+        "simdutf": "7.7.0",
+        "sqlite": "3.53.4",
+        "tz": "2025c",
+        "undici": "7.29.0",
+        "unicode": "17.0",
+        "uv": "1.52.1",
+        "uvwasi": "0.0.23",
+        "v8": "15.2.124.19-electron.0",
+        "zlib": "1.3.2.1-motley",
+        "zstd": "1.6.0",
+        "electron": "44.2.0",
+        "chrome": "152.0.7977.76"
+      }
+    },
+    "sourceMode": true,
+    "bootMs": 1071,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": "ac61b3ad79774f4272e7383801cd37dba68c98891c8a951ffa4eef660dc00c8f",
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "10c5a246421416dd77888a757cb0b5c2cc462e898be6bcc1b972f0c4a376adb0",
+        "sourceSha256": "10c5a246421416dd77888a757cb0b5c2cc462e898be6bcc1b972f0c4a376adb0"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "70ea6eb5a0f88e5a45b62fed93f6c14f6daad9de3a2a2e5fedfb04eb87baa824",
+        "sourceSha256": "70ea6eb5a0f88e5a45b62fed93f6c14f6daad9de3a2a2e5fedfb04eb87baa824"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "97553e188a464b573d309ba63ba7a44db9fd27b8ea18494edcc8558f0f796e1c",
+        "sourceSha256": "97553e188a464b573d309ba63ba7a44db9fd27b8ea18494edcc8558f0f796e1c"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "ac61b3ad79774f4272e7383801cd37dba68c98891c8a951ffa4eef660dc00c8f",
+        "sourceSha256": "506a019995027754e35a4ccc53c2400097a65021f812b4401a6c092407d1547c"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T09:48:24.410Z",
+  "passed": false
+}

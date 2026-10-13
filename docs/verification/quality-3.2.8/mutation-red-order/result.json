@@ -1,0 +1,170 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T18:38:17.588Z",
+  "cases": [
+    {
+      "id": "two-pastes-keep-request-order",
+      "status": "fail",
+      "trace": [
+        {
+          "failureState": {
+            "text": "![](assets/pasted-image-1.png)![](assets/pasted-image.png)AB\n",
+            "selection": {
+              "anchor": 58,
+              "head": 58
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 160.5,
+              "right": 160.5,
+              "top": 1016.40625,
+              "bottom": 1032.40625
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 61 字 — MarkPilot",
+            "banner": ""
+          },
+          "images": [
+            {
+              "src": "file:///<repo>/.mp-verify/codex-audit/cm6-image-mutations-3.2.8/negative-order/%E4%B8%AD%E6%96%87%20%E6%88%AA%E5%9B%B",
+              "complete": true,
+              "naturalWidth": 1369,
+              "naturalHeight": 857,
+              "width": 756,
+              "failed": false
+            },
+            {
+              "src": "file:///<repo>/.mp-verify/codex-audit/cm6-image-mutations-3.2.8/negative-order/%E4%B8%AD%E6%96%87%20%E6%88%AA%E5%9B%B",
+              "complete": true,
+              "naturalWidth": 1369,
+              "naturalHeight": 857,
+              "width": 756,
+              "failed": false
+            }
+          ],
+          "toast": "已存入 assets 并插入图片"
+        }
+      ],
+      "error": "Expected values to be strictly deep-equal:\n+ actual - expected\n\n  [\n    [\n+     248,\n+     220,\n+     215,\n+     255\n+   ],\n+   [\n      228,\n      243,\n      253,\n      255\n    ],\n-   [\n-     248,\n-     220,\n-     215,\n-     255\n-   ]\n  ]\n",
+      "ms": 10624
+    }
+  ],
+  "frames": [
+    {
+      "file": "failed-two-pastes-keep-request-order.png",
+      "sha256": "ad7c7ddc4172322bbdd06be910d9b632b9226b5a5b88b16d098a68c6245b542e",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 1016.40625,
+        "bottom": 1032.40625
+      },
+      "zoom": {
+        "file": "failed-two-pastes-keep-request-order-caret-2x.png",
+        "sha256": "8c1305d17a09d1d72f14bcb20d5b574e73ef0729f41cd95c439e615ad5308382",
+        "clip": {
+          "x": 40.5,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ],
+  "observations": [],
+  "metadata": {
+    "executable": "MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.8",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "bootMs": 923,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "178bb51a146b37ac15d6c913ddcaf50c9b80386751e8f51cdf0ba1c9e578bef8",
+        "sourceSha256": "178bb51a146b37ac15d6c913ddcaf50c9b80386751e8f51cdf0ba1c9e578bef8"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "81301eef4e4f09a3d499c50d2fe21f21604fc996c41173024ba7469ee191182d",
+        "sourceSha256": "81301eef4e4f09a3d499c50d2fe21f21604fc996c41173024ba7469ee191182d"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "bd28a67583607ea80e1e38558b660ddabb40529bd90e90eb3a6d9deb23dfee1f",
+        "sourceSha256": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ],
+    "imageHostDelayMs": 5000
+  },
+  "clipboardCleanup": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "completedAt": "2026-10-11T18:38:36.059Z",
+  "passed": false
+}

@@ -12,6 +12,7 @@
  *  （⚠️ 注释里也**不要写真实盘符路径** —— 可移植性判据会把它算作"写死路径" ✗，用 `<repo>` 占位 ✓）
  */
 'use strict';
+const path = require('node:path');
 /* ── 自适应头（公开快照专用，自动注入 ✓）──────────────────────────────────
    开发态：本文件在 <repo>/.mp-verify/checklist/；公开快照：<repo>/tools/probes/ ✓
    ⇒ 两种情况下"上溯两级"都是仓库根 ✓，工作目录若不存在就建在**系统临时目录**里 ✓
@@ -22,7 +23,7 @@ const __MP_WORK = process.env.MP_WORK || path.join(__MP_OS.tmpdir(), 'markpilot-
 const __MP_EXE = process.env.MP_EXE || path.join(__MP_REPO, 'MarkPilot-CM6', 'dist', 'win-unpacked', 'MarkPilot.exe');
 try { require('node:fs').mkdirSync(__MP_WORK, { recursive: true }); } catch { /* 建不了就由调用方报错 */ }
 const fs = require('node:fs');
-const path = require('node:path');
+
 const net = require('node:net');
 const { execFileSync } = require('node:child_process');
 

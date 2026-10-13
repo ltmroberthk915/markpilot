@@ -1,0 +1,15 @@
+{
+  "syntheticFixture": true,
+  "files": [
+    {
+      "file": "primary.pdf",
+      "sha256": "c5a434343af52bcb1971bdea9de6f727cdf5531d1a7b07e9b3012624a4861b69",
+      "bytes": 46541
+    },
+    {
+      "file": "primary-pdf.png",
+      "sha256": "ce1ac782a3c6a3cd18db97293870e8f1827784f6e91c6342223df3c35962abd1",
+      "bytes": 15955
+    }
+  ]
+}

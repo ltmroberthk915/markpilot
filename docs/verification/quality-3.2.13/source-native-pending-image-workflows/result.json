@@ -1,0 +1,2046 @@
+{
+  "schema": 1,
+  "suite": "native-pending-image-workflows",
+  "version": "3.2.13",
+  "passed": true,
+  "recordedCaseCount": 2,
+  "publishedCaseCount": 2,
+  "artifact": {
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.13",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "exeSha256": "d300992b1003765f2f64417269c124f0c7b14af65ce415ad2488d166e6f63e13",
+    "runtimeExecutableSha256": "d300992b1003765f2f64417269c124f0c7b14af65ce415ad2488d166e6f63e13",
+    "asarSha256": "08a6de1a9b6be8a6b8033ec5c8dbf5b6fd3f8277a674ed4c35bcc6b58dad4e51",
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "be105040e75e3707d9b5d978eaffa6d17151004e0f46fac4cc87bab829ec3f33"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "5d58d02e672705f4bb5c1475aa8be667b04a2cb9cb4111d285b9efead54a1521"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "4517f08c0f305d08c361c2079157e587b5a9e8097dc161ab748c26960a8c40f5"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "5c5ad94957ce94902176664182afbb1d578c42bf2347119bbbb58739c64abcb8"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": [],
+    "complete": true
+  },
+  "clipboardOutcome": {
+    "restored": true
+  },
+  "transport": "actual main MenuItem.click; IPC or native role beforeinput; no OS-click/accelerator claim",
+  "fixtureSha256": null,
+  "imageHostDelayMs": 5000,
+  "cases": [
+    {
+      "id": "native-menu-undo-pending-bitmap-empty-history",
+      "status": "pass",
+      "stage": "complete",
+      "productReached": true,
+      "detail": {
+        "history": "empty",
+        "initial": "EMPTY_PENDING_BASE\n",
+        "expectedFinal": "EMPTY_PENDING_BASE\n",
+        "pendingKind": "host-write-only",
+        "timing": {
+          "delayMs": 5000,
+          "pasteUtc": 1791768849258,
+          "menuUtc": 1791768849529,
+          "assetMtimeMs": 1791768854269.467,
+          "observedUtc": 1791768855048,
+          "assetAfterPasteMs": 5011.467041015625,
+          "hostDelayStartUpperBoundMs": 1791768849269.467
+        },
+        "menuIPC": true,
+        "nativeBeforeinput": false,
+        "lateAssetMayRemain": true
+      },
+      "trace": [
+        {
+          "name": "01-fresh",
+          "text": "EMPTY_PENDING_BASE\n",
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "editorFocus": true,
+          "images": 0,
+          "disk": {
+            "text": "EMPTY_PENDING_BASE\n"
+          },
+          "events": []
+        },
+        {
+          "name": "02-before-bitmap",
+          "text": "EMPTY_PENDING_BASE\n",
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "selection": {
+            "anchor": 19,
+            "head": 19
+          },
+          "editorFocus": true,
+          "images": 0,
+          "disk": {
+            "text": "EMPTY_PENDING_BASE\n"
+          },
+          "events": [
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            }
+          ]
+        },
+        {
+          "name": "bitmap-independent-STA"
+        },
+        {
+          "name": "provisional-host-write-pending",
+          "text": "EMPTY_PENDING_BASE\n",
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "selection": {
+            "anchor": 19,
+            "head": 19
+          },
+          "editorFocus": true,
+          "images": 0,
+          "events": [
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "v",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "v",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            }
+          ]
+        },
+        {
+          "name": "actual-main-MenuItem-undo",
+          "ack": {
+            "ok": true,
+            "label": "撤销",
+            "role": null,
+            "accelerator": "CmdOrCtrl+Z",
+            "focused": true
+          }
+        },
+        {
+          "name": "03-after-menu",
+          "text": "EMPTY_PENDING_BASE\n",
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "selection": {
+            "anchor": 19,
+            "head": 19
+          },
+          "editorFocus": true,
+          "images": 0,
+          "disk": {
+            "text": "EMPTY_PENDING_BASE\n"
+          },
+          "events": [
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "v",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "v",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            }
+          ]
+        },
+        {
+          "name": "04-late-response",
+          "text": "EMPTY_PENDING_BASE\n",
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "selection": {
+            "anchor": 19,
+            "head": 19
+          },
+          "editorFocus": true,
+          "images": 0,
+          "disk": {
+            "text": "EMPTY_PENDING_BASE\n"
+          },
+          "events": [
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "v",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "v",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            }
+          ]
+        },
+        {
+          "name": "retrospective-host-delay-proof",
+          "hostDelay": {
+            "timing": {
+              "delayMs": 5000,
+              "pasteUtc": 1791768849258,
+              "menuUtc": 1791768849529,
+              "assetMtimeMs": 1791768854269.467,
+              "observedUtc": 1791768855048,
+              "assetAfterPasteMs": 5011.467041015625,
+              "hostDelayStartUpperBoundMs": 1791768849269.467
+            },
+            "lateSeen": true,
+            "ticketFieldRead": false
+          }
+        },
+        {
+          "name": "bitmap-independent-STA-after-action"
+        },
+        {
+          "name": "live-product-health"
+        },
+        {
+          "name": "05-final-disk",
+          "text": "EMPTY_PENDING_BASE\n",
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "selection": {
+            "anchor": 19,
+            "head": 19
+          },
+          "editorFocus": true,
+          "images": 0,
+          "disk": {
+            "text": "EMPTY_PENDING_BASE\n"
+          },
+          "events": [
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "v",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "v",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "native-menu-undo-pending-bitmap-nonempty-history",
+      "status": "pass",
+      "stage": "complete",
+      "productReached": true,
+      "detail": {
+        "history": "nonempty",
+        "initial": "NONEMPTY_PENDING_BASE\n",
+        "expectedFinal": "NONEMPTY_PENDING_BASE\n",
+        "pendingKind": "host-write-only",
+        "timing": {
+          "delayMs": 5000,
+          "pasteUtc": 1791768858596,
+          "menuUtc": 1791768858878,
+          "assetMtimeMs": 1791768863603.6143,
+          "observedUtc": 1791768864379,
+          "assetAfterPasteMs": 5007.6142578125,
+          "hostDelayStartUpperBoundMs": 1791768858603.6143
+        },
+        "menuIPC": true,
+        "nativeBeforeinput": false,
+        "lateAssetMayRemain": true
+      },
+      "trace": [
+        {
+          "name": "01-fresh",
+          "text": "NONEMPTY_PENDING_BASE\n",
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "editorFocus": true,
+          "images": 0,
+          "disk": {
+            "text": "NONEMPTY_PENDING_BASE\n"
+          },
+          "events": []
+        },
+        {
+          "name": "02-before-bitmap",
+          "text": "XNONEMPTY_PENDING_BASE\n",
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "selection": {
+            "anchor": 23,
+            "head": 23
+          },
+          "editorFocus": true,
+          "images": 0,
+          "disk": {
+            "text": "NONEMPTY_PENDING_BASE\n"
+          },
+          "events": [
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            }
+          ]
+        },
+        {
+          "name": "bitmap-independent-STA"
+        },
+        {
+          "name": "provisional-host-write-pending",
+          "text": "XNONEMPTY_PENDING_BASE\n",
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "selection": {
+            "anchor": 23,
+            "head": 23
+          },
+          "editorFocus": true,
+          "images": 0,
+          "events": [
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "v",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "v",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            }
+          ]
+        },
+        {
+          "name": "actual-main-MenuItem-undo",
+          "ack": {
+            "ok": true,
+            "label": "撤销",
+            "role": null,
+            "accelerator": "CmdOrCtrl+Z",
+            "focused": true
+          }
+        },
+        {
+          "name": "03-after-menu",
+          "text": "NONEMPTY_PENDING_BASE\n",
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "editorFocus": true,
+          "images": 0,
+          "disk": {
+            "text": "XNONEMPTY_PENDING_BASE\n"
+          },
+          "events": [
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "v",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "v",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            }
+          ]
+        },
+        {
+          "name": "04-late-response",
+          "text": "NONEMPTY_PENDING_BASE\n",
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "editorFocus": true,
+          "images": 0,
+          "disk": {
+            "text": "NONEMPTY_PENDING_BASE\n"
+          },
+          "events": [
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "v",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "v",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            }
+          ]
+        },
+        {
+          "name": "retrospective-host-delay-proof",
+          "hostDelay": {
+            "timing": {
+              "delayMs": 5000,
+              "pasteUtc": 1791768858596,
+              "menuUtc": 1791768858878,
+              "assetMtimeMs": 1791768863603.6143,
+              "observedUtc": 1791768864379,
+              "assetAfterPasteMs": 5007.6142578125,
+              "hostDelayStartUpperBoundMs": 1791768858603.6143
+            },
+            "lateSeen": true,
+            "ticketFieldRead": false
+          }
+        },
+        {
+          "name": "bitmap-independent-STA-after-action"
+        },
+        {
+          "name": "live-product-health"
+        },
+        {
+          "name": "05-final-disk",
+          "text": "NONEMPTY_PENDING_BASE\n",
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "editorFocus": true,
+          "images": 0,
+          "disk": {
+            "text": "NONEMPTY_PENDING_BASE\n"
+          },
+          "events": [
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "End",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keydown",
+              "key": "v",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "v",
+              "ctrl": true,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "trusted": true,
+              "inEditor": true,
+              "defaultPrevented": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scope": "Synthetic fixtures only. Source/DOM owners and trusted passive input records are preserved when this suite actually records them. No user document/profile/registry/shortcut/original clipboard data. OS physical accelerator and actual IME claims are excluded."
+}

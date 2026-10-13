@@ -15,6 +15,7 @@
  *  不匹配 ⇒ 打印 ✗ 并 **exit(9)**：宁可不出数，也不出"对不上号的数"。
  */
 'use strict';
+const path = require('node:path');
 /* ── 自适应头（公开快照专用，自动注入 ✓）──────────────────────────────────
    开发态：本文件在 <repo>/.mp-verify/checklist/；公开快照：<repo>/tools/probes/ ✓
    ⇒ 两种情况下"上溯两级"都是仓库根 ✓，工作目录若不存在就建在**系统临时目录**里 ✓
@@ -26,7 +27,6 @@ const __MP_EXE = process.env.MP_EXE || path.join(__MP_REPO, 'MarkPilot-CM6', 'di
 try { require('node:fs').mkdirSync(__MP_WORK, { recursive: true }); } catch { /* 建不了就由调用方报错 */ }
 const fs = require('node:fs');
 const crypto = require('node:crypto');
-const path = require('node:path');
 
 /** 文件 sha256 前 16 位（本项目所有读数都用 16 位口径对齐） */
 function sha16(p) {

@@ -1,0 +1,285 @@
+{
+  "schema": 2,
+  "startedAt": "2026-10-11T22:41:20.193Z",
+  "baselineEngine": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+  "coreArtifactIdentity": {
+    "MarkPilot-CM6/main.js": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+    "MarkPilot-CM6/preload.js": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+    "MarkPilot-CM6/renderer/host.js": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+    "MarkPilot-CM6/shell/document-store.js": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+    "MarkPilot-CM6/shell/text-codec.js": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+    "MarkPilot-CM6/renderer/cm6/app.js": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+    "MarkPilot-CM6/renderer/cm6/markdown-worker.js": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+  },
+  "sourceIdentity": {
+    "dsh-markpilot/src-cm6/async-markdown.js": "9d2828d08f1d9910dee5c7835b2ad5e92ebc067b4f4e350d46bf8ee1840077f6",
+    "dsh-markpilot/src-cm6/cell-source-map.js": "011014350ef926a63d0c21dd104a4e2b96d40b8dcebcc54f4917a0ae898b4b81",
+    "dsh-markpilot/src-cm6/completion.js": "080b76a86aa6ba929a20197ea13c37ac9621994ab59540068bfdd08676e58207",
+    "dsh-markpilot/src-cm6/extras.js": "8293b1929b7360f9286c672ba5aad44858fd7a1cc3a191c79554e5b482daa4c9",
+    "dsh-markpilot/src-cm6/image-insertion.js": "dc3bb4ba45f7ab8d4408d9b4d0c3c5bf89ac86d13a4199965f9fabedf68acc2a",
+    "dsh-markpilot/src-cm6/image-path.js": "737e65a478ec0e0223dc8a73b3dc0d222a03dd0cbe1362d1024f7d105ceeab05",
+    "dsh-markpilot/src-cm6/knuth-plass.js": "d32b562f14241c13f602c09b9ae2c917da9c5e87e7eff2a88b26a2fea7538e49",
+    "dsh-markpilot/src-cm6/lists.js": "c212dc594f0a453ce661b635cba575adc1f9808f41a214c3884e7f4ef3abff49",
+    "dsh-markpilot/src-cm6/main.js": "9785673e49995f2c35333e06539054cc4e75b27b4af2b1e6d45f573ce260ecfe",
+    "dsh-markpilot/src-cm6/markdown-context.js": "b1d07db970a1810fb43e31e943caa666354511116956a6a4ed97d3cb53728754",
+    "dsh-markpilot/src-cm6/markdown-worker.js": "6b11050037be157ad8f35e642a7d84ca002d92f25fceb8a1952bf38f88498a6c",
+    "dsh-markpilot/src-cm6/math-source-map.js": "5866cd598c3e8b5e38e4e2527d8f6aba1e32f967df660bc3d679a634ad560f0b",
+    "dsh-markpilot/src-cm6/splitview.js": "9a25b63da42d749458cd1736174e1721601c4e8d4befec6396a25bc93f997532",
+    "dsh-markpilot/src-cm6/tables.js": "8a7bc6b7fd4cbe877212dc4fddb4abd9a6576235d0347a90a7d81e69c54aba44",
+    "dsh-markpilot/src-cm6/toolbar.js": "cb614897c47573770742734c9918f211f8baf8aa98460d32858c6a6daf183d64",
+    "dsh-markpilot/src-cm6/typography.js": "d9370dcb4e6bfc17e63c9d5baaad5cf26740b4ce310406afba1c768ded0c8e7f",
+    "dsh-markpilot/src-cm6/worker-tree-codec.js": "cb9dfe07a558b3a8f726e1cb22c548da7f45540f5fc21825751a7109bf8a5286",
+    "MarkPilot-CM6/main.js": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+    "MarkPilot-CM6/preload.js": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+    "MarkPilot-CM6/renderer/host.js": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+    "MarkPilot-CM6/shell/document-store.js": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+    "MarkPilot-CM6/shell/text-codec.js": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+    "MarkPilot-CM6/renderer/cm6/app.js": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+    "MarkPilot-CM6/renderer/cm6/markdown-worker.js": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+  },
+  "cellCodecIdentity": {
+    "file": "dsh-markpilot/src-cm6/cell-source-map.js",
+    "sha256": "011014350ef926a63d0c21dd104a4e2b96d40b8dcebcc54f4917a0ae898b4b81"
+  },
+  "mutations": [
+    {
+      "kind": "math-entry",
+      "suite": "math-entry-workflows",
+      "ids": [
+        "quoted-down-immediate-type-undo-redo",
+        "nested-quoted-down-immediate-type-undo-redo"
+      ],
+      "controls": [
+        "plain-down-immediate-type-undo-redo",
+        "plain-up-immediate-type-undo-redo"
+      ],
+      "negativeErrors": [
+        {
+          "id": "quoted-down-immediate-type-undo-redo",
+          "error": "vertical entry lands at the mapped formula token, past quote prefixes and delimiters\n+ actual - expected\n\n  {\n+   anchor: 11,\n+   head: 11\n-   anchor: 13,\n-   head: 13\n  }\n"
+        },
+        {
+          "id": "nested-quoted-down-immediate-type-undo-redo",
+          "error": "vertical entry lands at the mapped formula token, past quote prefixes and delimiters\n+ actual - expected\n\n  {\n+   anchor: 15,\n+   head: 15\n-   anchor: 19,\n-   head: 19\n  }\n"
+        }
+      ],
+      "expectedError": "vertical entry lands at the mapped formula token",
+      "mutantEngine": "2e0b07933d169491391b5a14febb254e06afc599dccc708e65e3f0c2d16c708f",
+      "restoredEngine": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+      "mutantCoreArtifactIdentity": {
+        "MarkPilot-CM6/main.js": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "MarkPilot-CM6/preload.js": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "MarkPilot-CM6/renderer/host.js": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "MarkPilot-CM6/shell/document-store.js": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "MarkPilot-CM6/shell/text-codec.js": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "MarkPilot-CM6/renderer/cm6/app.js": "2e0b07933d169491391b5a14febb254e06afc599dccc708e65e3f0c2d16c708f",
+        "MarkPilot-CM6/renderer/cm6/markdown-worker.js": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      },
+      "restoredCoreArtifactIdentity": {
+        "MarkPilot-CM6/main.js": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "MarkPilot-CM6/preload.js": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "MarkPilot-CM6/renderer/host.js": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "MarkPilot-CM6/shell/document-store.js": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "MarkPilot-CM6/shell/text-codec.js": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "MarkPilot-CM6/renderer/cm6/app.js": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+        "MarkPilot-CM6/renderer/cm6/markdown-worker.js": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      },
+      "redAsar": "d3644a4419768e965607c428f9ff763f62926ccca3946bd43968a8c1cce02912",
+      "greenAsar": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "positive": true
+    },
+    {
+      "kind": "math-paste",
+      "suite": "math-paste-workflows",
+      "ids": [
+        "html-ordinary-replace-inline-y-history-continue"
+      ],
+      "controls": [
+        "html-plain-shortcut-replace-inline-y-history-continue",
+        "text-only-replace-inline-y-history-continue"
+      ],
+      "negativeErrors": [
+        {
+          "id": "html-ordinary-replace-inline-y-history-continue",
+          "error": "paste preserves the complete intended literal source or ordinary cross-formula rich conversion\n+ actual - expected\n\n+ 'PRE $x+\\nQ\\n$ POST\\nTAIL\\n'\n- 'PRE $x+Q$ POST\\nTAIL\\n'\n          ^\n"
+        }
+      ],
+      "expectedError": "paste preserves the complete intended literal source",
+      "mutantEngine": "4b9a6584a13ee9106aee121c6cd0838d0c36442a683d7d89641a2243ca74097f",
+      "restoredEngine": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+      "mutantCoreArtifactIdentity": {
+        "MarkPilot-CM6/main.js": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "MarkPilot-CM6/preload.js": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "MarkPilot-CM6/renderer/host.js": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "MarkPilot-CM6/shell/document-store.js": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "MarkPilot-CM6/shell/text-codec.js": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "MarkPilot-CM6/renderer/cm6/app.js": "4b9a6584a13ee9106aee121c6cd0838d0c36442a683d7d89641a2243ca74097f",
+        "MarkPilot-CM6/renderer/cm6/markdown-worker.js": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      },
+      "restoredCoreArtifactIdentity": {
+        "MarkPilot-CM6/main.js": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "MarkPilot-CM6/preload.js": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "MarkPilot-CM6/renderer/host.js": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "MarkPilot-CM6/shell/document-store.js": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "MarkPilot-CM6/shell/text-codec.js": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "MarkPilot-CM6/renderer/cm6/app.js": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+        "MarkPilot-CM6/renderer/cm6/markdown-worker.js": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      },
+      "redAsar": "7068921582ee4a9e15f1d19976ef2acba7e69036acbdb7a3c1faa518c765c99b",
+      "greenAsar": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "positive": true
+    },
+    {
+      "kind": "html-fragment",
+      "suite": "math-paste-workflows",
+      "ids": [
+        "html-only-replace-inline-y-history-continue",
+        "html-only-literal-whitespace-replace-inline-y-history-continue"
+      ],
+      "controls": [
+        "html-ordinary-replace-inline-y-history-continue"
+      ],
+      "negativeErrors": [
+        {
+          "id": "html-only-replace-inline-y-history-continue",
+          "error": "paste preserves the complete intended literal source or ordinary cross-formula rich conversion\n+ actual - expected\n\n+ 'PRE $x+\\nQ\\n\\n$ POST\\nTAIL\\n'\n- 'PRE $x+Q$ POST\\nTAIL\\n'\n          ^\n"
+        },
+        {
+          "id": "html-only-literal-whitespace-replace-inline-y-history-continue",
+          "error": "paste preserves the complete intended literal source or ordinary cross-formula rich conversion\n+ actual - expected\n\n+ 'PRE $x+\\n  Q\\nR  \\n\\n\\n$ POST\\nTAIL\\n'\n- 'PRE $x+  Q\\nR  \\n$ POST\\nTAIL\\n'\n          ^\n"
+        }
+      ],
+      "expectedError": "paste preserves the complete intended literal source",
+      "mutantEngine": "9bb63c76ebf4b829b4ccc59f5f3732722ab4bae6510fe288b4b2cd80fb749f4b",
+      "restoredEngine": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+      "mutantCoreArtifactIdentity": {
+        "MarkPilot-CM6/main.js": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "MarkPilot-CM6/preload.js": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "MarkPilot-CM6/renderer/host.js": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "MarkPilot-CM6/shell/document-store.js": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "MarkPilot-CM6/shell/text-codec.js": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "MarkPilot-CM6/renderer/cm6/app.js": "9bb63c76ebf4b829b4ccc59f5f3732722ab4bae6510fe288b4b2cd80fb749f4b",
+        "MarkPilot-CM6/renderer/cm6/markdown-worker.js": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      },
+      "restoredCoreArtifactIdentity": {
+        "MarkPilot-CM6/main.js": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "MarkPilot-CM6/preload.js": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "MarkPilot-CM6/renderer/host.js": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "MarkPilot-CM6/shell/document-store.js": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "MarkPilot-CM6/shell/text-codec.js": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "MarkPilot-CM6/renderer/cm6/app.js": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+        "MarkPilot-CM6/renderer/cm6/markdown-worker.js": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      },
+      "redAsar": "edc090090d76855014f84097923232ad0df45406f937485d715b58ff9cf6173e",
+      "greenAsar": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "positive": true
+    },
+    {
+      "kind": "cell-search",
+      "suite": "search-workflows",
+      "ids": [
+        "active-cell-ctrl-f-opens-search-without-document-edit"
+      ],
+      "controls": [
+        "body-ctrl-f-search-focus-positive-control",
+        "toolbar-find-replace-search-focus-positive-control"
+      ],
+      "negativeErrors": [
+        {
+          "id": "active-cell-ctrl-f-opens-search-without-document-edit",
+          "error": "CtrlF or toolbar must open and focus the actual search input before any query"
+        }
+      ],
+      "expectedError": "CtrlF or toolbar must open and focus the actual search input before any query",
+      "mutantEngine": "d29e3309189711b4a856a93e69243b7ece4f70a570f20332eab4bca834aa3dd8",
+      "restoredEngine": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+      "mutantCoreArtifactIdentity": {
+        "MarkPilot-CM6/main.js": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "MarkPilot-CM6/preload.js": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "MarkPilot-CM6/renderer/host.js": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "MarkPilot-CM6/shell/document-store.js": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "MarkPilot-CM6/shell/text-codec.js": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "MarkPilot-CM6/renderer/cm6/app.js": "d29e3309189711b4a856a93e69243b7ece4f70a570f20332eab4bca834aa3dd8",
+        "MarkPilot-CM6/renderer/cm6/markdown-worker.js": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      },
+      "restoredCoreArtifactIdentity": {
+        "MarkPilot-CM6/main.js": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "MarkPilot-CM6/preload.js": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "MarkPilot-CM6/renderer/host.js": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "MarkPilot-CM6/shell/document-store.js": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "MarkPilot-CM6/shell/text-codec.js": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "MarkPilot-CM6/renderer/cm6/app.js": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+        "MarkPilot-CM6/renderer/cm6/markdown-worker.js": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      },
+      "redAsar": "65dc7112daac27696d6c3d38736da6b179a4ec6fec6ccf1da6a055ac1b796431",
+      "greenAsar": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "positive": true
+    },
+    {
+      "kind": "search-return",
+      "suite": "search-workflows",
+      "ids": [
+        "body-ctrl-f-search-focus-positive-control",
+        "toolbar-find-replace-search-focus-positive-control"
+      ],
+      "controls": [
+        "search-ordinary-body-return-history-positive-control"
+      ],
+      "negativeErrors": [
+        {
+          "id": "body-ctrl-f-search-focus-positive-control",
+          "error": "return-to-edit changes only the matched cell token\n+ actual - expected\n\n+ 'PRE_GUARD\\n\\n|H|K|\\n|---|---|\\n|ab|KEEP|\\nR\\nPOST_GUARD\\n'\n- 'PRE_GUARD\\n\\n|H|K|\\n|---|---|\\n|ab|KEEPR|\\n\\nPOST_GUARD\\n'\n"
+        },
+        {
+          "id": "toolbar-find-replace-search-focus-positive-control",
+          "error": "return-to-edit changes only the matched cell token\n+ actual - expected\n\n+ 'PRE_GUARD\\n\\n|H|K|\\n|---|---|\\n|ab|KEEP|\\nR\\nPOST_GUARD\\n'\n- 'PRE_GUARD\\n\\n|H|K|\\n|---|---|\\n|ab|KEEPR|\\n\\nPOST_GUARD\\n'\n"
+        }
+      ],
+      "expectedError": "return-to-edit changes only the matched cell token",
+      "mutantEngine": "006e4c783b4e33844b730f071c106bb19bd32913cbe5a0639925f97949d5034c",
+      "restoredEngine": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+      "mutantCoreArtifactIdentity": {
+        "MarkPilot-CM6/main.js": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "MarkPilot-CM6/preload.js": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "MarkPilot-CM6/renderer/host.js": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "MarkPilot-CM6/shell/document-store.js": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "MarkPilot-CM6/shell/text-codec.js": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "MarkPilot-CM6/renderer/cm6/app.js": "006e4c783b4e33844b730f071c106bb19bd32913cbe5a0639925f97949d5034c",
+        "MarkPilot-CM6/renderer/cm6/markdown-worker.js": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      },
+      "restoredCoreArtifactIdentity": {
+        "MarkPilot-CM6/main.js": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "MarkPilot-CM6/preload.js": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "MarkPilot-CM6/renderer/host.js": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "MarkPilot-CM6/shell/document-store.js": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "MarkPilot-CM6/shell/text-codec.js": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "MarkPilot-CM6/renderer/cm6/app.js": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+        "MarkPilot-CM6/renderer/cm6/markdown-worker.js": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      },
+      "redAsar": "49b57830a3d9a10ecfc7df768fa2b35575c5ee662b496be55b2dc539c7ffeda8",
+      "greenAsar": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "positive": true
+    }
+  ],
+  "selectedKinds": [
+    "math-entry",
+    "math-paste",
+    "html-fragment",
+    "cell-search",
+    "search-return"
+  ],
+  "passed": true,
+  "checkoutUnchanged": true,
+  "finishedAt": "2026-10-11T22:45:12.355Z",
+  "frames": []
+}

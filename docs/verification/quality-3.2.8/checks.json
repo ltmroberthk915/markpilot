@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "unit": {
+    "command": "node --test tools/quality/tests/*.test.cjs",
+    "total": 80,
+    "passed": 80,
+    "exitCode": 0
+  },
+  "preflight": {
+    "command": "node tools/quality/preflight.cjs",
+    "sources": 124,
+    "exitCode": 0,
+    "scope": "Source syntax/import checks, not 124 GUI scenarios"
+  },
+  "scope": "Counts overlap and are not feature coverage."
+}

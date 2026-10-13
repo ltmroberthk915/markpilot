@@ -1,5 +1,13 @@
 **[English](README.en.md)** · 中文
 
+## MarkPilot 3.3.0 · Windows
+
+默认手动保存；自动保存可在设置中开启并选择间隔。新开文档保留已有窗口与撤销历史，长文档滚动和末尾编辑更稳定，带关闭按钮的面板支持 Esc。
+
+公式预览在编辑位置附近避让，移动上限为 96 个视口像素；附近无空位时覆盖显示，滚动时不再持续重新定位。
+
+**[下载 3.3.0 安装版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.3.0/markpilot-Setup-3.3.0.exe)** · **[下载 3.3.0 便携版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.3.0/markpilot-3.3.0-portable.exe)** · [版本说明](docs/RELEASE-3.3.0.md)
+
 # MarkPilot · 万可百律
 
 > ### AI 时代，全新定义 Markdown 编辑器——万有可能，一致百「律」。
@@ -99,6 +107,8 @@ MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时�
 - 明暗主题、阅读调色盘、Ctrl+滚轮缩放
 - 弹窗 / 右键菜单 / 工具栏的透明度独立可调（10%–100%）
 - Windows 安装版 + 免安装便携版
+- **图片就地编辑**：单击图片即可在图上方改源码，预览保留；坏图也能修改链接，超长内嵌图折叠显示，复制与保存保留完整内容。
+- **公式与引用排版**：编辑公式时保留实时预览；引用内的公式、图片、代码与图表保持底纹、边线与缩进连续。
 
 ## MarkPilot vs Typora
 

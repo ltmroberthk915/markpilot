@@ -1,0 +1,207 @@
+{
+  "schema": 1,
+  "pngBytes": 789092,
+  "uniquePngFiles": 16,
+  "frames": [
+    {
+      "group": "source-quoted-math-subrange-workflows",
+      "suite": "quoted-math-subrange-workflows",
+      "caseId": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+      "stage": "03-reverse-selected",
+      "kind": "full",
+      "sha256": "ba8895bb619d335d4b9bc99c4f015981fa1e9e5676ec3ba1a21901befd84a6a0",
+      "file": "frames/ba8895bb619d335d4b9bc99c4f015981fa1e9e5676ec3ba1a21901befd84a6a0.png",
+      "bytes": 61335
+    },
+    {
+      "group": "source-quoted-math-subrange-workflows",
+      "suite": "quoted-math-subrange-workflows",
+      "caseId": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+      "stage": "03-reverse-selected",
+      "kind": "2x",
+      "sha256": "9469cf3fd4fa31e35fcf19eaddead0fc62fd17f60cfaebb16288642da3bebd33",
+      "file": "frames/9469cf3fd4fa31e35fcf19eaddead0fc62fd17f60cfaebb16288642da3bebd33.png",
+      "bytes": 11455
+    },
+    {
+      "group": "source-cell-composition-workflows",
+      "suite": "cell-composition-workflows",
+      "caseId": "cell-unicode-positive-history-continue",
+      "stage": "02-ordinary-unicode",
+      "kind": "full",
+      "sha256": "dbe694cbe518da929058317f485bf68a94d3838cf6a7acb551eb116aa2edc7be",
+      "file": "frames/dbe694cbe518da929058317f485bf68a94d3838cf6a7acb551eb116aa2edc7be.png",
+      "bytes": 58445
+    },
+    {
+      "group": "source-cell-composition-workflows",
+      "suite": "cell-composition-workflows",
+      "caseId": "cell-unicode-positive-history-continue",
+      "stage": "02-ordinary-unicode",
+      "kind": "2x",
+      "sha256": "a2f28d9889a61e8d5433b089b3f8c2ef50fe0fa146ed12e2b8fef9166337fade",
+      "file": "frames/a2f28d9889a61e8d5433b089b3f8c2ef50fe0fa146ed12e2b8fef9166337fade.png",
+      "bytes": 7854
+    },
+    {
+      "group": "source-cross-page-drag-workflows",
+      "suite": "cross-page-drag-workflows",
+      "caseId": "formula-held-wheel-loop",
+      "stage": "formula-03-released",
+      "kind": "full",
+      "sha256": "9fa6c36be0de1cbeedd50cb1ac4331a99099dae29efde553997c709044234166",
+      "file": "frames/9fa6c36be0de1cbeedd50cb1ac4331a99099dae29efde553997c709044234166.png",
+      "bytes": 224663
+    },
+    {
+      "group": "source-cross-page-drag-workflows",
+      "suite": "cross-page-drag-workflows",
+      "caseId": "formula-held-wheel-loop",
+      "stage": "formula-03-released",
+      "kind": "2x",
+      "sha256": "380c07f5975dd82fb79aecf0014f4262147048d17eef71c945ecc9a21cee4504",
+      "file": "frames/380c07f5975dd82fb79aecf0014f4262147048d17eef71c945ecc9a21cee4504.png",
+      "bytes": 37837
+    },
+    {
+      "group": "source-split-source-workflows",
+      "suite": "split-source-workflows",
+      "caseId": "active-cell-source-pane-click-immediate-edit-history-continue",
+      "stage": "04-immediate-R",
+      "kind": "full",
+      "sha256": "84dbb2a13c4f54db3e55771d3757211bf1cc67e36f58eb317f7984130f859758",
+      "file": "frames/84dbb2a13c4f54db3e55771d3757211bf1cc67e36f58eb317f7984130f859758.png",
+      "bytes": 69503
+    },
+    {
+      "group": "source-split-source-workflows",
+      "suite": "split-source-workflows",
+      "caseId": "active-cell-source-pane-click-immediate-edit-history-continue",
+      "stage": "04-immediate-R",
+      "kind": "2x",
+      "sha256": "ce18d25d638e5068e5b511104f6c5f7727a68ca7133b26f0e6d1e25d25939d4c",
+      "file": "frames/ce18d25d638e5068e5b511104f6c5f7727a68ca7133b26f0e6d1e25d25939d4c.png",
+      "bytes": 6545
+    },
+    {
+      "group": "source-split-source-workflows",
+      "suite": "split-source-workflows",
+      "caseId": "active-cell-source-pane-click-immediate-edit-history-continue",
+      "stage": "07-continued-one",
+      "kind": "full",
+      "sha256": "393afff6ecbf25d46d15093bac939e5bc1c6df657d482857bdc31869dd5120bf",
+      "file": "frames/393afff6ecbf25d46d15093bac939e5bc1c6df657d482857bdc31869dd5120bf.png",
+      "bytes": 69852
+    },
+    {
+      "group": "source-split-source-workflows",
+      "suite": "split-source-workflows",
+      "caseId": "active-cell-source-pane-click-immediate-edit-history-continue",
+      "stage": "07-continued-one",
+      "kind": "2x",
+      "sha256": "239aef59e92948d3a2df02cb9b9966868ac7ac37ac31962c4d29d09521d19381",
+      "file": "frames/239aef59e92948d3a2df02cb9b9966868ac7ac37ac31962c4d29d09521d19381.png",
+      "bytes": 6677
+    },
+    {
+      "group": "source-split-source-workflows",
+      "suite": "split-source-workflows",
+      "caseId": "active-cell-source-pane-plain-click-immediate-edit-history-continue",
+      "stage": "04-immediate-R",
+      "kind": "full",
+      "sha256": "a737f387ab1e4a7414676bae9e89e2549aaeacd0c3813fc357c69c0c779feafb",
+      "file": "frames/a737f387ab1e4a7414676bae9e89e2549aaeacd0c3813fc357c69c0c779feafb.png",
+      "bytes": 69009
+    },
+    {
+      "group": "source-split-source-workflows",
+      "suite": "split-source-workflows",
+      "caseId": "active-cell-source-pane-plain-click-immediate-edit-history-continue",
+      "stage": "04-immediate-R",
+      "kind": "2x",
+      "sha256": "e15a8e2f1f3dca2223262ae94b8742bf1d43dece9f49ff5c3aec2dc847d23afa",
+      "file": "frames/e15a8e2f1f3dca2223262ae94b8742bf1d43dece9f49ff5c3aec2dc847d23afa.png",
+      "bytes": 8091
+    },
+    {
+      "group": "source-split-source-workflows",
+      "suite": "split-source-workflows",
+      "caseId": "active-cell-source-pane-plain-click-immediate-edit-history-continue",
+      "stage": "07-continued-one",
+      "kind": "full",
+      "sha256": "0b7d1dde59e16185a376c491e8977eb514ac64d3a72524219e999917ecbb7233",
+      "file": "frames/0b7d1dde59e16185a376c491e8977eb514ac64d3a72524219e999917ecbb7233.png",
+      "bytes": 69844
+    },
+    {
+      "group": "source-split-source-workflows",
+      "suite": "split-source-workflows",
+      "caseId": "active-cell-source-pane-plain-click-immediate-edit-history-continue",
+      "stage": "07-continued-one",
+      "kind": "2x",
+      "sha256": "3aec827bd100d8064892f2bf7c38bec7582eef034f871f8f2bb8557a239d72b0",
+      "file": "frames/3aec827bd100d8064892f2bf7c38bec7582eef034f871f8f2bb8557a239d72b0.png",
+      "bytes": 8552
+    },
+    {
+      "group": "baseline-split-source-cell-owner",
+      "suite": "split-source-workflows",
+      "caseId": "active-cell-source-pane-click-immediate-edit-history-continue",
+      "stage": "04-immediate-R",
+      "kind": "full",
+      "sha256": "6566161c4d87ca081e3eed3f16b01fa456fd6fb355f58a2d0a887cd20da93bf1",
+      "file": "frames/6566161c4d87ca081e3eed3f16b01fa456fd6fb355f58a2d0a887cd20da93bf1.png",
+      "bytes": 69379
+    },
+    {
+      "group": "baseline-split-source-cell-owner",
+      "suite": "split-source-workflows",
+      "caseId": "active-cell-source-pane-click-immediate-edit-history-continue",
+      "stage": "04-immediate-R",
+      "kind": "2x",
+      "sha256": "408a4c2b7d9afadfa71a281eb7d7cd05fbd2f12ec3268523cdaf176f96dce3ee",
+      "file": "frames/408a4c2b7d9afadfa71a281eb7d7cd05fbd2f12ec3268523cdaf176f96dce3ee.png",
+      "bytes": 10051
+    },
+    {
+      "group": "mutation-red-split-source-cell-owner",
+      "suite": "split-source-workflows",
+      "caseId": "active-cell-source-pane-click-immediate-edit-history-continue",
+      "stage": "04-immediate-R",
+      "kind": "full",
+      "sha256": "6566161c4d87ca081e3eed3f16b01fa456fd6fb355f58a2d0a887cd20da93bf1",
+      "file": "frames/6566161c4d87ca081e3eed3f16b01fa456fd6fb355f58a2d0a887cd20da93bf1.png",
+      "bytes": 69379
+    },
+    {
+      "group": "mutation-red-split-source-cell-owner",
+      "suite": "split-source-workflows",
+      "caseId": "active-cell-source-pane-click-immediate-edit-history-continue",
+      "stage": "04-immediate-R",
+      "kind": "2x",
+      "sha256": "408a4c2b7d9afadfa71a281eb7d7cd05fbd2f12ec3268523cdaf176f96dce3ee",
+      "file": "frames/408a4c2b7d9afadfa71a281eb7d7cd05fbd2f12ec3268523cdaf176f96dce3ee.png",
+      "bytes": 10051
+    },
+    {
+      "group": "mutation-restored-split-source-cell-owner",
+      "suite": "split-source-workflows",
+      "caseId": "active-cell-source-pane-click-immediate-edit-history-continue",
+      "stage": "04-immediate-R",
+      "kind": "full",
+      "sha256": "84dbb2a13c4f54db3e55771d3757211bf1cc67e36f58eb317f7984130f859758",
+      "file": "frames/84dbb2a13c4f54db3e55771d3757211bf1cc67e36f58eb317f7984130f859758.png",
+      "bytes": 69503
+    },
+    {
+      "group": "mutation-restored-split-source-cell-owner",
+      "suite": "split-source-workflows",
+      "caseId": "active-cell-source-pane-click-immediate-edit-history-continue",
+      "stage": "04-immediate-R",
+      "kind": "2x",
+      "sha256": "ce18d25d638e5068e5b511104f6c5f7727a68ca7133b26f0e6d1e25d25939d4c",
+      "file": "frames/ce18d25d638e5068e5b511104f6c5f7727a68ca7133b26f0e6d1e25d25939d4c.png",
+      "bytes": 6545
+    }
+  ]
+}

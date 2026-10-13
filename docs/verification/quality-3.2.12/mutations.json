@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "passed": true,
+  "checkoutUnchanged": true,
+  "selectedKinds": [
+    "native-menu",
+    "math-gesture",
+    "menu-pending"
+  ],
+  "baselineEngine": "570aae504d0e7ccf46e77c180c861cf6d030d2421d070885340d7a41d10a79ba",
+  "mutations": [
+    {
+      "kind": "native-menu",
+      "suite": "native-menu-workflows",
+      "ids": [
+        "native-menu-body-undo-history-continue",
+        "native-menu-body-redo-history-continue",
+        "native-menu-cell-undo-history-continue",
+        "native-menu-cell-redo-history-continue",
+        "native-menu-search-undo-history-continue",
+        "native-menu-search-redo-history-continue"
+      ],
+      "controls": [
+        "native-menu-body-empty-undo-history-continue",
+        "native-menu-body-empty-redo-history-continue",
+        "native-menu-cell-empty-undo-history-continue",
+        "native-menu-cell-empty-redo-history-continue"
+      ],
+      "negativeErrors": [
+        {
+          "id": "native-menu-body-undo-history-continue",
+          "error": "actual menu undo preserves expected document history\n+ actual - expected\n\n+ 'XMENU_BASE\\n'\n- 'MENU_BASE\\n'\n"
+        },
+        {
+          "id": "native-menu-body-redo-history-continue",
+          "error": "actual menu redo preserves expected document history\n+ actual - expected\n\n+ 'MENU_BASE\\n'\n- 'XMENU_BASE\\n'\n"
+        },
+        {
+          "id": "native-menu-cell-undo-history-continue",
+          "error": "actual menu undo preserves expected document history\n+ actual - expected\n\n+ 'Before\\n\\n|H|K|\\n|---|---|\\n|a\\\\|中文b|KEEP|\\n\\nAfter\\n'\n- 'Before\\n\\n|H|K|\\n|---|---|\\n|a\\\\|b|KEEP|\\n\\nAfter\\n'\n"
+        },
+        {
+          "id": "native-menu-cell-redo-history-continue",
+          "error": "actual menu redo preserves expected document history\n+ actual - expected\n\n+ 'Before\\n\\n|H|K|\\n|---|---|\\n|a\\\\|b|KEEP|\\n\\nAfter\\n'\n- 'Before\\n\\n|H|K|\\n|---|---|\\n|a\\\\|中文b|KEEP|\\n\\nAfter\\n'\n"
+        },
+        {
+          "id": "native-menu-search-undo-history-continue",
+          "error": "search native fallback emits trusted history input on the actual search field"
+        },
+        {
+          "id": "native-menu-search-redo-history-continue",
+          "error": "search native fallback emits trusted history input on the actual search field"
+        }
+      ],
+      "redAsar": "39fdf4d3e77fd78671dbc1696730f1816140c776cdeca03ca14ffffdbb662736",
+      "greenAsar": "f794e8c23ea631afe1b66552c8674d9bd8c0a48eaf4b957b581832b57b624143",
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "positive": true
+    },
+    {
+      "kind": "math-gesture",
+      "suite": "cross-page-drag-workflows",
+      "ids": [
+        "formula-held-wheel-loop"
+      ],
+      "controls": [
+        "plain-held-wheel-loop"
+      ],
+      "negativeErrors": [
+        {
+          "id": "formula-held-wheel-loop",
+          "error": "mouseup preserves the established cross-page native range\n+ actual - expected\n\n  {\n+   anchor: 21,\n+   head: 21\n-   anchor: 18,\n-   head: 424\n  }\n"
+        }
+      ],
+      "redAsar": "833ab2166e535793038d95361a6b1940ad2e40ba0d86c4e47a887cb262db6b85",
+      "greenAsar": "f794e8c23ea631afe1b66552c8674d9bd8c0a48eaf4b957b581832b57b624143",
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "positive": true
+    },
+    {
+      "kind": "menu-pending",
+      "suite": "native-pending-image-workflows",
+      "ids": [
+        "native-menu-undo-pending-bitmap-empty-history"
+      ],
+      "controls": [
+        "native-menu-undo-pending-bitmap-nonempty-history"
+      ],
+      "negativeErrors": [
+        {
+          "id": "native-menu-undo-pending-bitmap-empty-history",
+          "error": "late image response never inserts Markdown after native Undo\n+ actual - expected\n\n+ 'EMPTY_PENDING_BASE\\n![](assets/pasted-image.png)'\n- 'EMPTY_PENDING_BASE\\n'\n                       ^\n"
+        }
+      ],
+      "redAsar": "6eb657f3f72abb6d55be532cc1abacb47f4118ec700706820534522550cac69b",
+      "greenAsar": "f794e8c23ea631afe1b66552c8674d9bd8c0a48eaf4b957b581832b57b624143",
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "positive": true
+    }
+  ],
+  "scope": "Only empty-history pending is the new cancellation negative; nonempty remains a positive control. Native menu has six negative cases and four empty-owner API/no-op controls."
+}

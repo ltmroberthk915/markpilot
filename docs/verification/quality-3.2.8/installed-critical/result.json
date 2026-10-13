@@ -1,0 +1,2080 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T18:56:19.375Z",
+  "cases": [
+    {
+      "id": "windows-bitmap-control-v-assets",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "text": "---\nmp-image-mode: assets\n---\n\n图片正文\n",
+            "selection": {
+              "anchor": 36,
+              "head": 36
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 160.5,
+              "y": 200.0859375,
+              "width": 0,
+              "height": 16,
+              "top": 200.0859375,
+              "right": 160.5,
+              "bottom": 216.0859375,
+              "left": 160.5
+            },
+            "scrollTop": 0,
+            "title": "primary-bom-crlf.md · 37 字 — MarkPilot",
+            "banner": ""
+          },
+          "clipboard": {
+            "ok": true,
+            "hasImage": true,
+            "width": 400,
+            "height": 160,
+            "textLen": 0
+          }
+        },
+        {
+          "after": {
+            "text": "---\nmp-image-mode: assets\n---\n\n图片正文\n![](assets/pasted-image.png)",
+            "selection": {
+              "anchor": 64,
+              "head": 64
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 560.5,
+              "right": 560.5,
+              "top": 195.5859375,
+              "bottom": 363.28125
+            },
+            "scrollTop": 0,
+            "title": "primary-bom-crlf.md · 64 字 — MarkPilot",
+            "banner": ""
+          },
+          "events": [
+            {
+              "trusted": true,
+              "types": [
+                "Files"
+              ],
+              "items": [
+                {
+                  "kind": "file",
+                  "type": "image/png"
+                }
+              ],
+              "files": [
+                {
+                  "type": "image/png",
+                  "size": 9990
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "immediateImages": [
+            {
+              "complete": true,
+              "width": 400,
+              "height": 160,
+              "visible": true
+            }
+          ]
+        },
+        {
+          "asset": "pasted-image.png",
+          "bytes": 9990,
+          "sha256": "ec4d03c0465dc2f4b3bdeeeae7f7bd90d5530208a4afc42d03d9abdc5c634911"
+        }
+      ],
+      "detail": {
+        "images": [
+          {
+            "complete": true,
+            "width": 0,
+            "height": 0
+          },
+          {
+            "complete": true,
+            "width": 400,
+            "height": 160
+          },
+          {
+            "complete": true,
+            "width": 0,
+            "height": 0
+          }
+        ]
+      },
+      "ms": 3877
+    },
+    {
+      "id": "windows-bitmap-control-v-inline",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "text": "---\nmp-image-mode: inline\n---\n\n图片正文\n",
+            "selection": {
+              "anchor": 36,
+              "head": 36
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 160.5,
+              "y": 200.0859375,
+              "width": 0,
+              "height": 16,
+              "top": 200.0859375,
+              "right": 160.5,
+              "bottom": 216.0859375,
+              "left": 160.5
+            },
+            "scrollTop": 0,
+            "title": "primary-bom-crlf.md · 66 字 — MarkPilot",
+            "banner": ""
+          },
+          "clipboard": {
+            "ok": true,
+            "hasImage": true,
+            "width": 400,
+            "height": 160,
+            "textLen": 0
+          }
+        },
+        {
+          "after": {
+            "text": {
+              "characters": 13383,
+              "sha256": "fe2d7efd01d0a7f49bd590fbae089271061b9897605c292bd407359059314368",
+              "preview": "---\nmp-image-mode: inline\n---\n\n图片正文\n![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAACgCAIAAACt0K2CAAAgAElEQVR4Ae2c918Tyf/H/U8OkwBJkKL0ai9nL1gQG9gABUQEsaCIolgAgVBCLwIqoChVEAihJCGE9N1NaPdf3P34vc3guGwC5yF339tP3o/HPvJ4Z3fq8z3zmtmZ3V0n3rARDiAABIAAJwisE3\n…\nAEQLBAsIAAEOEMABIszrsKDDBhAwGkJgGCBYAEBIMAZAiBYnHGV0w6qUHEggAmAYIFgAQEgwBkCIFiccRUeZMAAAk5LAAQLBAsIAAHOEADB4oyrnHZQhYoDAUwABAsECwgAAc4QAMHijKvwIAMGEHBaAiBYIFhAAAhwhgAIFmdc5bSDKlQcCGACIFggWEAACHCGAAgWZ1yFBxkwgIDTEgDBAsECAkCAMwT+D/nKE4GOivRLAAAAAElFTkSuQmCC)"
+            },
+            "selection": {
+              "anchor": 13383,
+              "head": 13383
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 560.5,
+              "right": 560.5,
+              "top": 195.5859375,
+              "bottom": 363.28125
+            },
+            "scrollTop": 0,
+            "title": "primary-bom-crlf.md · 13383 字 — MarkPilot",
+            "banner": ""
+          },
+          "events": [
+            {
+              "trusted": true,
+              "types": [
+                "Files"
+              ],
+              "items": [
+                {
+                  "kind": "file",
+                  "type": "image/png"
+                }
+              ],
+              "files": [
+                {
+                  "type": "image/png",
+                  "size": 9990
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "immediateImages": [
+            {
+              "complete": true,
+              "width": 400,
+              "height": 160,
+              "visible": true
+            }
+          ]
+        }
+      ],
+      "detail": {
+        "images": [
+          {
+            "complete": true,
+            "width": 0,
+            "height": 0
+          },
+          {
+            "complete": true,
+            "width": 400,
+            "height": 160
+          },
+          {
+            "complete": true,
+            "width": 0,
+            "height": 0
+          }
+        ]
+      },
+      "ms": 3809
+    },
+    {
+      "id": "bitmap-frontmatter-is-explicitly-refused",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "---\nmp-image-mode: assets\n---\n\n正文\n",
+            "selection": {
+              "anchor": 5,
+              "head": 5
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 172.828125,
+              "right": 172.828125,
+              "top": 89.5,
+              "bottom": 105.5
+            },
+            "scrollTop": 0,
+            "title": "primary-bom-crlf.md · 13385 字 — MarkPilot",
+            "banner": ""
+          },
+          "toast": "光标在文档头部信息区，请移到正文再粘贴"
+        }
+      ],
+      "detail": {
+        "toast": "光标在文档头部信息区，请移到正文再粘贴"
+      },
+      "ms": 661
+    },
+    {
+      "id": "bitmap-paste-after-plain-paste-shortcut",
+      "status": "pass",
+      "trace": [
+        {
+          "plainPaste": {
+            "text": "正文\n",
+            "selection": {
+              "anchor": 3,
+              "head": 3
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 160.5,
+              "y": 79.6953125,
+              "width": 0,
+              "height": 16,
+              "top": 79.6953125,
+              "right": 160.5,
+              "bottom": 95.6953125,
+              "left": 160.5
+            },
+            "scrollTop": 0,
+            "title": "primary-bom-crlf.md · 13385 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "ordinaryPaste": {
+            "text": "正文\n![](assets/pasted-image.png)",
+            "selection": {
+              "anchor": 31,
+              "head": 31
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 560.5,
+              "right": 560.5,
+              "top": 75.1953125,
+              "bottom": 242.890625
+            },
+            "scrollTop": 0,
+            "title": "primary-bom-crlf.md · 31 字 — MarkPilot",
+            "banner": ""
+          },
+          "events": [
+            {
+              "trusted": true,
+              "types": [],
+              "items": [],
+              "files": []
+            },
+            {
+              "trusted": true,
+              "types": [
+                "Files"
+              ],
+              "items": [
+                {
+                  "kind": "file",
+                  "type": "image/png"
+                }
+              ],
+              "files": [
+                {
+                  "type": "image/png",
+                  "size": 9990
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "ms": 1379
+    },
+    {
+      "id": "unsaved-document-bitmap-paste-falls-back-inline",
+      "status": "pass",
+      "trace": [
+        {
+          "nativeKey": {
+            "ok": true,
+            "input": {
+              "type": "keyDown",
+              "keyCode": "N",
+              "modifiers": [
+                "control"
+              ]
+            },
+            "wasFocused": true,
+            "focused": true,
+            "focusWaitedMs": 0
+          }
+        },
+        {
+          "text": {
+            "characters": 13353,
+            "sha256": "c781f1e7d36776590f5a052d69e011a90263d003f2d550cfd230929af1d97d83",
+            "preview": "未命名截图\n![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAACgCAIAAACt0K2CAAAgAElEQVR4Ae2c918Tyf/H/U8OkwBJkKL0ai9nL1gQG9gABUQEsaCIolgAgVBCLwIqoChVEAihJCGE9N1NaPdf3P34vc3guGwC5yF339tP3o/HPvJ4Z3fq8z3zmtmZ3V0n3rARDiAABIAAJwisE3n4wAEEgAAQ4ASBdUKxNxxAAAgAAU4Q\n…\nAEQLBAsIAAEOEMABIszrsKDDBhAwGkJgGCBYAEBIMAZAiBYnHGV0w6qUHEggAmAYIFgAQEgwBkCIFiccRUeZMAAAk5LAAQLBAsIAAHOEADB4oyrnHZQhYoDAUwABAsECwgAAc4QAMHijKvwIAMGEHBaAiBYIFhAAAhwhgAIFmdc5bSDKlQcCGACIFggWEAACHCGAAgWZ1yFBxkwgIDTEgDBAsECAkCAMwT+D/nKE4GOivRLAAAAAElFTkSuQmCC)"
+          },
+          "selection": {
+            "anchor": 13353,
+            "head": 13353
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 560.5,
+            "right": 560.5,
+            "top": 75.1953125,
+            "bottom": 242.890625
+          },
+          "scrollTop": 0,
+          "title": "● 未命名 · 13353 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 2770
+    },
+    {
+      "id": "fenced-code-enter-preserves-literal-list",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "text": "```shell\n- install foo\n```\n",
+            "selection": {
+              "anchor": 22,
+              "head": 22
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 252.140625,
+              "right": 252.140625,
+              "top": 70.4375,
+              "bottom": 84.4375
+            },
+            "scrollTop": 0,
+            "title": "primary-bom-crlf.md · 31 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "after": {
+            "text": "```shell\n- install foo\n\n```\n",
+            "selection": {
+              "anchor": 23,
+              "head": 23
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 161.5,
+              "y": 88.875,
+              "width": 0,
+              "height": 14,
+              "top": 88.875,
+              "right": 161.5,
+              "bottom": 102.875,
+              "left": 161.5
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 28 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 396
+    },
+    {
+      "id": "list-home-enter-does-not-duplicate-marker",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "\n- 项目\n",
+          "selection": {
+            "anchor": 1,
+            "head": 1
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 160.5,
+            "right": 160.5,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "● primary-bom-crlf.md · 6 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 410
+    },
+    {
+      "id": "math-completion-prose-enter",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "text": "计算 $\\fra",
+            "selection": {
+              "anchor": 8,
+              "head": 8
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 224.3203125,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 224.3203125,
+              "bottom": 70.5,
+              "left": 224.3203125
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 8 字 — MarkPilot",
+            "banner": ""
+          },
+          "selected": "\\frac"
+        },
+        {
+          "after": {
+            "text": "计算 $\\frac{}{}",
+            "selection": {
+              "anchor": 10,
+              "head": 10
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 236.703125,
+              "right": 236.703125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 13 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 469
+    },
+    {
+      "id": "math-completion-prose-tab",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "text": "计算 $\\fra",
+            "selection": {
+              "anchor": 8,
+              "head": 8
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 224.3203125,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 224.3203125,
+              "bottom": 70.5,
+              "left": 224.3203125
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 8 字 — MarkPilot",
+            "banner": ""
+          },
+          "selected": "\\frac"
+        },
+        {
+          "after": {
+            "text": "计算 $\\frac{}{}",
+            "selection": {
+              "anchor": 10,
+              "head": 10
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 236.703125,
+              "right": 236.703125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 13 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 471
+    },
+    {
+      "id": "math-completion-list-enter",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "text": "- 计算 $\\fra",
+            "selection": {
+              "anchor": 10,
+              "head": 10
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 233.1953125,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 233.1953125,
+              "bottom": 70.5,
+              "left": 233.1953125
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 10 字 — MarkPilot",
+            "banner": ""
+          },
+          "selected": "\\frac"
+        },
+        {
+          "after": {
+            "text": "- 计算 $\\frac{}{}",
+            "selection": {
+              "anchor": 12,
+              "head": 12
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 245.578125,
+              "right": 245.578125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 15 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 536
+    },
+    {
+      "id": "math-completion-list-tab",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "text": "- 计算 $\\fra",
+            "selection": {
+              "anchor": 10,
+              "head": 10
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 233.1953125,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 233.1953125,
+              "bottom": 70.5,
+              "left": 233.1953125
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 10 字 — MarkPilot",
+            "banner": ""
+          },
+          "selected": "\\frac"
+        },
+        {
+          "after": {
+            "text": "- 计算 $\\frac{}{}",
+            "selection": {
+              "anchor": 12,
+              "head": 12
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 245.578125,
+              "right": 245.578125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 15 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 534
+    },
+    {
+      "id": "quoted-fence-does-not-render-table",
+      "status": "pass",
+      "trace": [
+        {
+          "tables": 0,
+          "text": "起点\n\n> ```\n> | a | b |\n> | --- | --- |\n> ```\n\n"
+        }
+      ],
+      "ms": 745
+    },
+    {
+      "id": "quoted-fence-tab-keeps-editor-focus",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "> ```\n>   const a = 1\n> ```\n",
+          "selection": {
+            "anchor": 10,
+            "head": 10
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 189.8671875,
+            "right": 189.8671875,
+            "top": 73.03125,
+            "bottom": 86.03125
+          },
+          "scrollTop": 0,
+          "title": "● primary-bom-crlf.md · 28 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 166
+    },
+    {
+      "id": "hashtag-without-space-is-not-heading",
+      "status": "pass",
+      "trace": [
+        [
+          {
+            "text": "起点",
+            "class": "cm-line cm-activeLine"
+          },
+          {
+            "text": "#话题",
+            "class": "cm-line"
+          },
+          {
+            "text": "",
+            "class": "cm-line"
+          }
+        ]
+      ],
+      "ms": 389
+    },
+    {
+      "id": "ordered-list-export-preserves-numbering",
+      "status": "pass",
+      "trace": [
+        {
+          "body": "\n\n甲\n乙\n\n\n\n\n\n",
+          "ol": 1,
+          "ul": 0,
+          "pre": [],
+          "tables": []
+        }
+      ],
+      "ms": 247
+    },
+    {
+      "id": "tilde-fence-export-preserves-code",
+      "status": "pass",
+      "trace": [
+        {
+          "editorLines": [
+            {
+              "text": "起点",
+              "class": "cm-line cm-activeLine"
+            },
+            {
+              "text": "~~~text",
+              "class": "cm-line mp-fence mp-code"
+            },
+            {
+              "text": "*x* $y$",
+              "class": "cm-line mp-code"
+            },
+            {
+              "text": "~~~",
+              "class": "cm-line mp-fence mp-code"
+            },
+            {
+              "text": "",
+              "class": "cm-line"
+            }
+          ]
+        },
+        {
+          "body": "\n\n*x* $y$\n\n\n\n\n\n",
+          "ol": 0,
+          "ul": 0,
+          "pre": [
+            "\n*x* $y$\n"
+          ],
+          "tables": []
+        }
+      ],
+      "ms": 345
+    },
+    {
+      "id": "wide-dash-table-export-matches-editor",
+      "status": "pass",
+      "trace": [
+        {
+          "visible": 2,
+          "html": {
+            "body": "\nab\n12\n\n\n\n\n\n",
+            "ol": 0,
+            "ul": 0,
+            "pre": [],
+            "tables": [
+              [
+                [
+                  "a",
+                  "b"
+                ],
+                [
+                  "1",
+                  "2"
+                ]
+              ]
+            ]
+          }
+        }
+      ],
+      "ms": 350
+    },
+    {
+      "id": "windows-format-undo-control-y-redo",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "前文 **target** 后文",
+          "selection": {
+            "anchor": 11,
+            "head": 11
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 248.2109375,
+            "right": 248.2109375,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● primary-bom-crlf.md · 16 字 — MarkPilot",
+          "banner": ""
+        },
+        {
+          "text": "前文 target 后文",
+          "selection": {
+            "anchor": 3,
+            "head": 9
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 228.2265625,
+            "right": 228.2265625,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● primary-bom-crlf.md · 12 字 — MarkPilot",
+          "banner": ""
+        },
+        {
+          "text": "前文 **target** 后文",
+          "selection": {
+            "anchor": 3,
+            "head": 13
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 261.7109375,
+            "right": 261.7109375,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● primary-bom-crlf.md · 16 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 224
+    },
+    {
+      "id": "underline-empty-toggle-removes-entire-closing-tag",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "text": "<u></u>",
+            "selection": {
+              "anchor": 3,
+              "head": 3
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 186.5703125,
+              "right": 186.5703125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 7 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "after": {
+            "text": "",
+            "selection": {
+              "anchor": 0,
+              "head": 0
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 160.5,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 160.5,
+              "bottom": 70.5,
+              "left": 160.5
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 444
+    },
+    {
+      "id": "secondary-save-preserves-own-bom-eol",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "selection": {
+              "anchor": 41,
+              "head": 41
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 218.6328125,
+              "right": 218.6328125,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "scrollTop": 0,
+            "title": "secondary-lf.md · 41 字 — MarkPilot",
+            "banner": ""
+          },
+          "diskHex": "425f444f43554d454e545f53454e54494e454c0a5345434f4e4420434f4e54454e540a422d45444954",
+          "primaryDisk": "﻿A_DOCUMENT_SENTINEL\r\n\r\nPRIMARY CONTENT\r\nA-EDIT",
+          "infoA": {
+            "documentId": "85d8ce62-b380-4453-b3d1-8e3fd6a89dbb",
+            "revision": 32,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.8-critical\\primary-bom-crlf.md",
+            "text": "A_DOCUMENT_SENTINEL\n\nPRIMARY CONTENT\nA-EDIT",
+            "bom": true,
+            "eol": "\r\n",
+            "encoding": "utf8"
+          },
+          "infoB": {
+            "documentId": "dcc11147-ad92-4316-9c60-d7f9a334ea0b",
+            "revision": 1,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.8-critical\\secondary-lf.md",
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "bom": false,
+            "eol": "\n",
+            "encoding": "utf8"
+          }
+        }
+      ],
+      "ms": 1375
+    },
+    {
+      "id": "secondary-save-keeps-both-saved-texts",
+      "status": "pass",
+      "trace": [
+        {
+          "infoA": {
+            "documentId": "85d8ce62-b380-4453-b3d1-8e3fd6a89dbb",
+            "revision": 32,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.8-critical\\primary-bom-crlf.md",
+            "text": "A_DOCUMENT_SENTINEL\n\nPRIMARY CONTENT\nA-EDIT",
+            "bom": true,
+            "eol": "\r\n",
+            "encoding": "utf8"
+          },
+          "infoB": {
+            "documentId": "dcc11147-ad92-4316-9c60-d7f9a334ea0b",
+            "revision": 1,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.8-critical\\secondary-lf.md",
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "bom": false,
+            "eol": "\n",
+            "encoding": "utf8"
+          }
+        }
+      ],
+      "ms": 7
+    },
+    {
+      "id": "primary-pdf-exports-primary-with-secondary-open",
+      "status": "pass",
+      "trace": [
+        {
+          "ok": true,
+          "file": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.8-critical\\primary.pdf",
+          "bytes": 53843,
+          "pages": 1,
+          "ms": 203,
+          "printMs": 175,
+          "chunks": 1,
+          "html": {
+            "file": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.8-critical\\runtime-temp\\markpilot-pdf-OtfakC\\MarkPilot 导出.html",
+            "bytes": 373113,
+            "relImages": 0,
+            "dataImages": 0,
+            "remoteImages": 0,
+            "tables": 0,
+            "mathBlocks": 0
+          },
+          "images": {
+            "complete": 0,
+            "natural": 0,
+            "broken": 0,
+            "ms": 124
+          },
+          "gate": {
+            "passed": true,
+            "reasons": [],
+            "inlineDataImages": 0,
+            "relImages": 0
+          },
+          "memory": {
+            "peakMB": 933.5,
+            "lastMB": 933.5,
+            "samples": 2,
+            "intervalMs": 200,
+            "perProc": [
+              {
+                "type": "GPU",
+                "pid": 84936,
+                "peakMB": 411.5
+              },
+              {
+                "type": "Tab",
+                "pid": 88792,
+                "peakMB": 135
+              },
+              {
+                "type": "Browser",
+                "pid": 84112,
+                "peakMB": 120.6
+              },
+              {
+                "type": "Tab",
+                "pid": 70752,
+                "peakMB": 118.8
+              },
+              {
+                "type": "Tab",
+                "pid": 58564,
+                "peakMB": 97.1
+              },
+              {
+                "type": "Utility",
+                "pid": 52068,
+                "peakMB": 50.6
+              }
+            ],
+            "seriesMB": [
+              811,
+              934,
+              934
+            ]
+          },
+          "phases": [
+            {
+              "bytes": 373113,
+              "relImages": 0,
+              "dataImages": 0,
+              "tables": 0,
+              "phase": "inspect",
+              "ms": 8
+            },
+            {
+              "signal": "dom-ready",
+              "loadMs": 96,
+              "phase": "load",
+              "ms": 120
+            },
+            {
+              "total": 0,
+              "local": 0,
+              "remote": 0,
+              "complete": 0,
+              "natural": 0,
+              "broken": 0,
+              "remotePending": 0,
+              "partial": false,
+              "readyState": "complete",
+              "ms": 124,
+              "phase": "images"
+            },
+            {
+              "mathCssBytes": 369219,
+              "phase": "style",
+              "ms": 130
+            },
+            {
+              "applied": 3,
+              "lines": 3,
+              "blocks": 3,
+              "width": 680.64,
+              "fallback": {},
+              "phase": "typeset",
+              "ms": 135
+            },
+            {
+              "bytes": 53843,
+              "pages": 1,
+              "phase": "print",
+              "ms": 173
+            },
+            {
+              "done": 53843,
+              "bytes": 53843,
+              "chunks": 1,
+              "phase": "write",
+              "ms": 174
+            },
+            {
+              "bytes": 53843,
+              "chunks": 1,
+              "writeMs": 1,
+              "phase": "write-done",
+              "ms": 175
+            }
+          ],
+          "kp": {
+            "applied": 3,
+            "lines": 3,
+            "fallback": {},
+            "blocks": 3,
+            "width": 680.64,
+            "sourceBytes": 129,
+            "sourceChars": 43
+          },
+          "mathCss": {
+            "source": "engine",
+            "bytes": 369219
+          }
+        },
+        {
+          "htmlBody": "\nA_DOCUMENT_SENTINEL\n\nPRIMARY CONTENT\nA-EDIT\n\n\n\n"
+        }
+      ],
+      "ms": 286
+    },
+    {
+      "id": "secondary-save-as-keeps-primary-path",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "documentId": "85d8ce62-b380-4453-b3d1-8e3fd6a89dbb",
+            "revision": 32,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.8-critical\\primary-bom-crlf.md",
+            "text": "A_DOCUMENT_SENTINEL\n\nPRIMARY CONTENT\nA-EDIT",
+            "bom": true,
+            "eol": "\r\n",
+            "encoding": "utf8"
+          },
+          "after": {
+            "documentId": "85d8ce62-b380-4453-b3d1-8e3fd6a89dbb",
+            "revision": 32,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.8-critical\\primary-bom-crlf.md",
+            "text": "A_DOCUMENT_SENTINEL\n\nPRIMARY CONTENT\nA-EDIT",
+            "bom": true,
+            "eol": "\r\n",
+            "encoding": "utf8"
+          },
+          "infoB": {
+            "documentId": "dcc11147-ad92-4316-9c60-d7f9a334ea0b",
+            "revision": 1,
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.8-critical\\secondary-save-as.md",
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "bom": false,
+            "eol": "\n",
+            "encoding": "utf8"
+          },
+          "primaryDisk": "﻿A_DOCUMENT_SENTINEL\r\n\r\nPRIMARY CONTENT\r\nA-EDIT"
+        }
+      ],
+      "ms": 1248
+    },
+    {
+      "id": "utf16-chinese-safe-open-and-edit",
+      "status": "pass",
+      "trace": [
+        {
+          "opened": {
+            "ok": true
+          }
+        },
+        {
+          "beforeHex": "fffe2d4e87654b6dd58b70656e63b08b555f",
+          "loaded": {
+            "text": "中文测试数据记录",
+            "selection": {
+              "anchor": 8,
+              "head": 8
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 282.5,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 282.5,
+              "bottom": 70.5,
+              "left": 282.5
+            },
+            "scrollTop": 0,
+            "title": "utf16-chinese.md · 8 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "afterHex": "fffe2d4e87654b6dd58b70656e63b08b555ffd8fa052",
+          "after": {
+            "text": "中文测试数据记录追加",
+            "selection": {
+              "anchor": 10,
+              "head": 10
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 310.5,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 310.5,
+              "bottom": 70.5,
+              "left": 310.5
+            },
+            "scrollTop": 0,
+            "title": "utf16-chinese.md · 10 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 1771
+    },
+    {
+      "id": "unsaved-native-close-control-keeps-window-open",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "text": "UNSAVED CONTROL DRAFT",
+            "selection": {
+              "anchor": 21,
+              "head": 21
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 349.0390625,
+              "right": 349.0390625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● 未命名 · 21 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "clicked": {
+            "ok": true,
+            "id": "menu-close-window",
+            "forced": true,
+            "enabled": true
+          }
+        },
+        {
+          "primaryClosed": false
+        }
+      ],
+      "ms": 1083
+    },
+    {
+      "id": "secondary-save-does-not-clear-primary-unsaved-close-guard",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "text": "UNSAVED PRIMARY DRAFT",
+            "selection": {
+              "anchor": 21,
+              "head": 21
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 346.1640625,
+              "right": 346.1640625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● 未命名 · 21 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "afterSave": {
+            "text": "UNSAVED PRIMARY DRAFT",
+            "selection": {
+              "anchor": 21,
+              "head": 21
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 346.1640625,
+              "right": 346.1640625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● 未命名 · 21 字 — MarkPilot",
+            "banner": ""
+          },
+          "secondaryDisk": "SECONDARY GUARD FIXTURE\nSAVED SECONDARY"
+        },
+        {
+          "clicked": {
+            "ok": true,
+            "id": "menu-close-window",
+            "forced": true,
+            "enabled": true
+          }
+        },
+        {
+          "primaryClosed": false
+        }
+      ],
+      "ms": 2985
+    }
+  ],
+  "frames": [
+    {
+      "file": "clipboard-assets.png",
+      "sha256": "324e5739c5caded6b0e82e6242c856a5b8ede4a51abb151b46b42445db2ea084",
+      "caret": {
+        "left": 560.5,
+        "right": 560.5,
+        "top": 195.5859375,
+        "bottom": 363.28125
+      },
+      "zoom": {
+        "file": "clipboard-assets-caret-2x.png",
+        "sha256": "3dd7798022f394f4621f75835b2558f630c04c6e5414d0eabe481c8c8aa57d0c",
+        "clip": {
+          "x": 440.5,
+          "y": 170.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "clipboard-assets-reopened.png",
+      "sha256": "3b438e9fd7e94b318c8f35a37874e58822d124a8a5c859a2256f3fef7288bb35",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "clipboard-assets-reopened-caret-2x.png",
+        "sha256": "0bdafc219df3987532d56472af6c685e26da59fd7f593e883d8ff0de42da3be4",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "clipboard-inline.png",
+      "sha256": "30f8613abda2decbbd0d48fc3a824403f1ab15addbf55718db6491b822184605",
+      "caret": {
+        "left": 560.5,
+        "right": 560.5,
+        "top": 195.5859375,
+        "bottom": 363.28125
+      },
+      "zoom": {
+        "file": "clipboard-inline-caret-2x.png",
+        "sha256": "3dd7798022f394f4621f75835b2558f630c04c6e5414d0eabe481c8c8aa57d0c",
+        "clip": {
+          "x": 440.5,
+          "y": 170.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "clipboard-inline-reopened.png",
+      "sha256": "84b9bcce4487c7cbb980ac2ddf3da39075984690ef00c07cf04e3d8b7e3dbc44",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "clipboard-inline-reopened-caret-2x.png",
+        "sha256": "b16a9fefafb1575967a57e8ac21903e8cc6666e6f542fa52ce11ae8b9740f19c",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "clipboard-unsaved.png",
+      "sha256": "4716d80e2934e9ebb93baf26b5efa867f4591a62229f5ff067537fd84c7e4721",
+      "caret": {
+        "left": 560.5,
+        "right": 560.5,
+        "top": 75.1953125,
+        "bottom": 242.890625
+      },
+      "zoom": {
+        "file": "clipboard-unsaved-caret-2x.png",
+        "sha256": "fb3ee6dd40bd1a2ec4b312f211c4ad691359b749e87eb4a3ffdb9896402add9c",
+        "clip": {
+          "x": 440.5,
+          "y": 50.1953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "fenced-enter.png",
+      "sha256": "0d6a9c02bc88245e96fddb7e549ed38204ef0a5e523c28268aae006c49f5896b",
+      "caret": {
+        "x": 161.5,
+        "y": 88.875,
+        "width": 0,
+        "height": 14,
+        "top": 88.875,
+        "right": 161.5,
+        "bottom": 102.875,
+        "left": 161.5
+      },
+      "zoom": {
+        "file": "fenced-enter-caret-2x.png",
+        "sha256": "29f493336075117c2742343754b4fb75b92018ad73dee60a1af041a90ca046ea",
+        "clip": {
+          "x": 41.5,
+          "y": 63.875,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "list-home-enter.png",
+      "sha256": "ca68fdcf0d9abf2f60a4774729adbe6b26e2cdc29209810c394336047b278085",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "list-home-enter-caret-2x.png",
+        "sha256": "d153c079a89ab93fa2b52b3d828541f76c2fbc5f55291f0b54aaeb6117e56a32",
+        "clip": {
+          "x": 40.5,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "completion-prose-enter.png",
+      "sha256": "4584724f9c6e70f6aae900551bb4df6c6381f351f0265e5da66dc5c6b54d4eec",
+      "caret": {
+        "left": 236.703125,
+        "right": 236.703125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "completion-prose-enter-caret-2x.png",
+        "sha256": "053ef27a7e9e798d3fb49175c2300fd5b22dcbc49097a75d8fdb181d91620d0e",
+        "clip": {
+          "x": 116.703125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "completion-prose-tab.png",
+      "sha256": "4584724f9c6e70f6aae900551bb4df6c6381f351f0265e5da66dc5c6b54d4eec",
+      "caret": {
+        "left": 236.703125,
+        "right": 236.703125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "completion-prose-tab-caret-2x.png",
+        "sha256": "053ef27a7e9e798d3fb49175c2300fd5b22dcbc49097a75d8fdb181d91620d0e",
+        "clip": {
+          "x": 116.703125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "completion-list-enter.png",
+      "sha256": "e50a71d816c6616fc9cdde612f6353f961321d813bf6ea27be24d815a8273de6",
+      "caret": {
+        "left": 245.578125,
+        "right": 245.578125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "completion-list-enter-caret-2x.png",
+        "sha256": "6ed01724ddc8fc884e64c8f0720e27f08f26fbeeab5550e19213fdb091f4cb2c",
+        "clip": {
+          "x": 125.578125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "completion-list-tab.png",
+      "sha256": "e50a71d816c6616fc9cdde612f6353f961321d813bf6ea27be24d815a8273de6",
+      "caret": {
+        "left": 245.578125,
+        "right": 245.578125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "completion-list-tab-caret-2x.png",
+        "sha256": "6ed01724ddc8fc884e64c8f0720e27f08f26fbeeab5550e19213fdb091f4cb2c",
+        "clip": {
+          "x": 125.578125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "quoted-fence-table.png",
+      "sha256": "a04663eb9dca0a5518efbcf82b709df9ca1997a9f58785a5712084f4c675d852",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "quoted-fence-table-caret-2x.png",
+        "sha256": "031ea1f838f743f23e4fcf3531ef2a7c7df0737b3ddaebb86c619693b4f48aed",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "hashtag.png",
+      "sha256": "843f19423dee0448aaf28077a7d2d688012a4ba6a6082990349b240739405fdc",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "hashtag-caret-2x.png",
+        "sha256": "b6471a12e7a95becef82a89f18dfb52b04c2b408df3c110683fa620f998d9268",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "underline-empty-toggle.png",
+      "sha256": "ec287cd6414d5c8c615a747573407861cfe4c473fd1c4e03b71937bf602fee77",
+      "caret": {
+        "x": 160.5,
+        "y": 54.5,
+        "width": 0,
+        "height": 16,
+        "top": 54.5,
+        "right": 160.5,
+        "bottom": 70.5,
+        "left": 160.5
+      },
+      "zoom": {
+        "file": "underline-empty-toggle-caret-2x.png",
+        "sha256": "6ca1063e6d37ff320405d6729343150366747e32d11a8761fac37945616a7759",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "secondary-save.png",
+      "sha256": "0ba12b8db7ae920798da44de44439b5ae229a1513df7a4657a170f78d3a60863",
+      "caret": {
+        "left": 218.6328125,
+        "right": 218.6328125,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "secondary-save-caret-2x.png",
+        "sha256": "927cbab9cced00b7920117f631ca721d2bbfb53555195c60187414396bc3508c",
+        "clip": {
+          "x": 98.6328125,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "utf16-open.png",
+      "sha256": "47d84b4b4d88e0728f3906de80d6d6630574c3b2f21aeb9d6a169a2f270aa5fe",
+      "caret": {
+        "x": 282.5,
+        "y": 54.5,
+        "width": 0,
+        "height": 16,
+        "top": 54.5,
+        "right": 282.5,
+        "bottom": 70.5,
+        "left": 282.5
+      },
+      "zoom": {
+        "file": "utf16-open-caret-2x.png",
+        "sha256": "ff6f9270b42a7d8407c3d2fc8eaed272e0e688a25e07dffe21eefc69eb884196",
+        "clip": {
+          "x": 162.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "unsaved-primary-before.png",
+      "sha256": "e66ce075decdcd3529e40c07b7c3b59443e24b729b1fbbb07ee19bcfaab918d4",
+      "caret": {
+        "left": 346.1640625,
+        "right": 346.1640625,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "unsaved-primary-before-caret-2x.png",
+        "sha256": "c8eb00c687eed669ac444c74b285a4c035754d9b5d230333f3d5e54d6e5d06d9",
+        "clip": {
+          "x": 226.1640625,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ],
+  "observations": [
+    {
+      "id": "repeat-format-after-typing",
+      "key": "Control+b",
+      "open": "**",
+      "close": "**",
+      "state": {
+        "text": "**词体******",
+        "selection": {
+          "anchor": 6,
+          "head": 6
+        },
+        "focus": true,
+        "activeElement": {
+          "tag": "DIV",
+          "class": "cm-content cm-lineWrapping"
+        },
+        "caret": {
+          "left": 202.546875,
+          "right": 202.546875,
+          "top": 54.5,
+          "bottom": 70.5
+        },
+        "scrollTop": 0,
+        "title": "● primary-bom-crlf.md · 10 字 — MarkPilot",
+        "banner": ""
+      }
+    },
+    {
+      "id": "repeat-format-after-typing",
+      "key": "Control+i",
+      "open": "*",
+      "close": "*",
+      "state": {
+        "text": "*词体***",
+        "selection": {
+          "anchor": 4,
+          "head": 4
+        },
+        "focus": true,
+        "activeElement": {
+          "tag": "DIV",
+          "class": "cm-content cm-lineWrapping"
+        },
+        "caret": {
+          "left": 209.8046875,
+          "right": 209.8046875,
+          "top": 57.5,
+          "bottom": 73.5
+        },
+        "scrollTop": 0,
+        "title": "● primary-bom-crlf.md · 6 字 — MarkPilot",
+        "banner": ""
+      }
+    },
+    {
+      "id": "repeat-format-after-typing",
+      "key": "Control+u",
+      "open": "<u>",
+      "close": "</u>",
+      "state": {
+        "text": "<u>词体<u></u></u>",
+        "selection": {
+          "anchor": 8,
+          "head": 8
+        },
+        "focus": true,
+        "activeElement": {
+          "tag": "DIV",
+          "class": "cm-content cm-lineWrapping"
+        },
+        "caret": {
+          "left": 240.640625,
+          "right": 240.640625,
+          "top": 54.5,
+          "bottom": 70.5
+        },
+        "scrollTop": 0,
+        "title": "● primary-bom-crlf.md · 16 字 — MarkPilot",
+        "banner": ""
+      }
+    },
+    {
+      "id": "repeat-format-after-typing",
+      "key": "Alt+Shift+5",
+      "open": "~~",
+      "close": "~~",
+      "state": {
+        "text": "~~词体~~~~~~",
+        "selection": {
+          "anchor": 6,
+          "head": 6
+        },
+        "focus": true,
+        "activeElement": {
+          "tag": "DIV",
+          "class": "cm-content cm-lineWrapping"
+        },
+        "caret": {
+          "left": 224.5078125,
+          "right": 224.5078125,
+          "top": 54.5,
+          "bottom": 70.5
+        },
+        "scrollTop": 0,
+        "title": "● primary-bom-crlf.md · 10 字 — MarkPilot",
+        "banner": ""
+      }
+    },
+    {
+      "id": "repeat-format-after-typing",
+      "key": "Control+e",
+      "open": "`",
+      "close": "`",
+      "state": {
+        "text": "`词体```",
+        "selection": {
+          "anchor": 4,
+          "head": 4
+        },
+        "focus": true,
+        "activeElement": {
+          "tag": "DIV",
+          "class": "cm-content cm-lineWrapping"
+        },
+        "caret": {
+          "left": 202.5,
+          "right": 202.5,
+          "top": 54.5,
+          "bottom": 70.5
+        },
+        "scrollTop": 0,
+        "title": "● primary-bom-crlf.md · 6 字 — MarkPilot",
+        "banner": ""
+      }
+    }
+  ],
+  "metadata": {
+    "executable": "MarkPilot.exe",
+    "exeSha256": "56579c5bba04a6b86853ba66ebc001bf6cde869322d6f5caf62e0558e18bd720",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.8",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "bootMs": 820,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "178bb51a146b37ac15d6c913ddcaf50c9b80386751e8f51cdf0ba1c9e578bef8",
+        "sourceSha256": "178bb51a146b37ac15d6c913ddcaf50c9b80386751e8f51cdf0ba1c9e578bef8"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "81301eef4e4f09a3d499c50d2fe21f21604fc996c41173024ba7469ee191182d",
+        "sourceSha256": "81301eef4e4f09a3d499c50d2fe21f21604fc996c41173024ba7469ee191182d"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+        "sourceSha256": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "clipboard": {
+    "formats": [
+      "Bitmap",
+      "System.Drawing.Bitmap"
+    ],
+    "ready": true
+  },
+  "clipboardCleanup": {
+    "restored": true
+  },
+  "firstCleanup": {
+    "residual": []
+  },
+  "controlCleanup": {
+    "residual": []
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T18:57:04.949Z",
+  "passed": true
+}

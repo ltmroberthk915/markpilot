@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "version": "3.2.8",
+  "scope": "Recorded elapsed suite durations; excludes coding, review, packaging, recovery and gaps between runs. This is not a complete task time accounting or a measurement of wasted time.",
+  "groups": [
+    {
+      "name": "final-source-regression",
+      "elapsedMs": 259293,
+      "elapsedMinutes": 4.32,
+      "rows": [
+        {
+          "report": "source-critical/result.json",
+          "cases": 26,
+          "startedAt": "2026-10-11T18:46:09.390Z",
+          "completedAt": "2026-10-11T18:46:54.549Z",
+          "elapsedMs": 45159
+        },
+        {
+          "report": "source-acceptance/result.json",
+          "cases": 19,
+          "startedAt": "2026-10-11T18:46:54.615Z",
+          "completedAt": "2026-10-11T18:47:13.319Z",
+          "elapsedMs": 18704
+        },
+        {
+          "report": "source-editing/result.json",
+          "cases": 75,
+          "startedAt": "2026-10-11T18:47:13.377Z",
+          "completedAt": "2026-10-11T18:47:42.554Z",
+          "elapsedMs": 29177
+        },
+        {
+          "report": "source-worker-integration/result.json",
+          "cases": 28,
+          "startedAt": "2026-10-11T18:47:42.705Z",
+          "completedAt": "2026-10-11T18:48:58.306Z",
+          "elapsedMs": 75601
+        },
+        {
+          "report": "source-data-safety/result.json",
+          "cases": 23,
+          "startedAt": "2026-10-11T18:48:58.384Z",
+          "completedAt": "2026-10-11T18:49:56.649Z",
+          "elapsedMs": 58265
+        },
+        {
+          "report": "source-performance/result.json",
+          "cases": 7,
+          "startedAt": "2026-10-11T18:49:56.720Z",
+          "completedAt": "2026-10-11T18:50:20.565Z",
+          "elapsedMs": 23845
+        },
+        {
+          "report": "source-worker-latency/result.json",
+          "cases": 1,
+          "startedAt": "2026-10-11T18:50:20.623Z",
+          "completedAt": "2026-10-11T18:50:29.165Z",
+          "elapsedMs": 8542
+        }
+      ]
+    },
+    {
+      "name": "final-images",
+      "elapsedMs": 222429,
+      "elapsedMinutes": 3.71,
+      "rows": [
+        {
+          "report": "images/result.json",
+          "cases": 42,
+          "startedAt": "2026-10-11T18:42:09.169Z",
+          "completedAt": "2026-10-11T18:45:51.598Z",
+          "elapsedMs": 222429
+        }
+      ]
+    },
+    {
+      "name": "negative-controls",
+      "elapsedMs": 374447,
+      "elapsedMinutes": 6.24,
+      "rows": [
+        {
+          "report": "negative-controls/result.json",
+          "cases": 13,
+          "startedAt": "2026-10-11T18:35:18.133Z",
+          "completedAt": "2026-10-11T18:41:32.580Z",
+          "elapsedMs": 374447
+        }
+      ]
+    },
+    {
+      "name": "delivery-boundary",
+      "elapsedMs": 238625,
+      "elapsedMinutes": 3.98,
+      "rows": [
+        {
+          "report": "portable-critical/result.json",
+          "cases": 26,
+          "startedAt": "2026-10-11T18:52:17.464Z",
+          "completedAt": "2026-10-11T18:53:17.004Z",
+          "elapsedMs": 59540
+        },
+        {
+          "report": "portable-saved-screenshot-immediate/result.json",
+          "cases": 1,
+          "startedAt": "2026-10-11T18:53:17.098Z",
+          "completedAt": "2026-10-11T18:53:34.536Z",
+          "elapsedMs": 17438
+        },
+        {
+          "report": "isolated-critical/result.json",
+          "cases": 26,
+          "startedAt": "2026-10-11T18:54:09.579Z",
+          "completedAt": "2026-10-11T18:54:55.826Z",
+          "elapsedMs": 46247
+        },
+        {
+          "report": "isolated-saved-screenshot-immediate/result.json",
+          "cases": 1,
+          "startedAt": "2026-10-11T18:54:55.903Z",
+          "completedAt": "2026-10-11T18:55:10.209Z",
+          "elapsedMs": 14306
+        },
+        {
+          "report": "installed-critical/result.json",
+          "cases": 26,
+          "startedAt": "2026-10-11T18:56:19.375Z",
+          "completedAt": "2026-10-11T18:57:04.949Z",
+          "elapsedMs": 45574
+        },
+        {
+          "report": "installed-saved-screenshot-immediate/result.json",
+          "cases": 1,
+          "startedAt": "2026-10-11T18:57:05.009Z",
+          "completedAt": "2026-10-11T18:57:19.264Z",
+          "elapsedMs": 14255
+        },
+        {
+          "report": "installed-viewport/result.json",
+          "cases": 1,
+          "startedAt": "2026-10-11T18:57:19.337Z",
+          "completedAt": "2026-10-11T18:57:31.789Z",
+          "elapsedMs": 12452
+        },
+        {
+          "report": "installed-size/result.json",
+          "cases": 1,
+          "startedAt": "2026-10-11T18:57:31.856Z",
+          "completedAt": "2026-10-11T18:57:44.756Z",
+          "elapsedMs": 12900
+        },
+        {
+          "report": "installed-copy-save/result.json",
+          "cases": 1,
+          "startedAt": "2026-10-11T18:57:44.869Z",
+          "completedAt": "2026-10-11T18:58:00.782Z",
+          "elapsedMs": 15913
+        }
+      ]
+    }
+  ]
+}

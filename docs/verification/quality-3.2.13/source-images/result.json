@@ -1,0 +1,254 @@
+{
+  "schema": 1,
+  "suite": "images",
+  "version": "3.2.13",
+  "passed": true,
+  "recordedCaseCount": 42,
+  "publishedCaseCount": 42,
+  "artifact": {
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.13",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "exeSha256": "d300992b1003765f2f64417269c124f0c7b14af65ce415ad2488d166e6f63e13",
+    "runtimeExecutableSha256": "d300992b1003765f2f64417269c124f0c7b14af65ce415ad2488d166e6f63e13",
+    "asarSha256": "08a6de1a9b6be8a6b8033ec5c8dbf5b6fd3f8277a674ed4c35bcc6b58dad4e51",
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "be105040e75e3707d9b5d978eaffa6d17151004e0f46fac4cc87bab829ec3f33"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "5d58d02e672705f4bb5c1475aa8be667b04a2cb9cb4111d285b9efead54a1521"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "4517f08c0f305d08c361c2079157e587b5a9e8097dc161ab748c26960a8c40f5"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "5c5ad94957ce94902176664182afbb1d578c42bf2347119bbbb58739c64abcb8"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": [],
+    "complete": true
+  },
+  "clipboardOutcome": {
+    "restored": true
+  },
+  "fixtureSha256": null,
+  "cases": [
+    {
+      "id": "saved-screenshot-immediate",
+      "status": "pass"
+    },
+    {
+      "id": "long-document-paste-is-visible-without-extra-input",
+      "status": "pass"
+    },
+    {
+      "id": "image-start-boundary",
+      "status": "pass"
+    },
+    {
+      "id": "image-end-boundary",
+      "status": "pass"
+    },
+    {
+      "id": "ordinary-character-delete-creates-image",
+      "status": "pass"
+    },
+    {
+      "id": "source-address-remains-editable-inside",
+      "status": "pass"
+    },
+    {
+      "id": "inline-screenshot-immediate",
+      "status": "pass"
+    },
+    {
+      "id": "selection-replacement-undo-redo",
+      "status": "pass"
+    },
+    {
+      "id": "paste-keeps-origin-while-typing",
+      "status": "pass"
+    },
+    {
+      "id": "paste-replaced-selection-is-canceled",
+      "status": "pass"
+    },
+    {
+      "id": "same-text-reload-cancels-pending-image",
+      "status": "pass"
+    },
+    {
+      "id": "switch-document-cancels-pending-image",
+      "status": "pass"
+    },
+    {
+      "id": "two-pastes-keep-request-order",
+      "status": "pass"
+    },
+    {
+      "id": "undo-cancels-pending-image",
+      "status": "pass"
+    },
+    {
+      "id": "delete-image-balanced-url",
+      "status": "pass"
+    },
+    {
+      "id": "delete-image-html",
+      "status": "pass"
+    },
+    {
+      "id": "image-address-edit-and-stale-dialog-guard",
+      "status": "pass"
+    },
+    {
+      "id": "size-presets-are-distinct-stable-and-reversible",
+      "status": "pass"
+    },
+    {
+      "id": "size-presets-respect-editor-zoom",
+      "status": "pass"
+    },
+    {
+      "id": "image-menu-uses-second-image-identity",
+      "status": "pass"
+    },
+    {
+      "id": "image-attrs-quoted-greater",
+      "status": "pass"
+    },
+    {
+      "id": "image-attrs-balanced-parentheses",
+      "status": "pass"
+    },
+    {
+      "id": "image-attrs-html-entities",
+      "status": "pass"
+    },
+    {
+      "id": "image-attrs-data-src-boundary",
+      "status": "pass"
+    },
+    {
+      "id": "equal-length-middle-url-change-shows-new-pixels",
+      "status": "pass"
+    },
+    {
+      "id": "relative-file-data-copy-and-save-use-real-bytes",
+      "status": "pass"
+    },
+    {
+      "id": "two-windows-use-their-own-image-directory",
+      "status": "pass"
+    },
+    {
+      "id": "window-boot-and-new-document-preserve-session-identity",
+      "status": "pass"
+    },
+    {
+      "id": "concurrent-equal-size-images-never-overwrite-assets",
+      "status": "pass"
+    },
+    {
+      "id": "asset-created-during-save-is-never-overwritten",
+      "status": "pass"
+    },
+    {
+      "id": "failed-assets-write-keeps-inline-image",
+      "status": "pass"
+    },
+    {
+      "id": "unsaved-screenshot-renders-without-path",
+      "status": "pass"
+    },
+    {
+      "id": "mouse-combination-drag-copy-preserve-image-markdown",
+      "status": "pass"
+    },
+    {
+      "id": "readonly-directory-keeps-inline-image",
+      "status": "pass"
+    },
+    {
+      "id": "jpeg-webp-copy-save-preserve-format-bytes",
+      "status": "pass"
+    },
+    {
+      "id": "http-image-copy-save-use-original-bytes",
+      "status": "pass"
+    },
+    {
+      "id": "predecode-faults-do-not-swallow-real-screenshot",
+      "status": "pass"
+    },
+    {
+      "id": "custom-image-scale-has-useful-small-and-large-limits",
+      "status": "pass"
+    },
+    {
+      "id": "size-presets-follow-current-page-width",
+      "status": "pass"
+    },
+    {
+      "id": "high-image-next-to-table-keeps-image-menu",
+      "status": "pass"
+    },
+    {
+      "id": "document-switch-same-relative-name-updates-pixels",
+      "status": "pass"
+    },
+    {
+      "id": "extract-inline-image-cancels-on-concurrent-edit",
+      "status": "pass"
+    }
+  ],
+  "scope": "Synthetic fixtures only. Source/DOM owners and trusted passive input records are preserved when this suite actually records them. No user document/profile/registry/shortcut/original clipboard data. OS physical accelerator and actual IME claims are excluded."
+}

@@ -1,0 +1,4195 @@
+{
+  "schema": 1,
+  "suite": "cell-composition-workflows",
+  "version": "3.2.13",
+  "passed": true,
+  "recordedCaseCount": 1,
+  "publishedCaseCount": 1,
+  "artifact": {
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.13",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "exeSha256": "d300992b1003765f2f64417269c124f0c7b14af65ce415ad2488d166e6f63e13",
+    "runtimeExecutableSha256": "d300992b1003765f2f64417269c124f0c7b14af65ce415ad2488d166e6f63e13",
+    "asarSha256": "08a6de1a9b6be8a6b8033ec5c8dbf5b6fd3f8277a674ed4c35bcc6b58dad4e51",
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "be105040e75e3707d9b5d978eaffa6d17151004e0f46fac4cc87bab829ec3f33"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "5d58d02e672705f4bb5c1475aa8be667b04a2cb9cb4111d285b9efead54a1521"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "4517f08c0f305d08c361c2079157e587b5a9e8097dc161ab748c26960a8c40f5"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "5c5ad94957ce94902176664182afbb1d578c42bf2347119bbbb58739c64abcb8"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": [],
+    "complete": true
+  },
+  "clipboardOutcome": {
+    "touched": false
+  },
+  "transport": "Chromium renderer CDP only; OS IME candidates/229/native accelerators unverified",
+  "fixtureSha256": null,
+  "cases": [
+    {
+      "id": "cell-unicode-positive-history-continue",
+      "status": "pass",
+      "stage": "complete",
+      "productReached": true,
+      "detail": {
+        "fixture": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+        "committed": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+        "final": "Before\n\n|H|K|\n|---|---|\n|a\\|中文1b|KEEP|\n\nAfter\n",
+        "finalSha256": "002d68fed6a3e852f24090605652a5191a05533086755a6c2a8c1f8cddfdf3e8",
+        "clipboardTouched": false
+      },
+      "inputBoundary": {},
+      "trace": [
+        {
+          "name": "01-entry",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 26,
+            "head": 26
+          },
+          "visible": true,
+          "cellText": "a|b",
+          "domSelection": {
+            "anchor": 2,
+            "head": 2
+          },
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "focus": true,
+          "disk": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "bytes": 43,
+            "sha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3"
+          },
+          "events": [
+            {
+              "type": "mousedown",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": false,
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 936
+            },
+            {
+              "type": "focusout",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                }
+              },
+              "at": 949.5
+            },
+            {
+              "type": "focusin",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 950.2000000476837
+            },
+            {
+              "type": "mouseup",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1031.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1041.6000000238419
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1043.7000000476837
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1045.4000000953674
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1047.9000000953674
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1049.5
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1051.8000000715256
+            }
+          ]
+        },
+        {
+          "name": "02-ordinary-unicode",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 30,
+            "head": 30
+          },
+          "visible": true,
+          "cellText": "a|中文b",
+          "domSelection": {
+            "anchor": 4,
+            "head": 4
+          },
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "focus": true,
+          "disk": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "bytes": 43,
+            "sha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3"
+          },
+          "events": [
+            {
+              "type": "mousedown",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": false,
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 936
+            },
+            {
+              "type": "focusout",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                }
+              },
+              "at": 949.5
+            },
+            {
+              "type": "focusin",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 950.2000000476837
+            },
+            {
+              "type": "mouseup",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1031.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1041.6000000238419
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1043.7000000476837
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1045.4000000953674
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1047.9000000953674
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1049.5
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1051.8000000715256
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "data": "中文",
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1447.9000000953674
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "data": "中文",
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1450.4000000953674
+            }
+          ]
+        },
+        {
+          "name": "05-undo",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 28,
+            "head": 28
+          },
+          "visible": true,
+          "cellText": "a|b",
+          "domSelection": {
+            "anchor": 2,
+            "head": 2
+          },
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "focus": true,
+          "disk": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "bytes": 43,
+            "sha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3"
+          },
+          "events": [
+            {
+              "type": "mousedown",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": false,
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 936
+            },
+            {
+              "type": "focusout",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                }
+              },
+              "at": 949.5
+            },
+            {
+              "type": "focusin",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 950.2000000476837
+            },
+            {
+              "type": "mouseup",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1031.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1041.6000000238419
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1043.7000000476837
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1045.4000000953674
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1047.9000000953674
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1049.5
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1051.8000000715256
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "data": "中文",
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1447.9000000953674
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "data": "中文",
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1450.4000000953674
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1855.9000000953674
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1857.7000000476837
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1864.9000000953674
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1868.1000000238419
+            }
+          ]
+        },
+        {
+          "name": "07-continue-one",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文1b|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 31,
+            "head": 31
+          },
+          "visible": true,
+          "cellText": "a|中文1b",
+          "domSelection": {
+            "anchor": 5,
+            "head": 5
+          },
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "focus": true,
+          "disk": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "bytes": 43,
+            "sha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3"
+          },
+          "events": [
+            {
+              "type": "mousedown",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": false,
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 936
+            },
+            {
+              "type": "focusout",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                }
+              },
+              "at": 949.5
+            },
+            {
+              "type": "focusin",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 950.2000000476837
+            },
+            {
+              "type": "mouseup",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1031.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1041.6000000238419
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1043.7000000476837
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1045.4000000953674
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1047.9000000953674
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1049.5
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1051.8000000715256
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "data": "中文",
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1447.9000000953674
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "data": "中文",
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1450.4000000953674
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1855.9000000953674
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1857.7000000476837
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1864.9000000953674
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1868.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 2257.8000000715256
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 2260.5
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 2268.4000000953674
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 2270.8000000715256
+            },
+            {
+              "type": "keydown",
+              "key": "1",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 2273.2000000476837
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "data": "1",
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 2273.3000000715256
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "data": "1",
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文1b",
+                "domSelection": {
+                  "anchor": 5,
+                  "head": 5
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文1b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 31,
+                  "head": 31
+                },
+                "visible": true,
+                "cellText": "a|中文1b",
+                "domSelection": {
+                  "anchor": 5,
+                  "head": 5
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 2273.9000000953674
+            },
+            {
+              "type": "keyup",
+              "key": "1",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文1b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 31,
+                  "head": 31
+                },
+                "visible": true,
+                "cellText": "a|中文1b",
+                "domSelection": {
+                  "anchor": 5,
+                  "head": 5
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文1b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 31,
+                  "head": 31
+                },
+                "visible": true,
+                "cellText": "a|中文1b",
+                "domSelection": {
+                  "anchor": 5,
+                  "head": 5
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 2283.4000000953674
+            }
+          ]
+        },
+        {
+          "name": "06-passive-redo-before-one",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 30,
+            "head": 30
+          },
+          "visible": true,
+          "cellText": "a|中文b",
+          "domSelection": {
+            "anchor": 4,
+            "head": 4
+          },
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "focus": true
+        },
+        {
+          "name": "08-saved",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文1b|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 31,
+            "head": 31
+          },
+          "visible": true,
+          "cellText": "a|中文1b",
+          "domSelection": {
+            "anchor": 5,
+            "head": 5
+          },
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "focus": true,
+          "disk": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文1b|KEEP|\n\nAfter\n",
+            "bytes": 50,
+            "sha256": "002d68fed6a3e852f24090605652a5191a05533086755a6c2a8c1f8cddfdf3e8"
+          },
+          "events": [
+            {
+              "type": "mousedown",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": false,
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "cm-content cm-lineWrapping"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 936
+            },
+            {
+              "type": "focusout",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": null,
+                  "head": null
+                },
+                "activeElement": {
+                  "tag": "BODY",
+                  "class": ""
+                }
+              },
+              "at": 949.5
+            },
+            {
+              "type": "focusin",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 950.2000000476837
+            },
+            {
+              "type": "mouseup",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": null,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1031.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1041.6000000238419
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1043.7000000476837
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 0,
+                  "head": 0
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1045.4000000953674
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1047.9000000953674
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 25,
+                  "head": 25
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 1,
+                  "head": 1
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1049.5
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1051.8000000715256
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "data": "中文",
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 26,
+                  "head": 26
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1447.9000000953674
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "data": "中文",
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1450.4000000953674
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1855.9000000953674
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1857.7000000476837
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1864.9000000953674
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 1868.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 2257.8000000715256
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": true,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 28,
+                  "head": 28
+                },
+                "visible": true,
+                "cellText": "a|b",
+                "domSelection": {
+                  "anchor": 2,
+                  "head": 2
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 2260.5
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 2268.4000000953674
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 2270.8000000715256
+            },
+            {
+              "type": "keydown",
+              "key": "1",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 2273.2000000476837
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "data": "1",
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文b",
+                "domSelection": {
+                  "anchor": 4,
+                  "head": 4
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 2273.3000000715256
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "data": "1",
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 30,
+                  "head": 30
+                },
+                "visible": true,
+                "cellText": "a|中文1b",
+                "domSelection": {
+                  "anchor": 5,
+                  "head": 5
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文1b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 31,
+                  "head": 31
+                },
+                "visible": true,
+                "cellText": "a|中文1b",
+                "domSelection": {
+                  "anchor": 5,
+                  "head": 5
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 2273.9000000953674
+            },
+            {
+              "type": "keyup",
+              "key": "1",
+              "ctrl": false,
+              "shift": false,
+              "isComposing": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "defaultPreventedAfter": false,
+              "bubbleSeen": true,
+              "before": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文1b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 31,
+                  "head": 31
+                },
+                "visible": true,
+                "cellText": "a|中文1b",
+                "domSelection": {
+                  "anchor": 5,
+                  "head": 5
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "after": {
+                "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文1b|KEEP|\n\nAfter\n",
+                "sourceSelection": {
+                  "anchor": 31,
+                  "head": 31
+                },
+                "visible": true,
+                "cellText": "a|中文1b",
+                "domSelection": {
+                  "anchor": 5,
+                  "head": 5
+                },
+                "activeElement": {
+                  "tag": "DIV",
+                  "class": "mp-cell-overlay-text"
+                }
+              },
+              "at": 2283.4000000953674
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scope": "Synthetic fixtures only. Source/DOM owners and trusted passive input records are preserved when this suite actually records them. No user document/profile/registry/shortcut/original clipboard data. OS physical accelerator and actual IME claims are excluded."
+}

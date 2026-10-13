@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "version": "3.2.15",
+  "passed": true,
+  "artifact": {
+    "asarSha256": "f979c2bac7a3293e8fabb3e278a5b325ee206bfba7d17b79b5b88d4ef693025b",
+    "engineSha256": "ceb6e4b8883879d53d6f3d0f436bbe2b8bf548afef7e77c0c83e7df431fd64af",
+    "packagedExeSha256": "10014beb28ebbe4d193bd218a62c42113f227a1e6acc79779ec8235045923eff"
+  },
+  "regression": {
+    "suites": 31,
+    "cases": 401,
+    "passed": true,
+    "frozenUnchanged": true,
+    "originalReceiptSha256": "c720d1331d3dd086694f62b5106390762d3ba8a16b0c4be260d54faefadae167",
+    "evidenceReuse": "Executed prefix retained with full source/runtime/probe/fixture/receipt identity; final tail executed. Historical failed attempts remain separate."
+  },
+  "independentReview": {
+    "sourceAndUi": "pass",
+    "distinctImagePaths": 30,
+    "successfulImageReads": 31,
+    "originalReviewSha256": "39ee1637dc407ea1bc676c1b297e3de8fa2126e860da14f4653fb7bf97310fe2",
+    "imageCallAuditSha256": "80af1c2024e06d614e27af8b88873e54d8d7e272dda32093d2ac3cf6ae74a501"
+  },
+  "package": {
+    "passed": true,
+    "payloads": 3,
+    "runtimeFilesPerPayload": 73,
+    "asarMembersPerPayload": 141,
+    "originalReceiptSha256": "4880182c0df303cf398dc9c0f9a86ffda259deb5f5a0f12394b4b9c52a8bc368"
+  },
+  "installed": {
+    "passed": true,
+    "guiCases": 15,
+    "files": 75,
+    "registrations": 4,
+    "fileVersion": "3.2.15.0",
+    "productVersion": "3.2.15",
+    "originalReceiptSha256": "24150d6dc674c26bd53fc32252703bfd31a0cdba2a098e445c2d2e22501386f3"
+  },
+  "products": [
+    {
+      "name": "markpilot-Setup-3.2.15.exe",
+      "bytes": 84629485,
+      "sha256": "11ff95b8a3e89efa34b292b7ecab9f93e866f76eec529396e680488fc5b0bc24"
+    },
+    {
+      "name": "markpilot-3.2.15-portable.exe",
+      "bytes": 84364662,
+      "sha256": "43e5df27a2b309ea79ccecba4c326e5393a844e6cbf42c37d3eeb17b6c79af71"
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "version": "3.2.12",
+  "tag": "portable",
+  "passed": true,
+  "asarSha256": "f794e8c23ea631afe1b66552c8674d9bd8c0a48eaf4b957b581832b57b624143",
+  "sha256": "40e6f365e9e4d5dd722712a604c0ad07b7d384e9c286abff8205f9cde897e9fa",
+  "expectedCases": 10,
+  "runtimeIdentity": {
+    "completePackagedPayload": true,
+    "liveDllEnumeration": false,
+    "scope": "Actual wrapper/inner EXE/full ASAR/runtime versions plus every extracted runtime/resource byte; native inspector/physical accelerators not claimed on wrapper."
+  },
+  "results": [
+    {
+      "suite": "cross-page-drag-workflows",
+      "scope": "cross-page",
+      "total": 2,
+      "passed": true,
+      "caseIds": [
+        "plain-held-wheel-loop",
+        "formula-held-wheel-loop"
+      ],
+      "resultSha256": "646b229bc12b0cad2ae2a0da113f5c6ef954c3e8c913b380707a333687b18966"
+    },
+    {
+      "suite": "math-gesture-workflows",
+      "scope": "math-gesture",
+      "total": 4,
+      "passed": true,
+      "caseIds": [
+        "math-gesture-click-source-and-selection",
+        "math-gesture-jitter-source-and-selection",
+        "math-gesture-local-loop-source-and-selection",
+        "math-gesture-wheel-only-source-and-selection"
+      ],
+      "resultSha256": "d51090af884ce28e8a25baf289b94245b2a6445772468e86fc9876fd46c8e3af"
+    },
+    {
+      "suite": "selection-workflows",
+      "scope": "selection",
+      "total": 3,
+      "passed": true,
+      "caseIds": [
+        "boot-open-document-direct-typing-needs-no-click",
+        "early-cell-focus-survives-boot-fallback",
+        "cell-tab-home-keeps-caret-before-next-input"
+      ],
+      "resultSha256": "c19f52c21d5b656391372cdeaa28ffff0188a4095f52a8b5cad142f468dcb788"
+    },
+    {
+      "suite": "images",
+      "scope": "saved-screenshot",
+      "total": 1,
+      "passed": true,
+      "caseIds": [
+        "saved-screenshot-immediate"
+      ],
+      "resultSha256": "c00134f083c4bb9c47611846980b65bfedeac82b19db5afece6106e728014ced"
+    }
+  ],
+  "payloadIdentitySha256": "76eeb921e4f3531594eec493b4681a5502999d7a74689c36566ac838e4ac7557"
+}

@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawn, execSync } = require('node:child_process');
-const { chromium } = require('C:/Windows/System32/node_modules/playwright-core');
+const { chromium } = require('../quality/dependencies.cjs').playwright();
 
 const DIR = __dirname, ROOT = path.resolve(DIR, '..', '..');
 const MD = path.join(ROOT, '.mp-verify', 'demo', '验收清单.md');

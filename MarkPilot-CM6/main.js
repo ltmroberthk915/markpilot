@@ -9,10 +9,19 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
+const { fileURLToPath, pathToFileURL } = require('node:url');
 // 「导出为文件夹」的落盘实现：图片逐张复制进 assets/、HTML 分块流式写入（实现在 export-folder.js，纯 Node 可单测）
 const exporter = require('./export-folder');
 // 「导出为 PDF」的打印层：从磁盘上的本地 HTML 打印（隐藏窗口 + printToPDF + 分片写盘），实现在 export-pdf.js
 const pdfExporter = require('./export-pdf');
+const { DocumentStore, createSession, failure } = require('./shell/document-store');
+const documents = new DocumentStore({
+  // Deterministic receipt/race regressions; absent from normal launches.
+  beforeReplace: async () => {
+    const ms = process.env.MP_TEST_HOOKS === '1' ? Math.min(2000, Math.max(0, Number(process.env.MP_TEST_SAVE_DELAY_MS) || 0)) : 0;
+    if (ms) await new Promise(resolve => setTimeout(resolve, ms));
+  },
+});
 
 /* 【载入前禁写·2026-10-09】settings.json 在 `loadSettings()` 之前**不许被写**。
  *  起因：改名迁移把老设置拷进新 userData 后，`loadSettings()` 读到的却是应用默认值
@@ -143,31 +152,31 @@ function dbg(...parts) {
   } catch { }
 }
 
-/** 当前文档状态（唯一真源在渲染进程，这里只缓存元数据） */
-const state = {
-  filePath: null,      // 当前文件绝对路径；null = 未命名新文档
-  savedText: '',       // 最近一次成功落盘的内容（外改探测用）
-  diskMtime: 0,        // 落盘后的 mtimeMs
-  bom: false,          // 原文件是否带 UTF-8 BOM（保持原样，避免"改一个字符整篇二进制变化"）
-  eol: '\n',           // 原文件行尾风格（CRLF/LF），保存时还原
-  dirty: false,
-  unresponsiveAt: 0,        // 最近一次「无响应」开始时刻（0 = 当前正常）
-  unresponsiveCount: 0,     // 无响应事件次数
-  unresponsiveTotalMs: 0,   // 无响应累计时长（实测报告直接引用）
-  // recent：3.0.5 及更早的存放处（只在迁移时读一次）；recentFiles：3.0.6 起的 MRU（recents.json 的真源镜像）
-  settings: { theme: 'system', recent: [], recentFiles: [], winBounds: null, restoreLast: true },
-};
+/** Application preferences are shared; each window owns its document session. */
+const state = { ...createSession(), unresponsiveAt: 0, unresponsiveCount: 0, unresponsiveTotalMs: 0,
+  settings: { theme: 'system', recent: [], recentFiles: [], winBounds: null, restoreLast: true, autosaveEnabled: false, autosaveIntervalMs: 30000 } };
+const sessions = new Map();
+function registerSession(wc, session) { sessions.set(wc.id, session); }
+function unregisterSession(wc) { if (wc) sessions.delete(wc.id); }
+function sessionOf(wc) {
+  const S = wc && !wc.isDestroyed() && sessions.get(wc.id);
+  if (!S) throw failure('MP_SESSION_CLOSED', '发起文档操作的窗口已关闭');
+  return S;
+}
+function windowOf(e) {
+  const W = e?.sender && BrowserWindow.fromWebContents(e.sender);
+  if (!W || W.isDestroyed()) throw failure('MP_SESSION_CLOSED', '发起文档操作的窗口已关闭');
+  sessionOf(e.sender); return W;
+}
+function activeWindow(candidate) {
+  const W = candidate || BrowserWindow.getFocusedWindow() || win;
+  return W && !W.isDestroyed() && sessions.has(W.webContents.id) ? W : null;
+}
+function sendTo(W, channel, payload) {
+  if (!W || W.isDestroyed() || W.webContents.isDestroyed()) return false;
+  W.webContents.send(channel, payload); return true;
+}
 
-/* ── 【文件多开·第 1 步】每窗口会话注册表 ───────────────────────────────────
-   目标：同一个进程里开多个窗口、每个窗口有自己的文档会话（filePath/dirty/最近记录等）。
-   本步**只建立结构、不改行为**：主窗口注册的会话就是原来的全局 state，
-   而 sessionOf() 对未注册的窗口**保守回落**到 state —— 所以现有 50 多个 handle(...) 一行都不用动。
-   第 2 步：把 handle(...) 里的 state.* 换成 sessionOf(e.sender).*（逐个改、逐步验）。
-   第 3 步：openPath 在"调用窗口已有别的文档"时新建窗口；second-instance 同改。 */
-const sessions = new Map();                      // webContents.id -> session
-function registerSession(wc, session) { try { if (wc && session) sessions.set(wc.id, session); } catch { /* 忽略 */ } }
-function unregisterSession(wc) { try { if (wc) sessions.delete(wc.id); } catch { /* 忽略 */ } }
-function sessionOf(wc) { try { return (wc && sessions.get(wc.id)) || state; } catch { return state; } }
 function loadSettings() {
   try {
     const raw = fs.readFileSync(SETTINGS, 'utf8');
@@ -227,100 +236,15 @@ function saveSettings() {
   return { ok: true };
 }
 
-/** 读文件：剥 BOM、记录行尾风格，返回给渲染进程的"纯 LF 文本" */
-async function readDoc(filePath, S = state) {   // 【文件多开·批 B2】会话可传（默认主会话 ⇒ 老行为）
-  const buf = await fsp.readFile(filePath);
-  /* 【P0-1·2026-10-10 由"人类常用操作普查"查出，**会毁用户数据**】
-     把 .png 等二进制文件当文本文档打开（拖入窗口、或双击 png 走 openPath），用户一打字、
-     去抖自动保存就把它按 UTF-8 就地改写 ⇒ 图片被毁。物证：合法 PNG 495 B → 882 B，
-     前 4 字节 137,80,78,71 变成 239,191,189,80（U+FFFD），PNG 魔数失效。
-     这里在**唯一读盘入口**做嗅探并拒绝（openPath / 最近打开 / 二次启动 / 打开上次的文件全走它）：
-     命中常见二进制魔数、或前 4KB 含 NUL 字节，一律不当作文本读入。 */
-  const head = buf.subarray(0, 4096);
-  const b = (i) => head[i];
-  /* 【修复·2026-10-10（第三波 control-chars）】原来"含 NUL 即判二进制"太宽：用户把一段带 NUL
-     的文本粘进文档并保存后，**这个文件就再也打不开了**（被自家守卫永久拒读 ✗）—— 自造的取数陷阱。
-     收紧为：命中**已知魔数**，或"NUL 且可打印比例 < 0.8"（真正的二进制里 NUL 与不可打印字节密集；
-     正常文本里偶发一个控制字符不会触发）。图片/压缩包/可执行文件照旧被拒 ✓。 */
-  const isTextish = (() => {
-    let printable = 0;
-    for (const c of head) if (c === 9 || c === 10 || c === 13 || (c >= 32 && c < 127) || c >= 128) printable++;
-    return head.length ? printable / head.length : 1;
-  })();
-  const isBinary = (head.includes(0) && isTextish < 0.8)
-    || (b(0) === 0x89 && b(1) === 0x50 && b(2) === 0x4e && b(3) === 0x47)   // PNG
-    || (b(0) === 0xff && b(1) === 0xd8 && b(2) === 0xff)                     // JPEG
-    || (b(0) === 0x47 && b(1) === 0x49 && b(2) === 0x46)                     // GIF
-    || (b(0) === 0x42 && b(1) === 0x4d)                                      // BMP
-    || (b(0) === 0x25 && b(1) === 0x50 && b(2) === 0x44 && b(3) === 0x46)   // PDF
-    || (b(0) === 0x50 && b(1) === 0x4b)                                      // ZIP/OOXML
-    || (b(0) === 0x7f && b(1) === 0x45 && b(2) === 0x4c && b(3) === 0x46)   // ELF
-    || (b(0) === 0x52 && b(1) === 0x49 && b(2) === 0x46 && b(3) === 0x46)   // RIFF(webp/wav/avi)
-    || (b(0) === 0x00 && b(1) === 0x00 && b(2) === 0x01 && b(3) === 0x00);  // ICO
-  if (isBinary) {
-    const err = new Error('这是一个二进制文件（图片 / 压缩包 / 可执行文件等），MarkPilot 只打开文本文件：' + filePath);
-    err.code = 'MP_BINARY';
-    dbg('readDoc:binary-refused', { filePath, head: Array.from(head.subarray(0, 8)) });
-    throw err;
-  }
-  let text = buf.toString('utf8');
-  const bom = text.charCodeAt(0) === 0xfeff;
-  if (bom) text = text.slice(1);
-  const crlf = (text.match(/\r\n/g) || []).length;
-  const lf = (text.match(/\n/g) || []).length;
-  const eol = crlf > 0 && crlf >= lf - crlf ? '\r\n' : '\n';
-  const norm = text.replace(/\r\n/g, '\n');
-  const st = await fsp.stat(filePath);
-  S.filePath = filePath;
-  S.savedText = norm;
-  S.diskMtime = st.mtimeMs;
-  S.bom = bom;
-  S.eol = eol;
-  S.dirty = false;
-  pushRecent(filePath);
-  return { text: norm, filePath, eol, bom };
+async function readDoc(filePath, S) {
+  const doc = await documents.load(S, filePath); pushRecent(doc.filePath); return doc;
 }
-
-/** 原子写：临时文件 + rename（避免半截文件；也与 2.x 的 ReplaceFileW 语义一致） */
-async function writeDoc(filePath, text, S = state) {   // 【文件多开·批 B2】会话可传
-  const body = S.eol === '\r\n' ? text.replace(/\n/g, '\r\n') : text;
-  const out = (S.bom ? '\ufeff' : '') + body;
-  const dir = path.dirname(filePath);
-  const tmp = path.join(dir, `.${path.basename(filePath)}.mp-tmp-${process.pid}`);
-  await fsp.mkdir(dir, { recursive: true });
-  /* 【第二波·file-ops 缺陷·2026-10-10】磁盘上把文件**改名或删除**之后，应用并不知道：
-     打字 → 去抖自动保存 → **静默把旧文件名重新创建出来**（普查物证：旧文件复活、新文件保持旧内容、
-     全程无任何提示）。判据只用"本会话此前确实加载过这个文件"（`S.diskMtime > 0`）⇒
-     另存为到一个**新路径**不受影响（那时 diskMtime 已指向新文件），也不会阻碍首次创建。 */
-  if (S.diskMtime) {
-    const still = await fsp.stat(filePath).catch(() => null);
-    if (!still) {
-      const err = new Error('原文件已不在磁盘上（可能被重命名或删除）：' + filePath);
-      err.code = 'MP_FILE_MISSING';
-      dbg('writeDoc:file-missing', { filePath });
-      throw err;
-    }
-  }
-  /* 【第二波·file-ops 缺陷·2026-10-10】写盘失败时（只读目标 EPERM、被别的程序占用 EBUSY 等）
-     原来会把临时文件 `.名字.mp-tmp-<pid>` **留在用户文档目录里**（普查物证仍在盘上：
-     `.readonly.md.mp-tmp-95800`；走「另存为…」那条路会**永久**残留）。失败即清理，
-     不让用户的目录变脏；清理失败也不掩盖原始错误（继续抛原来那个 e）。 */
-  try {
-    await fsp.writeFile(tmp, out, 'utf8');
-    await fsp.rename(tmp, filePath);
-  } catch (e) {
-    try { await fsp.unlink(tmp); } catch { /* 临时文件可能压根没建起来，忽略 */ }
-    throw e;
-  }
-  const st = await fsp.stat(filePath);
-  S.savedText = text;
-  S.diskMtime = st.mtimeMs;
-  S.dirty = false;
-  return { ok: true, mtimeMs: st.mtimeMs, bytes: Buffer.byteLength(out, 'utf8') };
+async function writeDoc(filePath, text, S, metadata) {
+  return documents.save(S, { ...metadata, filePath, text });
 }
-
 let win = null;
-const send = (channel, payload) => { if (win && !win.isDestroyed()) win.webContents.send(channel, payload); };
+const send = (channel, payload, W = activeWindow()) => sendTo(W, channel, payload);
+
 /* 【S5 折中·2026-10-10（用户批准 ✓）】`send` 只发给**一个**窗口 ✗ ⇒ 改设置时其它已开窗口**不刷新** ✗
    （实测同一份设置下 A `zoom=1` 版心 525px ／ B `zoom=1.5` 版心 351px ✗）。这里补一个**广播**助手 ✓：
    全局观感类设置改完后发给**所有**窗口 ✓；视图类（缩放/滚动）**不广播** ✗ ⇒ 各窗口保持独立 ✓（折中 ✓）。 */
@@ -339,7 +263,7 @@ function recentMenuItems() {
       ? { type: 'separator' }
       : {
         id: m.id, label: m.label, sublabel: m.sublabel, enabled: m.enabled,
-        click: m.path ? () => { void openPath(m.path); } : () => clearRecent(),
+        click: m.path ? () => { void openDocument(m.path); } : () => clearRecent(),
       }));
 }
 
@@ -440,7 +364,7 @@ function fileMenuModel(filePath) {
   };
 }
 /** 菜单项的 label/enabled 一律从这里取（唯一来源）。 */
-function currentFileMenuModel() { return fileMenuModel(state.filePath); }
+function currentFileMenuModel(W = activeWindow()) { return fileMenuModel(W ? sessionOf(W.webContents).filePath : null); }
 
 /** 把「文件位置」这几项**就地**刷成当前文档的值。
  *  【为什么不能只靠 buildMenu 重建】实测：清空路径（Ctrl+N / 关闭文件）后**没有**任何东西重建菜单，
@@ -472,7 +396,7 @@ function refreshFileMenuItems() {
 /* 【文件多开·第 2 步·批 B0】参数化：默认值 = 原来的全局 state/win ⇒ **所有既有调用点原样可用**
    （单窗口行为逐字节不变）；批 B 的写入类处理器改成传自己窗口的会话后，
    「改哪个窗口的状态就刷哪个窗口的标题」才成立。菜单仍是应用级（refreshFileMenuItems/buildMenu 不动）。 */
-function syncPathUi(S = state, W = win) {
+function syncPathUi(S, W) {
   updateTitle(S, W);
   refreshFileMenuItems();
   // 「在资源管理器中显示」的 enabled 也随路径变；buildMenu 会把 menuItemClicks 重新登记一遍，
@@ -484,12 +408,12 @@ function syncPathUi(S = state, W = win) {
  *  为什么不让渲染进程写：引擎有自己的剪贴板出口（复制图片/富文本），渲染侧一写就会与它抢焦点与内容；
  *  壳层要的只是"把路径放进去"，在拥有窗口的主进程里做最干净、也不经过任何页面脚本。
  *  没有路径时**不写**，给出可读原因（对话框），返回 'no-path' 让判据能区分"没复制"和"复制了空串"。 */
-function copyCurrentFilePath() {
-  const m = currentFileMenuModel();
+function copyCurrentFilePath(W = activeWindow()) {
+  const m = currentFileMenuModel(W);
   if (!m.hasPath) {
     dbg('menu:copy-path:no-path');
     if (process.env.MP_TEST_NO_DIALOG !== '1') {
-      dialog.showMessageBox(win, { type: 'info', title: '复制文件绝对路径', message: '当前文档还没有保存', detail: '请先保存（Ctrl+S）或另存为，再复制它的绝对路径。' }).catch(() => { });
+      dialog.showMessageBox(W, { type: 'info', title: '复制文件绝对路径', message: '当前文档还没有保存', detail: '请先保存（Ctrl+S）或另存为，再复制它的绝对路径。' }).catch(() => { });
     }
     return 'no-path';
   }
@@ -510,8 +434,8 @@ function buildMenu() {
     {
       label: '文件',
       submenu: [
-        { label: '新建', accelerator: 'CmdOrCtrl+N', click: () => send('menu', 'new') },
-        { label: '打开…', accelerator: 'CmdOrCtrl+O', click: () => pickOpen() },
+        { id: 'menu-new-document', label: '新建', accelerator: 'CmdOrCtrl+N', click: (_item, W) => send('menu', 'new', activeWindow(W)) },
+        { label: '打开…', accelerator: 'CmdOrCtrl+O', click: (_item, W) => pickOpen(activeWindow(W)) },
         { label: '最近打开', submenu: recents },
         { type: 'separator' },
         // id 固定：真链路测试直接触发**这个菜单项自己的 click**（与用户点菜单同一条路）
@@ -519,23 +443,23 @@ function buildMenu() {
      渲染侧也没有 beforeunload（普查用 CDP 与主进程注入两条通道各试多遍：进程存活、窗口数不变、
      文档原样）。补上标准的「关闭窗口」并给加速键 —— 加速键走主进程菜单体系派发，
      不依赖渲染侧是否持焦；`W.close()` 会走既有的关闭处理器（脏文档照旧弹三按钮框）。 */
-  { id: 'menu-close-window', label: '关闭窗口', accelerator: 'CmdOrCtrl+W', click: () => { const Wc = BrowserWindow.getFocusedWindow() || win; try { if (Wc && !Wc.isDestroyed()) Wc.close(); } catch { /* 忽略 */ } } },
-  { id: 'menu-save', label: '保存', accelerator: 'CmdOrCtrl+S', click: () => send('menu', 'save') },
+  { id: 'menu-close-window', label: '关闭窗口', accelerator: 'CmdOrCtrl+W', click: (_item, W) => { const Wc = activeWindow(W); if (Wc) Wc.close(); } },
+  { id: 'menu-save', label: '保存', accelerator: 'CmdOrCtrl+S', click: (_item, W) => send('menu', 'save', activeWindow(W)) },
         /* 【3.0.6 修掉的真缺陷】另存为必须和 Ctrl+S 一样**转给渲染进程**去执行。
          * 原实现直接在这里调 pickSaveAs()：它只问了一个目标路径、把主进程的 state.filePath 改了，
          * 渲染进程那边根本不知道 —— 文件**没落盘**、标题不变、"最近打开"也不会记；更糟的是
          * 主进程的路径已经变成新文件，下一次外改探测会拿新文件的 mtime 比旧文件，出现假"外部改动"。
          * 实测证据：按 Ctrl+Shift+S 后 main-debug.log 只有 `pickSaveAs:env`，没有 file:save/doc:saved。 */
-        { id: 'menu-save-as', label: '另存为…', accelerator: 'CmdOrCtrl+Shift+S', click: () => send('menu', 'saveAs') },
+        { id: 'menu-save-as', label: '另存为…', accelerator: 'CmdOrCtrl+Shift+S', click: (_item, W) => send('menu', 'saveAs', activeWindow(W)) },
     /* 【设置真源·S1·2026-10-10（settings-truth 族）】「恢复所有默认…」：用户删掉 settings.json 后
        **仍看到**工具岛透明度/版心/内容缩放/状态栏开关还在 ✗ —— 渲染侧偏好是另一套存储
        （localStorage 的 mp-pref-* / mp-surfaces / mp-reading* / editor-theme…）。这一项发命令给渲染侧，
        由 host.js 的 `case 'resetAll'` 一次清掉**全部 mp-\* 键**并重载 ⇒ 两套存储都能被一个动作覆盖。 */
-    { id: 'menu-reset-all', label: '恢复所有默认…', click: () => send('menu', 'resetAll') },
+    { id: 'menu-reset-all', label: '恢复所有默认…', click: (_item, W) => send('menu', 'resetAll', activeWindow(W)) },
         { type: 'separator' },
         // 导出为 PDF：壳层入口。渲染侧调 window.mpHost.exportPdf()（引擎侧的 ⋯ 菜单项以后走同一个名字）
         // （id 固定：真链路测试用主进程 CDP 触发这个原生菜单项本身，避免"截图看菜单"这种间接证据）
-        { id: 'menu-export-pdf', label: '导出为 PDF…', accelerator: 'CmdOrCtrl+Shift+P', click: () => send('menu', 'exportPdf') },
+        { id: 'menu-export-pdf', label: '导出为 PDF…', accelerator: 'CmdOrCtrl+Shift+P', click: (_item, W) => send('menu', 'exportPdf', activeWindow(W)) },
         { type: 'separator' },
         /* ── 文件位置 / 复制文件绝对路径 / 在资源管理器中显示（3.0.9）────────────────────
          * 【动态性】菜单在启动时构建一次，而"文件位置"必须跟着**当前文档**走：这里的
@@ -543,18 +467,18 @@ function buildMenu() {
          * 打开/另存为/新建/关闭之后都会被调到（pushRecent 与 doc:saved/doc:path 链路上）。
          * 另外还有一道保险：`menu-will-show` 时重建一次，保证"菜单栏被点开的那一刻"一定是实时值。 */
         { id: 'menu-file-location', label: loc.locationLabel, enabled: false, sublabel: loc.locationSublabel || undefined },
-        { id: 'menu-copy-file-path', label: loc.copyLabel, accelerator: 'CmdOrCtrl+Shift+C', enabled: true, click: () => copyCurrentFilePath() },
+        { id: 'menu-copy-file-path', label: loc.copyLabel, accelerator: 'CmdOrCtrl+Shift+C', enabled: true, click: (_item, W) => copyCurrentFilePath(activeWindow(W)) },
         { id: 'menu-reveal-in-explorer', label: loc.revealLabel, enabled: loc.hasPath, click: () => { const m = currentFileMenuModel(); if (m.hasPath) shell.showItemInFolder(m.path); } },
         { type: 'separator' },
-        { label: '关闭文件', click: () => send('menu', 'closeFile') },
+        { label: '关闭文件', click: (_item, W) => send('menu', 'closeFile', activeWindow(W)) },
         { label: '退出', role: 'quit' },
       ],
     },
     {
       label: '编辑',
       submenu: [
-        { label: '撤销', accelerator: 'CmdOrCtrl+Z', click: () => send('menu', 'undo') },
-        { label: '重做', accelerator: 'CmdOrCtrl+Y', click: () => send('menu', 'redo') },
+        { label: '撤销', accelerator: 'CmdOrCtrl+Z', click: (_item, W) => send('menu', 'undo', activeWindow(W)) },
+        { label: '重做', accelerator: 'CmdOrCtrl+Y', click: (_item, W) => send('menu', 'redo', activeWindow(W)) },
         { type: 'separator' },
         { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' },
       ],
@@ -562,13 +486,14 @@ function buildMenu() {
     {
       label: '视图',
       submenu: [
-        { label: '切换主题（深/浅）', accelerator: 'CmdOrCtrl+Shift+L', click: () => send('menu', 'theme') },
+        { label: '切换主题（深/浅）', accelerator: 'CmdOrCtrl+Shift+L', click: (_item, W) => send('menu', 'theme', activeWindow(W)) },
         { type: 'separator' },
-        { label: '放大', accelerator: 'CmdOrCtrl+=', click: () => send('menu', 'zoomIn') },
-        { label: '缩小', accelerator: 'CmdOrCtrl+-', click: () => send('menu', 'zoomOut') },
-        { label: '重置缩放', accelerator: 'CmdOrCtrl+0', click: () => send('menu', 'zoomReset') },
+        { label: '放大', accelerator: 'CmdOrCtrl+=', click: (_item, W) => send('menu', 'zoomIn', activeWindow(W)) },
+        { label: '缩小', accelerator: 'CmdOrCtrl+-', click: (_item, W) => send('menu', 'zoomOut', activeWindow(W)) },
+        { label: '重置缩放', accelerator: 'CmdOrCtrl+0', click: (_item, W) => send('menu', 'zoomReset', activeWindow(W)) },
         { type: 'separator' },
-        { role: 'reload' }, { role: 'toggleDevTools' }, { role: 'togglefullscreen' },
+        { id: 'menu-reload-view', label: '刷新', accelerator: 'CmdOrCtrl+R', click: (_item, W) => { void reloadEditorView(W || activeWindow()); } },
+        { role: 'toggleDevTools' }, { role: 'togglefullscreen' },
       ],
     },
     {
@@ -599,52 +524,59 @@ function buildMenu() {
   }
 }
 
-async function pickOpen() {
-  const r = await dialog.showOpenDialog(win, {
-    title: '打开 Markdown',
-    filters: [{ name: 'Markdown', extensions: ['md', 'markdown', 'mdx', 'txt'] }, { name: '全部文件', extensions: ['*'] }],
-    properties: ['openFile'],
-  });
-  if (!r.canceled && r.filePaths[0]) openPath(r.filePaths[0]);
+async function pickOpen(W = activeWindow()) {
+  if (!W) return { ok: false, error: '没有可用的编辑窗口' };
+  const r = await dialog.showOpenDialog(W, { title: '打开 Markdown',
+    filters: [{ name: 'Markdown', extensions: ['md', 'markdown', 'mdx', 'txt'] }, { name: '全部文件', extensions: ['*'] }], properties: ['openFile'] });
+  if (r.canceled || !r.filePaths[0]) return { ok: false, canceled: true };
+  return openDocument(r.filePaths[0]);
 }
-async function pickSaveAs() {
-  // 自动化/回归用：MP_TEST_SAVE_AS 预置路径时**不弹原生对话框**（原生对话框没人点会永远卡住）。
-  // 只影响"路径从哪来"，后面的落盘、MRU 置顶、系统最近记录全走同一条路。
-  dbg('pickSaveAs:enter', { env: process.env.MP_TEST_SAVE_AS || null });
-  if (process.env.MP_TEST_SAVE_AS) {
-    const abs = path.resolve(String(process.env.MP_TEST_SAVE_AS));
-    state.filePath = abs;
-    /* 【回归修复·2026-10-10（第三波 path-edge 族 P1）】换路径时必须**复位 diskMtime**：
-       它记的是"上一个文件"的 mtime，而 writeDoc 新加的「原文件已不在磁盘上」守卫会拿
-       **新路径**去 stat ⇒ 必空 ⇒ 抛 MP_FILE_MISSING ⇒ **另存为到新路径整个失败**
-       （普查三臂定向枚举：空文档→新路径成功 / 已存在目标成功 / 打开的文件→新路径必败 ✗）。
-       置 0 后守卫对"尚未落过盘的新目标"自然不生效（建新文件仍允许）。 */
-    state.diskMtime = 0;
-    dbg('pickSaveAs:env', abs);
-    return { ok: true, filePath: abs, env: true };
-  }
-  const r = await dialog.showSaveDialog(win, {
-    title: '另存为',
-    defaultPath: state.filePath || path.join(app.getPath('documents'), '未命名.md'),
-    filters: [{ name: 'Markdown', extensions: ['md'] }],
-  });
-  if (r.canceled || !r.filePath) { dbg('pickSaveAs:canceled'); return { ok: false, canceled: true }; }
-  state.filePath = r.filePath;
-  state.diskMtime = 0;   // 【回归修复·2026-10-10】同上面 env 分支：换路径必须复位，否则新加的"原文件已不在盘上"守卫会把另存为打死（真人这条路的必现缺陷）
-  dbg('pickSaveAs:picked', r.filePath);
-  return { ok: true, filePath: r.filePath };
+let testSaveAsIndex = 0;
+async function pickSaveAs(S, W) {
+  const request = documents.beginSaveAs(S);
+  try {
+    if (MP_TEST_HOOKS && process.env.MP_TEST_SAVE_AS_CANCEL === '1') return { ok: false, canceled: true };
+    let file = process.env.MP_TEST_SAVE_AS;
+    const documentId = request.documentId;
+    // Only the owned quality launch may exercise deterministic dialog latency.
+    if (MP_TEST_HOOKS && process.env.MP_TEST_SAVE_AS_PLAN) {
+      const plans = JSON.parse(process.env.MP_TEST_SAVE_AS_PLAN), index = testSaveAsIndex++;
+      const plan = Array.isArray(plans) ? plans[index] : null;
+      if (plan?.filePath && typeof plan.filePath === 'string') file = plan.filePath;
+      const ms = Math.min(5000,Math.max(0,Number(plan?.delayMs)||0));
+      if (ms) { dbg('test:save-as-delay',{index,phase:'before-grant',ms}); await new Promise(resolve=>setTimeout(resolve,ms)); }
+    }
+    if (!file) {
+      const r = await dialog.showSaveDialog(W, { title: '另存为', defaultPath: S.filePath || path.join(app.getPath('documents'), '未命名.md'), filters: [{ name: 'Markdown', extensions: ['md'] }] });
+      if (r.canceled || !r.filePath) return { ok: false, canceled: true };
+      file = r.filePath;
+    }
+    if (W.isDestroyed() || S.documentId !== documentId || S.saveAsRequest !== request.serial) return { ok: false, error: '选择路径期间文档或另存为操作已改变', code: 'MP_DOC_MISMATCH' };
+    return await documents.grantSaveAs(S, file, request);
+  } catch (e) { return { ok: false, error: e.message, code: e.code }; }
 }
+async function confirmReplace(S, W) {
+  if (!S.dirty) return true;
+  if (process.env.MP_TEST_NO_DIALOG === '1') return false;
+  const r = await dialog.showMessageBox(W, { type: 'warning', buttons: ['放弃修改并打开', '取消'], defaultId: 1, cancelId: 1, message: '还有未保存的修改', detail: S.filePath || '未命名文档' });
+  return r.response === 0 && !W.isDestroyed();
+}
+
 async function openPath(p, target = null) {   // 【文件多开·批 B2】target={win,session} 可指定落点；不传＝老行为
   dbg('openPath:start', p);
-  const S = (target && target.session) || state;
-  const W = (target && target.win) || win;
+  const W = target?.win || activeWindow();
+  if (!W) return { ok: false, error: '没有可用的编辑窗口' };
+  const S = target?.session || sessionOf(W.webContents);
+  if (pdfActive?.owner === W.webContents.id) return { ok: false, error: 'PDF 正在导出，请完成或取消后再打开文档', code: 'MP_EXPORT_BUSY' };
+  if (!(await confirmReplace(S, W))) return { ok: false, canceled: true };
   try { dbg('openPath:target', { hasTarget: !!target, isPrimary: S === state, sessionPath: S.filePath || null, tag: S.__tag || null, wcId: (W && W.webContents) ? W.webContents.id : null }); } catch { }
   try {
-    const { text, filePath } = await readDoc(p, S);
+    const doc = await readDoc(p, S);
+    const { text, filePath } = doc;
     dbg('openPath:loaded', { filePath, len: text.length, lines: text.split('\n').length });
     try { dbg('doc:push:openPath', { to: (W && W.webContents) ? W.webContents.id : null, path: (filePath || '').split('\\').pop() || null }); } catch { }
-    try { if (W && W.webContents && !W.webContents.isDestroyed()) W.webContents.send('doc', { text, filePath }); else send('doc', { text, filePath }); }
-    catch { send('doc', { text, filePath }); }
+    sendTo(W, 'doc', doc);
+    syncPathUi(S, W);
     dbg('openPath:pushed');
     return { ok: true };
   } catch (e) {
@@ -676,76 +608,112 @@ async function openPath(p, target = null) {   // 【文件多开·批 B2】targe
  *   ③ 失败**不摘 MRU**（文件没坏、只是读不到；openPath 那条"摘死记录"的逻辑在这里是错的）。
  * 【并发】同一路径重入**复用上一次的 Promise**（见 reloads），不做任何自动重试。 */
 const reloads = new Map();
-/* 【第二波·cross-window 缺陷·2026-10-10】加 S/W 两个参数：本函数原来读全局 `state.filePath`、
-   写全局 `state.*`、并用 send() 广播推送 ⇒ 多窗口下"重载"会把内容与路径灌进**主会话**并推到
-   **最后创建的窗口**，两个窗口随即错位（实测：只改 A 的 mtime、点 B 再点 A ⇒ B 自报变成 A 的文档）。
-   默认值 = 原来的全局对象 ⇒ 单窗口行为不变。 */
-async function reloadDoc(opts = {}, S = state, W = win) {
-  const p = (typeof opts.filePath === 'string' && opts.filePath) ? opts.filePath : S.filePath;
-  if (!p) return { ok: false, error: '当前文档没有路径（未保存的新文档），无法重新加载' };
-  if (reloads.has(p)) return reloads.get(p);                 // 同路径重入 ⇒ 复用同一次读盘
-  const job = (async () => {
-    if (S.dirty) {
-      /* 未保存确认：逐字沿用「关闭窗口」那条的 message/detail 口径，只把按钮换成重载语境；
-       * defaultId/cancelId 都指向「取消」（破坏性操作不设默认）。按**发起窗口**弹框与取路径。 */
-      if (process.env.MP_TEST_NO_DIALOG === '1') return { ok: false, canceled: true, reason: 'test-no-dialog' };
-      const r = await dialog.showMessageBox(W, {
-        type: 'warning', buttons: ['重新加载', '取消'], defaultId: 1, cancelId: 1,
-        message: '还有未保存的修改', detail: S.filePath || '未命名文档',
-      });
-      if (r.response !== 0) return { ok: false, canceled: true };
-    }
+async function reloadEditorView(W) {
+  if (!W || W.isDestroyed()) return { ok: false, code: 'MP_SESSION_CLOSED' };
+  const S = sessionOf(W.webContents), documentId = S.documentId;
+  await documents.pending(S);
+  if (W.isDestroyed() || documentId !== S.documentId) return { ok: false, code: 'MP_DOC_MISMATCH' };
+  if (pdfActive?.owner === W.webContents.id) return { ok: false, error: 'PDF 正在导出，请完成或取消后再刷新' };
+  if (S.dirty) {
+    dbg('doc:reload-confirm', { wcId: W.webContents.id, documentId });
+    if (process.env.MP_TEST_NO_DIALOG === '1') return { ok: false, canceled: true };
+    const r = await dialog.showMessageBox(W, { type: 'warning', buttons: ['保存并刷新', '取消'], defaultId: 1, cancelId: 1, message: '还有未保存的修改', detail: '刷新前需要保存当前文档。' });
+    if (r.response === 0 && !W.isDestroyed() && documentId === S.documentId) sendTo(W, 'menu', 'saveThenReload');
+    return { ok: false, canceled: r.response !== 0 };
+  }
+  W.reload(); return { ok: true };
+}
+async function reloadDoc(opts, S, W) {
+  const p = S.filePath;
+  if (!p) return { ok: false, error: '当前文档没有路径，无法重新加载' };
+  if (pdfActive?.owner === W.webContents.id) return { ok: false, error: 'PDF 正在导出，请先完成或取消', code: 'MP_EXPORT_BUSY' };
+  const requestId = typeof opts.requestId === 'string' ? opts.requestId : null;
+  const expected = { documentId: S.documentId, revision: S.revision, filePath: p, loadRequest: S.loadRequest };
+  if (opts.documentId && (opts.documentId !== expected.documentId || opts.revision !== expected.revision || opts.filePath !== p)) return { ok: false, code: 'MP_DOC_MISMATCH', error: '文档版本已改变，重载已取消' };
+  const pending = reloads.get(S);
+  if (pending) return pending.requestId === requestId && pending.path === p ? pending.job : { ok: false, code: 'MP_RELOAD_BUSY', error: '正在读取当前文档' };
+  const job = Promise.resolve().then(async () => {
     try {
-      /* 与 readDoc() 同源的 BOM/EOL 归一，但**不 pushRecent**（这就是不能直接调 readDoc 的原因）。 */
-      const buf = await fsp.readFile(p);
-      let text = buf.toString('utf8');
-      const bom = text.charCodeAt(0) === 0xfeff;
-      if (bom) text = text.slice(1);
-      const crlf = (text.match(/\r\n/g) || []).length;
-      const lf = (text.match(/\n/g) || []).length;
-      const eol = crlf > 0 && crlf >= lf - crlf ? '\r\n' : '\n';
-      const norm = text.replace(/\r\n/g, '\n');
-      const st = await fsp.stat(p);
-      /* 会话与窗口都按**发起者**收尾（本函数第 594 行起有说明）：单窗口下 S/W 就是 state/win。 */
-      S.filePath = p;
-      S.savedText = norm;
-      S.diskMtime = st.mtimeMs;
-      S.bom = bom;
-      S.eol = eol;
-      S.dirty = false;
-      syncPathUi(S, W);                                      // 标题 + 「文件位置」+ 菜单项
-      try { if (W && W.webContents && !W.webContents.isDestroyed()) W.webContents.send('doc', { text: norm, filePath: p }); else send('doc', { text: norm, filePath: p }); } catch { send('doc', { text: norm, filePath: p }); }
-      dbg('file:reload', { filePath: p, bytes: buf.length, eol, bom, mtimeMs: st.mtimeMs });
-      return { ok: true, filePath: p, bytes: buf.length, eol, bom, mtimeMs: st.mtimeMs };
-    } catch (e) {
-      dbg('file:reload:error', { filePath: p, error: String((e && e.message) || e) });
-      if (process.env.MP_TEST_NO_DIALOG !== '1') {
-        // 与 openPath 的弹窗纪律一致：模态框会卡住自动化 ⇒ 自动化用 MP_TEST_NO_DIALOG=1 免打扰
-        dialog.showErrorBox('重新加载失败', `${p}\n\n${(e && e.message) || e}`);
-      }
-      return { ok: false, error: String((e && e.message) || e) };   // 注意：**不**摘 MRU
-    } finally { reloads.delete(p); }
-  })();
-  reloads.set(p, job);
-  return job;
+      if (!(await confirmReplace(S, W))) return { ok: false, canceled: true, requestId };
+      // Bounded test-only transport/IO delays make revision and response races
+      // reproducible while retaining the actual handler and store adoption.
+      const pauseForTest = async phase => {
+        const key = phase === 'before-read' ? 'MP_TEST_RELOAD_READ_DELAY_MS' : 'MP_TEST_RELOAD_RESPONSE_DELAY_MS';
+        const ms = process.env.MP_TEST_HOOKS === '1' ? Math.min(5000, Math.max(0, Number(process.env[key]) || 0)) : 0;
+        if (!ms) return;
+        dbg('test:reload-delay', { phase, requestId, filePath: p, documentId: S.documentId, ms });
+        await new Promise(resolve => setTimeout(resolve, ms));
+      };
+      await pauseForTest('before-read');
+      const doc = await documents.load(S, p, expected);
+      const payload = { ...doc, loadKind: 'reload', requestId };
+      await pauseForTest('after-adopt');
+      syncPathUi(S, W); sendTo(W, 'doc', payload);
+      return { ok: true, ...payload };
+    } catch (e) { return { ok: false, error: e.message, code: e.code }; }
+    finally { if (reloads.get(S)?.job === job) reloads.delete(S); }
+  });
+  reloads.set(S, { job, requestId, path: p }); return job;
 }
 
 /* ── 【文件多开·第 3 步·3b】会话工厂与新窗口打开 ──────────────────────────
    文档级字段单独放一个对象；应用级设置（settings/主题/缩放/最近记录）**故意不放进会话**，
    它们本来就该跨窗口共享。 */
 function newSession() {
-  return { filePath: null, savedText: '', diskMtime: 0, bom: false, eol: '\n', dirty: false, __pendingClose: false };
+  return createSession();
 }
 /** 在新窗口里打开一个文件（OS 二次启动、菜单「在新窗口中打开」都走这里）。 */
-function openInNewWindow(filePath) {
+async function openInNewWindow(filePath) {
+  let createdWindow = null;
   try {
     const S = newSession();
+    // Read before creating a renderer: an unreadable file leaves every existing
+    // window intact and does not create an empty failed document.
+    if (filePath) await readDoc(filePath, S);
     const W = createWindow(S);          // 3a 已参数化：窗口与会话一一对应
+    createdWindow = W;
     try { S.__tag = 'newwin-' + Date.now(); dbg('newwin:session', { tag: S.__tag, isPrimary: S === state, wcId: W.webContents.id }); } catch { }
-    W.once('ready-to-show', () => { try { if (filePath) openPath(filePath, { win: W, session: S }); } catch (e) { dbg('newwin:open-failed', String((e && e.message) || e)); } });
+    await new Promise((resolve, reject) => {
+      const finish = error => {
+        clearTimeout(timer); W.removeListener('ready-to-show', ready); W.removeListener('closed', closed);
+        W.webContents.removeListener('did-fail-load', failed);
+        error ? reject(error) : resolve();
+      };
+      const ready = () => finish(), closed = () => finish(failure('MP_SESSION_CLOSED', '打开期间窗口已关闭'));
+      const failed = (_event, code, description) => finish(failure('MP_WINDOW_LOAD', description || String(code)));
+      const timer = setTimeout(() => { finish(failure('MP_WINDOW_LOAD', '编辑窗口启动超时')); if (!W.isDestroyed()) W.destroy(); }, 15000);
+      W.once('ready-to-show', ready); W.once('closed', closed); W.webContents.once('did-fail-load', failed);
+    });
     dbg('newwin:created', { filePath: filePath || null, sessions: sessions.size });
-    return { ok: true };
-  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+    return { ok: true, windowId: W.id, documentId: S.documentId };
+  } catch (e) {
+    if (createdWindow && !createdWindow.isDestroyed()) createdWindow.destroy();
+    return { ok: false, error: String((e && e.message) || e), code: e.code };
+  }
+}
+const documentOpens = new Map();
+async function openDocument(filePath) {
+  try {
+    if (typeof filePath !== 'string' || !filePath) throw failure('MP_BAD_PATH', '没有指定文件路径');
+    const canonical = await documents.canonical(filePath), key = documents.key(canonical);
+    if (documentOpens.has(key)) return documentOpens.get(key);
+    const job = (async () => {
+      for (const W of BrowserWindow.getAllWindows()) {
+        if (W.isDestroyed() || !sessions.has(W.webContents.id)) continue;
+        const S = sessionOf(W.webContents);
+        if (!S.filePath) continue;
+        const identity = { documentId: S.documentId, filePath: S.filePath };
+        const candidate = documents.key(await documents.canonical(identity.filePath));
+        if (candidate !== key || W.isDestroyed() || S.documentId !== identity.documentId || S.filePath !== identity.filePath) continue;
+        if (W.isMinimized()) W.restore(); W.show(); W.focus();
+        pushRecent(S.filePath);
+        return { ok: true, existing: true, windowId: W.id, documentId: S.documentId };
+      }
+      return openInNewWindow(canonical);
+    })();
+    documentOpens.set(key, job);
+    try { return await job; } finally { if (documentOpens.get(key) === job) documentOpens.delete(key); }
+  } catch (error) { return { ok: false, error: error.message, code: error.code }; }
 }
 function createWindow(session = state) {   // 【文件多开·第 3 步·3a】可指定会话；默认主会话 ⇒ 老行为
   /* 【S6·主窗口语义·2026-10-10（用户批准 ✓）】几何**只记主窗口** ✓：
@@ -787,6 +755,7 @@ function createWindow(session = state) {   // 【文件多开·第 3 步·3a】�
   } catch (e) { dbg("session:register-failed", String((e && e.message) || e)); }
 
   W.once('ready-to-show', () => W.show());
+  W.on('focus', () => refreshFileMenuItems());
   // 键盘留痕（仅 MP_DEBUG=1）：加速键（Ctrl+Shift+S 之类）到底有没有进到窗口，只看界面看不出来。
   // 只在调试时挂，且只记按键本身，不干预事件。
   if (DBG) {
@@ -826,29 +795,29 @@ function createWindow(session = state) {   // 【文件多开·第 3 步·3a】�
   W.on('resize', () => { if (!W.isMaximized() && isPrimaryWin) state.settings.winBounds = W.getBounds(); });
   W.on('move', () => { if (!W.isMaximized() && isPrimaryWin) state.settings.winBounds = W.getBounds(); });
   W.on('close', async (e) => {
-    /* 【文件多开·3c】脏标记/路径/对话框/保存请求**全部按本窗口的会话**：
-       改前读全局 state ⇒ 多窗口下关 B 会看 A 的脏标记，还会把 'save' 广播给 A。 */
     const S = sessionOf(W.webContents);
-    if (!S.dirty) { saveSettings(); return; }
+    if (!S.dirty && !S.pendingSaves.size) { saveSettings(); return; }
     e.preventDefault();
-    const r = await dialog.showMessageBox(W, {
-      type: 'warning', buttons: ['保存并退出', '不保存', '取消'], defaultId: 0, cancelId: 2,
-      message: '还有未保存的修改', detail: S.filePath || '未命名文档',
-    });
-    if (r.response === 2) return;
-    if (r.response === 0) {
-      /* 【P1-2·2026-10-10 由"人类常用操作普查"查出】这里原来只发 'save' 就 return，指望
-         `doc:saved` 里的 `W.__pendingClose` 收尾；但**全仓没有任何地方把它置 true** ⇒
-         保存成功窗口也不退，用户看到的是"点了『保存并退出』，应用还在"（磁盘已写好）。
-         现在置位；并加 8 秒兜底清位，万一保存失败/渲染侧不回，下次关窗不会被误当成"等待中"。 */
-      try { W.__pendingClose = true; } catch { /* 忽略 */ }
-      setTimeout(() => { try { if (W && !W.isDestroyed()) W.__pendingClose = false; } catch { /* 忽略 */ } }, 8000);
-      try { if (!W.webContents.isDestroyed()) W.webContents.send('menu', 'save'); else send('menu', 'save'); } catch { send('menu', 'save'); }
-      return;
-    }
-    S.dirty = false;
-    W.destroy();
+    if (W.__closeWaiting) return;
+    W.__closeWaiting = true;
+    try {
+      const documentId = S.documentId, revision = S.revision;
+      await documents.pending(S);
+      if (W.isDestroyed()) return;
+      if (S.documentId !== documentId || S.revision !== revision) return;
+      if (!S.dirty) { W.close(); return; }
+      dbg('doc:close-confirm', { wcId: W.webContents.id, documentId, revision, filePath: S.filePath });
+      const testResponse = MP_TEST_HOOKS && process.env.MP_TEST_CLOSE_RESPONSE;
+      const r = testResponse && /^[012]$/.test(testResponse) ? { response: Number(testResponse) } : await dialog.showMessageBox(W, { type: 'warning', buttons: ['保存并退出', '不保存', '取消'], defaultId: 0, cancelId: 2, message: '还有未保存的修改', detail: S.filePath || '未命名文档' });
+      if (W.isDestroyed() || S.documentId !== documentId || S.revision !== revision || r.response === 2) return;
+      if (r.response === 0) {
+        const intent = W.__pendingClose = { documentId, revision };
+        sendTo(W, 'menu', 'save');
+        setTimeout(() => { if (!W.isDestroyed() && W.__pendingClose === intent) W.__pendingClose = null; }, 8000).unref();
+      } else W.destroy();
+    } finally { W.__closeWaiting = false; }
   });
+
   /* 全局 win 保持指向"最新创建的窗口"：既有 50 处 win 引用因此无需改动；
      多窗口下凡是要精确落点的路径（openPath/doc 推送/标题）都已改成按会话取。 */
   win = W;
@@ -864,7 +833,7 @@ else {
        就是这条路径（系统里双击另一个 .md / 命令行再启一次）。
        同时修掉一条回归：改前这里是 `if (win) { if (W.isMinimized()) W.restore(); W.focus(); }`，
        而 `W` 在本作用域不存在（3a 的区块替换范围过大把这段一起改名了）⇒ 第二次启动会抛错。 */
-    if (p) openInNewWindow(p);
+    if (p) { void openDocument(p); return; }
     const alive = BrowserWindow.getAllWindows().filter((x) => !x.isDestroyed());
     if (alive.length) { const w2 = alive[alive.length - 1]; try { if (w2.isMinimized()) w2.restore(); w2.focus(); } catch { /* 忽略 */ } }
   });
@@ -930,28 +899,24 @@ handle('app:health', () => ({
 // 渲染进程启动后**主动拉**当前文档：主进程的 openPath 可能早于渲染进程注册监听而把 doc 消息丢掉（实测竞态）。
 /* 【文件多开·第 2 步·批 A】文档读取按**发起窗口的会话**取（sessionOf 对未注册窗口保守回落到主会话，
    所以单窗口下行为与改前逐字节一致；多窗口时各读各的）。doc:ready 的推送也改成发给**发起窗口**。 */
-handle('doc:current', (e) => { const S = sessionOf(e && e.sender); dbg('doc:current', { wcId: e && e.sender ? e.sender.id : null, has: !!S.filePath, isPrimary: S === state, path: (S.filePath || '').split('\\').pop() || null }); return (S.filePath ? { text: S.savedText, filePath: S.filePath } : null); });
-// 引擎 boot 完成后的反向握手：此刻渲染进程一定已经注册好 onDoc，再推一次当前文档（不再丢消息）。
-handle('doc:ready', (e) => {
-  const S = sessionOf(e && e.sender);
-  dbg('doc:ready', { wcId: e && e.sender ? e.sender.id : null, has: !!S.filePath, isPrimary: S === state, path: (S.filePath || '').split('\\').pop() || null });
-  if (S.filePath) {
-    try { if (e && e.sender && !e.sender.isDestroyed()) { try { dbg('doc:push:ready', { to: e.sender.id, path: (S.filePath || '').split('\\').pop() || null }); } catch { } e.sender.send('doc', { text: S.savedText, filePath: S.filePath }); } else send('doc', { text: S.savedText, filePath: S.filePath }); }
-    catch { send('doc', { text: S.savedText, filePath: S.filePath }); }
-  }
-  return !!S.filePath;
+handle('doc:current', e => { const S = sessionOf(e.sender); return S.filePath ? documents.metadata(S) : null; });
+handle('doc:ready', e => {
+  const S = sessionOf(e.sender);
+  if (S.filePath && !S.dirty) sendTo(windowOf(e), 'doc', documents.metadata(S));
+  return documents.metadata(S);
 });
-handle('file:open', () => pickOpen());
-handle('file:openPath', (_e, p) => openPath(p));
-/* 【文件多开·3b】显式开新窗（探针/菜单/二次启动共用）。 */
-handle('win:openInNewWindow', (_e, p) => openInNewWindow(p || state.filePath || null));
-/* 【第二波·cross-window 缺陷·2026-10-10】按**发起窗口**的会话与窗口调用。
-   原来只传 opts ⇒ S/W 回落到全局 state/win ⇒ 第二个窗口的重载会把内容灌进主会话并推到别的窗口。 */
-handle('file:reload', (e, opts) => {
-  const S = sessionOf(e && e.sender);
-  const W = (e && e.sender) ? BrowserWindow.fromWebContents(e.sender) : win;
-  return reloadDoc(opts || {}, S, W);
+handle('view:reload', e => reloadEditorView(windowOf(e)));
+handle('file:cancelCloseSave', e => {
+  const W = windowOf(e), hadCloseIntent = !!W.__pendingClose;
+  W.__pendingClose = null;
+  dbg('doc:close-save-cancelled', { wcId: e.sender.id, hadCloseIntent });
+  return { ok: true };
 });
+handle('file:open', e => pickOpen(windowOf(e)));
+handle('file:openPath', (e, p) => openPath(p, { win: windowOf(e), session: sessionOf(e.sender) }));
+handle('file:openDocument', (_e, p) => openDocument(p));
+handle('win:openInNewWindow', (e, p) => openInNewWindow(p === undefined ? sessionOf(e.sender).filePath : p));
+handle('file:reload', (e, opts) => reloadDoc(opts || {}, sessionOf(e.sender), windowOf(e)));
 
 /* ── IPC：最近打开（「文件 → 最近打开」的数据面）──────────────────────────────
  *   · recent:list          当前 MRU（含 alive 标记：条目还在不在磁盘上）
@@ -969,12 +934,12 @@ const recentView = () => {
   return { file: RECENTS_FILE, limit: RECENT_LIMIT, aumid: APP_USER_MODEL_ID, files };
 };
 handle('recent:list', () => recentView());
-handle('recent:open', (_e, p) => openPath(p));
+handle('recent:open', (_e, p) => openDocument(p));
 handle('recent:clear', () => clearRecent());
 if (MP_TEST_HOOKS) {
   dbg('test-hooks:on');
   // force=true：连"灰掉的项"也点（验证"菜单建好之后文件才被删"这条竞态：要点得动、但不许崩）
-  handle('recent:test-menu-click', (_e, id, force) => {
+  handle('recent:test-menu-click', (e, id, force) => {
     dbg('test-menu-click', { id, force, forceType: typeof force });
     const click = menuItemClicks.get(String(id || ''));
     if (!click) return { ok: false, error: `没有这个菜单项：${id}`, ids: [...menuItemClicks.keys()] };
@@ -988,7 +953,7 @@ if (MP_TEST_HOOKS) {
     };
     const item = menu ? find(menu.items, String(id)) : null;
     if (item && item.enabled === false && !force) return { ok: false, error: '该菜单项已灰掉（不禁用模拟点击）', id: String(id), enabled: false };
-    try { click(); return { ok: true, id: String(id), forced: !!force, enabled: item ? item.enabled : null }; }
+    try { click(item, windowOf(e)); return { ok: true, id: String(id), forced: !!force, enabled: item ? item.enabled : null }; }
     catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
   });
   /* 文件相关的菜单读数（3.0.9）：把「文件位置」等项的**实时** label/enabled 直接读出来，
@@ -1079,7 +1044,7 @@ if (MP_TEST_HOOKS) {
     const out = { ok: true, items: labels, bounds: w.getBounds(), popupAt: { x: popts.x || null, y: popts.y || null }, note: '用 Electron 菜单 API 弹出当前子菜单；这是"同一子菜单的原生呈现"，不是点击菜单栏' };
     if (opts && 'filePathOverride' in opts) {                 // 还原：覆盖只用于这一次弹菜单
       state.filePath = prevPath;
-      try { syncPathUi(); } catch { /* 尽力而为 */ }
+      try { syncPathUi(sessionOf(e.sender), w); } catch { /* 尽力而为 */ }
       out.restoredPath = prevPath;
     }
     return out;
@@ -1141,10 +1106,14 @@ function watchIpc(channel, handler) {
     finally { clearTimeout(timer); if (ipcSlowness.delete(channel)) dbg('ipc:slow-end', { channel, ms: Date.now() - t0 }); }
   });
 }
-watchIpc('file:saveAs', () => pickSaveAs());
-handle('file:save', async (_e, { filePath, text }) => {
+watchIpc('file:saveAs', e => pickSaveAs(sessionOf(e.sender), windowOf(e)));
+handle('file:requestSave', e => { sendTo(windowOf(e), 'menu', 'save'); return { ok: true }; });
+handle('file:save', async (e, { filePath, text, ...metadata }) => {
   try {
-    const r = await writeDoc(filePath, text);
+    if (metadata.automatic && state.settings.autosaveEnabled !== true) return { ok: false, code: 'MP_AUTOSAVE_DISABLED' };
+    const S = sessionOf(e.sender);
+    const r = await writeDoc(filePath, text, S, metadata);
+    if (r.current) syncPathUi(S, windowOf(e));
     dbg('file:save', { filePath, bytes: r.bytes });
     return r;
   }
@@ -1186,10 +1155,17 @@ function imgSafeName(name, fallback = 'image.png') {
 const imgSha1 = (buf) => crypto.createHash('sha1').update(buf).digest('hex');
 /** 原子写：临时文件 + rename（assets 里的图不该出现半截文件）。 */
 async function imgAtomicWrite(target, buf) {
-  const tmp = `${target}.mp-tmp-${process.pid}`;
-  await fsp.writeFile(tmp, buf);
-  try { await fsp.rename(tmp, target); }
-  catch { try { await fsp.rm(target, { force: true }); } catch { /* 目标本来就不在 */ } await fsp.rename(tmp, target); }
+  const tmp = `${target}.mp-tmp-${process.pid}-${crypto.randomUUID()}`;
+  try { await fsp.writeFile(tmp, buf, { flag: 'wx' }); await fsp.rename(tmp, target); }
+  finally { await fsp.rm(tmp, { force: true }).catch(() => {}); }
+}
+/** Stage all bytes first; exclusive copy never replaces an existing asset. */
+async function imgExclusiveWrite(target, buf) {
+  const tmp = `${target}.mp-tmp-${process.pid}-${crypto.randomUUID()}`;
+  try {
+    await fsp.writeFile(tmp, buf, { flag: 'wx' });
+    await fsp.copyFile(tmp, target, fs.constants.COPYFILE_EXCL);
+  } finally { await fsp.rm(tmp, { force: true }).catch(() => {}); }
 }
 /** 先 stat 再读：超过上限**根本不读进内存**（这是"大文件别塞内存"的落点）。 */
 async function imgReadCapped(p) {
@@ -1199,7 +1175,7 @@ async function imgReadCapped(p) {
     return { ok: false, error: `图片过大：${p} 有 ${(st.size / 1048576).toFixed(1)} MB，超过单张 ${IMG_MAX_BYTES / 1048576} MB 上限`, code: 'E_TOO_LARGE', bytes: st.size };
   }
   const buf = await fsp.readFile(p);
-  return { ok: true, buf, bytes: buf.length };
+  return { ok: true, buf, bytes: buf.length, mime: imgMimeOf(p) };
 }
 /** 落盘到 <文档目录>/assets/ 并回相对路径（重名去重规则由引擎定、这里执行）：
  *  同名 + 字节相同 ⇒ 复用已有文件；同名 + 字节不同 ⇒ a-1.png、a-2.png… */
@@ -1232,8 +1208,13 @@ async function imgSaveToAssets({ docPath, srcPath, base64, mime, fileName } = {}
       const target = path.join(assetsDir, candidate);
       let existing = null;
       try { existing = await fsp.readFile(target); } catch (e) { if (e.code !== 'ENOENT') throw e; }
-      if (existing === null) { await imgAtomicWrite(target, buf); dbg('img:saveToAssets', { from, target, bytes: buf.length, renamed }); return { ok: true, relPath: `assets/${candidate}`, absPath: target, renamed, reused: false, bytes: buf.length, mime: mime || imgMimeOf(candidate) }; }
-      if (imgSha1(existing) === sha) { dbg('img:saveToAssets:reuse', { from, target }); return { ok: true, relPath: `assets/${candidate}`, absPath: target, renamed, reused: true, bytes: buf.length, mime: mime || imgMimeOf(candidate) }; }
+      if (existing === null) {
+        try { await imgExclusiveWrite(target, buf); }
+        catch (e) { if (e.code === 'EEXIST') { i--; continue; } throw e; }
+        dbg('img:saveToAssets', { from, target, bytes: buf.length, renamed });
+        return { ok: true, relPath: `assets/${encodeURIComponent(candidate).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase())}`, absPath: target, renamed, reused: false, bytes: buf.length, mime: mime || imgMimeOf(candidate) };
+      }
+      if (imgSha1(existing) === sha && existing.equals(buf)) { dbg('img:saveToAssets:reuse', { from, target }); return { ok: true, relPath: `assets/${encodeURIComponent(candidate).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase())}`, absPath: target, renamed, reused: true, bytes: buf.length, mime: mime || imgMimeOf(candidate) }; }
       if (i > 99) return { ok: false, error: `同名文件太多（试到 ${candidate}），请换个文件名` };
       candidate = `${stem}-${i + 1}${ext}`;
       renamed = true;
@@ -1310,7 +1291,17 @@ handle('image:pick', async (_e, opts = {}) => {
   dbg('image:pick', r.filePaths);
   return { ok: true, files: r.filePaths };
 });
-handle('image:saveToAssets', (_e, opts = {}) => imgSaveToAssets(opts));
+// Name allocation and write receipts are serial across all editor windows.
+let imageAssetsQueue = Promise.resolve();
+handle('image:saveToAssets', (_e, opts = {}) => {
+  const result = imageAssetsQueue.then(async () => {
+    const delay = process.env.MP_TEST_HOOKS === '1' ? Math.min(5000, Math.max(0, Number(process.env.MP_TEST_IMAGE_DELAY_MS) || 0)) : 0;
+    if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+    return imgSaveToAssets(opts);
+  });
+  imageAssetsQueue = result.catch(() => {});
+  return result;
+});
 handle('image:base64ToFile', async (_e, { base64, mime, fileName } = {}) => {
   if (typeof base64 !== 'string' || !base64) return { ok: false, error: 'base64 为空' };
   const buf = Buffer.from(base64, 'base64');
@@ -1343,18 +1334,26 @@ handle('shell:openExternal', (_e, url) => { try { shell.openExternal(String(url)
    clipboard.write 由主进程执行，支持 text + html 两种口味，是 Electron 里最可靠的一条。 */
 /* 【右键菜单·粘贴·2026-10-10】渲染进程里 execCommand("paste") 在 Electron 中不可靠（多数情况下被拒），
    右键菜单的「粘贴」必须由主进程执行。返回是否成功，失败不静默。 */
-handle('edit:paste', () => {
+handle('edit:paste', e => {
   try {
-    const w = BrowserWindow.getFocusedWindow() || win;
+    const w = windowOf(e);
     if (!w) return { ok: false, error: "no-window" };
     w.webContents.paste();
     return { ok: true };
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
+handle('edit:history', (e, cmd) => {
+  if (cmd !== 'undo' && cmd !== 'redo') return { ok: false, error: 'invalid-command' };
+  try {
+    const w = windowOf(e);
+    w.webContents[cmd]();
+    return { ok: true };
+  } catch (err) { return { ok: false, error: String((err && err.message) || err) }; }
+});
 /* 【通用设置通道·2026-10-10】渲染侧只允许改这几个键（白名单）：
    设置面板要加的开关会越来越多，但**不能**给渲染侧一个万能写入口 —— 
    state.settings 里有 recentFiles/winBounds 这类壳层自己维护的字段，被渲染侧覆盖会丢数据。 */
-const SETTING_WRITABLE = new Set(['restoreLast', 'theme', 'zoom', 'fontFamily', 'fontSize', 'lineHeight', 'mathScale']);
+const SETTING_WRITABLE = new Set(['restoreLast', 'theme', 'zoom', 'fontFamily', 'fontSize', 'lineHeight', 'mathScale', 'autosaveEnabled', 'autosaveIntervalMs']);
 /* 【文件多开·第 1 步】会话读数（只读）：给探针与后续步骤当验收口。 */
 /* 【只读调试口·S4①·2026-10-10（settings-truth 族）】原生主题的**真源读数**（主进程侧）。
    复核"启动时 theme 是否落到 nativeTheme"必须读这里 —— 渲染侧的 `matchMedia('(prefers-color-scheme: dark)')`
@@ -1376,23 +1375,32 @@ handle('debug:sessions', (e) => {
     };
   } catch (err) { return { ok: false, error: String((err && err.message) || err) }; }
 });
-handle('setting:get', (_e, key) => { const k = String(key || ''); return { key: k, value: state.settings[k] }; });
+handle('setting:get', (_e, key) => {
+  const k = String(key || ''), policy = require('./shell/save-policy').normalize(state.settings.autosaveEnabled, state.settings.autosaveIntervalMs);
+  return { key: k, value: k === 'autosaveEnabled' ? policy.enabled : k === 'autosaveIntervalMs' ? policy.intervalMs : state.settings[k] };
+});
 handle('setting:set', (_e, payload = {}) => {
   const k = String(payload.key || '');
   if (!SETTING_WRITABLE.has(k)) return { ok: false, error: 'readonly-key', key: k };
+  const existed = Object.hasOwn(state.settings, k), previous = state.settings[k];
+  if (k === 'autosaveEnabled' && typeof payload.value !== 'boolean') return { ok: false, error: 'invalid-value', key: k };
+  if (k === 'autosaveIntervalMs' && (!Number.isFinite(payload.value) || payload.value < 1000 || payload.value > 3600000)) return { ok: false, error: 'invalid-value', key: k };
   state.settings[k] = payload.value;
   /* 【数据丢失修复·2026-10-10（corrupt-config A7）】原来无条件 `return { ok: true }` ⇒
      只读 settings.json 时面板改设置"**回执成功、磁盘没变、零提示**"（OS 拒绝写入）。
      现在让写盘结果说话：失败即如实回报，用户看得见。 */
   const w = saveSettings();
   dbg("setting:set", { key: k, value: payload.value, wrote: !!(w && w.ok) });
-  if (w && w.ok === false) return { ok: false, error: 'write-failed', key: k, detail: w.error || '无法写入设置文件' };
+  if (w && w.ok === false) {
+    if (existed) state.settings[k] = previous; else delete state.settings[k];
+    return { ok: false, error: 'write-failed', key: k, detail: w.error || '无法写入设置文件' };
+  }
   /* 【S5 折中·2026-10-10（用户批准 ✓）】写盘成功后，**全局观感类**设置广播到所有窗口 ✓ ⇒ 其它已开窗口
      的面板/正文立即跟上 ✓（原来只有发起操作的那个窗口重算 ✗）。**`zoom` 明确排除** ✗ —— 视图类保持
      各窗口独立 ✓（折中的关键：缩放/滚动不互相干扰 ✓）。渲染侧收到后用**既有 applier** 应用 ✓
      （引擎的 `window.mpEngine.applyPrefs()` 与主题的 `themeGet/applyTheme` ✓，不新写第二份 ✗）。 */
-  const GLOBAL_LOOK = new Set(['theme', 'fontFamily', 'fontSize', 'lineHeight', 'mathScale']);
-  if (GLOBAL_LOOK.has(k)) { try { sendAll('setting', { key: k, value: state.settings[k] }); } catch { /* 忽略 */ } }
+  const GLOBAL_LOOK = new Set(['theme', 'fontFamily', 'fontSize', 'lineHeight', 'mathScale', 'autosaveEnabled', 'autosaveIntervalMs']);
+  if (GLOBAL_LOOK.has(k)) { try { sendAll('setting', { key: k, value: state.settings[k], savePolicy: require('./shell/save-policy').normalize(state.settings.autosaveEnabled, state.settings.autosaveIntervalMs) }); } catch { /* 忽略 */ } }
   return { ok: true, key: k, value: payload.value };
 });
 /* 【图片右键·2026-10-10 用户报"图片右键没反应"】Typora 的图片右键有「复制图片 / 另存为图片」等；
@@ -1408,37 +1416,99 @@ handle('clipboard:hasImage', () => {
     return { ok: true, hasImage: !img.isEmpty(), width: size.width, height: size.height, textLen: clipboard.readText().length };
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
-handle('clipboard:writeImage', (_e, payload = {}) => {
+async function imgSourceBytes(src, docPath) {
+  const value = String(src || '');
+  if (!value) return { ok: false, error: '图片地址为空' };
+  if (/^data:/i.test(value)) {
+    const comma = value.indexOf(','), meta = value.slice(5, comma);
+    if (comma < 0 || !/^image\//i.test(meta)) return { ok: false, error: '不是图片数据' };
+    const data = value.slice(comma + 1);
+    const buf = /;base64(?:;|$)/i.test(meta) ? Buffer.from(data, 'base64') : Buffer.from(decodeURIComponent(data));
+    if (!buf.length || buf.length > IMG_MAX_BYTES) return { ok: false, error: '图片为空或超过单张大小上限' };
+    return { ok: true, buf, bytes: buf.length, mime: meta.split(';')[0] };
+  }
+  if (/^https?:/i.test(value)) {
+    const downloaded = await imgDownload({ url: value });
+    if (!downloaded.ok) return downloaded;
+    return imgReadCapped(downloaded.absPath);
+  }
+  let file;
+  if (/^file:/i.test(value)) file = fileURLToPath(value);
+  else if (path.isAbsolute(value)) file = value;
+  else {
+    if (!docPath) return { ok: false, error: '请先保存文档，或使用完整图片地址' };
+    const base = pathToFileURL(path.dirname(path.resolve(docPath)) + path.sep);
+    file = fileURLToPath(new URL(value.replace(/\\/g, '/'), base));
+  }
+  return imgReadCapped(file);
+}
+// nativeImage decodes PNG/JPEG. Chromium supplies the raster for other editor
+// formats such as WebP; the source file remains unchanged when saving it.
+async function imgForClipboard(sender, source) {
+  let image = nativeImage.createFromBuffer(source.buf);
+  if (!image.isEmpty()) return image;
+  const decode = async (dataURL, maxBytes) => {
+    const img = new Image(); img.src = dataURL; await img.decode();
+    if (!img.naturalWidth || !img.naturalHeight || img.naturalWidth * img.naturalHeight > 64000000) throw new Error('图片为空或像素过大');
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    const png = canvas.toDataURL('image/png');
+    if (png.length > maxBytes * 4 / 3 + 128) throw new Error('图片无法复制或超过大小上限');
+    return png;
+  };
+  const dataURL = `data:${source.mime || 'image/png'};base64,${source.buf.toString('base64')}`;
+  let timer;
   try {
-    const src = String(payload.src || '');
-    let img = null;
-    if (/^data:/i.test(src)) img = nativeImage.createFromDataURL(src);
-    else if (src && fs.existsSync(src)) img = nativeImage.createFromPath(src);
+    const png = await Promise.race([
+      sender.executeJavaScript(`(${decode.toString()})(${JSON.stringify(dataURL)},${IMG_MAX_BYTES})`),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('图片解码超时')), 10000); }),
+    ]);
+    if (typeof png !== 'string' || !png.startsWith('data:image/png;base64,') || png.length > IMG_MAX_BYTES * 4 / 3 + 128) throw new Error('图片无法复制或超过大小上限');
+    image = nativeImage.createFromBuffer(Buffer.from(png.slice(png.indexOf(',') + 1), 'base64'));
+    return image;
+  } finally { clearTimeout(timer); }
+}
+handle('clipboard:writeImage', async (e, payload = {}) => {
+  try {
+    const docPath = sessionOf(e.sender).filePath;
+    const source = await imgSourceBytes(payload.src, docPath);
+    if (!source.ok) return source;
+    if (e.sender.isDestroyed()) return { ok: false, canceled: true };
+    const img = await imgForClipboard(e.sender, source);
+    if (e.sender.isDestroyed()) return { ok: false, canceled: true };
     if (!img || img.isEmpty()) return { ok: false, error: "bad-image" };
     clipboard.writeImage(img);
     const size = img.getSize();
     return { ok: true, width: size.width, height: size.height };
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
-handle('image:saveAs', async (_e, payload = {}) => {
+handle('image:saveAs', async (e, payload = {}) => {
   try {
-    const src = String(payload.src || '');
-    const suggest = String(payload.fileName || 'image.png');
-    let bytes = null;
-    if (/^data:/i.test(src)) { const i = src.indexOf(','); bytes = Buffer.from(src.slice(i + 1), 'base64'); }
-    else if (src && fs.existsSync(src)) bytes = fs.readFileSync(src);
-    if (!bytes || !bytes.length) return { ok: false, error: "bad-image" };
-    const r = await dialog.showSaveDialog(win, { title: "图片另存为", defaultPath: path.join(app.getPath("pictures"), suggest) });
+    const owner = BrowserWindow.fromWebContents(e.sender), docPath = sessionOf(e.sender).filePath;
+    const suggest = imgSafeName(payload.fileName || 'image.png');
+    const source = await imgSourceBytes(payload.src, docPath);
+    if (!source.ok) return source;
+    let r;
+    if (MP_TEST_HOOKS && process.env.MP_TEST_IMAGE_SAVE_AS) r = { canceled: false, filePath: path.resolve(process.env.MP_TEST_IMAGE_SAVE_AS) };
+    else if (process.env.MP_TEST_NO_DIALOG === '1') r = { canceled: true };
+    else r = await dialog.showSaveDialog(owner, { title: "图片另存为", defaultPath: path.join(app.getPath("pictures"), suggest) });
     if (r.canceled || !r.filePath) return { ok: false, canceled: true };
-    await fsp.writeFile(r.filePath, bytes);
-    return { ok: true, path: r.filePath, bytes: bytes.length };
+    await fsp.writeFile(r.filePath, source.buf);
+    return { ok: true, path: r.filePath, bytes: source.bytes };
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
-handle('clipboard:write', (_e, p) => {
+let clipboardWriteSerial = 0;
+handle('clipboard:write', async (_e, p) => {
   try {
     const text = String((p && p.text) || '');
     const html = (p && p.html) ? String(p.html) : '';
     if (!text && !html) return { ok: false, error: "empty" };
+    const delay = Number(process.env.MP_TEST_CLIPBOARD_DELAY_MS);
+    if (process.env.MP_TEST_HOOKS === '1' && Number.isFinite(delay) && delay > 0 && delay <= 5000) {
+      dbg('clipboardWrite:start', { seq: ++clipboardWriteSerial, ms: delay });
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
     if (html) clipboard.write({ text, html }); else clipboard.writeText(text);
     return { ok: true, bytes: text.length, hasHtml: !!html };
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
@@ -1481,26 +1551,32 @@ handle('theme:pickCss', async () => {
     return { ok: true, path: file, name: path.basename(file, path.extname(file)), text };
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
-/* 【文件多开·批 B1】按发起窗口的会话与窗口：B 窗口改脏标记不再影响 A 窗口的标题。 */
-handle('doc:dirty', (e, dirty) => { const S = sessionOf(e && e.sender); const W = (e && e.sender) ? BrowserWindow.fromWebContents(e.sender) : win; S.dirty = !!dirty; updateTitle(S, W); });// 【纪律】路径只由显式 doc:path / doc:saved 改：早先的 doc:title 顺手写 state.filePath，
-// 会在渲染进程尚未拿到文档时把主进程的路径清成 null（实测：pull has:true → 一秒后 has:false）。
-/* 【文件多开·批 B1】路径写进本窗口会话，标题/路径 UI 也刷本窗口。 */
-handle('doc:path', (e, filePath) => { const S = sessionOf(e && e.sender); const W = (e && e.sender) ? BrowserWindow.fromWebContents(e.sender) : win; try { dbg('doc:path:write', { wcId: e && e.sender ? e.sender.id : null, isPrimary: S === state, path: (filePath || '').split('\\').pop() || null }); } catch { }
-  S.filePath = filePath || null; syncPathUi(S, W); return true; });
-/* 【文件多开·批 B1】保存成功：会话与标题按本窗口；最近记录是**应用级**共享列表，保持全局。 */
-handle('doc:saved', (e, { filePath }) => {
-  const S = sessionOf(e && e.sender);
-  const W = (e && e.sender) ? BrowserWindow.fromWebContents(e.sender) : win;
-  S.filePath = filePath; S.dirty = false; syncPathUi(S, W); pushRecent(filePath);
-  if (W && W.__pendingClose) { W.__pendingClose = false; W.destroy(); }
+handle('doc:dirty', (e, payload) => {
+  const S = sessionOf(e.sender), W = windowOf(e);
+  let accepted;
+  if (typeof payload === 'boolean' && MP_TEST_HOOKS) { S.dirty = payload; accepted = true; }
+  else accepted = documents.markDirty(S, payload || {});
+  updateTitle(S, W); return { ok: accepted, documentId: S.documentId, revision: S.revision, dirty: S.dirty };
+});
+handle('doc:path', (e, filePath, metadata = {}) => {
+  const S = sessionOf(e.sender), W = windowOf(e);
+  if (filePath === null) {
+    if (metadata.documentId !== S.documentId) return { ok: false, code: 'MP_DOC_MISMATCH' };
+    if (pdfActive?.owner === e.sender.id) return { ok: false, error: 'PDF 正在导出，请完成或取消后再新建文档' };
+    documents.reset(S); W.__pendingClose = null;
+  } else if (filePath !== S.filePath || (metadata.documentId && metadata.documentId !== S.documentId)) return { ok: false, code: 'MP_DOC_MISMATCH' };
+  syncPathUi(S, W); return { ok: true, ...documents.metadata(S) };
+});
+handle('doc:saved', (e, receipt = {}) => {
+  const S = sessionOf(e.sender), W = windowOf(e), saved = S.lastSave;
+  if (!saved || receipt.saveId !== saved.id || receipt.documentId !== S.documentId || receipt.revision !== saved.revision || receipt.filePath !== S.filePath) return false;
+  syncPathUi(S, W); pushRecent(S.filePath);
+  if (W.__pendingClose?.documentId === S.documentId && W.__pendingClose.revision === S.revision && !S.dirty && !S.pendingSaves.size) { W.__pendingClose = null; W.destroy(); }
   return true;
 });
-/* 【文件多开·批 B1】外部改写比对用**本窗口会话**记的 diskMtime。 */
 handle('doc:outside-change', async (e, { filePath }) => {
-  const S = sessionOf(e && e.sender);
-  const st = await fsp.stat(filePath).catch(() => null);
-  if (!st) return { changed: false };
-  return { changed: Math.abs(st.mtimeMs - S.diskMtime) > 1, mtimeMs: st.mtimeMs };
+  try { return await documents.outsideChange(sessionOf(e.sender), filePath); }
+  catch (err) { return { changed: false, error: err.message }; }
 });
 
 /* ── IPC：导出为文件夹（图片外链，不内联） ──────────────────────────────
@@ -1513,77 +1589,55 @@ const exportWriters = new Map();
 /** 当前 PDF 导出会话（staging 目录 + 取消位 + 等渲染侧交 HTML 的承诺）；null = 没有 PDF 导出在进行 */
 let pdfActive = null;
 let pdfSeq = 0;
-handle('doc:info', (e) => { const S = sessionOf(e && e.sender); try { dbg('doc:info:read', { wcId: e && e.sender ? e.sender.id : null, isPrimary: S === state, path: (S.filePath || '').split('\\').pop() || null, mapSize: sessions.size }); } catch { } return { filePath: S.filePath, name: S.filePath ? path.basename(S.filePath) : null }; });   // 【文件多开·第 2 步·批 A】按发起窗口的会话
-handle('export:pickFolder', async (_e, opts = {}) => {
-  // 【PDF 复用文件夹版 HTML 的关键一步】PDF 导出期间，目标目录由主进程指定为 staging：
-  // 引擎跑的是**同一条**「导出为文件夹」流程（同样的分块写、同样的 assets/ 逐张复制、同样相对路径），
-  // 只是不问用户要目录 —— 引擎侧一行都不用改，也不会退化成"整篇内联"。
-  if (pdfActive) {
-    try { await fsp.mkdir(pdfActive.dir, { recursive: true }); } catch (e) { return { ok: false, error: e.message }; }
-    dbg('export:pickFolder:staging', { dir: pdfActive.dir });
-    return { ok: true, dir: pdfActive.dir, staging: true };
+handle('doc:info', (e) => { const S = sessionOf(e && e.sender); try { dbg('doc:info:read', { wcId: e && e.sender ? e.sender.id : null, isPrimary: S === state, path: (S.filePath || '').split('\\').pop() || null, mapSize: sessions.size }); } catch { } return { filePath: S.filePath, documentId: S.documentId, name: S.filePath ? path.basename(S.filePath) : null }; });
+handle('export:pickFolder', async (e, opts = {}) => {
+  const S = sessionOf(e.sender), W = windowOf(e);
+  if (pdfActive?.owner === e.sender.id) {
+    if (!pdfActive.dir || pdfActive.pickUsed) return { ok: false, error: 'PDF 正在导出，请稍后再导出文件夹' };
+    pdfActive.pickUsed = true; return { ok: true, dir: pdfActive.dir, staging: true };
   }
   const envDir = process.env.MP_EXPORT_DIR;
-  if (envDir) { try { await fsp.mkdir(envDir, { recursive: true }); return { ok: true, dir: envDir, auto: true }; } catch (e) { return { ok: false, error: e.message }; } }
-  const base = state.filePath ? path.dirname(state.filePath) : app.getPath('documents');
-  const r = await dialog.showOpenDialog(win, {
-    title: '导出为文件夹（图片放进 assets/）',
-    defaultPath: opts.defaultPath || base,
-    buttonLabel: '导出到此文件夹',
-    properties: ['openDirectory', 'createDirectory'],
-  });
-  if (r.canceled || !r.filePaths[0]) return { ok: false, canceled: true };
-  return { ok: true, dir: r.filePaths[0] };
+  if (envDir) { try { await fsp.mkdir(envDir, { recursive: true }); return { ok: true, dir: envDir, auto: true }; } catch (err) { return { ok: false, error: err.message }; } }
+  const base = S.filePath ? path.dirname(S.filePath) : app.getPath('documents');
+  const r = await dialog.showOpenDialog(W, { title: '导出为文件夹（图片放进 assets/）', defaultPath: opts.defaultPath || base, buttonLabel: '导出到此文件夹', properties: ['openDirectory', 'createDirectory'] });
+  return r.canceled || !r.filePaths[0] ? { ok: false, canceled: true } : { ok: true, dir: r.filePaths[0] };
 });
-handle('export:prepareAssets', async (_e, { dir, docPath, refs, concurrency } = {}) => {
+handle('export:prepareAssets', async (e, { dir, docPath, refs, concurrency } = {}) => {
+  const S = sessionOf(e.sender), W = windowOf(e);
   if (!dir) return { ok: false, error: '缺少目标文件夹' };
-  const t0 = Date.now();
   try {
-    const res = await exporter.prepareAssets({
-      dir, docPath: docPath || state.filePath, refs, concurrency,
-      onProgress: (p) => send('export:progress', p),
-    });
-    dbg('export:prepareAssets', { dir, refs: (refs || []).length, copied: res.copied, failed: res.failed, skipped: res.skipped, bytes: res.bytes, ms: res.ms });
-    send('export:progress', { done: res.copied + res.failed + res.skipped, total: (refs || []).length, phase: 'done' });
-    dbg('export:prepareAssets:total', { ms: Date.now() - t0 });
-    return res;
-  } catch (e) {
-    dbg('export:prepareAssets:error', e.message);
-    return { ok: false, error: e.message };
-  }
+    return await exporter.prepareAssets({ dir, docPath: docPath || S.filePath, refs, concurrency, onProgress: p => sendTo(W, 'export:progress', p) });
+  } catch (err) { return { ok: false, error: err.message }; }
 });
-handle('export:beginHtml', (_e, { dir, name } = {}) => {
+function ownedWriter(e, id) { const w = exportWriters.get(id); return w?.owner === e.sender.id ? w : null; }
+handle('export:beginHtml', (e, { dir, name } = {}) => {
+  sessionOf(e.sender);
   try {
-    const w = exporter.createHtmlWriter({ dir, name });
-    exportWriters.set(w.id, w);
-    dbg('export:beginHtml', { id: w.id, file: w.file });
-    return { ok: true, id: w.id, file: w.file };
-  } catch (e) {
-    dbg('export:beginHtml:error', e.message);
-    return { ok: false, error: e.message };
-  }
+    if (pdfActive?.owner === e.sender.id && path.resolve(dir) === pdfActive.dir) {
+      if (pdfActive.htmlWriterCreated) return { ok: false, error: 'PDF 的 HTML 已在生成' };
+      pdfActive.htmlWriterCreated = true;
+    }
+    const writer = exporter.createHtmlWriter({ dir, name });
+    exportWriters.set(writer.id, { owner: e.sender.id, writer });
+    return { ok: true, id: writer.id, file: writer.file };
+  } catch (err) { return { ok: false, error: err.message }; }
 });
-handle('export:appendHtml', async (_e, { id, text } = {}) => {
-  const w = exportWriters.get(id);
-  if (!w) return { ok: false, error: '写流不存在（可能已结束）' };
-  try { return { ok: true, ...(await w.write(text)) }; }
-  catch (e) { exportWriters.delete(id); return { ok: false, error: e.message }; }
+handle('export:appendHtml', async (e, { id, text } = {}) => {
+  const entry = ownedWriter(e, id);
+  if (!entry) return { ok: false, error: '写流不属于当前窗口或已结束' };
+  try { return { ok: true, ...(await entry.writer.write(text)) }; }
+  catch (err) { exportWriters.delete(id); await entry.writer.abort().catch(() => {}); return { ok: false, error: err.message }; }
 });
-handle('export:finishHtml', async (_e, { id } = {}) => {
-  const w = exportWriters.get(id);
-  if (!w) return { ok: false, error: '写流不存在' };
+handle('export:finishHtml', async (e, { id } = {}) => {
+  const entry = ownedWriter(e, id);
+  if (!entry) return { ok: false, error: '写流不属于当前窗口或已结束' };
   exportWriters.delete(id);
-  try {
-    const r = await w.finish();
-    dbg('export:finishHtml', r);
-    return r;
-  } catch (e) { dbg('export:finishHtml:error', e.message); return { ok: false, error: e.message }; }
+  try { return await entry.writer.finish(); } catch (err) { await entry.writer.abort().catch(() => {}); return { ok: false, error: err.message }; }
 });
-handle('export:abortHtml', async (_e, { id } = {}) => {
-  const w = exportWriters.get(id);
-  if (!w) return { ok: false, error: '写流不存在' };
-  exportWriters.delete(id);
-  try { return await w.abort(); } catch (e) { return { ok: false, error: e.message }; }
+handle('export:abortHtml', async (e, { id } = {}) => {
+  const entry = ownedWriter(e, id);
+  if (!entry) return { ok: false, error: '写流不属于当前窗口或已结束' };
+  exportWriters.delete(id); return entry.writer.abort();
 });
 
 /* ── IPC：导出为 PDF（复用文件夹版 HTML → 从磁盘上的本地 HTML 打印） ──────────────
@@ -1633,51 +1687,43 @@ function mathCssFallback() {
   }
   return mathCssFallbackCache;
 }
-handle('export:pdf', async (_e, opts = {}) => {
-  const t0 = Date.now();
+handle('export:pdf', async (e, opts = {}) => {
+  const S = sessionOf(e.sender), W = windowOf(e), t0 = Date.now();
   if (pdfActive) return { ok: false, error: '已有一个 PDF 导出在进行中' };
-  const stem = state.filePath ? path.basename(state.filePath, path.extname(state.filePath)) : '未命名';
-  const progress = (p) => { try { send('export:progress', p); } catch { /* 窗口没了就算了 */ } };
-
-  // ① 目标 PDF：MP_EXPORT_PDF 环境变量优先（自动化/回归用），否则弹保存框
-  let outFile = opts.outFile || process.env.MP_EXPORT_PDF || null;
-  if (outFile) {
-    outFile = path.resolve(outFile);
-    try { await fsp.mkdir(path.dirname(outFile), { recursive: true }); } catch { /* 让写盘阶段报错 */ }
-  } else {
-    const base = state.filePath ? path.dirname(state.filePath) : app.getPath('documents');
-    const r = await dialog.showSaveDialog(win, {
-      title: '导出为 PDF', defaultPath: path.join(base, `${stem}.pdf`),
-      filters: [{ name: 'PDF', extensions: ['pdf'] }],
-    });
-    if (r.canceled || !r.filePath) return { ok: false, canceled: true };
-    outFile = r.filePath;
-  }
-
-  // ② staging 目录：引擎的「导出为文件夹」写这里（<stem>.html + assets/）
-  let dir;
-  try { dir = await fsp.mkdtemp(path.join(app.getPath('temp'), 'markpilot-pdf-')); }
-  catch (e) { return { ok: false, error: `建临时目录失败：${e.message}` }; }
-  const session = { id: `pdf-${process.pid}-${++pdfSeq}`, dir, outFile, name: stem, canceled: false, t0, waiter: deferred(), phases: [] };
-  pdfActive = session;
-  // 内存闸门测量：应用自报的整树 RSS（app.getAppMetrics），200ms 一次，开销可忽略
+  const stem = S.filePath ? path.basename(S.filePath, path.extname(S.filePath)) : '未命名';
+  const session = { id: 'pdf-' + process.pid + '-' + (++pdfSeq), owner: e.sender.id, documentId: S.documentId, canceled: false, waiter: deferred(), phases: [], dir: null };
+  pdfActive = session; // Reserve before the first dialog or filesystem await.
+  const progress = p => sendTo(W, 'export:progress', p);
+  const ownerClosed = () => { session.canceled = true; session.waiter.resolve({ ok: false, canceled: true }); };
+  W.once('closed', ownerClosed);
+  let dir = null, outFile = opts.outFile || process.env.MP_EXPORT_PDF || null, htmlTimer;
   const mem = pdfExporter.memorySampler(app, { intervalMs: 200 });
-  mem.start();
-  dbg('export:pdf:start', { id: session.id, dir, outFile, name: stem });
-  progress({ phase: 'pick', file: outFile });
-
   const cleanupStaging = async () => {
-    // MP_KEEP_STAGING=1：诊断/取证用——保留 staging，便于核对"PDF 的源 HTML 与文件夹导出逐字节相同"
-    if (process.env.MP_KEEP_STAGING) { dbg('export:pdf:staging-kept', dir); return; }
-    try { await fsp.rm(dir, { recursive: true, force: true }); dbg('export:pdf:staging-removed', dir); }
-    catch (e) { dbg('export:pdf:staging-remove-failed', e.message); }
+    if (!dir || process.env.MP_KEEP_STAGING) return;
+    const target = path.resolve(dir), parent = path.resolve(app.getPath('temp'));
+    if (path.dirname(target) !== parent || !path.basename(target).startsWith('markpilot-pdf-')) throw new Error('PDF 临时目录超出清理范围');
+    await fsp.rm(target, { recursive: true, force: true });
   };
   try {
+    progress({ phase: 'pick' });
+    if (!outFile) {
+      const base = S.filePath ? path.dirname(S.filePath) : app.getPath('documents');
+      const r = await dialog.showSaveDialog(W, { title: '导出为 PDF', defaultPath: path.join(base, stem + '.pdf'), filters: [{ name: 'PDF', extensions: ['pdf'] }] });
+      if (r.canceled || !r.filePath) { progress({ phase: 'canceled' }); return { ok: false, canceled: true }; }
+      outFile = r.filePath;
+    }
+    if (session.canceled || S.documentId !== session.documentId) { progress({ phase: 'canceled' }); return { ok: false, canceled: true }; }
+    outFile = path.resolve(outFile);
+    const outputKey = documents.key(await documents.canonical(outFile));
+    for (const doc of sessions.values()) if (doc.filePath && documents.key(await documents.canonical(doc.filePath)) === outputKey) throw failure('MP_EXPORT_TARGET', 'PDF 不能覆盖正在编辑的文档，请选择其他路径');
+    await fsp.mkdir(path.dirname(outFile), { recursive: true });
+    dir = await fsp.mkdtemp(path.join(app.getPath('temp'), 'markpilot-pdf-')); session.dir = dir;
+    mem.start();
     // ③ 请渲染侧用**引擎自己的**文件夹导出流程把 HTML + assets/ 写到 staging
-    send('export:make-html', { id: session.id, stageDir: dir, name: stem });
+    sendTo(W, 'export:make-html', { id: session.id, documentId: session.documentId, stageDir: dir, name: stem });
     const html = await Promise.race([
       session.waiter.promise,
-      new Promise((r) => setTimeout(() => r({ ok: false, error: '等渲染侧生成 HTML 超时' }), pdfExporter.GATE.HTML_WAIT_MS)),
+      new Promise(r => { htmlTimer = setTimeout(() => r({ ok: false, error: '等渲染侧生成 HTML 超时' }), pdfExporter.GATE.HTML_WAIT_MS); }),
     ]);
     if (session.canceled) { await cleanupStaging(); progress({ phase: 'canceled' }); return { ok: false, canceled: true, ms: Date.now() - t0 }; }
     if (!html || !html.ok || !html.file) {
@@ -1718,7 +1764,6 @@ handle('export:pdf', async (_e, opts = {}) => {
       onPhase: (p) => { session.phases.push(p); progress({ phase: p.phase, ms: p.ms, bytes: p.bytes, done: p.done, pages: p.pages }); },
     });
     if (r.canceled) {
-      await fsp.rm(outFile, { force: true }).catch(() => { });
       await cleanupStaging();
       progress({ phase: 'canceled' });
       return { ok: false, canceled: true, ms: Date.now() - t0, phases: session.phases };
@@ -1741,27 +1786,29 @@ handle('export:pdf', async (_e, opts = {}) => {
     await cleanupStaging();
     progress({ phase: 'done', file: outFile, bytes: r.bytes, pages: r.pages, ms: result.ms });
     return result;
-  } catch (e) {
-    dbg('export:pdf:error', e && e.message);
-    await fsp.rm(outFile, { force: true }).catch(() => { });
-    await cleanupStaging();
-    progress({ phase: 'error', error: String(e && e.message || e) });
-    return { ok: false, error: String(e && e.message || e), gate: e && e.gate, ms: Date.now() - t0, phases: session.phases };
+  } catch (err) {
+    dbg('export:pdf:error', err.message);
+    await cleanupStaging().catch(e => dbg('export:pdf:cleanup-error', e.message));
+    progress({ phase: 'error', error: err.message });
+    return { ok: false, error: err.message, code: err.code, ms: Date.now() - t0, phases: session.phases };
   } finally {
-    pdfActive = null;
-    try { mem.stop(); } catch { /* 采样器已停 */ }
+    clearTimeout(htmlTimer); W.removeListener('closed', ownerClosed);
+    if (pdfActive === session) pdfActive = null;
+    mem.stop();
   }
 });
-handle('export:pdfCancel', () => {
+handle('export:pdfCancel', e => {
   if (!pdfActive) return { ok: false, error: '没有进行中的 PDF 导出' };
+  if (pdfActive.owner !== e.sender.id) return { ok: false, error: 'PDF 导出不属于当前窗口' };
   pdfActive.canceled = true;
   dbg('export:pdf:cancel', { id: pdfActive.id });
   try { pdfActive.waiter.resolve({ ok: false, canceled: true }); } catch { /* 已 resolve */ }
   return { ok: true, id: pdfActive.id };
 });
-handle('export:htmlDone', (_e, o = {}) => {
+handle('export:htmlDone', (e, o = {}) => {
   const s = pdfActive;
-  if (!s || (o.id && o.id !== s.id)) return { ok: false, error: 'PDF 会话不存在（可能已结束）' };
+  if (!s || o.id !== s.id || s.owner !== e.sender.id) return { ok: false, error: 'PDF 会话不存在（可能已结束）' };
+  if (o.ok && (!s.dir || !o.file || path.dirname(path.resolve(o.file)) !== s.dir)) return { ok: false, error: 'PDF 的 HTML 不属于本次临时目录' };
   dbg('export:htmlDone', { id: o.id, ok: !!o.ok, file: o.file || null, error: o.error || null });
   /* 【★ 2026-10-09 修·丢字段】改前这里只透传 {ok,file,error,mode}，把渲染侧一起送来的
      `mathCss` 与 `sourceBytes` **静默丢掉**：
@@ -1781,7 +1828,7 @@ handle('export:htmlDone', (_e, o = {}) => {
   return { ok: true };
 });
 
-function updateTitle(S = state, W = win) {
+function updateTitle(S, W) {
   if (!W || W.isDestroyed()) return;
   const name = S.filePath ? path.basename(S.filePath) : '未命名';
   W.setTitle(`${S.dirty ? '● ' : ''}${name} — MarkPilot`);

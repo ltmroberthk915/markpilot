@@ -1,0 +1,5433 @@
+{
+  "suite": "rich-workflows",
+  "schema": 1,
+  "startedAt": "2026-10-11T23:00:07.183Z",
+  "cases": [
+    {
+      "id": "mixed-html-preserve-all-content-in-order",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "mixed.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "mixed-01-before.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "mixed-01-before-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "text": {
+            "matches": true,
+            "length": 99
+          },
+          "html": {
+            "matches": true,
+            "length": 425
+          }
+        },
+        {
+          "name": "pasted",
+          "text": "Existing text\n\nPRE_SENTINEL\n\n| A_HEAD | A_LABEL |\n| --- | --- |\n| A_CELL | A_VALUE |\n\nMID_SENTINEL\n\n| B_HEAD | B_LABEL |\n| --- | --- |\n| B_CELL | B_VALUE |\n\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 170,
+            "head": 170
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 428.84375,
+            "bottom": 444.84375
+          },
+          "scrollTop": 0,
+          "title": "mixed.md · 170 字 — MarkPilot",
+          "banner": "",
+          "paste": {
+            "trusted": true,
+            "types": [
+              "text/plain",
+              "text/html"
+            ],
+            "format": "html",
+            "tokens": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          },
+          "screenshot": {
+            "file": "mixed-02-pasted.png",
+            "sha256": "0d6115a06ee3c36fd29d10fe956f1770750a85b745184158691ae8233d2c43d9",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 428.84375,
+              "bottom": 444.84375
+            },
+            "zoom": {
+              "file": "mixed-02-pasted-caret-2x.png",
+              "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+              "clip": {
+                "x": 165.1640625,
+                "y": 403.84375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-after",
+          "text": {
+            "length": 99,
+            "matches": true
+          },
+          "html": {
+            "matches": true,
+            "length": 425
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "● mixed.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "mixed-03-undo.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "mixed-03-undo-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Existing text\n\nPRE_SENTINEL\n\n| A_HEAD | A_LABEL |\n| --- | --- |\n| A_CELL | A_VALUE |\n\nMID_SENTINEL\n\n| B_HEAD | B_LABEL |\n| --- | --- |\n| B_CELL | B_VALUE |\n\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 170,
+            "head": 170
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 428.84375,
+            "bottom": 444.84375
+          },
+          "scrollTop": 0,
+          "title": "● mixed.md · 170 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "mixed-04-redo.png",
+            "sha256": "fac98d6e75986d2893d631a32cb9c7311aa36318889802186a39b30bbb5dee6d",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 428.84375,
+              "bottom": 444.84375
+            },
+            "zoom": {
+              "file": "mixed-04-redo-caret-2x.png",
+              "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+              "clip": {
+                "x": 165.1640625,
+                "y": 403.84375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "order",
+          "tokens": [
+            "PRE_SENTINEL",
+            "A_HEAD",
+            "A_LABEL",
+            "A_CELL",
+            "A_VALUE",
+            "MID_SENTINEL",
+            "B_HEAD",
+            "B_LABEL",
+            "B_CELL",
+            "B_VALUE",
+            "POST_SENTINEL"
+          ],
+          "positions": [
+            15,
+            31,
+            40,
+            66,
+            75,
+            86,
+            102,
+            111,
+            137,
+            146,
+            157
+          ]
+        }
+      ],
+      "detail": {
+        "tokens": [
+          "PRE_SENTINEL",
+          "A_HEAD",
+          "A_LABEL",
+          "A_CELL",
+          "A_VALUE",
+          "MID_SENTINEL",
+          "B_HEAD",
+          "B_LABEL",
+          "B_CELL",
+          "B_VALUE",
+          "POST_SENTINEL"
+        ],
+        "positions": [
+          15,
+          31,
+          40,
+          66,
+          75,
+          86,
+          102,
+          111,
+          137,
+          146,
+          157
+        ],
+        "atomicUndoRedo": true
+      },
+      "ms": 4607
+    },
+    {
+      "id": "wrapper-html-preserve-all-content-in-order",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "wrapper.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "wrapper-01-before.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "wrapper-01-before-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "text": {
+            "matches": true,
+            "length": 99
+          },
+          "html": {
+            "matches": true,
+            "length": 455
+          }
+        },
+        {
+          "name": "pasted",
+          "text": "Existing text\n\nPRE_SENTINEL\n\n| A_HEAD | A_LABEL |\n| --- | --- |\n| A_CELL | A_VALUE |\n\nMID_SENTINEL\n\n| B_HEAD | B_LABEL |\n| --- | --- |\n| B_CELL | B_VALUE |\n\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 170,
+            "head": 170
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 428.84375,
+            "bottom": 444.84375
+          },
+          "scrollTop": 0,
+          "title": "wrapper.md · 170 字 — MarkPilot",
+          "banner": "",
+          "paste": {
+            "trusted": true,
+            "types": [
+              "text/plain",
+              "text/html"
+            ],
+            "format": "html",
+            "tokens": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          },
+          "screenshot": {
+            "file": "wrapper-02-pasted.png",
+            "sha256": "0d6115a06ee3c36fd29d10fe956f1770750a85b745184158691ae8233d2c43d9",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 428.84375,
+              "bottom": 444.84375
+            },
+            "zoom": {
+              "file": "wrapper-02-pasted-caret-2x.png",
+              "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+              "clip": {
+                "x": 165.1640625,
+                "y": 403.84375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-after",
+          "text": {
+            "matches": true,
+            "length": 99
+          },
+          "html": {
+            "matches": true,
+            "length": 455
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "● wrapper.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "wrapper-03-undo.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "wrapper-03-undo-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Existing text\n\nPRE_SENTINEL\n\n| A_HEAD | A_LABEL |\n| --- | --- |\n| A_CELL | A_VALUE |\n\nMID_SENTINEL\n\n| B_HEAD | B_LABEL |\n| --- | --- |\n| B_CELL | B_VALUE |\n\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 170,
+            "head": 170
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 428.84375,
+            "bottom": 444.84375
+          },
+          "scrollTop": 0,
+          "title": "● wrapper.md · 170 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "wrapper-04-redo.png",
+            "sha256": "fac98d6e75986d2893d631a32cb9c7311aa36318889802186a39b30bbb5dee6d",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 428.84375,
+              "bottom": 444.84375
+            },
+            "zoom": {
+              "file": "wrapper-04-redo-caret-2x.png",
+              "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+              "clip": {
+                "x": 165.1640625,
+                "y": 403.84375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "order",
+          "tokens": [
+            "PRE_SENTINEL",
+            "A_HEAD",
+            "A_LABEL",
+            "A_CELL",
+            "A_VALUE",
+            "MID_SENTINEL",
+            "B_HEAD",
+            "B_LABEL",
+            "B_CELL",
+            "B_VALUE",
+            "POST_SENTINEL"
+          ],
+          "positions": [
+            15,
+            31,
+            40,
+            66,
+            75,
+            86,
+            102,
+            111,
+            137,
+            146,
+            157
+          ]
+        }
+      ],
+      "detail": {
+        "tokens": [
+          "PRE_SENTINEL",
+          "A_HEAD",
+          "A_LABEL",
+          "A_CELL",
+          "A_VALUE",
+          "MID_SENTINEL",
+          "B_HEAD",
+          "B_LABEL",
+          "B_CELL",
+          "B_VALUE",
+          "POST_SENTINEL"
+        ],
+        "positions": [
+          15,
+          31,
+          40,
+          66,
+          75,
+          86,
+          102,
+          111,
+          137,
+          146,
+          157
+        ],
+        "atomicUndoRedo": true
+      },
+      "ms": 4823
+    },
+    {
+      "id": "bare-text-html-preserve-all-content-in-order",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "bare-text.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "bare-text-01-before.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "bare-text-01-before-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "text": {
+            "matches": true,
+            "length": 99
+          },
+          "html": {
+            "length": 404,
+            "matches": true
+          }
+        },
+        {
+          "name": "pasted",
+          "text": "Existing text\n\nPRE_SENTINEL\n\n| A_HEAD | A_LABEL |\n| --- | --- |\n| A_CELL | A_VALUE |\n\nMID_SENTINEL\n\n| B_HEAD | B_LABEL |\n| --- | --- |\n| B_CELL | B_VALUE |\n\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 170,
+            "head": 170
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 428.84375,
+            "bottom": 444.84375
+          },
+          "scrollTop": 0,
+          "title": "bare-text.md · 170 字 — MarkPilot",
+          "banner": "",
+          "paste": {
+            "trusted": true,
+            "types": [
+              "text/plain",
+              "text/html"
+            ],
+            "format": "html",
+            "tokens": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          },
+          "screenshot": {
+            "file": "bare-text-02-pasted.png",
+            "sha256": "0d6115a06ee3c36fd29d10fe956f1770750a85b745184158691ae8233d2c43d9",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 428.84375,
+              "bottom": 444.84375
+            },
+            "zoom": {
+              "file": "bare-text-02-pasted-caret-2x.png",
+              "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+              "clip": {
+                "x": 165.1640625,
+                "y": 403.84375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-after",
+          "text": {
+            "matches": true,
+            "length": 99
+          },
+          "html": {
+            "length": 404,
+            "matches": true
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "● bare-text.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "bare-text-03-undo.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "bare-text-03-undo-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Existing text\n\nPRE_SENTINEL\n\n| A_HEAD | A_LABEL |\n| --- | --- |\n| A_CELL | A_VALUE |\n\nMID_SENTINEL\n\n| B_HEAD | B_LABEL |\n| --- | --- |\n| B_CELL | B_VALUE |\n\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 170,
+            "head": 170
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 428.84375,
+            "bottom": 444.84375
+          },
+          "scrollTop": 0,
+          "title": "● bare-text.md · 170 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "bare-text-04-redo.png",
+            "sha256": "fac98d6e75986d2893d631a32cb9c7311aa36318889802186a39b30bbb5dee6d",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 428.84375,
+              "bottom": 444.84375
+            },
+            "zoom": {
+              "file": "bare-text-04-redo-caret-2x.png",
+              "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+              "clip": {
+                "x": 165.1640625,
+                "y": 403.84375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "order",
+          "tokens": [
+            "PRE_SENTINEL",
+            "A_HEAD",
+            "A_LABEL",
+            "A_CELL",
+            "A_VALUE",
+            "MID_SENTINEL",
+            "B_HEAD",
+            "B_LABEL",
+            "B_CELL",
+            "B_VALUE",
+            "POST_SENTINEL"
+          ],
+          "positions": [
+            15,
+            31,
+            40,
+            66,
+            75,
+            86,
+            102,
+            111,
+            137,
+            146,
+            157
+          ]
+        }
+      ],
+      "detail": {
+        "tokens": [
+          "PRE_SENTINEL",
+          "A_HEAD",
+          "A_LABEL",
+          "A_CELL",
+          "A_VALUE",
+          "MID_SENTINEL",
+          "B_HEAD",
+          "B_LABEL",
+          "B_CELL",
+          "B_VALUE",
+          "POST_SENTINEL"
+        ],
+        "positions": [
+          15,
+          31,
+          40,
+          66,
+          75,
+          86,
+          102,
+          111,
+          137,
+          146,
+          157
+        ],
+        "atomicUndoRedo": true
+      },
+      "ms": 4742
+    },
+    {
+      "id": "adjacent-html-preserve-all-content-in-order",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "adjacent.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "adjacent-01-before.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "adjacent-01-before-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "text": {
+            "length": 59,
+            "matches": true
+          },
+          "html": {
+            "length": 367,
+            "matches": true
+          }
+        },
+        {
+          "name": "pasted",
+          "text": "Existing text\n\n| A_HEAD | A_LABEL |\n| --- | --- |\n| A_CELL | A_VALUE |\n\n| B_HEAD | B_LABEL |\n| --- | --- |\n| B_CELL | B_VALUE |",
+          "selection": {
+            "anchor": 127,
+            "head": 127
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 986.5,
+            "right": 986.5,
+            "top": 255.171875,
+            "bottom": 298.3671875
+          },
+          "scrollTop": 0,
+          "title": "adjacent.md · 127 字 — MarkPilot",
+          "banner": "",
+          "paste": {
+            "trusted": true,
+            "types": [
+              "text/plain",
+              "text/html"
+            ],
+            "format": "html",
+            "tokens": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          },
+          "screenshot": {
+            "file": "adjacent-02-pasted.png",
+            "sha256": "a67fd2302c5b6c685fe2f528be999c975ebe40d7ff67ebe7e692d064844595ba",
+            "caret": {
+              "left": 986.5,
+              "right": 986.5,
+              "top": 255.171875,
+              "bottom": 298.3671875
+            },
+            "zoom": {
+              "file": "adjacent-02-pasted-caret-2x.png",
+              "sha256": "2e477ab476dea2634134a567af5e9178da2dc5a8e8ef0d4c8470867863152fcc",
+              "clip": {
+                "x": 866.5,
+                "y": 230.171875,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-after",
+          "text": {
+            "matches": true,
+            "length": 59
+          },
+          "html": {
+            "length": 367,
+            "matches": true
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "● adjacent.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "adjacent-03-undo.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "adjacent-03-undo-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Existing text\n\n| A_HEAD | A_LABEL |\n| --- | --- |\n| A_CELL | A_VALUE |\n\n| B_HEAD | B_LABEL |\n| --- | --- |\n| B_CELL | B_VALUE |",
+          "selection": {
+            "anchor": 127,
+            "head": 127
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 986.5,
+            "right": 986.5,
+            "top": 255.171875,
+            "bottom": 298.3671875
+          },
+          "scrollTop": 0,
+          "title": "● adjacent.md · 127 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "adjacent-04-redo.png",
+            "sha256": "e8a1c521bb3afba674cc12e6ebdefed4c71b425acbffe4d1bfcc9d986778aac9",
+            "caret": {
+              "left": 986.5,
+              "right": 986.5,
+              "top": 255.171875,
+              "bottom": 298.3671875
+            },
+            "zoom": {
+              "file": "adjacent-04-redo-caret-2x.png",
+              "sha256": "2e477ab476dea2634134a567af5e9178da2dc5a8e8ef0d4c8470867863152fcc",
+              "clip": {
+                "x": 866.5,
+                "y": 230.171875,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "order",
+          "tokens": [
+            "A_HEAD",
+            "A_LABEL",
+            "A_CELL",
+            "A_VALUE",
+            "B_HEAD",
+            "B_LABEL",
+            "B_CELL",
+            "B_VALUE"
+          ],
+          "positions": [
+            17,
+            26,
+            52,
+            61,
+            74,
+            83,
+            109,
+            118
+          ]
+        }
+      ],
+      "detail": {
+        "tokens": [
+          "A_HEAD",
+          "A_LABEL",
+          "A_CELL",
+          "A_VALUE",
+          "B_HEAD",
+          "B_LABEL",
+          "B_CELL",
+          "B_VALUE"
+        ],
+        "positions": [
+          17,
+          26,
+          52,
+          61,
+          74,
+          83,
+          109,
+          118
+        ],
+        "atomicUndoRedo": true
+      },
+      "ms": 4868
+    },
+    {
+      "id": "single-html-preserve-all-content-in-order",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "single.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "single-01-before.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "single-01-before-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "text": {
+            "length": 29,
+            "matches": true
+          },
+          "html": {
+            "length": 272,
+            "matches": true
+          }
+        },
+        {
+          "name": "pasted",
+          "text": "Existing text\n\n| A_HEAD | A_LABEL |\n| --- | --- |\n| A_CELL | A_VALUE |",
+          "selection": {
+            "anchor": 70,
+            "head": 70
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 986.5,
+            "right": 986.5,
+            "top": 143.5859375,
+            "bottom": 186.78125
+          },
+          "scrollTop": 0,
+          "title": "single.md · 70 字 — MarkPilot",
+          "banner": "",
+          "paste": {
+            "trusted": true,
+            "types": [
+              "text/plain",
+              "text/html"
+            ],
+            "format": "html",
+            "tokens": [
+              true,
+              true,
+              true,
+              true
+            ]
+          },
+          "screenshot": {
+            "file": "single-02-pasted.png",
+            "sha256": "33fe700479c2adff249647a78e94faaae6294b4f92ab7046bd1a0105c46b7275",
+            "caret": {
+              "left": 986.5,
+              "right": 986.5,
+              "top": 143.5859375,
+              "bottom": 186.78125
+            },
+            "zoom": {
+              "file": "single-02-pasted-caret-2x.png",
+              "sha256": "3992c2bd15b8501df62e0b22a40e22f4eae12d7f2f767e5d4decc03133df1ee4",
+              "clip": {
+                "x": 866.5,
+                "y": 118.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-after",
+          "text": {
+            "length": 29,
+            "matches": true
+          },
+          "html": {
+            "matches": true,
+            "length": 272
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "● single.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "single-03-undo.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "single-03-undo-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Existing text\n\n| A_HEAD | A_LABEL |\n| --- | --- |\n| A_CELL | A_VALUE |",
+          "selection": {
+            "anchor": 70,
+            "head": 70
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 986.5,
+            "right": 986.5,
+            "top": 143.5859375,
+            "bottom": 186.78125
+          },
+          "scrollTop": 0,
+          "title": "● single.md · 70 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "single-04-redo.png",
+            "sha256": "375c906310f9741c2a683d068617c8134b9bff8e6afdd874de41974c79c4f4e6",
+            "caret": {
+              "left": 986.5,
+              "right": 986.5,
+              "top": 143.5859375,
+              "bottom": 186.78125
+            },
+            "zoom": {
+              "file": "single-04-redo-caret-2x.png",
+              "sha256": "3992c2bd15b8501df62e0b22a40e22f4eae12d7f2f767e5d4decc03133df1ee4",
+              "clip": {
+                "x": 866.5,
+                "y": 118.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "order",
+          "tokens": [
+            "A_HEAD",
+            "A_LABEL",
+            "A_CELL",
+            "A_VALUE"
+          ],
+          "positions": [
+            17,
+            26,
+            52,
+            61
+          ]
+        }
+      ],
+      "detail": {
+        "tokens": [
+          "A_HEAD",
+          "A_LABEL",
+          "A_CELL",
+          "A_VALUE"
+        ],
+        "positions": [
+          17,
+          26,
+          52,
+          61
+        ],
+        "atomicUndoRedo": true
+      },
+      "ms": 5285
+    },
+    {
+      "id": "rich-no-table-html-preserve-all-content-in-order",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "rich-no-table.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "rich-no-table-01-before.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "rich-no-table-01-before-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "text": {
+            "length": 33,
+            "matches": true
+          },
+          "html": {
+            "matches": true,
+            "length": 255
+          }
+        },
+        {
+          "name": "pasted",
+          "text": "Existing text\n\n## PRE_SENTINEL\n\nA **A_HEAD** word\n\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 64,
+            "head": 64
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 221.4765625,
+            "bottom": 237.4765625
+          },
+          "scrollTop": 0,
+          "title": "rich-no-table.md · 64 字 — MarkPilot",
+          "banner": "",
+          "paste": {
+            "trusted": true,
+            "types": [
+              "text/plain",
+              "text/html"
+            ],
+            "format": "html",
+            "tokens": [
+              true,
+              true,
+              true
+            ]
+          },
+          "screenshot": {
+            "file": "rich-no-table-02-pasted.png",
+            "sha256": "9be2c1bf34811fee4bafa6e17f9862c6e2b897928a93da2ed037c03a8c3ed9d6",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 221.4765625,
+              "bottom": 237.4765625
+            },
+            "zoom": {
+              "file": "rich-no-table-02-pasted-caret-2x.png",
+              "sha256": "c1f5a017732f313e37e7710e5c9458e867c3f7551c40ec1b8bcce9254a337d79",
+              "clip": {
+                "x": 165.1640625,
+                "y": 196.4765625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-after",
+          "text": {
+            "length": 33,
+            "matches": true
+          },
+          "html": {
+            "matches": true,
+            "length": 255
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "● rich-no-table.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "rich-no-table-03-undo.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "rich-no-table-03-undo-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Existing text\n\n## PRE_SENTINEL\n\nA **A_HEAD** word\n\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 64,
+            "head": 64
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 221.4765625,
+            "bottom": 237.4765625
+          },
+          "scrollTop": 0,
+          "title": "● rich-no-table.md · 64 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "rich-no-table-04-redo.png",
+            "sha256": "d744fc3c5fe4c22c36c1ba8e1828004220ab3890c568a22eaafe9b8959455343",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 221.4765625,
+              "bottom": 237.4765625
+            },
+            "zoom": {
+              "file": "rich-no-table-04-redo-caret-2x.png",
+              "sha256": "c1f5a017732f313e37e7710e5c9458e867c3f7551c40ec1b8bcce9254a337d79",
+              "clip": {
+                "x": 165.1640625,
+                "y": 196.4765625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "order",
+          "tokens": [
+            "PRE_SENTINEL",
+            "A_HEAD",
+            "POST_SENTINEL"
+          ],
+          "positions": [
+            18,
+            36,
+            51
+          ]
+        }
+      ],
+      "detail": {
+        "tokens": [
+          "PRE_SENTINEL",
+          "A_HEAD",
+          "POST_SENTINEL"
+        ],
+        "positions": [
+          18,
+          36,
+          51
+        ],
+        "atomicUndoRedo": true
+      },
+      "ms": 4967
+    },
+    {
+      "id": "paragraph-bare-text-html-preserve-all-content-in-order",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "paragraph-bare-text.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "paragraph-bare-text-01-before.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "paragraph-bare-text-01-before-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "text": {
+            "length": 69,
+            "matches": true
+          },
+          "html": {
+            "matches": true,
+            "length": 323
+          }
+        },
+        {
+          "name": "pasted",
+          "text": "Existing text\n\nPRE_SENTINEL\n\nMID_SENTINEL\n\n| A_HEAD | A_LABEL |\n| --- | --- |\n| A_CELL | A_VALUE |\n\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 113,
+            "head": 113
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 317.2578125,
+            "bottom": 333.2578125
+          },
+          "scrollTop": 0,
+          "title": "paragraph-bare-text.md · 113 字 — MarkPilot",
+          "banner": "",
+          "paste": {
+            "trusted": true,
+            "types": [
+              "text/plain",
+              "text/html"
+            ],
+            "format": "html",
+            "tokens": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          },
+          "screenshot": {
+            "file": "paragraph-bare-text-02-pasted.png",
+            "sha256": "995e7896380f28d5beaa90fb5794b75a829c5ea4beca3bb889de911fafcb989c",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 317.2578125,
+              "bottom": 333.2578125
+            },
+            "zoom": {
+              "file": "paragraph-bare-text-02-pasted-caret-2x.png",
+              "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+              "clip": {
+                "x": 165.1640625,
+                "y": 292.2578125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-after",
+          "text": {
+            "matches": true,
+            "length": 69
+          },
+          "html": {
+            "length": 323,
+            "matches": true
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "● paragraph-bare-text.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "paragraph-bare-text-03-undo.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "paragraph-bare-text-03-undo-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Existing text\n\nPRE_SENTINEL\n\nMID_SENTINEL\n\n| A_HEAD | A_LABEL |\n| --- | --- |\n| A_CELL | A_VALUE |\n\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 113,
+            "head": 113
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 317.2578125,
+            "bottom": 333.2578125
+          },
+          "scrollTop": 0,
+          "title": "● paragraph-bare-text.md · 113 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "paragraph-bare-text-04-redo.png",
+            "sha256": "dc41dcc4c77b52aeff88a16408dd4b3d614043694ca23f6ea6fdc92e6a011cbd",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 317.2578125,
+              "bottom": 333.2578125
+            },
+            "zoom": {
+              "file": "paragraph-bare-text-04-redo-caret-2x.png",
+              "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+              "clip": {
+                "x": 165.1640625,
+                "y": 292.2578125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "order",
+          "tokens": [
+            "PRE_SENTINEL",
+            "MID_SENTINEL",
+            "A_HEAD",
+            "A_LABEL",
+            "A_CELL",
+            "A_VALUE",
+            "POST_SENTINEL"
+          ],
+          "positions": [
+            15,
+            29,
+            45,
+            54,
+            80,
+            89,
+            100
+          ]
+        }
+      ],
+      "detail": {
+        "tokens": [
+          "PRE_SENTINEL",
+          "MID_SENTINEL",
+          "A_HEAD",
+          "A_LABEL",
+          "A_CELL",
+          "A_VALUE",
+          "POST_SENTINEL"
+        ],
+        "positions": [
+          15,
+          29,
+          45,
+          54,
+          80,
+          89,
+          100
+        ],
+        "atomicUndoRedo": true
+      },
+      "ms": 5182
+    },
+    {
+      "id": "uppercase-html-preserve-all-content-in-order",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "uppercase.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "uppercase-01-before.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "uppercase-01-before-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "text": {
+            "matches": true,
+            "length": 99
+          },
+          "html": {
+            "matches": true,
+            "length": 425
+          }
+        },
+        {
+          "name": "pasted",
+          "text": "Existing text\n\nPRE_SENTINEL\n\n| A_HEAD | A_LABEL |\n| --- | --- |\n| A_CELL | A_VALUE |\n\nMID_SENTINEL\n\n| B_HEAD | B_LABEL |\n| --- | --- |\n| B_CELL | B_VALUE |\n\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 170,
+            "head": 170
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 428.84375,
+            "bottom": 444.84375
+          },
+          "scrollTop": 0,
+          "title": "uppercase.md · 170 字 — MarkPilot",
+          "banner": "",
+          "paste": {
+            "trusted": true,
+            "types": [
+              "text/plain",
+              "text/html"
+            ],
+            "format": "html",
+            "tokens": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          },
+          "screenshot": {
+            "file": "uppercase-02-pasted.png",
+            "sha256": "0d6115a06ee3c36fd29d10fe956f1770750a85b745184158691ae8233d2c43d9",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 428.84375,
+              "bottom": 444.84375
+            },
+            "zoom": {
+              "file": "uppercase-02-pasted-caret-2x.png",
+              "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+              "clip": {
+                "x": 165.1640625,
+                "y": 403.84375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-after",
+          "text": {
+            "matches": true,
+            "length": 99
+          },
+          "html": {
+            "matches": true,
+            "length": 425
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "● uppercase.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "uppercase-03-undo.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "uppercase-03-undo-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Existing text\n\nPRE_SENTINEL\n\n| A_HEAD | A_LABEL |\n| --- | --- |\n| A_CELL | A_VALUE |\n\nMID_SENTINEL\n\n| B_HEAD | B_LABEL |\n| --- | --- |\n| B_CELL | B_VALUE |\n\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 170,
+            "head": 170
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 428.84375,
+            "bottom": 444.84375
+          },
+          "scrollTop": 0,
+          "title": "● uppercase.md · 170 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "uppercase-04-redo.png",
+            "sha256": "fac98d6e75986d2893d631a32cb9c7311aa36318889802186a39b30bbb5dee6d",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 428.84375,
+              "bottom": 444.84375
+            },
+            "zoom": {
+              "file": "uppercase-04-redo-caret-2x.png",
+              "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+              "clip": {
+                "x": 165.1640625,
+                "y": 403.84375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "order",
+          "tokens": [
+            "PRE_SENTINEL",
+            "A_HEAD",
+            "A_LABEL",
+            "A_CELL",
+            "A_VALUE",
+            "MID_SENTINEL",
+            "B_HEAD",
+            "B_LABEL",
+            "B_CELL",
+            "B_VALUE",
+            "POST_SENTINEL"
+          ],
+          "positions": [
+            15,
+            31,
+            40,
+            66,
+            75,
+            86,
+            102,
+            111,
+            137,
+            146,
+            157
+          ]
+        }
+      ],
+      "detail": {
+        "tokens": [
+          "PRE_SENTINEL",
+          "A_HEAD",
+          "A_LABEL",
+          "A_CELL",
+          "A_VALUE",
+          "MID_SENTINEL",
+          "B_HEAD",
+          "B_LABEL",
+          "B_CELL",
+          "B_VALUE",
+          "POST_SENTINEL"
+        ],
+        "positions": [
+          15,
+          31,
+          40,
+          66,
+          75,
+          86,
+          102,
+          111,
+          137,
+          146,
+          157
+        ],
+        "atomicUndoRedo": true
+      },
+      "ms": 5004
+    },
+    {
+      "id": "nested-fallback-html-preserve-all-content-in-order",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "nested-fallback.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "nested-fallback-01-before.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "nested-fallback-01-before-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "text": {
+            "length": 101,
+            "matches": true
+          },
+          "html": {
+            "matches": true,
+            "length": 453
+          }
+        },
+        {
+          "name": "pasted",
+          "text": "Existing text\n\nPRE_SENTINEL\nOUTER_SENTINEL\nA_HEAD\nA_LABEL\nA_CELL\nA_VALUE\nB_HEAD\nB_LABEL\nB_CELL\nB_VALUE\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 116,
+            "head": 116
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 356.84375,
+            "bottom": 372.84375
+          },
+          "scrollTop": 0,
+          "title": "nested-fallback.md · 116 字 — MarkPilot",
+          "banner": "",
+          "paste": {
+            "trusted": true,
+            "types": [
+              "text/plain",
+              "text/html"
+            ],
+            "format": "html",
+            "tokens": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          },
+          "screenshot": {
+            "file": "nested-fallback-02-pasted.png",
+            "sha256": "5bd767117d8950795c57a1d265a2f61cad387bac775ef395ca0b212441fd827e",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 356.84375,
+              "bottom": 372.84375
+            },
+            "zoom": {
+              "file": "nested-fallback-02-pasted-caret-2x.png",
+              "sha256": "38eeec5043a3bd2af6c1997e397a570bffbe9520a1efc690ee7bbadb6563cab9",
+              "clip": {
+                "x": 165.1640625,
+                "y": 331.84375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-after",
+          "text": {
+            "matches": true,
+            "length": 101
+          },
+          "html": {
+            "matches": true,
+            "length": 453
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "● nested-fallback.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "nested-fallback-03-undo.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "nested-fallback-03-undo-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Existing text\n\nPRE_SENTINEL\nOUTER_SENTINEL\nA_HEAD\nA_LABEL\nA_CELL\nA_VALUE\nB_HEAD\nB_LABEL\nB_CELL\nB_VALUE\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 116,
+            "head": 116
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 356.84375,
+            "bottom": 372.84375
+          },
+          "scrollTop": 0,
+          "title": "● nested-fallback.md · 116 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "nested-fallback-04-redo.png",
+            "sha256": "c43b3f88d6ea56501a45bde6f573aff28732fa58a21953d40aa4a9853a2eb2d3",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 356.84375,
+              "bottom": 372.84375
+            },
+            "zoom": {
+              "file": "nested-fallback-04-redo-caret-2x.png",
+              "sha256": "38eeec5043a3bd2af6c1997e397a570bffbe9520a1efc690ee7bbadb6563cab9",
+              "clip": {
+                "x": 165.1640625,
+                "y": 331.84375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "order",
+          "tokens": [
+            "PRE_SENTINEL",
+            "OUTER_SENTINEL",
+            "A_HEAD",
+            "A_LABEL",
+            "A_CELL",
+            "A_VALUE",
+            "B_HEAD",
+            "B_LABEL",
+            "B_CELL",
+            "B_VALUE",
+            "POST_SENTINEL"
+          ],
+          "positions": [
+            15,
+            28,
+            43,
+            50,
+            58,
+            65,
+            73,
+            80,
+            88,
+            95,
+            103
+          ]
+        }
+      ],
+      "detail": {
+        "tokens": [
+          "PRE_SENTINEL",
+          "OUTER_SENTINEL",
+          "A_HEAD",
+          "A_LABEL",
+          "A_CELL",
+          "A_VALUE",
+          "B_HEAD",
+          "B_LABEL",
+          "B_CELL",
+          "B_VALUE",
+          "POST_SENTINEL"
+        ],
+        "positions": [
+          15,
+          28,
+          43,
+          50,
+          58,
+          65,
+          73,
+          80,
+          88,
+          95,
+          103
+        ],
+        "atomicUndoRedo": true
+      },
+      "ms": 4867
+    },
+    {
+      "id": "merged-fallback-html-preserve-all-content-in-order",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "merged-fallback.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "merged-fallback-01-before.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "merged-fallback-01-before-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "text": {
+            "matches": true,
+            "length": 72
+          },
+          "html": {
+            "matches": true,
+            "length": 371
+          }
+        },
+        {
+          "name": "pasted",
+          "text": "Existing text\n\nPRE_SENTINEL\nMERGED_SENTINEL\nB_HEAD\nB_LABEL\nB_CELL\nB_VALUE\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 87,
+            "head": 87
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 256.0625,
+            "bottom": 272.0625
+          },
+          "scrollTop": 0,
+          "title": "merged-fallback.md · 87 字 — MarkPilot",
+          "banner": "",
+          "paste": {
+            "trusted": true,
+            "types": [
+              "text/plain",
+              "text/html"
+            ],
+            "format": "html",
+            "tokens": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          },
+          "screenshot": {
+            "file": "merged-fallback-02-pasted.png",
+            "sha256": "f643a5aea18dc0b6eca99bbe11657d1d3372ecae9d54ec4f5216877ca0de1bd1",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 256.0625,
+              "bottom": 272.0625
+            },
+            "zoom": {
+              "file": "merged-fallback-02-pasted-caret-2x.png",
+              "sha256": "142ff2e564f9fbf047b5b9373a99b706c2f0f27b1f41c6e04c30cc23c4765f53",
+              "clip": {
+                "x": 165.1640625,
+                "y": 231.0625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-after",
+          "text": {
+            "matches": true,
+            "length": 72
+          },
+          "html": {
+            "matches": true,
+            "length": 371
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "● merged-fallback.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "merged-fallback-03-undo.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "merged-fallback-03-undo-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Existing text\n\nPRE_SENTINEL\nMERGED_SENTINEL\nB_HEAD\nB_LABEL\nB_CELL\nB_VALUE\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 87,
+            "head": 87
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 256.0625,
+            "bottom": 272.0625
+          },
+          "scrollTop": 0,
+          "title": "● merged-fallback.md · 87 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "merged-fallback-04-redo.png",
+            "sha256": "df5cf2b9b9e90e30222702e3d1a30d2197b933bb8cb0df1d70f681d07d0e5b11",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 256.0625,
+              "bottom": 272.0625
+            },
+            "zoom": {
+              "file": "merged-fallback-04-redo-caret-2x.png",
+              "sha256": "142ff2e564f9fbf047b5b9373a99b706c2f0f27b1f41c6e04c30cc23c4765f53",
+              "clip": {
+                "x": 165.1640625,
+                "y": 231.0625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "order",
+          "tokens": [
+            "PRE_SENTINEL",
+            "MERGED_SENTINEL",
+            "B_HEAD",
+            "B_LABEL",
+            "B_CELL",
+            "B_VALUE",
+            "POST_SENTINEL"
+          ],
+          "positions": [
+            15,
+            28,
+            44,
+            51,
+            59,
+            66,
+            74
+          ]
+        }
+      ],
+      "detail": {
+        "tokens": [
+          "PRE_SENTINEL",
+          "MERGED_SENTINEL",
+          "B_HEAD",
+          "B_LABEL",
+          "B_CELL",
+          "B_VALUE",
+          "POST_SENTINEL"
+        ],
+        "positions": [
+          15,
+          28,
+          44,
+          51,
+          59,
+          66,
+          74
+        ],
+        "atomicUndoRedo": true
+      },
+      "ms": 5114
+    },
+    {
+      "id": "one-row-html-preserve-all-content-in-order",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "one-row.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "one-row-01-before.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "one-row-01-before-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "text": {
+            "length": 22,
+            "matches": true
+          },
+          "html": {
+            "matches": true,
+            "length": 240
+          }
+        },
+        {
+          "name": "pasted",
+          "text": "Existing text\n\n| ONLY_HEADER | ONLY_LABEL |\n| --- | --- |",
+          "selection": {
+            "anchor": 57,
+            "head": 57
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 986.5,
+            "right": 986.5,
+            "top": 100.390625,
+            "bottom": 143.5859375
+          },
+          "scrollTop": 0,
+          "title": "one-row.md · 57 字 — MarkPilot",
+          "banner": "",
+          "paste": {
+            "trusted": true,
+            "types": [
+              "text/plain",
+              "text/html"
+            ],
+            "format": "html",
+            "tokens": [
+              true,
+              true
+            ]
+          },
+          "screenshot": {
+            "file": "one-row-02-pasted.png",
+            "sha256": "6de2843082080acaab4a6f96797e1b58390f6c385f9d4bd99411ff8725a0febe",
+            "caret": {
+              "left": 986.5,
+              "right": 986.5,
+              "top": 100.390625,
+              "bottom": 143.5859375
+            },
+            "zoom": {
+              "file": "one-row-02-pasted-caret-2x.png",
+              "sha256": "ae81208b8384e050fd13dd1154220f14ae8a2333194340f01307681a0de06f73",
+              "clip": {
+                "x": 866.5,
+                "y": 75.390625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-after",
+          "text": {
+            "length": 22,
+            "matches": true
+          },
+          "html": {
+            "length": 240,
+            "matches": true
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "● one-row.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "one-row-03-undo.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "one-row-03-undo-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Existing text\n\n| ONLY_HEADER | ONLY_LABEL |\n| --- | --- |",
+          "selection": {
+            "anchor": 57,
+            "head": 57
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 986.5,
+            "right": 986.5,
+            "top": 100.390625,
+            "bottom": 143.5859375
+          },
+          "scrollTop": 0,
+          "title": "● one-row.md · 57 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "one-row-04-redo.png",
+            "sha256": "592ea3eb4a4a85b757e9825fd4263f50e39c4d81b4bb5a87d58b3ec27eb386d8",
+            "caret": {
+              "left": 986.5,
+              "right": 986.5,
+              "top": 100.390625,
+              "bottom": 143.5859375
+            },
+            "zoom": {
+              "file": "one-row-04-redo-caret-2x.png",
+              "sha256": "ae81208b8384e050fd13dd1154220f14ae8a2333194340f01307681a0de06f73",
+              "clip": {
+                "x": 866.5,
+                "y": 75.390625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "order",
+          "tokens": [
+            "ONLY_HEADER",
+            "ONLY_LABEL"
+          ],
+          "positions": [
+            17,
+            31
+          ]
+        }
+      ],
+      "detail": {
+        "tokens": [
+          "ONLY_HEADER",
+          "ONLY_LABEL"
+        ],
+        "positions": [
+          17,
+          31
+        ],
+        "atomicUndoRedo": true
+      },
+      "ms": 5759
+    },
+    {
+      "id": "plain-tsv-html-preserve-all-content-in-order",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "plain-tsv.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "plain-tsv-01-before.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "plain-tsv-01-before-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "text": {
+            "matches": true,
+            "length": 37
+          },
+          "html": {
+            "matches": true,
+            "absent": true
+          }
+        },
+        {
+          "name": "pasted",
+          "text": "Existing text\n\n| TSV_HEAD | TSV_LABEL |\n| --- | --- |\n| TSV_CELL | TSV_VALUE |",
+          "selection": {
+            "anchor": 78,
+            "head": 78
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 986.5,
+            "right": 986.5,
+            "top": 143.5859375,
+            "bottom": 186.78125
+          },
+          "scrollTop": 0,
+          "title": "plain-tsv.md · 78 字 — MarkPilot",
+          "banner": "",
+          "paste": {
+            "trusted": true,
+            "types": [
+              "text/plain"
+            ],
+            "format": "plain",
+            "tokens": [
+              true,
+              true,
+              true,
+              true
+            ]
+          },
+          "screenshot": {
+            "file": "plain-tsv-02-pasted.png",
+            "sha256": "e54837654130c4a31296914d0596ee3b6d917d4349f19a17ea9abbb220f2c912",
+            "caret": {
+              "left": 986.5,
+              "right": 986.5,
+              "top": 143.5859375,
+              "bottom": 186.78125
+            },
+            "zoom": {
+              "file": "plain-tsv-02-pasted-caret-2x.png",
+              "sha256": "3992c2bd15b8501df62e0b22a40e22f4eae12d7f2f767e5d4decc03133df1ee4",
+              "clip": {
+                "x": 866.5,
+                "y": 118.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-after",
+          "text": {
+            "length": 37,
+            "matches": true
+          },
+          "html": {
+            "matches": true,
+            "absent": true
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "● plain-tsv.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "plain-tsv-03-undo.png",
+            "sha256": "31185217f00ebfbb748242e6cd4f0afbadb87e67e294be40225c51b46702aac3",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "plain-tsv-03-undo-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Existing text\n\n| TSV_HEAD | TSV_LABEL |\n| --- | --- |\n| TSV_CELL | TSV_VALUE |",
+          "selection": {
+            "anchor": 78,
+            "head": 78
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 986.5,
+            "right": 986.5,
+            "top": 143.5859375,
+            "bottom": 186.78125
+          },
+          "scrollTop": 0,
+          "title": "● plain-tsv.md · 78 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "plain-tsv-04-redo.png",
+            "sha256": "2d70ee6b64ffbf9f504811afdad8a6e16b8c88e05a2917646efa7b78bc93e364",
+            "caret": {
+              "left": 986.5,
+              "right": 986.5,
+              "top": 143.5859375,
+              "bottom": 186.78125
+            },
+            "zoom": {
+              "file": "plain-tsv-04-redo-caret-2x.png",
+              "sha256": "3992c2bd15b8501df62e0b22a40e22f4eae12d7f2f767e5d4decc03133df1ee4",
+              "clip": {
+                "x": 866.5,
+                "y": 118.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "order",
+          "tokens": [
+            "TSV_HEAD",
+            "TSV_LABEL",
+            "TSV_CELL",
+            "TSV_VALUE"
+          ],
+          "positions": [
+            17,
+            28,
+            56,
+            67
+          ]
+        }
+      ],
+      "detail": {
+        "tokens": [
+          "TSV_HEAD",
+          "TSV_LABEL",
+          "TSV_CELL",
+          "TSV_VALUE"
+        ],
+        "positions": [
+          17,
+          28,
+          56,
+          67
+        ],
+        "atomicUndoRedo": true
+      },
+      "ms": 4184
+    },
+    {
+      "id": "code-literal-html-preserve-all-content-in-order",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before",
+          "text": "Start\n```text\n\n```\nEnd\n",
+          "selection": {
+            "anchor": 14,
+            "head": 14
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 171.5,
+            "y": 95.6328125,
+            "width": 0,
+            "height": 14,
+            "top": 95.6328125,
+            "right": 171.5,
+            "bottom": 109.6328125,
+            "left": 171.5
+          },
+          "scrollTop": 0,
+          "title": "code-literal.md · 23 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "code-literal-01-before.png",
+            "sha256": "39755e0c709eac335c363bf10fde158e3fa8ab40703921532900a2861f769b9b",
+            "caret": {
+              "x": 171.5,
+              "y": 95.6328125,
+              "width": 0,
+              "height": 14,
+              "top": 95.6328125,
+              "right": 171.5,
+              "bottom": 109.6328125,
+              "left": 171.5
+            },
+            "zoom": {
+              "file": "code-literal-01-before-caret-2x.png",
+              "sha256": "6e5cbd3d03221a06f269903844d8fb03c50b34c931f9ce4fa69ca0de0af5bc38",
+              "clip": {
+                "x": 51.5,
+                "y": 70.6328125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "text": {
+            "length": 99,
+            "matches": true
+          },
+          "html": {
+            "length": 425,
+            "matches": true
+          }
+        },
+        {
+          "name": "pasted",
+          "text": "Start\n```text\nPRE_SENTINEL\nA_HEAD\nA_LABEL\nA_CELL\nA_VALUE\nMID_SENTINEL\nB_HEAD\nB_LABEL\nB_CELL\nB_VALUE\nPOST_SENTINEL\n```\nEnd\n",
+          "selection": {
+            "anchor": 113,
+            "head": 113
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 253.078125,
+            "right": 253.078125,
+            "top": 281.0078125,
+            "bottom": 293.5078125
+          },
+          "scrollTop": 0,
+          "title": "code-literal.md · 122 字 — MarkPilot",
+          "banner": "",
+          "paste": {
+            "trusted": true,
+            "types": [
+              "text/plain",
+              "text/html"
+            ],
+            "format": "html",
+            "tokens": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          },
+          "screenshot": {
+            "file": "code-literal-02-pasted.png",
+            "sha256": "1c31ce8518ed57c468aa3dc17f22ff2b2133bcb8d74aadc0d246b821cc0baea1",
+            "caret": {
+              "left": 253.078125,
+              "right": 253.078125,
+              "top": 281.0078125,
+              "bottom": 293.5078125
+            },
+            "zoom": {
+              "file": "code-literal-02-pasted-caret-2x.png",
+              "sha256": "4ea12df2f8cb5384745629dde12c810d0d537de5aaec6b8cd4d3f6b3f36de524",
+              "clip": {
+                "x": 133.078125,
+                "y": 256.0078125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-after",
+          "text": {
+            "matches": true,
+            "length": 99
+          },
+          "html": {
+            "matches": true,
+            "length": 425
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Start\n```text\n\n```\nEnd\n",
+          "selection": {
+            "anchor": 14,
+            "head": 14
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 171.5,
+            "y": 95.6328125,
+            "width": 0,
+            "height": 14,
+            "top": 95.6328125,
+            "right": 171.5,
+            "bottom": 109.6328125,
+            "left": 171.5
+          },
+          "scrollTop": 0,
+          "title": "● code-literal.md · 23 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "code-literal-03-undo.png",
+            "sha256": "39755e0c709eac335c363bf10fde158e3fa8ab40703921532900a2861f769b9b",
+            "caret": {
+              "x": 171.5,
+              "y": 95.6328125,
+              "width": 0,
+              "height": 14,
+              "top": 95.6328125,
+              "right": 171.5,
+              "bottom": 109.6328125,
+              "left": 171.5
+            },
+            "zoom": {
+              "file": "code-literal-03-undo-caret-2x.png",
+              "sha256": "6e5cbd3d03221a06f269903844d8fb03c50b34c931f9ce4fa69ca0de0af5bc38",
+              "clip": {
+                "x": 51.5,
+                "y": 70.6328125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Start\n```text\nPRE_SENTINEL\nA_HEAD\nA_LABEL\nA_CELL\nA_VALUE\nMID_SENTINEL\nB_HEAD\nB_LABEL\nB_CELL\nB_VALUE\nPOST_SENTINEL\n```\nEnd\n",
+          "selection": {
+            "anchor": 113,
+            "head": 113
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 253.078125,
+            "right": 253.078125,
+            "top": 281.0078125,
+            "bottom": 293.5078125
+          },
+          "scrollTop": 0,
+          "title": "● code-literal.md · 122 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "code-literal-04-redo.png",
+            "sha256": "1c31ce8518ed57c468aa3dc17f22ff2b2133bcb8d74aadc0d246b821cc0baea1",
+            "caret": {
+              "left": 253.078125,
+              "right": 253.078125,
+              "top": 281.0078125,
+              "bottom": 293.5078125
+            },
+            "zoom": {
+              "file": "code-literal-04-redo-caret-2x.png",
+              "sha256": "4ea12df2f8cb5384745629dde12c810d0d537de5aaec6b8cd4d3f6b3f36de524",
+              "clip": {
+                "x": 133.078125,
+                "y": 256.0078125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "order",
+          "tokens": [
+            "PRE_SENTINEL",
+            "A_HEAD",
+            "A_LABEL",
+            "A_CELL",
+            "A_VALUE",
+            "MID_SENTINEL",
+            "B_HEAD",
+            "B_LABEL",
+            "B_CELL",
+            "B_VALUE",
+            "POST_SENTINEL"
+          ],
+          "positions": [
+            14,
+            27,
+            34,
+            42,
+            49,
+            57,
+            70,
+            77,
+            85,
+            92,
+            100
+          ]
+        }
+      ],
+      "detail": {
+        "tokens": [
+          "PRE_SENTINEL",
+          "A_HEAD",
+          "A_LABEL",
+          "A_CELL",
+          "A_VALUE",
+          "MID_SENTINEL",
+          "B_HEAD",
+          "B_LABEL",
+          "B_CELL",
+          "B_VALUE",
+          "POST_SENTINEL"
+        ],
+        "positions": [
+          14,
+          27,
+          34,
+          42,
+          49,
+          57,
+          70,
+          77,
+          85,
+          92,
+          100
+        ],
+        "atomicUndoRedo": true
+      },
+      "ms": 5140
+    },
+    {
+      "id": "plain-shortcut-html-preserve-all-content-in-order",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "plain-shortcut.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "plain-shortcut-01-before.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "plain-shortcut-01-before-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "text": {
+            "length": 99,
+            "matches": true
+          },
+          "html": {
+            "length": 425,
+            "matches": true
+          }
+        },
+        {
+          "name": "pasted",
+          "text": "Existing text\n\nPRE_SENTINEL\nA_HEAD\nA_LABEL\nA_CELL\nA_VALUE\nMID_SENTINEL\nB_HEAD\nB_LABEL\nB_CELL\nB_VALUE\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 114,
+            "head": 114
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 356.84375,
+            "bottom": 372.84375
+          },
+          "scrollTop": 0,
+          "title": "plain-shortcut.md · 114 字 — MarkPilot",
+          "banner": "",
+          "paste": {
+            "trusted": true,
+            "types": [
+              "text/plain"
+            ],
+            "format": "plain",
+            "tokens": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ]
+          },
+          "screenshot": {
+            "file": "plain-shortcut-02-pasted.png",
+            "sha256": "3561bac42abe5cf61d6729df103494522478b563c55e2c1993f46e499b0e5f0b",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 356.84375,
+              "bottom": 372.84375
+            },
+            "zoom": {
+              "file": "plain-shortcut-02-pasted-caret-2x.png",
+              "sha256": "38eeec5043a3bd2af6c1997e397a570bffbe9520a1efc690ee7bbadb6563cab9",
+              "clip": {
+                "x": 165.1640625,
+                "y": 331.84375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-after",
+          "text": {
+            "matches": true,
+            "length": 99
+          },
+          "html": {
+            "matches": true,
+            "length": 425
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Existing text\n\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 104.890625,
+            "width": 0,
+            "height": 16,
+            "top": 104.890625,
+            "right": 170.5,
+            "bottom": 120.890625,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "● plain-shortcut.md · 15 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "plain-shortcut-03-undo.png",
+            "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+            "caret": {
+              "x": 170.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 170.5,
+              "bottom": 120.890625,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "plain-shortcut-03-undo-caret-2x.png",
+              "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Existing text\n\nPRE_SENTINEL\nA_HEAD\nA_LABEL\nA_CELL\nA_VALUE\nMID_SENTINEL\nB_HEAD\nB_LABEL\nB_CELL\nB_VALUE\nPOST_SENTINEL",
+          "selection": {
+            "anchor": 114,
+            "head": 114
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 285.1640625,
+            "right": 285.1640625,
+            "top": 356.84375,
+            "bottom": 372.84375
+          },
+          "scrollTop": 0,
+          "title": "● plain-shortcut.md · 114 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "plain-shortcut-04-redo.png",
+            "sha256": "3561bac42abe5cf61d6729df103494522478b563c55e2c1993f46e499b0e5f0b",
+            "caret": {
+              "left": 285.1640625,
+              "right": 285.1640625,
+              "top": 356.84375,
+              "bottom": 372.84375
+            },
+            "zoom": {
+              "file": "plain-shortcut-04-redo-caret-2x.png",
+              "sha256": "38eeec5043a3bd2af6c1997e397a570bffbe9520a1efc690ee7bbadb6563cab9",
+              "clip": {
+                "x": 165.1640625,
+                "y": 331.84375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "order",
+          "tokens": [
+            "PRE_SENTINEL",
+            "A_HEAD",
+            "A_LABEL",
+            "A_CELL",
+            "A_VALUE",
+            "MID_SENTINEL",
+            "B_HEAD",
+            "B_LABEL",
+            "B_CELL",
+            "B_VALUE",
+            "POST_SENTINEL"
+          ],
+          "positions": [
+            15,
+            28,
+            35,
+            43,
+            50,
+            58,
+            71,
+            78,
+            86,
+            93,
+            101
+          ]
+        }
+      ],
+      "detail": {
+        "tokens": [
+          "PRE_SENTINEL",
+          "A_HEAD",
+          "A_LABEL",
+          "A_CELL",
+          "A_VALUE",
+          "MID_SENTINEL",
+          "B_HEAD",
+          "B_LABEL",
+          "B_CELL",
+          "B_VALUE",
+          "POST_SENTINEL"
+        ],
+        "positions": [
+          15,
+          28,
+          35,
+          43,
+          50,
+          58,
+          71,
+          78,
+          86,
+          93,
+          101
+        ],
+        "atomicUndoRedo": true
+      },
+      "ms": 5030
+    }
+  ],
+  "artifact": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-common-final-source-3.2.11\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-common-final-source-3.2.11\\unpacked\\MarkPilot.exe",
+    "runtimeExecutableSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\cm6-common-final-source-3.2.11\\unpacked\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.11",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\cm6-common-final-source-3.2.11\\unpacked\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\cm6-common-final-source-3.2.11\\unpacked\\resources\\app.asar",
+    "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+    "bootMs": 910,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+        "sourceSha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "clipboard": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T23:01:30.391Z",
+  "passed": true,
+  "frames": [
+    {
+      "file": "mixed-01-before.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "mixed-01-before-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "mixed-02-pasted.png",
+      "sha256": "0d6115a06ee3c36fd29d10fe956f1770750a85b745184158691ae8233d2c43d9",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 428.84375,
+        "bottom": 444.84375
+      },
+      "zoom": {
+        "file": "mixed-02-pasted-caret-2x.png",
+        "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+        "clip": {
+          "x": 165.1640625,
+          "y": 403.84375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "mixed-03-undo.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "mixed-03-undo-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "mixed-04-redo.png",
+      "sha256": "fac98d6e75986d2893d631a32cb9c7311aa36318889802186a39b30bbb5dee6d",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 428.84375,
+        "bottom": 444.84375
+      },
+      "zoom": {
+        "file": "mixed-04-redo-caret-2x.png",
+        "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+        "clip": {
+          "x": 165.1640625,
+          "y": 403.84375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "wrapper-01-before.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "wrapper-01-before-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "wrapper-02-pasted.png",
+      "sha256": "0d6115a06ee3c36fd29d10fe956f1770750a85b745184158691ae8233d2c43d9",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 428.84375,
+        "bottom": 444.84375
+      },
+      "zoom": {
+        "file": "wrapper-02-pasted-caret-2x.png",
+        "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+        "clip": {
+          "x": 165.1640625,
+          "y": 403.84375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "wrapper-03-undo.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "wrapper-03-undo-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "wrapper-04-redo.png",
+      "sha256": "fac98d6e75986d2893d631a32cb9c7311aa36318889802186a39b30bbb5dee6d",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 428.84375,
+        "bottom": 444.84375
+      },
+      "zoom": {
+        "file": "wrapper-04-redo-caret-2x.png",
+        "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+        "clip": {
+          "x": 165.1640625,
+          "y": 403.84375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "bare-text-01-before.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "bare-text-01-before-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "bare-text-02-pasted.png",
+      "sha256": "0d6115a06ee3c36fd29d10fe956f1770750a85b745184158691ae8233d2c43d9",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 428.84375,
+        "bottom": 444.84375
+      },
+      "zoom": {
+        "file": "bare-text-02-pasted-caret-2x.png",
+        "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+        "clip": {
+          "x": 165.1640625,
+          "y": 403.84375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "bare-text-03-undo.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "bare-text-03-undo-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "bare-text-04-redo.png",
+      "sha256": "fac98d6e75986d2893d631a32cb9c7311aa36318889802186a39b30bbb5dee6d",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 428.84375,
+        "bottom": 444.84375
+      },
+      "zoom": {
+        "file": "bare-text-04-redo-caret-2x.png",
+        "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+        "clip": {
+          "x": 165.1640625,
+          "y": 403.84375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "adjacent-01-before.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "adjacent-01-before-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "adjacent-02-pasted.png",
+      "sha256": "a67fd2302c5b6c685fe2f528be999c975ebe40d7ff67ebe7e692d064844595ba",
+      "caret": {
+        "left": 986.5,
+        "right": 986.5,
+        "top": 255.171875,
+        "bottom": 298.3671875
+      },
+      "zoom": {
+        "file": "adjacent-02-pasted-caret-2x.png",
+        "sha256": "2e477ab476dea2634134a567af5e9178da2dc5a8e8ef0d4c8470867863152fcc",
+        "clip": {
+          "x": 866.5,
+          "y": 230.171875,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "adjacent-03-undo.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "adjacent-03-undo-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "adjacent-04-redo.png",
+      "sha256": "e8a1c521bb3afba674cc12e6ebdefed4c71b425acbffe4d1bfcc9d986778aac9",
+      "caret": {
+        "left": 986.5,
+        "right": 986.5,
+        "top": 255.171875,
+        "bottom": 298.3671875
+      },
+      "zoom": {
+        "file": "adjacent-04-redo-caret-2x.png",
+        "sha256": "2e477ab476dea2634134a567af5e9178da2dc5a8e8ef0d4c8470867863152fcc",
+        "clip": {
+          "x": 866.5,
+          "y": 230.171875,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "single-01-before.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "single-01-before-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "single-02-pasted.png",
+      "sha256": "33fe700479c2adff249647a78e94faaae6294b4f92ab7046bd1a0105c46b7275",
+      "caret": {
+        "left": 986.5,
+        "right": 986.5,
+        "top": 143.5859375,
+        "bottom": 186.78125
+      },
+      "zoom": {
+        "file": "single-02-pasted-caret-2x.png",
+        "sha256": "3992c2bd15b8501df62e0b22a40e22f4eae12d7f2f767e5d4decc03133df1ee4",
+        "clip": {
+          "x": 866.5,
+          "y": 118.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "single-03-undo.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "single-03-undo-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "single-04-redo.png",
+      "sha256": "375c906310f9741c2a683d068617c8134b9bff8e6afdd874de41974c79c4f4e6",
+      "caret": {
+        "left": 986.5,
+        "right": 986.5,
+        "top": 143.5859375,
+        "bottom": 186.78125
+      },
+      "zoom": {
+        "file": "single-04-redo-caret-2x.png",
+        "sha256": "3992c2bd15b8501df62e0b22a40e22f4eae12d7f2f767e5d4decc03133df1ee4",
+        "clip": {
+          "x": 866.5,
+          "y": 118.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "rich-no-table-01-before.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "rich-no-table-01-before-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "rich-no-table-02-pasted.png",
+      "sha256": "9be2c1bf34811fee4bafa6e17f9862c6e2b897928a93da2ed037c03a8c3ed9d6",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 221.4765625,
+        "bottom": 237.4765625
+      },
+      "zoom": {
+        "file": "rich-no-table-02-pasted-caret-2x.png",
+        "sha256": "c1f5a017732f313e37e7710e5c9458e867c3f7551c40ec1b8bcce9254a337d79",
+        "clip": {
+          "x": 165.1640625,
+          "y": 196.4765625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "rich-no-table-03-undo.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "rich-no-table-03-undo-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "rich-no-table-04-redo.png",
+      "sha256": "d744fc3c5fe4c22c36c1ba8e1828004220ab3890c568a22eaafe9b8959455343",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 221.4765625,
+        "bottom": 237.4765625
+      },
+      "zoom": {
+        "file": "rich-no-table-04-redo-caret-2x.png",
+        "sha256": "c1f5a017732f313e37e7710e5c9458e867c3f7551c40ec1b8bcce9254a337d79",
+        "clip": {
+          "x": 165.1640625,
+          "y": 196.4765625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "paragraph-bare-text-01-before.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "paragraph-bare-text-01-before-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "paragraph-bare-text-02-pasted.png",
+      "sha256": "995e7896380f28d5beaa90fb5794b75a829c5ea4beca3bb889de911fafcb989c",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 317.2578125,
+        "bottom": 333.2578125
+      },
+      "zoom": {
+        "file": "paragraph-bare-text-02-pasted-caret-2x.png",
+        "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+        "clip": {
+          "x": 165.1640625,
+          "y": 292.2578125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "paragraph-bare-text-03-undo.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "paragraph-bare-text-03-undo-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "paragraph-bare-text-04-redo.png",
+      "sha256": "dc41dcc4c77b52aeff88a16408dd4b3d614043694ca23f6ea6fdc92e6a011cbd",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 317.2578125,
+        "bottom": 333.2578125
+      },
+      "zoom": {
+        "file": "paragraph-bare-text-04-redo-caret-2x.png",
+        "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+        "clip": {
+          "x": 165.1640625,
+          "y": 292.2578125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "uppercase-01-before.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "uppercase-01-before-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "uppercase-02-pasted.png",
+      "sha256": "0d6115a06ee3c36fd29d10fe956f1770750a85b745184158691ae8233d2c43d9",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 428.84375,
+        "bottom": 444.84375
+      },
+      "zoom": {
+        "file": "uppercase-02-pasted-caret-2x.png",
+        "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+        "clip": {
+          "x": 165.1640625,
+          "y": 403.84375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "uppercase-03-undo.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "uppercase-03-undo-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "uppercase-04-redo.png",
+      "sha256": "fac98d6e75986d2893d631a32cb9c7311aa36318889802186a39b30bbb5dee6d",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 428.84375,
+        "bottom": 444.84375
+      },
+      "zoom": {
+        "file": "uppercase-04-redo-caret-2x.png",
+        "sha256": "034683f24e620567305a55f15ca6a1968425a8026e7196e69df93a3f6cff37e1",
+        "clip": {
+          "x": 165.1640625,
+          "y": 403.84375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "nested-fallback-01-before.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "nested-fallback-01-before-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "nested-fallback-02-pasted.png",
+      "sha256": "5bd767117d8950795c57a1d265a2f61cad387bac775ef395ca0b212441fd827e",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 356.84375,
+        "bottom": 372.84375
+      },
+      "zoom": {
+        "file": "nested-fallback-02-pasted-caret-2x.png",
+        "sha256": "38eeec5043a3bd2af6c1997e397a570bffbe9520a1efc690ee7bbadb6563cab9",
+        "clip": {
+          "x": 165.1640625,
+          "y": 331.84375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "nested-fallback-03-undo.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "nested-fallback-03-undo-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "nested-fallback-04-redo.png",
+      "sha256": "c43b3f88d6ea56501a45bde6f573aff28732fa58a21953d40aa4a9853a2eb2d3",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 356.84375,
+        "bottom": 372.84375
+      },
+      "zoom": {
+        "file": "nested-fallback-04-redo-caret-2x.png",
+        "sha256": "38eeec5043a3bd2af6c1997e397a570bffbe9520a1efc690ee7bbadb6563cab9",
+        "clip": {
+          "x": 165.1640625,
+          "y": 331.84375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "merged-fallback-01-before.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "merged-fallback-01-before-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "merged-fallback-02-pasted.png",
+      "sha256": "f643a5aea18dc0b6eca99bbe11657d1d3372ecae9d54ec4f5216877ca0de1bd1",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 256.0625,
+        "bottom": 272.0625
+      },
+      "zoom": {
+        "file": "merged-fallback-02-pasted-caret-2x.png",
+        "sha256": "142ff2e564f9fbf047b5b9373a99b706c2f0f27b1f41c6e04c30cc23c4765f53",
+        "clip": {
+          "x": 165.1640625,
+          "y": 231.0625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "merged-fallback-03-undo.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "merged-fallback-03-undo-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "merged-fallback-04-redo.png",
+      "sha256": "df5cf2b9b9e90e30222702e3d1a30d2197b933bb8cb0df1d70f681d07d0e5b11",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 256.0625,
+        "bottom": 272.0625
+      },
+      "zoom": {
+        "file": "merged-fallback-04-redo-caret-2x.png",
+        "sha256": "142ff2e564f9fbf047b5b9373a99b706c2f0f27b1f41c6e04c30cc23c4765f53",
+        "clip": {
+          "x": 165.1640625,
+          "y": 231.0625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "one-row-01-before.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "one-row-01-before-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "one-row-02-pasted.png",
+      "sha256": "6de2843082080acaab4a6f96797e1b58390f6c385f9d4bd99411ff8725a0febe",
+      "caret": {
+        "left": 986.5,
+        "right": 986.5,
+        "top": 100.390625,
+        "bottom": 143.5859375
+      },
+      "zoom": {
+        "file": "one-row-02-pasted-caret-2x.png",
+        "sha256": "ae81208b8384e050fd13dd1154220f14ae8a2333194340f01307681a0de06f73",
+        "clip": {
+          "x": 866.5,
+          "y": 75.390625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "one-row-03-undo.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "one-row-03-undo-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "one-row-04-redo.png",
+      "sha256": "592ea3eb4a4a85b757e9825fd4263f50e39c4d81b4bb5a87d58b3ec27eb386d8",
+      "caret": {
+        "left": 986.5,
+        "right": 986.5,
+        "top": 100.390625,
+        "bottom": 143.5859375
+      },
+      "zoom": {
+        "file": "one-row-04-redo-caret-2x.png",
+        "sha256": "ae81208b8384e050fd13dd1154220f14ae8a2333194340f01307681a0de06f73",
+        "clip": {
+          "x": 866.5,
+          "y": 75.390625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-tsv-01-before.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "plain-tsv-01-before-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-tsv-02-pasted.png",
+      "sha256": "e54837654130c4a31296914d0596ee3b6d917d4349f19a17ea9abbb220f2c912",
+      "caret": {
+        "left": 986.5,
+        "right": 986.5,
+        "top": 143.5859375,
+        "bottom": 186.78125
+      },
+      "zoom": {
+        "file": "plain-tsv-02-pasted-caret-2x.png",
+        "sha256": "3992c2bd15b8501df62e0b22a40e22f4eae12d7f2f767e5d4decc03133df1ee4",
+        "clip": {
+          "x": 866.5,
+          "y": 118.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-tsv-03-undo.png",
+      "sha256": "31185217f00ebfbb748242e6cd4f0afbadb87e67e294be40225c51b46702aac3",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "plain-tsv-03-undo-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-tsv-04-redo.png",
+      "sha256": "2d70ee6b64ffbf9f504811afdad8a6e16b8c88e05a2917646efa7b78bc93e364",
+      "caret": {
+        "left": 986.5,
+        "right": 986.5,
+        "top": 143.5859375,
+        "bottom": 186.78125
+      },
+      "zoom": {
+        "file": "plain-tsv-04-redo-caret-2x.png",
+        "sha256": "3992c2bd15b8501df62e0b22a40e22f4eae12d7f2f767e5d4decc03133df1ee4",
+        "clip": {
+          "x": 866.5,
+          "y": 118.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-literal-01-before.png",
+      "sha256": "39755e0c709eac335c363bf10fde158e3fa8ab40703921532900a2861f769b9b",
+      "caret": {
+        "x": 171.5,
+        "y": 95.6328125,
+        "width": 0,
+        "height": 14,
+        "top": 95.6328125,
+        "right": 171.5,
+        "bottom": 109.6328125,
+        "left": 171.5
+      },
+      "zoom": {
+        "file": "code-literal-01-before-caret-2x.png",
+        "sha256": "6e5cbd3d03221a06f269903844d8fb03c50b34c931f9ce4fa69ca0de0af5bc38",
+        "clip": {
+          "x": 51.5,
+          "y": 70.6328125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-literal-02-pasted.png",
+      "sha256": "1c31ce8518ed57c468aa3dc17f22ff2b2133bcb8d74aadc0d246b821cc0baea1",
+      "caret": {
+        "left": 253.078125,
+        "right": 253.078125,
+        "top": 281.0078125,
+        "bottom": 293.5078125
+      },
+      "zoom": {
+        "file": "code-literal-02-pasted-caret-2x.png",
+        "sha256": "4ea12df2f8cb5384745629dde12c810d0d537de5aaec6b8cd4d3f6b3f36de524",
+        "clip": {
+          "x": 133.078125,
+          "y": 256.0078125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-literal-03-undo.png",
+      "sha256": "39755e0c709eac335c363bf10fde158e3fa8ab40703921532900a2861f769b9b",
+      "caret": {
+        "x": 171.5,
+        "y": 95.6328125,
+        "width": 0,
+        "height": 14,
+        "top": 95.6328125,
+        "right": 171.5,
+        "bottom": 109.6328125,
+        "left": 171.5
+      },
+      "zoom": {
+        "file": "code-literal-03-undo-caret-2x.png",
+        "sha256": "6e5cbd3d03221a06f269903844d8fb03c50b34c931f9ce4fa69ca0de0af5bc38",
+        "clip": {
+          "x": 51.5,
+          "y": 70.6328125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-literal-04-redo.png",
+      "sha256": "1c31ce8518ed57c468aa3dc17f22ff2b2133bcb8d74aadc0d246b821cc0baea1",
+      "caret": {
+        "left": 253.078125,
+        "right": 253.078125,
+        "top": 281.0078125,
+        "bottom": 293.5078125
+      },
+      "zoom": {
+        "file": "code-literal-04-redo-caret-2x.png",
+        "sha256": "4ea12df2f8cb5384745629dde12c810d0d537de5aaec6b8cd4d3f6b3f36de524",
+        "clip": {
+          "x": 133.078125,
+          "y": 256.0078125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-shortcut-01-before.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "plain-shortcut-01-before-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-shortcut-02-pasted.png",
+      "sha256": "3561bac42abe5cf61d6729df103494522478b563c55e2c1993f46e499b0e5f0b",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 356.84375,
+        "bottom": 372.84375
+      },
+      "zoom": {
+        "file": "plain-shortcut-02-pasted-caret-2x.png",
+        "sha256": "38eeec5043a3bd2af6c1997e397a570bffbe9520a1efc690ee7bbadb6563cab9",
+        "clip": {
+          "x": 165.1640625,
+          "y": 331.84375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-shortcut-03-undo.png",
+      "sha256": "6a77eaf34be1932ab030dffc67826bf67654868069c56ebf43b5d7dbf3924b71",
+      "caret": {
+        "x": 170.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 170.5,
+        "bottom": 120.890625,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "plain-shortcut-03-undo-caret-2x.png",
+        "sha256": "15e414a40488815787c484e075d2a049095383318be7142c7dbe723ad0ef7855",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "plain-shortcut-04-redo.png",
+      "sha256": "3561bac42abe5cf61d6729df103494522478b563c55e2c1993f46e499b0e5f0b",
+      "caret": {
+        "left": 285.1640625,
+        "right": 285.1640625,
+        "top": 356.84375,
+        "bottom": 372.84375
+      },
+      "zoom": {
+        "file": "plain-shortcut-04-redo-caret-2x.png",
+        "sha256": "38eeec5043a3bd2af6c1997e397a570bffbe9520a1efc690ee7bbadb6563cab9",
+        "clip": {
+          "x": 165.1640625,
+          "y": 331.84375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ]
+}

@@ -1,0 +1,1825 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T09:51:38.940Z",
+  "cases": [
+    {
+      "id": "windows-bitmap-control-v-assets",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "text": "---\nmp-image-mode: assets\n---\n\n图片正文\n",
+            "selection": {
+              "anchor": 36,
+              "head": 36
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 160.5,
+              "y": 200.0859375,
+              "width": 0,
+              "height": 16,
+              "top": 200.0859375,
+              "right": 160.5,
+              "bottom": 216.0859375,
+              "left": 160.5
+            },
+            "scrollTop": 0,
+            "title": "primary-bom-crlf.md · 37 字 — MarkPilot",
+            "banner": ""
+          },
+          "clipboard": {
+            "ok": true,
+            "hasImage": true,
+            "width": 400,
+            "height": 160,
+            "textLen": 0
+          }
+        },
+        {
+          "after": {
+            "text": "---\nmp-image-mode: assets\n---\n\n图片正文\n![](assets/pasted-image.png)",
+            "selection": {
+              "anchor": 64,
+              "head": 64
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 327.734375,
+              "y": 200.0859375,
+              "width": 0,
+              "height": 16,
+              "top": 200.0859375,
+              "right": 327.734375,
+              "bottom": 216.0859375,
+              "left": 327.734375
+            },
+            "scrollTop": 0,
+            "title": "primary-bom-crlf.md · 64 字 — MarkPilot",
+            "banner": ""
+          },
+          "events": [
+            {
+              "trusted": true,
+              "types": [
+                "Files"
+              ],
+              "items": [
+                {
+                  "kind": "file",
+                  "type": "image/png"
+                }
+              ],
+              "files": [
+                {
+                  "type": "image/png",
+                  "size": 9990
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "asset": "pasted-image.png",
+          "bytes": 9990,
+          "sha256": "ec4d03c0465dc2f4b3bdeeeae7f7bd90d5530208a4afc42d03d9abdc5c634911"
+        }
+      ],
+      "detail": {
+        "images": [
+          {
+            "complete": true,
+            "width": 0,
+            "height": 0
+          },
+          {
+            "complete": true,
+            "width": 400,
+            "height": 160
+          },
+          {
+            "complete": true,
+            "width": 0,
+            "height": 0
+          }
+        ]
+      },
+      "ms": 3715
+    },
+    {
+      "id": "windows-bitmap-control-v-inline",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "text": "---\nmp-image-mode: inline\n---\n\n图片正文\n",
+            "selection": {
+              "anchor": 36,
+              "head": 36
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 160.5,
+              "y": 200.0859375,
+              "width": 0,
+              "height": 16,
+              "top": 200.0859375,
+              "right": 160.5,
+              "bottom": 216.0859375,
+              "left": 160.5
+            },
+            "scrollTop": 0,
+            "title": "primary-bom-crlf.md · 66 字 — MarkPilot",
+            "banner": ""
+          },
+          "clipboard": {
+            "ok": true,
+            "hasImage": true,
+            "width": 400,
+            "height": 160,
+            "textLen": 0
+          }
+        },
+        {
+          "after": {
+            "text": {
+              "characters": 13383,
+              "sha256": "fe2d7efd01d0a7f49bd590fbae089271061b9897605c292bd407359059314368",
+              "preview": "---\nmp-image-mode: inline\n---\n\n图片正文\n![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAACgCAIAAACt0K2CAAAgAElEQVR4Ae2c918Tyf/H/U8OkwBJkKL0ai9nL1gQG9gABUQEsaCIolgAgVBCLwIqoChVEAihJCGE9N1NaPdf3P34vc3guGwC5yF339tP3o/HPvJ4Z3fq8z3zmtmZ3V0n3rARDiAABIAAJwisE3\n…\nAEQLBAsIAAEOEMABIszrsKDDBhAwGkJgGCBYAEBIMAZAiBYnHGV0w6qUHEggAmAYIFgAQEgwBkCIFiccRUeZMAAAk5LAAQLBAsIAAHOEADB4oyrnHZQhYoDAUwABAsECwgAAc4QAMHijKvwIAMGEHBaAiBYIFhAAAhwhgAIFmdc5bSDKlQcCGACIFggWEAACHCGAAgWZ1yFBxkwgIDTEgDBAsECAkCAMwT+D/nKE4GOivRLAAAAAElFTkSuQmCC)"
+            },
+            "selection": {
+              "anchor": 13383,
+              "head": 13383
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 490.625,
+              "y": 3601.453125,
+              "width": 0,
+              "height": 16,
+              "top": 3601.453125,
+              "right": 490.625,
+              "bottom": 3617.453125,
+              "left": 490.625
+            },
+            "scrollTop": 0,
+            "title": "primary-bom-crlf.md · 13383 字 — MarkPilot",
+            "banner": ""
+          },
+          "events": [
+            {
+              "trusted": true,
+              "types": [
+                "Files"
+              ],
+              "items": [
+                {
+                  "kind": "file",
+                  "type": "image/png"
+                }
+              ],
+              "files": [
+                {
+                  "type": "image/png",
+                  "size": 9990
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "detail": {
+        "images": [
+          {
+            "complete": true,
+            "width": 0,
+            "height": 0
+          },
+          {
+            "complete": true,
+            "width": 400,
+            "height": 160
+          },
+          {
+            "complete": true,
+            "width": 0,
+            "height": 0
+          }
+        ]
+      },
+      "ms": 3737
+    },
+    {
+      "id": "bitmap-frontmatter-is-explicitly-refused",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "---\nmp-image-mode: assets\n---\n\n正文\n",
+            "selection": {
+              "anchor": 5,
+              "head": 5
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 172.828125,
+              "right": 172.828125,
+              "top": 89.5,
+              "bottom": 105.5
+            },
+            "scrollTop": 0,
+            "title": "primary-bom-crlf.md · 13385 字 — MarkPilot",
+            "banner": ""
+          },
+          "toast": "光标在文档头部信息区，请移到正文再粘贴"
+        }
+      ],
+      "detail": {
+        "toast": "光标在文档头部信息区，请移到正文再粘贴"
+      },
+      "ms": 663
+    },
+    {
+      "id": "bitmap-paste-after-plain-paste-shortcut",
+      "status": "pass",
+      "trace": [
+        {
+          "plainPaste": {
+            "text": "正文\n",
+            "selection": {
+              "anchor": 3,
+              "head": 3
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 160.5,
+              "y": 79.6953125,
+              "width": 0,
+              "height": 16,
+              "top": 79.6953125,
+              "right": 160.5,
+              "bottom": 95.6953125,
+              "left": 160.5
+            },
+            "scrollTop": 0,
+            "title": "primary-bom-crlf.md · 13385 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "ordinaryPaste": {
+            "text": "正文\n![](assets/pasted-image.png)",
+            "selection": {
+              "anchor": 31,
+              "head": 31
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 327.734375,
+              "y": 79.6953125,
+              "width": 0,
+              "height": 16,
+              "top": 79.6953125,
+              "right": 327.734375,
+              "bottom": 95.6953125,
+              "left": 327.734375
+            },
+            "scrollTop": 0,
+            "title": "primary-bom-crlf.md · 31 字 — MarkPilot",
+            "banner": ""
+          },
+          "events": [
+            {
+              "trusted": true,
+              "types": [],
+              "items": [],
+              "files": []
+            },
+            {
+              "trusted": true,
+              "types": [
+                "Files"
+              ],
+              "items": [
+                {
+                  "kind": "file",
+                  "type": "image/png"
+                }
+              ],
+              "files": [
+                {
+                  "type": "image/png",
+                  "size": 9990
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "ms": 1384
+    },
+    {
+      "id": "unsaved-document-bitmap-paste-falls-back-inline",
+      "status": "pass",
+      "trace": [
+        {
+          "nativeKey": {
+            "ok": true,
+            "input": {
+              "type": "keyDown",
+              "keyCode": "N",
+              "modifiers": [
+                "control"
+              ]
+            },
+            "wasFocused": true,
+            "focused": true,
+            "focusWaitedMs": 0
+          }
+        },
+        {
+          "text": {
+            "characters": 13353,
+            "sha256": "c781f1e7d36776590f5a052d69e011a90263d003f2d550cfd230929af1d97d83",
+            "preview": "未命名截图\n![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAACgCAIAAACt0K2CAAAgAElEQVR4Ae2c918Tyf/H/U8OkwBJkKL0ai9nL1gQG9gABUQEsaCIolgAgVBCLwIqoChVEAihJCGE9N1NaPdf3P34vc3guGwC5yF339tP3o/HPvJ4Z3fq8z3zmtmZ3V0n3rARDiAABIAAJwisE3n4wAEEgAAQ4ASBdUKxNxxAAAgAAU4Q\n…\nAEQLBAsIAAEOEMABIszrsKDDBhAwGkJgGCBYAEBIMAZAiBYnHGV0w6qUHEggAmAYIFgAQEgwBkCIFiccRUeZMAAAk5LAAQLBAsIAAHOEADB4oyrnHZQhYoDAUwABAsECwgAAc4QAMHijKvwIAMGEHBaAiBYIFhAAAhwhgAIFmdc5bSDKlQcCGACIFggWEAACHCGAAgWZ1yFBxkwgIDTEgDBAsECAkCAMwT+D/nKE4GOivRLAAAAAElFTkSuQmCC)"
+          },
+          "selection": {
+            "anchor": 13353,
+            "head": 13353
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 490.625,
+            "y": 3481.0625,
+            "width": 0,
+            "height": 16,
+            "top": 3481.0625,
+            "right": 490.625,
+            "bottom": 3497.0625,
+            "left": 490.625
+          },
+          "scrollTop": 0,
+          "title": "● 未命名 · 13353 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 2742
+    },
+    {
+      "id": "fenced-code-enter-preserves-literal-list",
+      "status": "fail",
+      "trace": [
+        {
+          "before": {
+            "text": "```shell\n- install foo\n```\n",
+            "selection": {
+              "anchor": 22,
+              "head": 22
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 251.140625,
+              "right": 251.140625,
+              "top": 70.4375,
+              "bottom": 84.4375
+            },
+            "scrollTop": 0,
+            "title": "primary-bom-crlf.md · 31 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "after": {
+            "text": "```shell\n- install foo\n- \n```\n",
+            "selection": {
+              "anchor": 25,
+              "head": 25
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 175.4453125,
+              "y": 88.875,
+              "width": 0,
+              "height": 14,
+              "top": 88.875,
+              "right": 175.4453125,
+              "bottom": 102.875,
+              "left": 175.4453125
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 30 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "error": "Enter inside code adds no list marker\n+ actual - expected\n\n+ '```shell\\n- install foo\\n- \\n```\\n'\n- '```shell\\n- install foo\\n\\n```\\n'\n                            ^\n",
+      "ms": 300
+    },
+    {
+      "id": "list-home-enter-does-not-duplicate-marker",
+      "status": "fail",
+      "trace": [
+        {
+          "text": "\n- - 项目\n",
+          "selection": {
+            "anchor": 3,
+            "head": 3
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 169.125,
+            "right": 169.125,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "● primary-bom-crlf.md · 8 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "error": "Expected values to be strictly equal:\n+ actual - expected\n\n+ '\\n- - 项目\\n'\n- '\\n- 项目\\n'\n       ^\n",
+      "ms": 311
+    },
+    {
+      "id": "math-completion-prose-enter",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "text": "计算 $\\fra",
+            "selection": {
+              "anchor": 8,
+              "head": 8
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 224.3203125,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 224.3203125,
+              "bottom": 70.5,
+              "left": 224.3203125
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 8 字 — MarkPilot",
+            "banner": ""
+          },
+          "selected": "\\frac"
+        },
+        {
+          "after": {
+            "text": "计算 $\\frac{}{}",
+            "selection": {
+              "anchor": 10,
+              "head": 10
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 236.703125,
+              "right": 236.703125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 13 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 323
+    },
+    {
+      "id": "math-completion-prose-tab",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "text": "计算 $\\fra",
+            "selection": {
+              "anchor": 8,
+              "head": 8
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 224.3203125,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 224.3203125,
+              "bottom": 70.5,
+              "left": 224.3203125
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 8 字 — MarkPilot",
+            "banner": ""
+          },
+          "selected": "\\frac"
+        },
+        {
+          "after": {
+            "text": "计算 $\\frac{}{}",
+            "selection": {
+              "anchor": 10,
+              "head": 10
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 236.703125,
+              "right": 236.703125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 13 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 341
+    },
+    {
+      "id": "math-completion-list-enter",
+      "status": "fail",
+      "trace": [
+        {
+          "before": {
+            "text": "- 计算 $\\fra",
+            "selection": {
+              "anchor": 10,
+              "head": 10
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 233.1953125,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 233.1953125,
+              "bottom": 70.5,
+              "left": 233.1953125
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 10 字 — MarkPilot",
+            "banner": ""
+          },
+          "selected": "\\frac"
+        },
+        {
+          "after": {
+            "text": "- 计算 $\\fra\n- ",
+            "selection": {
+              "anchor": 13,
+              "head": 13
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 169.1171875,
+              "right": 169.1171875,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 13 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "error": "open completion accepts with Enter",
+      "ms": 334
+    },
+    {
+      "id": "math-completion-list-tab",
+      "status": "fail",
+      "trace": [
+        {
+          "before": {
+            "text": "- 计算 $\\fra",
+            "selection": {
+              "anchor": 10,
+              "head": 10
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 233.1953125,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 233.1953125,
+              "bottom": 70.5,
+              "left": 233.1953125
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 10 字 — MarkPilot",
+            "banner": ""
+          },
+          "selected": "\\frac"
+        },
+        {
+          "after": {
+            "text": "  - 计算 $\\fra",
+            "selection": {
+              "anchor": 12,
+              "head": 12
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 241.8125,
+              "right": 241.8125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 12 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "error": "open completion accepts with Tab",
+      "ms": 356
+    },
+    {
+      "id": "quoted-fence-does-not-render-table",
+      "status": "fail",
+      "trace": [
+        {
+          "tables": 1,
+          "text": "起点\n\n> ```\n> | a | b |\n> | --- | --- |\n> ```\n\n"
+        }
+      ],
+      "error": "literal code has no table widget\n\n1 !== 0\n",
+      "ms": 612
+    },
+    {
+      "id": "quoted-fence-tab-keeps-editor-focus",
+      "status": "fail",
+      "trace": [
+        {
+          "text": "> ```\n> const a = 1\n> ```\n",
+          "selection": {
+            "anchor": 8,
+            "head": 8
+          },
+          "focus": false,
+          "activeElement": {
+            "tag": "BUTTON",
+            "class": "mp-tb-item"
+          },
+          "caret": {
+            "left": 176.578125,
+            "right": 176.578125,
+            "top": 73.03125,
+            "bottom": 86.03125
+          },
+          "scrollTop": 0,
+          "title": "primary-bom-crlf.md · 12 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "error": "Tab stays in editor",
+      "ms": 148
+    },
+    {
+      "id": "hashtag-without-space-is-not-heading",
+      "status": "fail",
+      "trace": [
+        [
+          {
+            "text": "起点",
+            "class": "cm-line cm-activeLine"
+          },
+          {
+            "text": "话题",
+            "class": "cm-line mp-h1"
+          },
+          {
+            "text": "",
+            "class": "cm-line"
+          }
+        ]
+      ],
+      "error": "#话题 remains ordinary text",
+      "ms": 274
+    },
+    {
+      "id": "ordered-list-export-preserves-numbering",
+      "status": "fail",
+      "trace": [
+        {
+          "body": "\n\n甲\n乙\n\n\n\n\n\n",
+          "ol": 0,
+          "ul": 1,
+          "pre": [],
+          "tables": []
+        }
+      ],
+      "error": "ordered Markdown exports as ol\n\n0 !== 1\n",
+      "ms": 277
+    },
+    {
+      "id": "tilde-fence-export-preserves-code",
+      "status": "fail",
+      "trace": [
+        {
+          "editorLines": [
+            {
+              "text": "起点",
+              "class": "cm-line cm-activeLine"
+            },
+            {
+              "text": "~~~text",
+              "class": "cm-line mp-fence mp-code"
+            },
+            {
+              "text": "*x* y",
+              "class": "cm-line mp-code"
+            },
+            {
+              "text": "~~~",
+              "class": "cm-line mp-fence mp-code"
+            },
+            {
+              "text": "",
+              "class": "cm-line"
+            }
+          ]
+        },
+        {
+          "body": "\n~~~text\nx y\n~~~\n\n\n\n\n",
+          "ol": 0,
+          "ul": 0,
+          "pre": [],
+          "tables": []
+        }
+      ],
+      "error": "tilde-fenced code exports literally",
+      "ms": 410
+    },
+    {
+      "id": "wide-dash-table-export-matches-editor",
+      "status": "fail",
+      "trace": [
+        {
+          "visible": 2,
+          "html": {
+            "body": "\n\nab\n\n————\n12\n\n\n\n\n\n\n",
+            "ol": 0,
+            "ul": 0,
+            "pre": [],
+            "tables": [
+              [
+                [
+                  "a",
+                  "b"
+                ],
+                [
+                  "——",
+                  "——"
+                ],
+                [
+                  "1",
+                  "2"
+                ]
+              ]
+            ]
+          }
+        }
+      ],
+      "error": "separator is not a data row",
+      "ms": 423
+    },
+    {
+      "id": "windows-format-undo-control-y-redo",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "前文 **target** 后文",
+          "selection": {
+            "anchor": 11,
+            "head": 11
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 248.2109375,
+            "right": 248.2109375,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● primary-bom-crlf.md · 16 字 — MarkPilot",
+          "banner": ""
+        },
+        {
+          "text": "前文 target 后文",
+          "selection": {
+            "anchor": 3,
+            "head": 9
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 228.2265625,
+            "right": 228.2265625,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● primary-bom-crlf.md · 12 字 — MarkPilot",
+          "banner": ""
+        },
+        {
+          "text": "前文 **target** 后文",
+          "selection": {
+            "anchor": 3,
+            "head": 13
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 261.7109375,
+            "right": 261.7109375,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● primary-bom-crlf.md · 16 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 180
+    },
+    {
+      "id": "underline-empty-toggle-removes-entire-closing-tag",
+      "status": "fail",
+      "trace": [
+        {
+          "before": {
+            "text": "<u></u>",
+            "selection": {
+              "anchor": 3,
+              "head": 3
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 186.5703125,
+              "right": 186.5703125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 7 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "after": {
+            "text": ">",
+            "selection": {
+              "anchor": 0,
+              "head": 0
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 176.578125,
+              "y": 52.90625,
+              "width": 0,
+              "height": 12.59375,
+              "top": 52.90625,
+              "right": 176.578125,
+              "bottom": 65.5,
+              "left": 176.578125
+            },
+            "scrollTop": 0,
+            "title": "● primary-bom-crlf.md · 1 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "error": "toggle removes both full tags\n\n'>' !== ''\n",
+      "ms": 313
+    },
+    {
+      "id": "secondary-save-preserves-own-bom-eol",
+      "status": "fail",
+      "trace": [
+        {
+          "state": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "selection": {
+              "anchor": 41,
+              "head": 41
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 218.6328125,
+              "right": 218.6328125,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "scrollTop": 0,
+            "title": "secondary-lf.md · 41 字 — MarkPilot",
+            "banner": ""
+          },
+          "diskHex": "efbbbf425f444f43554d454e545f53454e54494e454c0d0a5345434f4e4420434f4e54454e540d0a422d45444954",
+          "primaryDisk": "﻿A_DOCUMENT_SENTINEL\r\n\r\nPRIMARY CONTENT\r\nA-EDIT",
+          "infoA": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\release-critical-native-control\\primary-bom-crlf.md"
+          },
+          "infoB": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\n",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\release-critical-native-control\\secondary-lf.md"
+          }
+        }
+      ],
+      "error": "LF/no-BOM secondary gained primary BOM",
+      "ms": 1324
+    },
+    {
+      "id": "secondary-save-keeps-both-saved-texts",
+      "status": "fail",
+      "trace": [
+        {
+          "infoA": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\release-critical-native-control\\primary-bom-crlf.md"
+          },
+          "infoB": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\n",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\release-critical-native-control\\secondary-lf.md"
+          }
+        }
+      ],
+      "error": "primary saved text stays primary\n+ actual - expected\n\n+ 'B_DOCUMENT_SENTINEL\\nSECOND CONTENT\\nB-EDIT'\n- 'A_DOCUMENT_SENTINEL\\n\\nPRIMARY CONTENT\\nA-EDIT'\n",
+      "ms": 8
+    },
+    {
+      "id": "primary-pdf-exports-primary-with-secondary-open",
+      "status": "fail",
+      "trace": [
+        {
+          "ok": true,
+          "file": "<repo>\\.mp-verify\\codex-audit\\release-critical-native-control\\primary.pdf",
+          "bytes": 46541,
+          "pages": 1,
+          "ms": 315,
+          "printMs": 264,
+          "chunks": 1,
+          "html": {
+            "file": "<repo>\\.mp-verify\\codex-audit\\release-critical-native-control\\runtime-temp\\markpilot-pdf-AsG8h5\\MarkPilot 导出.html",
+            "bytes": 373111,
+            "relImages": 0,
+            "dataImages": 0,
+            "remoteImages": 0,
+            "tables": 0,
+            "mathBlocks": 0
+          },
+          "images": {
+            "complete": 0,
+            "natural": 0,
+            "broken": 0,
+            "ms": 219
+          },
+          "gate": {
+            "passed": true,
+            "reasons": [],
+            "inlineDataImages": 0,
+            "relImages": 0
+          },
+          "memory": {
+            "peakMB": 847.6,
+            "lastMB": 847.6,
+            "samples": 3,
+            "intervalMs": 200,
+            "perProc": [
+              {
+                "type": "GPU",
+                "pid": 68428,
+                "peakMB": 327.7
+              },
+              {
+                "type": "Tab",
+                "pid": 88484,
+                "peakMB": 130.5
+              },
+              {
+                "type": "Tab",
+                "pid": 45096,
+                "peakMB": 122.6
+              },
+              {
+                "type": "Browser",
+                "pid": 88968,
+                "peakMB": 118.9
+              },
+              {
+                "type": "Tab",
+                "pid": 80536,
+                "peakMB": 97.3
+              },
+              {
+                "type": "Utility",
+                "pid": 54524,
+                "peakMB": 50.6
+              }
+            ],
+            "seriesMB": [
+              734,
+              833,
+              848,
+              848
+            ]
+          },
+          "phases": [
+            {
+              "bytes": 373111,
+              "relImages": 0,
+              "dataImages": 0,
+              "tables": 0,
+              "phase": "inspect",
+              "ms": 91
+            },
+            {
+              "signal": "dom-ready",
+              "loadMs": 111,
+              "phase": "load",
+              "ms": 214
+            },
+            {
+              "total": 0,
+              "local": 0,
+              "remote": 0,
+              "complete": 0,
+              "natural": 0,
+              "broken": 0,
+              "remotePending": 0,
+              "partial": false,
+              "readyState": "complete",
+              "ms": 219,
+              "phase": "images"
+            },
+            {
+              "mathCssBytes": 369219,
+              "phase": "style",
+              "ms": 223
+            },
+            {
+              "applied": 3,
+              "lines": 3,
+              "blocks": 3,
+              "width": 680.64,
+              "fallback": {},
+              "phase": "typeset",
+              "ms": 229
+            },
+            {
+              "bytes": 46541,
+              "pages": 1,
+              "phase": "print",
+              "ms": 262
+            },
+            {
+              "done": 46541,
+              "bytes": 46541,
+              "chunks": 1,
+              "phase": "write",
+              "ms": 264
+            },
+            {
+              "bytes": 46541,
+              "chunks": 1,
+              "writeMs": 1,
+              "phase": "write-done",
+              "ms": 264
+            }
+          ],
+          "kp": {
+            "applied": 3,
+            "lines": 3,
+            "fallback": {},
+            "blocks": 3,
+            "width": 680.64,
+            "sourceBytes": 123,
+            "sourceChars": 41
+          },
+          "mathCss": {
+            "source": "engine",
+            "bytes": 369219
+          }
+        },
+        {
+          "htmlBody": "\nB_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT\n\n\n\n"
+        }
+      ],
+      "error": "A export contains A",
+      "ms": 393
+    },
+    {
+      "id": "secondary-save-as-keeps-primary-path",
+      "status": "fail",
+      "trace": [
+        {
+          "before": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\release-critical-native-control\\primary-bom-crlf.md"
+          },
+          "after": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\nB-EDIT",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\release-critical-native-control\\secondary-save-as.md"
+          },
+          "infoB": {
+            "text": "B_DOCUMENT_SENTINEL\nSECOND CONTENT\n",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\release-critical-native-control\\secondary-save-as.md"
+          },
+          "primaryDisk": "﻿A_DOCUMENT_SENTINEL\r\n\r\nPRIMARY CONTENT\r\nA-EDIT"
+        }
+      ],
+      "error": "primary path unchanged by B Save As\n+ actual - expected\n\n+ '<repo>\\\\.mp-verify\\\\codex-audit\\\\release-critical-native-control\\\\secondary-save-as.md'\n- '<repo>\\\\.mp-verify\\\\codex-audit\\\\release-critical-native-control\\\\primary-bom-crlf.md'\n",
+      "ms": 1253
+    },
+    {
+      "id": "utf16-chinese-safe-open-and-edit",
+      "status": "fail",
+      "trace": [
+        {
+          "opened": {
+            "ok": true
+          }
+        },
+        {
+          "beforeHex": "fffe2d4e87654b6dd58b70656e63b08b555f",
+          "loaded": {
+            "text": "��-N�eKmՋpenc��U_",
+            "selection": {
+              "anchor": 17,
+              "head": 17
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 342.234375,
+              "right": 342.234375,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "utf16-chinese.md · 17 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "afterHex": "efbfbdefbfbd2d4eefbfbd654b6dd58b70656e63efbfbdefbfbd555fe8bfbde58aa0",
+          "after": {
+            "text": "��-N�eKmՋpenc��U_追加",
+            "selection": {
+              "anchor": 19,
+              "head": 19
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 370.234375,
+              "right": 370.234375,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "utf16-chinese.md · 19 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "error": "UTF16 is decoded correctly, or must be refused before editing\n+ actual - expected\n\n+ '��-N�eKmՋpenc��U_'\n- '中文测试数据记录'\n",
+      "ms": 1726
+    },
+    {
+      "id": "unsaved-native-close-control-keeps-window-open",
+      "status": "pass",
+      "trace": [
+        {
+          "before": {
+            "text": "UNSAVED CONTROL DRAFT",
+            "selection": {
+              "anchor": 21,
+              "head": 21
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 349.0390625,
+              "right": 349.0390625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● 未命名 · 21 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "clicked": {
+            "ok": true,
+            "id": "menu-close-window",
+            "forced": true,
+            "enabled": true
+          }
+        },
+        {
+          "primaryClosed": false
+        }
+      ],
+      "ms": 1069
+    },
+    {
+      "id": "secondary-save-does-not-clear-primary-unsaved-close-guard",
+      "status": "fail",
+      "trace": [
+        {
+          "before": {
+            "text": "UNSAVED PRIMARY DRAFT",
+            "selection": {
+              "anchor": 21,
+              "head": 21
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 346.1640625,
+              "right": 346.1640625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● 未命名 · 21 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "afterSave": {
+            "text": "UNSAVED PRIMARY DRAFT",
+            "selection": {
+              "anchor": 21,
+              "head": 21
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 346.1640625,
+              "right": 346.1640625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● 未命名 · 21 字 — MarkPilot",
+            "banner": ""
+          },
+          "secondaryDisk": "SECONDARY GUARD FIXTURE\nSAVED SECONDARY"
+        },
+        {
+          "clicked": {
+            "ok": true,
+            "id": "menu-close-window",
+            "forced": true,
+            "enabled": true
+          }
+        },
+        {
+          "primaryClosed": true
+        }
+      ],
+      "error": "unsaved primary must stay open for save/discard confirmation\n\ntrue !== false\n",
+      "ms": 2941
+    }
+  ],
+  "frames": [
+    {
+      "file": "clipboard-assets.png",
+      "sha256": "0249b2cc40f006a458628d896c3e893e20a279a34850f7b163c0c527f24802bc",
+      "caret": {
+        "x": 327.734375,
+        "y": 200.0859375,
+        "width": 0,
+        "height": 16,
+        "top": 200.0859375,
+        "right": 327.734375,
+        "bottom": 216.0859375,
+        "left": 327.734375
+      }
+    },
+    {
+      "file": "clipboard-assets-reopened.png",
+      "sha256": "3b438e9fd7e94b318c8f35a37874e58822d124a8a5c859a2256f3fef7288bb35",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      }
+    },
+    {
+      "file": "clipboard-inline.png",
+      "sha256": "0135a7b968180a9ee618a19608bf7e765de041329aa24d4153f43a8ed8417d52",
+      "caret": {
+        "x": 490.625,
+        "y": 3601.453125,
+        "width": 0,
+        "height": 16,
+        "top": 3601.453125,
+        "right": 490.625,
+        "bottom": 3617.453125,
+        "left": 490.625
+      }
+    },
+    {
+      "file": "clipboard-inline-reopened.png",
+      "sha256": "84b9bcce4487c7cbb980ac2ddf3da39075984690ef00c07cf04e3d8b7e3dbc44",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      }
+    },
+    {
+      "file": "clipboard-unsaved.png",
+      "sha256": "80b038466f3ea8c0aa4df18d70b18c3a6202850a96ada4bf98b17e0f38544197",
+      "caret": {
+        "x": 490.625,
+        "y": 3481.0625,
+        "width": 0,
+        "height": 16,
+        "top": 3481.0625,
+        "right": 490.625,
+        "bottom": 3497.0625,
+        "left": 490.625
+      }
+    },
+    {
+      "file": "fenced-enter.png",
+      "sha256": "ad30d3e2b88cfb54a0ec6726cc0961e1e1a38447d058f38240621b64a69fd629",
+      "caret": {
+        "x": 175.4453125,
+        "y": 88.875,
+        "width": 0,
+        "height": 14,
+        "top": 88.875,
+        "right": 175.4453125,
+        "bottom": 102.875,
+        "left": 175.4453125
+      }
+    },
+    {
+      "file": "list-home-enter.png",
+      "sha256": "84fe65351f60f24541637a4b0a44f8e922a3c0958f73799685d5dcca861c3900",
+      "caret": {
+        "left": 169.125,
+        "right": 169.125,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      }
+    },
+    {
+      "file": "completion-prose-enter.png",
+      "sha256": "4584724f9c6e70f6aae900551bb4df6c6381f351f0265e5da66dc5c6b54d4eec",
+      "caret": {
+        "left": 236.703125,
+        "right": 236.703125,
+        "top": 54.5,
+        "bottom": 70.5
+      }
+    },
+    {
+      "file": "completion-prose-tab.png",
+      "sha256": "4584724f9c6e70f6aae900551bb4df6c6381f351f0265e5da66dc5c6b54d4eec",
+      "caret": {
+        "left": 236.703125,
+        "right": 236.703125,
+        "top": 54.5,
+        "bottom": 70.5
+      }
+    },
+    {
+      "file": "completion-list-enter.png",
+      "sha256": "58e424bcca3d30df47a71b65eee65792e41e225fb7806e2c54b74666f827e292",
+      "caret": {
+        "left": 169.1171875,
+        "right": 169.1171875,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      }
+    },
+    {
+      "file": "completion-list-tab.png",
+      "sha256": "3b6332c77ce39ee89d9be45bc9afe1ffe0452fdf8a04d96cb41a5a115f32f6b7",
+      "caret": {
+        "left": 241.8125,
+        "right": 241.8125,
+        "top": 54.5,
+        "bottom": 70.5
+      }
+    },
+    {
+      "file": "quoted-fence-table.png",
+      "sha256": "38b09220403447df4652811f345d6e1f757f4785245c0ad8a5d7fd82f8cf6e7e",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      }
+    },
+    {
+      "file": "hashtag.png",
+      "sha256": "a8eaac350d968d74f74458f60747878c15a1bf5fc932854c3c2e88564d03c013",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      }
+    },
+    {
+      "file": "underline-empty-toggle.png",
+      "sha256": "7e74a5e3f6a37482138a381c1f337c46bd5a5764803b11d2d6cf41d4a9912f6e",
+      "caret": {
+        "x": 176.578125,
+        "y": 52.90625,
+        "width": 0,
+        "height": 12.59375,
+        "top": 52.90625,
+        "right": 176.578125,
+        "bottom": 65.5,
+        "left": 176.578125
+      }
+    },
+    {
+      "file": "secondary-save.png",
+      "sha256": "0ba12b8db7ae920798da44de44439b5ae229a1513df7a4657a170f78d3a60863",
+      "caret": {
+        "left": 218.6328125,
+        "right": 218.6328125,
+        "top": 104.890625,
+        "bottom": 120.890625
+      }
+    },
+    {
+      "file": "utf16-open.png",
+      "sha256": "8df88a843cbbeccc2f1970ac9830f62a58e24ba2b1de3952a39023eb33ee595f",
+      "caret": {
+        "left": 342.234375,
+        "right": 342.234375,
+        "top": 54.5,
+        "bottom": 70.5
+      }
+    },
+    {
+      "file": "unsaved-primary-before.png",
+      "sha256": "e66ce075decdcd3529e40c07b7c3b59443e24b729b1fbbb07ee19bcfaab918d4",
+      "caret": {
+        "left": 346.1640625,
+        "right": 346.1640625,
+        "top": 54.5,
+        "bottom": 70.5
+      }
+    }
+  ],
+  "observations": [
+    {
+      "id": "repeat-format-after-typing",
+      "key": "Control+b",
+      "open": "**",
+      "close": "**",
+      "state": {
+        "text": "**词体******",
+        "selection": {
+          "anchor": 6,
+          "head": 6
+        },
+        "focus": true,
+        "activeElement": {
+          "tag": "DIV",
+          "class": "cm-content cm-lineWrapping"
+        },
+        "caret": {
+          "left": 202.546875,
+          "right": 202.546875,
+          "top": 54.5,
+          "bottom": 70.5
+        },
+        "scrollTop": 0,
+        "title": "● primary-bom-crlf.md · 10 字 — MarkPilot",
+        "banner": ""
+      }
+    },
+    {
+      "id": "repeat-format-after-typing",
+      "key": "Control+i",
+      "open": "*",
+      "close": "*",
+      "state": {
+        "text": "*词体***",
+        "selection": {
+          "anchor": 4,
+          "head": 4
+        },
+        "focus": true,
+        "activeElement": {
+          "tag": "DIV",
+          "class": "cm-content cm-lineWrapping"
+        },
+        "caret": {
+          "left": 209.8046875,
+          "right": 209.8046875,
+          "top": 57.5,
+          "bottom": 73.5
+        },
+        "scrollTop": 0,
+        "title": "● primary-bom-crlf.md · 6 字 — MarkPilot",
+        "banner": ""
+      }
+    },
+    {
+      "id": "repeat-format-after-typing",
+      "key": "Control+u",
+      "open": "<u>",
+      "close": "</u>",
+      "state": {
+        "text": "<u>词体<u></u></u>",
+        "selection": {
+          "anchor": 8,
+          "head": 8
+        },
+        "focus": true,
+        "activeElement": {
+          "tag": "DIV",
+          "class": "cm-content cm-lineWrapping"
+        },
+        "caret": {
+          "left": 240.640625,
+          "right": 240.640625,
+          "top": 54.5,
+          "bottom": 70.5
+        },
+        "scrollTop": 0,
+        "title": "● primary-bom-crlf.md · 16 字 — MarkPilot",
+        "banner": ""
+      }
+    },
+    {
+      "id": "repeat-format-after-typing",
+      "key": "Alt+Shift+5",
+      "open": "~~",
+      "close": "~~",
+      "state": {
+        "text": "~~词体~~~~~~",
+        "selection": {
+          "anchor": 6,
+          "head": 6
+        },
+        "focus": true,
+        "activeElement": {
+          "tag": "DIV",
+          "class": "cm-content cm-lineWrapping"
+        },
+        "caret": {
+          "left": 224.5078125,
+          "right": 224.5078125,
+          "top": 54.5,
+          "bottom": 70.5
+        },
+        "scrollTop": 0,
+        "title": "● primary-bom-crlf.md · 10 字 — MarkPilot",
+        "banner": ""
+      }
+    },
+    {
+      "id": "repeat-format-after-typing",
+      "key": "Control+e",
+      "open": "`",
+      "close": "`",
+      "state": {
+        "text": "`词体```",
+        "selection": {
+          "anchor": 4,
+          "head": 4
+        },
+        "focus": true,
+        "activeElement": {
+          "tag": "DIV",
+          "class": "cm-content cm-lineWrapping"
+        },
+        "caret": {
+          "left": 202.5,
+          "right": 202.5,
+          "top": 54.5,
+          "bottom": 70.5
+        },
+        "scrollTop": 0,
+        "title": "● primary-bom-crlf.md · 6 字 — MarkPilot",
+        "banner": ""
+      }
+    }
+  ],
+  "metadata": {
+    "executable": "markpilot-3.2.5-portable.exe",
+    "exeSha256": "df37e3e44bee42637da1dabddd6aeeab9d422aff61f5458505fc1dd19af77d2b",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.5",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "bootMs": 5929,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "10c5a246421416dd77888a757cb0b5c2cc462e898be6bcc1b972f0c4a376adb0",
+        "sourceSha256": "10c5a246421416dd77888a757cb0b5c2cc462e898be6bcc1b972f0c4a376adb0"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "70ea6eb5a0f88e5a45b62fed93f6c14f6daad9de3a2a2e5fedfb04eb87baa824",
+        "sourceSha256": "70ea6eb5a0f88e5a45b62fed93f6c14f6daad9de3a2a2e5fedfb04eb87baa824"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "97553e188a464b573d309ba63ba7a44db9fd27b8ea18494edcc8558f0f796e1c",
+        "sourceSha256": "97553e188a464b573d309ba63ba7a44db9fd27b8ea18494edcc8558f0f796e1c"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "506a019995027754e35a4ccc53c2400097a65021f812b4401a6c092407d1547c",
+        "sourceSha256": "506a019995027754e35a4ccc53c2400097a65021f812b4401a6c092407d1547c"
+      }
+    ]
+  },
+  "clipboard": {
+    "ready": true,
+    "formats": [
+      "Bitmap",
+      "System.Drawing.Bitmap"
+    ]
+  },
+  "clipboardCleanup": {
+    "restored": true
+  },
+  "firstCleanup": {
+    "residual": []
+  },
+  "controlCleanup": {
+    "residual": []
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T09:52:39.325Z",
+  "passed": false
+}

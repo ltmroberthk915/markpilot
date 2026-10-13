@@ -1,0 +1,26 @@
+name: Quality tooling
+on:
+  push:
+    paths: ['tools/**', 'scripts/acceptance/**', '.github/workflows/quality-tools.yml']
+  pull_request:
+    paths: ['tools/**', 'scripts/acceptance/**', '.github/workflows/quality-tools.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preflight:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: tools/quality/package-lock.json
+      - run: npm ci --prefix tools/quality --ignore-scripts --no-audit --no-fund
+      - run: npm ci --prefix dsh-markpilot --ignore-scripts --legacy-peer-deps --no-audit --no-fund
+      - run: npm run preflight --prefix tools/quality
+      - run: npm test --prefix tools/quality

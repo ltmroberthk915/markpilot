@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "unit": {
+    "command": "node --test tools/quality/tests/*.test.cjs",
+    "total": 89,
+    "passed": 89,
+    "exitCode": 0
+  },
+  "preflight": {
+    "schema": 1,
+    "total": 124,
+    "syntaxFailures": [],
+    "eagerImportFailures": [],
+    "legacyDependencyPaths": [],
+    "ok": true
+  },
+  "scope": "Synthetic fixtures. Suite counts overlap and are not feature coverage. Native dialogs use explicitly identified test hooks."
+}

@@ -1,0 +1,187 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T23:17:59.259Z",
+  "cases": [
+    {
+      "id": "long-document-paste-is-visible-without-extra-input",
+      "status": "pass",
+      "trace": [
+        {
+          "phase": "decoded",
+          "top": 495.0703125,
+          "bottom": 655.0703125,
+          "visibleBottom": 667,
+          "scrollTop": 10297.5,
+          "caret": {
+            "left": 560.5,
+            "right": 560.5,
+            "top": 495.0703125,
+            "bottom": 662.765625
+          }
+        },
+        {
+          "phase": "settled",
+          "top": 495.0703125,
+          "bottom": 655.0703125,
+          "visibleBottom": 667,
+          "scrollTop": 10297.5,
+          "caret": {
+            "left": 560.5,
+            "right": 560.5,
+            "top": 495.0703125,
+            "bottom": 662.765625
+          }
+        },
+        {
+          "fixtureBytes": 10269327,
+          "imageHostDelayMs": 0
+        }
+      ],
+      "ms": 7138
+    }
+  ],
+  "frames": [
+    {
+      "file": "long-document-before-paste.png",
+      "sha256": "2779eece484ec58e0d4857d714159b34b7a7a9ba3be936ec621d48b4f7157d8a",
+      "caret": {
+        "left": 916.5,
+        "right": 916.5,
+        "top": 10135.25,
+        "bottom": 10616.203125
+      },
+      "zoom": {
+        "file": "long-document-before-paste-caret-2x.png",
+        "sha256": "54b79cbeef887863500a63722657d90f9267c54bf8fa11d39d1e4e13585518d7",
+        "clip": {
+          "x": 787,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "long-document-immediate-paste.png",
+      "sha256": "0d47538f6ca65f0e2c07c780227a52866c9388693ef9fc718d247efffe0da7fc",
+      "caret": {
+        "left": 560.5,
+        "right": 560.5,
+        "top": 495.0703125,
+        "bottom": 662.765625
+      },
+      "zoom": {
+        "file": "long-document-immediate-paste-caret-2x.png",
+        "sha256": "07390ebd1c228241bad898cf1ef3fc7bee7cd61d2c9e4b068f6181f140315a0c",
+        "clip": {
+          "x": 440.5,
+          "y": 470.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ],
+  "observations": [],
+  "metadata": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\MarkPilot.exe",
+    "exeSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+    "runtimeExecutablePath": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\MarkPilot.exe",
+    "runtimeExecutableSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+    "artifactRoot": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.11",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\resources",
+    "asarPath": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\resources\\app.asar",
+    "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+    "bootMs": 978,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+        "sourceSha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ],
+    "imageHostDelayMs": 0
+  },
+  "clipboardCleanup": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "completedAt": "2026-10-11T23:18:12.979Z",
+  "passed": true
+}

@@ -1,0 +1,564 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T10:13:12.769Z",
+  "seed": 325,
+  "cases": [
+    {
+      "id": "startup-exact-bytes-and-focus",
+      "status": "pass",
+      "ms": 5,
+      "detail": {
+        "selection": {
+          "anchor": 0,
+          "head": 0
+        },
+        "focus": true
+      }
+    },
+    {
+      "id": "real-unicode-input-autosave",
+      "status": "pass",
+      "ms": 657,
+      "detail": {
+        "characters": 43,
+        "diskSha256": "45feb1a8f50f1bc7c75a7f1f849f9a7751f9c45a630f93e061d030ed33d14d3b"
+      }
+    },
+    {
+      "id": "format-bold-typing-and-toggle",
+      "status": "pass",
+      "ms": 232,
+      "detail": {
+        "text": "词体",
+        "selection": {
+          "anchor": 0,
+          "head": 0
+        }
+      }
+    },
+    {
+      "id": "format-italic-typing-and-toggle",
+      "status": "pass",
+      "ms": 228,
+      "detail": {
+        "text": "词体",
+        "selection": {
+          "anchor": 0,
+          "head": 0
+        }
+      }
+    },
+    {
+      "id": "format-underline-typing-and-toggle",
+      "status": "fail",
+      "ms": 175,
+      "error": "immediate empty toggle removes markers\n\n'>' !== ''\n"
+    },
+    {
+      "id": "format-strike-typing-and-toggle",
+      "status": "pass",
+      "ms": 256,
+      "detail": {
+        "text": "词体",
+        "selection": {
+          "anchor": 0,
+          "head": 0
+        }
+      }
+    },
+    {
+      "id": "format-code-typing-and-toggle",
+      "status": "pass",
+      "ms": 225,
+      "detail": {
+        "text": "词体",
+        "selection": {
+          "anchor": 0,
+          "head": 0
+        }
+      }
+    },
+    {
+      "id": "format-selection-undo-redo",
+      "status": "pass",
+      "ms": 178
+    },
+    {
+      "id": "plain-input-model-fixed-seed",
+      "status": "pass",
+      "ms": 746,
+      "detail": {
+        "seed": 325,
+        "operations": [
+          "甲",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a"
+        ],
+        "characters": 35
+      }
+    },
+    {
+      "id": "markdown-projection-and-source-fidelity",
+      "status": "pass",
+      "ms": 613,
+      "detail": {
+        "underline": [
+          {
+            "text": "下划线",
+            "style": "underline"
+          }
+        ],
+        "math": 1
+      }
+    },
+    {
+      "id": "mermaid-render-and-content-update",
+      "status": "pass",
+      "ms": 703,
+      "detail": {
+        "svg": true,
+        "updated": true
+      }
+    },
+    {
+      "id": "mermaid-invalid-source-safe-fallback",
+      "status": "pass",
+      "ms": 314,
+      "detail": {
+        "message": "mermaid 渲染失败：Parse error on line 3:\n... TD A[unterminated\n---------------------^\nExpecting 'SQE', 'DOUBLECIRCLEEND', 'PE', '-)', 'STADIUMEND', 'SUBROUTINEEND', 'PIPE', 'CYLINDEREND', 'DIAMOND_STOP', 'TAGEND', 'TRAPEND', 'INVTRAPEND', 'UNICODE_TEXT', 'TEXT', 'TAGSTART', got '1'"
+      }
+    },
+    {
+      "id": "task-list-widget-after-offset-shift",
+      "status": "pass",
+      "ms": 218,
+      "detail": {
+        "text": "前缀\n前文\n- [x] task\n后文\n"
+      }
+    },
+    {
+      "id": "mouse-drag-selection-and-shift-key-extension",
+      "status": "pass",
+      "ms": 410,
+      "detail": {
+        "before": {
+          "anchor": 1,
+          "head": 6
+        },
+        "after": {
+          "anchor": 1,
+          "head": 7
+        }
+      }
+    },
+    {
+      "id": "shift-mouse-click-and-real-double-click",
+      "status": "pass",
+      "ms": 450,
+      "detail": {
+        "shifted": {
+          "anchor": 2,
+          "head": 8
+        },
+        "doubleClicked": {
+          "anchor": 6,
+          "head": 10
+        }
+      }
+    },
+    {
+      "id": "save-as-real-menu-and-disk",
+      "status": "pass",
+      "ms": 1029,
+      "detail": {
+        "file": "mp-quality-save-as.md",
+        "bytes": 22
+      }
+    },
+    {
+      "id": "secondary-window-eol-and-session-isolation",
+      "status": "pass",
+      "ms": 2359,
+      "detail": {
+        "primary": "mp-quality-save-as.md",
+        "secondary": "mp-quality-b.md"
+      }
+    },
+    {
+      "id": "large-document-real-input-latency",
+      "status": "pass",
+      "ms": 3906,
+      "detail": [
+        {
+          "lines": 1000,
+          "characters": 33890,
+          "p50Ms": 17,
+          "p95Ms": 26,
+          "samples": 30,
+          "metric": "CDP input through next renderer animation frame; excludes whole-document serialization",
+          "rawMs": [
+            13.115600000000995,
+            13.584999999999127,
+            14.266299999999319,
+            15.03060000000005,
+            15.41740000000027,
+            15.810999999999694,
+            15.960800000000745,
+            16.316200000001118,
+            16.32639999999992,
+            16.588700000000244,
+            16.6171000000013,
+            16.663399999999456,
+            16.759500000000116,
+            16.98649999999907,
+            17.013599999998405,
+            17.09060000000136,
+            17.19890000000123,
+            17.575299999998606,
+            18.040399999999863,
+            18.18739999999889,
+            18.269800000000032,
+            18.306000000000495,
+            18.606700000000274,
+            18.895399999999427,
+            19.48160000000098,
+            20.04610000000139,
+            20.23359999999957,
+            24.455200000000332,
+            25.612600000000384,
+            28.655099999999948
+          ]
+        },
+        {
+          "lines": 10000,
+          "characters": 348890,
+          "p50Ms": 64,
+          "p95Ms": 118,
+          "samples": 30,
+          "metric": "CDP input through next renderer animation frame; excludes whole-document serialization",
+          "rawMs": [
+            55.84070000000065,
+            56.949899999999616,
+            57.38869999999952,
+            57.517799999999625,
+            57.72829999999885,
+            58.79399999999987,
+            59.008199999998396,
+            59.46150000000125,
+            59.99419999999918,
+            60.68110000000161,
+            62.073199999998906,
+            62.28020000000106,
+            63.305099999997765,
+            63.712900000000445,
+            64.03340000000026,
+            64.91469999999754,
+            67.89210000000094,
+            70.13100000000122,
+            71.56360000000132,
+            71.66679999999906,
+            74.03470000000016,
+            94.18269999999939,
+            101.5643999999993,
+            104.83450000000084,
+            105.92770000000019,
+            108.09820000000036,
+            110.23489999999947,
+            117.83699999999953,
+            118.22360000000117,
+            125.21500000000015
+          ]
+        }
+      ]
+    },
+    {
+      "id": "no-renderer-exceptions",
+      "status": "pass",
+      "ms": 0,
+      "detail": {
+        "errors": []
+      }
+    }
+  ],
+  "frames": [
+    {
+      "file": "01-boot.png",
+      "sha256": "c5417be8cfdc46aa3d2b40e79db40611130cc5b03da4b757abf3b998379eb337",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 57,
+        "bottom": 91
+      }
+    },
+    {
+      "file": "02-markdown.png",
+      "sha256": "c476785ed96335bfcc1b48d5044ff6f585f88edff5a20d79abe03873b97af94d",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      }
+    },
+    {
+      "file": "03-mermaid.png",
+      "sha256": "e788b75b096665086f8e77a4055ffd7804649302f013758d11ffc9322f7b9a09",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      }
+    },
+    {
+      "file": "04-mermaid-updated.png",
+      "sha256": "49828bd56a79c6d3db973b745076e075f9a323e76d59034a86be62991c8fc3b9",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      }
+    },
+    {
+      "file": "08-mermaid-error.png",
+      "sha256": "235783643053fe4312628e73d72b27bbcf7b40bacd06df56dfb913b4c381b1d3",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      }
+    },
+    {
+      "file": "05-selection.png",
+      "sha256": "011a9aa16a16787eaaeca1ca9029349333f19d0d84a3b0de4e8f4bfadffa2a69",
+      "caret": {
+        "left": 208.2421875,
+        "right": 208.2421875,
+        "top": 54.5,
+        "bottom": 70.5
+      }
+    },
+    {
+      "file": "09-double-click-selection.png",
+      "sha256": "b9f3d5377abfbbff65bad65371e86b68127bb9c74edbeb1a406caf6b32eb248e",
+      "caret": {
+        "left": 224.6328125,
+        "right": 224.6328125,
+        "top": 54.5,
+        "bottom": 70.5
+      }
+    },
+    {
+      "file": "06-second-window.png",
+      "sha256": "8db30192182e60250b79b12a01c3181824e52dc6b3caf25a60df20954bd122b9",
+      "caret": {
+        "left": 267.1171875,
+        "right": 267.1171875,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      }
+    },
+    {
+      "file": "07-final.png",
+      "sha256": "ec001ea7ae769b63b7b615030447849277b8fd2e6d026fbc065575f601797eab",
+      "caret": {
+        "left": 372.546875,
+        "right": 372.546875,
+        "top": 642.3515625,
+        "bottom": 658.3515625
+      }
+    }
+  ],
+  "warnings": [],
+  "performance": [
+    {
+      "lines": 1000,
+      "characters": 33890,
+      "p50Ms": 17,
+      "p95Ms": 26,
+      "samples": 30,
+      "metric": "CDP input through next renderer animation frame; excludes whole-document serialization",
+      "rawMs": [
+        13.115600000000995,
+        13.584999999999127,
+        14.266299999999319,
+        15.03060000000005,
+        15.41740000000027,
+        15.810999999999694,
+        15.960800000000745,
+        16.316200000001118,
+        16.32639999999992,
+        16.588700000000244,
+        16.6171000000013,
+        16.663399999999456,
+        16.759500000000116,
+        16.98649999999907,
+        17.013599999998405,
+        17.09060000000136,
+        17.19890000000123,
+        17.575299999998606,
+        18.040399999999863,
+        18.18739999999889,
+        18.269800000000032,
+        18.306000000000495,
+        18.606700000000274,
+        18.895399999999427,
+        19.48160000000098,
+        20.04610000000139,
+        20.23359999999957,
+        24.455200000000332,
+        25.612600000000384,
+        28.655099999999948
+      ]
+    },
+    {
+      "lines": 10000,
+      "characters": 348890,
+      "p50Ms": 64,
+      "p95Ms": 118,
+      "samples": 30,
+      "metric": "CDP input through next renderer animation frame; excludes whole-document serialization",
+      "rawMs": [
+        55.84070000000065,
+        56.949899999999616,
+        57.38869999999952,
+        57.517799999999625,
+        57.72829999999885,
+        58.79399999999987,
+        59.008199999998396,
+        59.46150000000125,
+        59.99419999999918,
+        60.68110000000161,
+        62.073199999998906,
+        62.28020000000106,
+        63.305099999997765,
+        63.712900000000445,
+        64.03340000000026,
+        64.91469999999754,
+        67.89210000000094,
+        70.13100000000122,
+        71.56360000000132,
+        71.66679999999906,
+        74.03470000000016,
+        94.18269999999939,
+        101.5643999999993,
+        104.83450000000084,
+        105.92770000000019,
+        108.09820000000036,
+        110.23489999999947,
+        117.83699999999953,
+        118.22360000000117,
+        125.21500000000015
+      ]
+    }
+  ],
+  "metadata": {
+    "executable": "markpilot-3.2.5-portable.exe",
+    "exeSha256": "df37e3e44bee42637da1dabddd6aeeab9d422aff61f5458505fc1dd19af77d2b",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.5",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "bootMs": 4042,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "10c5a246421416dd77888a757cb0b5c2cc462e898be6bcc1b972f0c4a376adb0",
+        "sourceSha256": "10c5a246421416dd77888a757cb0b5c2cc462e898be6bcc1b972f0c4a376adb0"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "70ea6eb5a0f88e5a45b62fed93f6c14f6daad9de3a2a2e5fedfb04eb87baa824",
+        "sourceSha256": "70ea6eb5a0f88e5a45b62fed93f6c14f6daad9de3a2a2e5fedfb04eb87baa824"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "97553e188a464b573d309ba63ba7a44db9fd27b8ea18494edcc8558f0f796e1c",
+        "sourceSha256": "97553e188a464b573d309ba63ba7a44db9fd27b8ea18494edcc8558f0f796e1c"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "506a019995027754e35a4ccc53c2400097a65021f812b4401a6c092407d1547c",
+        "sourceSha256": "506a019995027754e35a4ccc53c2400097a65021f812b4401a6c092407d1547c"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T10:13:35.918Z",
+  "passed": false
+}

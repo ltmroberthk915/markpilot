@@ -1,0 +1,23 @@
+'use strict';
+// Build into an owned scratch directory. Never overwrite the checked-in runtime bundle.
+const fs=require('node:fs');
+const path=require('node:path');
+const {execFileSync}=require('node:child_process');
+const {ROOT,sha256}=require('./lifecycle.cjs');
+const {outputDir}=require('./harness.cjs');
+const argv=process.argv.slice(2);
+if(argv.length && (argv.length!==2||argv[0]!=='--out'))throw new Error('Usage: node tools/quality/build-check.cjs [--out empty-directory]');
+const dir=outputDir(argv[1],'build-check'),engine=path.join(ROOT,'dsh-markpilot');
+const binary=path.join(engine,'node_modules/esbuild/bin/esbuild');
+if(!fs.existsSync(binary))throw new Error('Install engine dependencies with npm ci --prefix dsh-markpilot --ignore-scripts --legacy-peer-deps');
+const output=path.join(dir,'app.js');
+execFileSync(process.execPath,[binary,'src-cm6/main.js','--bundle','--format=iife','--outfile='+output,'--loader:.woff=file','--loader:.woff2=file','--loader:.ttf=file','--minify','--log-level=error'],{cwd:engine,stdio:['ignore','ignore','pipe']});
+const checked=path.join(ROOT,'MarkPilot-CM6/renderer/cm6/app.js');
+const worker=path.join(dir,'markdown-worker.js'),checkedWorker=path.join(ROOT,'MarkPilot-CM6/renderer/cm6/markdown-worker.js');
+execFileSync(process.execPath,[binary,'src-cm6/markdown-worker.js','--bundle','--format=iife','--outfile='+worker,'--minify','--log-level=error'],{cwd:engine,stdio:['ignore','ignore','pipe']});
+const pkg=JSON.parse(fs.readFileSync(path.join(engine,'package.json'),'utf8'));
+const versions={};for(const name of Object.keys({...pkg.dependencies,...pkg.devDependencies}))versions[name]=JSON.parse(fs.readFileSync(path.join(engine,'node_modules',name,'package.json'),'utf8')).version;
+const result={schema:1,at:new Date().toISOString(),node:process.version,sourceCommit:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),versions,built:{sha256:sha256(output),bytes:fs.statSync(output).size},checkedIn:{sha256:sha256(checked),bytes:fs.statSync(checked).size}};
+result.worker={built:{sha256:sha256(worker),bytes:fs.statSync(worker).size},checkedIn:{sha256:sha256(checkedWorker),bytes:fs.statSync(checkedWorker).size}};
+result.matches=result.built.sha256===result.checkedIn.sha256&&result.worker.built.sha256===result.worker.checkedIn.sha256;
+fs.writeFileSync(path.join(dir,'result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));process.exitCode=result.matches?0:1;

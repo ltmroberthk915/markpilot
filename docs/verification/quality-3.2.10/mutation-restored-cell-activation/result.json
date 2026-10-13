@@ -1,0 +1,1696 @@
+{
+  "schema": 1,
+  "suite": "selection-workflows",
+  "startedAt": "2026-10-11T21:42:48.938Z",
+  "cases": [
+    {
+      "id": "early-cell-focus-survives-boot-fallback",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "early-cell-click",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 26,
+            "head": 26
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": [],
+          "pageMs": 889.0999999046326
+        },
+        {
+          "name": "cell-early-focus-01",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 26,
+            "head": 26
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": [],
+          "screenshot": {
+            "file": "cell-early-focus-01.png",
+            "sha256": "4d9a954ea0b7ea3106dc26364d2fcd93541c3d424daed9b7a9c99e163033f28a",
+            "caret": {
+              "x": 195.0546875,
+              "y": 157.5859375,
+              "width": 0,
+              "height": 16,
+              "top": 157.5859375,
+              "right": 195.0546875,
+              "bottom": 173.5859375,
+              "left": 195.0546875
+            },
+            "zoom": {
+              "file": "cell-early-focus-01-caret-2x.png",
+              "sha256": "206badaa587505481269102d5b428790d4f9e01cb51bf882bab66521d4ff7f5d",
+              "clip": {
+                "x": 75.0546875,
+                "y": 132.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "ms": 1964
+    },
+    {
+      "id": "active-cell-undo-redo-keeps-source-and-overlay-in-sync",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "cell-click",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 26,
+            "head": 26
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": []
+        },
+        {
+          "name": "cell-keyboard-start",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 25,
+            "head": 25
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ]
+        },
+        {
+          "name": "cell-history-00-edited",
+          "text": "Before\n\n|H|K|\n|---|---|\n|aXb|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 27,
+            "head": 27
+          },
+          "cellText": "aXb",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 2,
+          "head": 2,
+          "focusNode": {
+            "type": 3,
+            "text": "aXb",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "cell-history-00-edited.png",
+            "sha256": "7121ab97985fc844d11664cb673545e4d3994c637f4e075d0a5a28a82900dc3e",
+            "caret": {
+              "x": 205,
+              "y": 157.5859375,
+              "width": 0.0078125,
+              "height": 16,
+              "top": 157.5859375,
+              "right": 205.0078125,
+              "bottom": 173.5859375,
+              "left": 205
+            },
+            "zoom": {
+              "file": "cell-history-00-edited-caret-2x.png",
+              "sha256": "6c45672271e1c6a23fb03b1edba7a537124adc988d5cc2b2a49b60a0418675db",
+              "clip": {
+                "x": 85,
+                "y": 132.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "cell-history-01",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 26,
+            "head": 26
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "cell-history-01.png",
+            "sha256": "4d9a954ea0b7ea3106dc26364d2fcd93541c3d424daed9b7a9c99e163033f28a",
+            "caret": {
+              "x": 195.0546875,
+              "y": 157.5859375,
+              "width": 0,
+              "height": 16,
+              "top": 157.5859375,
+              "right": 195.0546875,
+              "bottom": 173.5859375,
+              "left": 195.0546875
+            },
+            "zoom": {
+              "file": "cell-history-01-caret-2x.png",
+              "sha256": "206badaa587505481269102d5b428790d4f9e01cb51bf882bab66521d4ff7f5d",
+              "clip": {
+                "x": 75.0546875,
+                "y": 132.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "cell-history-02",
+          "text": "Before\n\n|H|K|\n|---|---|\n|aXb|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 27,
+            "head": 27
+          },
+          "cellText": "aXb",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 2,
+          "head": 2,
+          "focusNode": {
+            "type": 3,
+            "text": "aXb",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "cell-history-02.png",
+            "sha256": "7121ab97985fc844d11664cb673545e4d3994c637f4e075d0a5a28a82900dc3e",
+            "caret": {
+              "x": 205,
+              "y": 157.5859375,
+              "width": 0.0078125,
+              "height": 16,
+              "top": 157.5859375,
+              "right": 205.0078125,
+              "bottom": 173.5859375,
+              "left": 205
+            },
+            "zoom": {
+              "file": "cell-history-02-caret-2x.png",
+              "sha256": "6c45672271e1c6a23fb03b1edba7a537124adc988d5cc2b2a49b60a0418675db",
+              "clip": {
+                "x": 85,
+                "y": 132.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "ms": 2924
+    },
+    {
+      "id": "cell-tab-home-keeps-caret-before-next-input",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "cell-click",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 26,
+            "head": 26
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": []
+        },
+        {
+          "name": "cell-keyboard-start",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 25,
+            "head": 25
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ]
+        },
+        {
+          "name": "cell-tab-home-0-01-typed",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|YKEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 29,
+            "head": 29
+          },
+          "cellText": "YKEEP",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "YKEEP",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Tab",
+              "code": "Tab",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "cell-tab-home-0-01-typed.png",
+            "sha256": "57a2b761101f28ac3f1ea7676163761bc5582f9f6abde1ec0543d47082c1e242",
+            "caret": {
+              "x": 468,
+              "y": 157.5859375,
+              "width": 0.0078125,
+              "height": 16,
+              "top": 157.5859375,
+              "right": 468.0078125,
+              "bottom": 173.5859375,
+              "left": 468
+            },
+            "zoom": {
+              "file": "cell-tab-home-0-01-typed-caret-2x.png",
+              "sha256": "d745cbb0084a19e9df5e38cd2098ce7f63d15aeb68f1795defdca364f661bb11",
+              "clip": {
+                "x": 348,
+                "y": 132.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "cell-tab-home-events",
+          "round": 0,
+          "events": [
+            {
+              "kind": "keyup",
+              "key": "Tab",
+              "trusted": true,
+              "at": 1910,
+              "focus": true,
+              "text": "KEEP",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 1,
+              "textOffset": 4
+            },
+            {
+              "kind": "selectionchange",
+              "at": 1910,
+              "focus": true,
+              "text": "KEEP",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 1,
+              "textOffset": 4
+            },
+            {
+              "kind": "selectionchange",
+              "at": 1915.2000000476837,
+              "focus": true,
+              "text": "KEEP",
+              "head": 0,
+              "anchor": 0,
+              "nodeType": 3,
+              "textOffset": 0
+            },
+            {
+              "kind": "keyup",
+              "key": "Home",
+              "trusted": true,
+              "at": 1916.7000000476837,
+              "focus": true,
+              "text": "KEEP",
+              "head": 0,
+              "anchor": 0,
+              "nodeType": 3,
+              "textOffset": 0
+            },
+            {
+              "kind": "beforeinput",
+              "type": "insertText",
+              "trusted": true,
+              "at": 2002.8000000715256,
+              "focus": true,
+              "text": "KEEP",
+              "head": 0,
+              "anchor": 0,
+              "nodeType": 3,
+              "textOffset": 0
+            },
+            {
+              "kind": "selectionchange",
+              "at": 2009.2000000476837,
+              "focus": true,
+              "text": "YKEEP",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 3,
+              "textOffset": 1
+            }
+          ]
+        },
+        {
+          "name": "cell-click",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 26,
+            "head": 26
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": []
+        },
+        {
+          "name": "cell-keyboard-start",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 25,
+            "head": 25
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ]
+        },
+        {
+          "name": "cell-tab-home-1-01-typed",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|YKEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 29,
+            "head": 29
+          },
+          "cellText": "YKEEP",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "YKEEP",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Tab",
+              "code": "Tab",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "cell-tab-home-1-01-typed.png",
+            "sha256": "910d615d8a3922c5add818a2394d4ada63b617a5361c40f99bd9d59aafee74fd",
+            "caret": {
+              "x": 429.6953125,
+              "y": 157.5859375,
+              "width": 0.0078125,
+              "height": 16,
+              "top": 157.5859375,
+              "right": 429.703125,
+              "bottom": 173.5859375,
+              "left": 429.6953125
+            },
+            "zoom": {
+              "file": "cell-tab-home-1-01-typed-caret-2x.png",
+              "sha256": "05d1a7da7a6b53d34ce834fa5d99fbc5e0bdd91381afab5b1f1b12ca85f4bd4c",
+              "clip": {
+                "x": 309.6953125,
+                "y": 132.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "cell-tab-home-events",
+          "round": 1,
+          "events": [
+            {
+              "kind": "keyup",
+              "key": "Tab",
+              "trusted": true,
+              "at": 1922.6000000238419,
+              "focus": true,
+              "text": "KEEP",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 1,
+              "textOffset": 4
+            },
+            {
+              "kind": "selectionchange",
+              "at": 1922.7000000476837,
+              "focus": true,
+              "text": "KEEP",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 1,
+              "textOffset": 4
+            },
+            {
+              "kind": "selectionchange",
+              "at": 1928,
+              "focus": true,
+              "text": "KEEP",
+              "head": 0,
+              "anchor": 0,
+              "nodeType": 3,
+              "textOffset": 0
+            },
+            {
+              "kind": "keyup",
+              "key": "Home",
+              "trusted": true,
+              "at": 1929.8000000715256,
+              "focus": true,
+              "text": "KEEP",
+              "head": 0,
+              "anchor": 0,
+              "nodeType": 3,
+              "textOffset": 0
+            },
+            {
+              "kind": "beforeinput",
+              "type": "insertText",
+              "trusted": true,
+              "at": 2028.8000000715256,
+              "focus": true,
+              "text": "KEEP",
+              "head": 0,
+              "anchor": 0,
+              "nodeType": 3,
+              "textOffset": 0
+            },
+            {
+              "kind": "selectionchange",
+              "at": 2039.5,
+              "focus": true,
+              "text": "YKEEP",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 3,
+              "textOffset": 1
+            }
+          ]
+        },
+        {
+          "name": "cell-click",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 26,
+            "head": 26
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": []
+        },
+        {
+          "name": "cell-keyboard-start",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 25,
+            "head": 25
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ]
+        },
+        {
+          "name": "cell-tab-home-2-01-typed",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|YKEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 29,
+            "head": 29
+          },
+          "cellText": "YKEEP",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "YKEEP",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Tab",
+              "code": "Tab",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "cell-tab-home-2-01-typed.png",
+            "sha256": "910d615d8a3922c5add818a2394d4ada63b617a5361c40f99bd9d59aafee74fd",
+            "caret": {
+              "x": 429.6953125,
+              "y": 157.5859375,
+              "width": 0.0078125,
+              "height": 16,
+              "top": 157.5859375,
+              "right": 429.703125,
+              "bottom": 173.5859375,
+              "left": 429.6953125
+            },
+            "zoom": {
+              "file": "cell-tab-home-2-01-typed-caret-2x.png",
+              "sha256": "05d1a7da7a6b53d34ce834fa5d99fbc5e0bdd91381afab5b1f1b12ca85f4bd4c",
+              "clip": {
+                "x": 309.6953125,
+                "y": 132.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "cell-tab-home-events",
+          "round": 2,
+          "events": [
+            {
+              "kind": "selectionchange",
+              "at": 1842.1000000238419,
+              "focus": true,
+              "text": "KEEP",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 1,
+              "textOffset": 4
+            },
+            {
+              "kind": "keyup",
+              "key": "Tab",
+              "trusted": true,
+              "at": 1847.6000000238419,
+              "focus": true,
+              "text": "KEEP",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 1,
+              "textOffset": 4
+            },
+            {
+              "kind": "selectionchange",
+              "at": 1854.1000000238419,
+              "focus": true,
+              "text": "KEEP",
+              "head": 0,
+              "anchor": 0,
+              "nodeType": 3,
+              "textOffset": 0
+            },
+            {
+              "kind": "keyup",
+              "key": "Home",
+              "trusted": true,
+              "at": 1856.2000000476837,
+              "focus": true,
+              "text": "KEEP",
+              "head": 0,
+              "anchor": 0,
+              "nodeType": 3,
+              "textOffset": 0
+            },
+            {
+              "kind": "beforeinput",
+              "type": "insertText",
+              "trusted": true,
+              "at": 1944.2000000476837,
+              "focus": true,
+              "text": "KEEP",
+              "head": 0,
+              "anchor": 0,
+              "nodeType": 3,
+              "textOffset": 0
+            },
+            {
+              "kind": "selectionchange",
+              "at": 1953.7000000476837,
+              "focus": true,
+              "text": "YKEEP",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 3,
+              "textOffset": 1
+            }
+          ]
+        },
+        {
+          "name": "cell-click",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 26,
+            "head": 26
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": []
+        },
+        {
+          "name": "cell-keyboard-start",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 25,
+            "head": 25
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ]
+        },
+        {
+          "name": "cell-tab-home-3-01-typed",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|YKEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 29,
+            "head": 29
+          },
+          "cellText": "YKEEP",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "YKEEP",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Tab",
+              "code": "Tab",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "cell-tab-home-3-01-typed.png",
+            "sha256": "57a2b761101f28ac3f1ea7676163761bc5582f9f6abde1ec0543d47082c1e242",
+            "caret": {
+              "x": 468,
+              "y": 157.5859375,
+              "width": 0.0078125,
+              "height": 16,
+              "top": 157.5859375,
+              "right": 468.0078125,
+              "bottom": 173.5859375,
+              "left": 468
+            },
+            "zoom": {
+              "file": "cell-tab-home-3-01-typed-caret-2x.png",
+              "sha256": "d745cbb0084a19e9df5e38cd2098ce7f63d15aeb68f1795defdca364f661bb11",
+              "clip": {
+                "x": 348,
+                "y": 132.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "cell-tab-home-events",
+          "round": 3,
+          "events": [
+            {
+              "kind": "selectionchange",
+              "at": 1854.6000000238419,
+              "focus": true,
+              "text": "KEEP",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 1,
+              "textOffset": 4
+            },
+            {
+              "kind": "keyup",
+              "key": "Tab",
+              "trusted": true,
+              "at": 1856.4000000953674,
+              "focus": true,
+              "text": "KEEP",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 1,
+              "textOffset": 4
+            },
+            {
+              "kind": "selectionchange",
+              "at": 1866.1000000238419,
+              "focus": true,
+              "text": "KEEP",
+              "head": 0,
+              "anchor": 0,
+              "nodeType": 3,
+              "textOffset": 0
+            },
+            {
+              "kind": "keyup",
+              "key": "Home",
+              "trusted": true,
+              "at": 1867.9000000953674,
+              "focus": true,
+              "text": "KEEP",
+              "head": 0,
+              "anchor": 0,
+              "nodeType": 3,
+              "textOffset": 0
+            },
+            {
+              "kind": "beforeinput",
+              "type": "insertText",
+              "trusted": true,
+              "at": 1952.6000000238419,
+              "focus": true,
+              "text": "KEEP",
+              "head": 0,
+              "anchor": 0,
+              "nodeType": 3,
+              "textOffset": 0
+            },
+            {
+              "kind": "selectionchange",
+              "at": 1958.8000000715256,
+              "focus": true,
+              "text": "YKEEP",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 3,
+              "textOffset": 1
+            }
+          ]
+        }
+      ],
+      "detail": {
+        "independentRounds": 4,
+        "homeThenInputPauseMs": 80
+      },
+      "ms": 9377
+    },
+    {
+      "id": "cell-mouse-click-immediate-input-keeps-ratio-caret",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "cell-click-immediate-01",
+          "text": "Before\n\n|H|K|\n|---|---|\n|aXb|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 27,
+            "head": 27
+          },
+          "cellText": "aXb",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 2,
+          "head": 2,
+          "focusNode": {
+            "type": 3,
+            "text": "aXb",
+            "withinOverlay": true
+          },
+          "keys": [],
+          "screenshot": {
+            "file": "cell-click-immediate-01.png",
+            "sha256": "7121ab97985fc844d11664cb673545e4d3994c637f4e075d0a5a28a82900dc3e",
+            "caret": {
+              "x": 205,
+              "y": 157.5859375,
+              "width": 0.0078125,
+              "height": 16,
+              "top": 157.5859375,
+              "right": 205.0078125,
+              "bottom": 173.5859375,
+              "left": 205
+            },
+            "zoom": {
+              "file": "cell-click-immediate-01-caret-2x.png",
+              "sha256": "6c45672271e1c6a23fb03b1edba7a537124adc988d5cc2b2a49b60a0418675db",
+              "clip": {
+                "x": 85,
+                "y": 132.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "real-cell-click-events",
+          "box": {
+            "x": 171,
+            "y": 144.0859375,
+            "width": 271.390625,
+            "height": 42.1953125
+          },
+          "events": [
+            {
+              "kind": "selectionchange",
+              "at": 1766,
+              "focus": true,
+              "text": "ab",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 3,
+              "textOffset": 1
+            },
+            {
+              "kind": "beforeinput",
+              "type": "insertText",
+              "trusted": true,
+              "at": 1850,
+              "focus": true,
+              "text": "ab",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 3,
+              "textOffset": 1
+            },
+            {
+              "kind": "selectionchange",
+              "at": 1858.2999999523163,
+              "focus": true,
+              "text": "aXb",
+              "head": 2,
+              "anchor": 2,
+              "nodeType": 3,
+              "textOffset": 2
+            }
+          ]
+        }
+      ],
+      "detail": {
+        "realClickDelayMs": 65,
+        "immediateInput": true
+      },
+      "ms": 2209
+    }
+  ],
+  "errors": [],
+  "artifact": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-cell-activation\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-cell-activation\\unpacked\\MarkPilot.exe",
+    "runtimeExecutableSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-cell-activation\\unpacked\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.10",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-cell-activation\\unpacked\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-cell-activation\\unpacked\\resources\\app.asar",
+    "asarSha256": "da087df330d99409909ccad8ef58a64de5903319b6272c14703857e463d5cf99",
+    "bootMs": 929,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3",
+        "sourceSha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "clipboard": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T21:43:15.118Z",
+  "passed": true,
+  "frames": [
+    {
+      "file": "cell-early-focus-01.png",
+      "sha256": "4d9a954ea0b7ea3106dc26364d2fcd93541c3d424daed9b7a9c99e163033f28a",
+      "caret": {
+        "x": 195.0546875,
+        "y": 157.5859375,
+        "width": 0,
+        "height": 16,
+        "top": 157.5859375,
+        "right": 195.0546875,
+        "bottom": 173.5859375,
+        "left": 195.0546875
+      },
+      "zoom": {
+        "file": "cell-early-focus-01-caret-2x.png",
+        "sha256": "206badaa587505481269102d5b428790d4f9e01cb51bf882bab66521d4ff7f5d",
+        "clip": {
+          "x": 75.0546875,
+          "y": 132.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "cell-history-00-edited.png",
+      "sha256": "7121ab97985fc844d11664cb673545e4d3994c637f4e075d0a5a28a82900dc3e",
+      "caret": {
+        "x": 205,
+        "y": 157.5859375,
+        "width": 0.0078125,
+        "height": 16,
+        "top": 157.5859375,
+        "right": 205.0078125,
+        "bottom": 173.5859375,
+        "left": 205
+      },
+      "zoom": {
+        "file": "cell-history-00-edited-caret-2x.png",
+        "sha256": "6c45672271e1c6a23fb03b1edba7a537124adc988d5cc2b2a49b60a0418675db",
+        "clip": {
+          "x": 85,
+          "y": 132.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "cell-history-01.png",
+      "sha256": "4d9a954ea0b7ea3106dc26364d2fcd93541c3d424daed9b7a9c99e163033f28a",
+      "caret": {
+        "x": 195.0546875,
+        "y": 157.5859375,
+        "width": 0,
+        "height": 16,
+        "top": 157.5859375,
+        "right": 195.0546875,
+        "bottom": 173.5859375,
+        "left": 195.0546875
+      },
+      "zoom": {
+        "file": "cell-history-01-caret-2x.png",
+        "sha256": "206badaa587505481269102d5b428790d4f9e01cb51bf882bab66521d4ff7f5d",
+        "clip": {
+          "x": 75.0546875,
+          "y": 132.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "cell-history-02.png",
+      "sha256": "7121ab97985fc844d11664cb673545e4d3994c637f4e075d0a5a28a82900dc3e",
+      "caret": {
+        "x": 205,
+        "y": 157.5859375,
+        "width": 0.0078125,
+        "height": 16,
+        "top": 157.5859375,
+        "right": 205.0078125,
+        "bottom": 173.5859375,
+        "left": 205
+      },
+      "zoom": {
+        "file": "cell-history-02-caret-2x.png",
+        "sha256": "6c45672271e1c6a23fb03b1edba7a537124adc988d5cc2b2a49b60a0418675db",
+        "clip": {
+          "x": 85,
+          "y": 132.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "cell-tab-home-0-01-typed.png",
+      "sha256": "57a2b761101f28ac3f1ea7676163761bc5582f9f6abde1ec0543d47082c1e242",
+      "caret": {
+        "x": 468,
+        "y": 157.5859375,
+        "width": 0.0078125,
+        "height": 16,
+        "top": 157.5859375,
+        "right": 468.0078125,
+        "bottom": 173.5859375,
+        "left": 468
+      },
+      "zoom": {
+        "file": "cell-tab-home-0-01-typed-caret-2x.png",
+        "sha256": "d745cbb0084a19e9df5e38cd2098ce7f63d15aeb68f1795defdca364f661bb11",
+        "clip": {
+          "x": 348,
+          "y": 132.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "cell-tab-home-1-01-typed.png",
+      "sha256": "910d615d8a3922c5add818a2394d4ada63b617a5361c40f99bd9d59aafee74fd",
+      "caret": {
+        "x": 429.6953125,
+        "y": 157.5859375,
+        "width": 0.0078125,
+        "height": 16,
+        "top": 157.5859375,
+        "right": 429.703125,
+        "bottom": 173.5859375,
+        "left": 429.6953125
+      },
+      "zoom": {
+        "file": "cell-tab-home-1-01-typed-caret-2x.png",
+        "sha256": "05d1a7da7a6b53d34ce834fa5d99fbc5e0bdd91381afab5b1f1b12ca85f4bd4c",
+        "clip": {
+          "x": 309.6953125,
+          "y": 132.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "cell-tab-home-2-01-typed.png",
+      "sha256": "910d615d8a3922c5add818a2394d4ada63b617a5361c40f99bd9d59aafee74fd",
+      "caret": {
+        "x": 429.6953125,
+        "y": 157.5859375,
+        "width": 0.0078125,
+        "height": 16,
+        "top": 157.5859375,
+        "right": 429.703125,
+        "bottom": 173.5859375,
+        "left": 429.6953125
+      },
+      "zoom": {
+        "file": "cell-tab-home-2-01-typed-caret-2x.png",
+        "sha256": "05d1a7da7a6b53d34ce834fa5d99fbc5e0bdd91381afab5b1f1b12ca85f4bd4c",
+        "clip": {
+          "x": 309.6953125,
+          "y": 132.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "cell-tab-home-3-01-typed.png",
+      "sha256": "57a2b761101f28ac3f1ea7676163761bc5582f9f6abde1ec0543d47082c1e242",
+      "caret": {
+        "x": 468,
+        "y": 157.5859375,
+        "width": 0.0078125,
+        "height": 16,
+        "top": 157.5859375,
+        "right": 468.0078125,
+        "bottom": 173.5859375,
+        "left": 468
+      },
+      "zoom": {
+        "file": "cell-tab-home-3-01-typed-caret-2x.png",
+        "sha256": "d745cbb0084a19e9df5e38cd2098ce7f63d15aeb68f1795defdca364f661bb11",
+        "clip": {
+          "x": 348,
+          "y": 132.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "cell-click-immediate-01.png",
+      "sha256": "7121ab97985fc844d11664cb673545e4d3994c637f4e075d0a5a28a82900dc3e",
+      "caret": {
+        "x": 205,
+        "y": 157.5859375,
+        "width": 0.0078125,
+        "height": 16,
+        "top": 157.5859375,
+        "right": 205.0078125,
+        "bottom": 173.5859375,
+        "left": 205
+      },
+      "zoom": {
+        "file": "cell-click-immediate-01-caret-2x.png",
+        "sha256": "6c45672271e1c6a23fb03b1edba7a537124adc988d5cc2b2a49b60a0418675db",
+        "clip": {
+          "x": 85,
+          "y": 132.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ]
+}

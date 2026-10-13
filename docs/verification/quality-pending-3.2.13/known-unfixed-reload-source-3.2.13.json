@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "version": "3.2.13",
+  "asarSha256": "08a6de1a9b6be8a6b8033ec5c8dbf5b6fd3f8277a674ed4c35bcc6b58dad4e51",
+  "runtimeExecutableSha256": "d300992b1003765f2f64417269c124f0c7b14af65ce415ad2488d166e6f63e13",
+  "reportSha256": "2829bf564ec834110d7af980d322741d2aace43ee9c005248f535dc793642ad1",
+  "executedProbeSha256": "0d35976e940f043216104d8ac786f6db9e96658d57e4954c4f61f766ef433d28",
+  "caseId": "active-cell-reverse-range-real-menu-reload-continue-history",
+  "status": "fail",
+  "productReached": true,
+  "failureKind": "product-check",
+  "firstFailure": "actual reload preserves/transfers writable editing focus without user repair",
+  "authoritativeReload": {
+    "loadKind": "reload",
+    "text": "EXT\nBefore\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+    "after": {
+      "text": "EXT\nBefore\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+      "sourceSelection": {
+        "anchor": 33,
+        "head": 32
+      },
+      "cmFocus": false,
+      "cellFocus": false,
+      "owner": "other",
+      "cellText": "a|b",
+      "domSelection": {
+        "anchor": null,
+        "head": null
+      },
+      "activeElement": {
+        "tag": "BODY",
+        "class": ""
+      }
+    }
+  },
+  "immediateInputObserved": {
+    "text": "EXT\nBefore\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+    "sourceSelection": {
+      "anchor": 33,
+      "head": 32
+    },
+    "cmFocus": false,
+    "cellFocus": false,
+    "owner": "other",
+    "cellText": "a|b",
+    "domSelection": {
+      "anchor": null,
+      "head": null
+    },
+    "activeElement": {
+      "tag": "BODY",
+      "class": ""
+    },
+    "disk": "EXT\nBefore\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n"
+  },
+  "cleanup": {
+    "residual": [],
+    "errors": [],
+    "cleanupErrors": [],
+    "clipboardTouched": false
+  },
+  "recordedFullFrameSha256": "92023bf4d4a35daa403e5d5fd88f65e8a19f1d7481dcfcac1edf11cff1c3188e",
+  "scope": "Separate actual source-13 known failure; excluded from the 345 passing cases and from the single-root fix. Not repaired, no successful Undo/Redo continuation or independent visual approval claimed."
+}

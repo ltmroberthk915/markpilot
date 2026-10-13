@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "builderVersion": "25.1.8",
+  "argumentForm": "/D=\"<absolute path containing spaces>\"",
+  "verbatim": true,
+  "installed": true,
+  "uninstalled": true,
+  "actualDirectoryMatchedRequested": true,
+  "originalRegistryCount": 2,
+  "registryRestoredExactly": true,
+  "exeSha256": "21732b6358f5aa4bab9896cdcb9084b02c9b8e04e10bb5eafc83a5d2d9b2f54a",
+  "asarSha256": "6c1a72713b27a842f8471d2303f84a15031f9e0b7573ecbec8c05d517d4b249a",
+  "at": "2026-10-11T16:16:51.060Z"
+}

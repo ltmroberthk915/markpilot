@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "unit": {
+    "command": "npm test --prefix tools/quality",
+    "tests": 56,
+    "passed": 56,
+    "failed": 0,
+    "exitCode": 0
+  },
+  "preflight": {
+    "command": "npm run preflight --prefix tools/quality",
+    "sources": 124,
+    "syntaxFailures": [],
+    "eagerImportFailures": [],
+    "legacyDependencyPaths": [],
+    "exitCode": 0
+  },
+  "scope": "Preflight is a source check, not execution of 124 GUI scenarios."
+}

@@ -14,6 +14,8 @@ import { Prec } from "@codemirror/state";
 import { ViewPlugin, keymap } from "@codemirror/view";
 import { localCandidates } from "../renderer/js/completion-sources.js";
 import { sourceKind } from "../renderer/js/completion-policy.mjs";
+import { codeBlockAt } from './markdown-context.js';
+import { verticalFrame, controlObstacles } from './overlay-layout.js';
 
 const MATH_TOKEN = /\\([A-Za-z]*)$/;
 const SLASH_TOKEN = /(?:^|[\s([{>])\/([A-Za-z]*)$/;
@@ -44,14 +46,23 @@ function ensureBox() {
 
 function place() {
   if (!box || box.style.display === "none" || !view) return;
+  const owned=view,from=tokenFrom,to=tokenTo,state=view.state;
+  view.requestMeasure({key:box,
+  read(){
   let c = null;
   try { c = view.coordsAtPos(tokenTo); } catch { }
-  if (!c) { close(); return; }
+  if (!c) return null;
   const h = box.offsetHeight || 200;
   const below = c.bottom + 6;
   const flip = below + h > window.innerHeight - 8;
-  box.style.left = Math.round(Math.min(c.left, Math.max(8, window.innerWidth - box.offsetWidth - 8))) + "px";
-  box.style.top = Math.round(flip ? Math.max(8, c.top - h - 6) : below) + "px";
+  const left=Math.min(c.left,Math.max(8,window.innerWidth-box.offsetWidth-8));
+  const slot=verticalFrame({bounds:{top:8,bottom:innerHeight-8},anchor:c,left,width:box.offsetWidth,height:h,obstacles:[...controlObstacles(owned,2),c]});
+  return {left,top:slot?.top??(flip?Math.max(8,c.top-h-6):below),height:slot?.height??h};
+  },write(value){
+    if(!value||view!==owned||view.state!==state||tokenFrom!==from||tokenTo!==to||box.style.display==='none')return;
+    box.style.left=Math.round(value.left)+'px';box.style.top=Math.round(value.top)+'px';box.style.maxHeight=Math.round(value.height)+'px';
+    document.dispatchEvent(new Event('mp:overlay'));
+  }});
 }
 
 function render() {
@@ -104,6 +115,7 @@ function accept(index) {
 
 /** token → 候选。返回 null 表示"当前不该有菜单"。 */
 function candidatesFor(state, manual) {
+  if (state.selection.ranges.length !== 1 || codeBlockAt(state, state.selection.main.head)) return null;
   const head = state.selection.main.head;
   if (!state.selection.main.empty) return null;
   const before = state.doc.sliceString(Math.max(0, head - 12000), head);

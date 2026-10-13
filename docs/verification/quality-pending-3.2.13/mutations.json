@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "passed": true,
+  "checkoutUnchanged": true,
+  "resultSha256": "62fc0ded319fb2671f212022cc810bdba21ce1ef36bbe072fb680cf263b21541",
+  "selectedKinds": [
+    "split-source-cell-owner"
+  ],
+  "root": {
+    "kind": "split-source-cell-owner",
+    "suite": "split-source-workflows",
+    "ids": [
+      "active-cell-source-pane-click-immediate-edit-history-continue"
+    ],
+    "controls": [
+      "active-cell-source-pane-plain-click-immediate-edit-history-continue"
+    ],
+    "redAsar": "04becfae783478edc78f0add55a10fe277d135830e6a66bcc4c6d6999a35b6d4",
+    "greenAsar": "08a6de1a9b6be8a6b8033ec5c8dbf5b6fd3f8277a674ed4c35bcc6b58dad4e51",
+    "sourceRestored": true,
+    "idempotentOnOff": true,
+    "positive": true
+  },
+  "polarityReports": [
+    {
+      "polarity": "negative",
+      "resultSha256": "ed2a252fc65a6388e5807febd5930d1976d9f53cd42cdbbd67f80b817117d9e8"
+    },
+    {
+      "polarity": "positive",
+      "resultSha256": "c4016efa61d9ae4ef1421f8e1a7d0fd50808178a2af0eeba7942c1c12b43f6d5"
+    }
+  ],
+  "scope": "Actual table-owner regression red, independent ordinary-source control green, byte-exact restore, then both arms green. Exactly one new root."
+}

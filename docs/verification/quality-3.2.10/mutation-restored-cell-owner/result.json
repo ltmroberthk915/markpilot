@@ -1,0 +1,852 @@
+{
+  "schema": 1,
+  "suite": "selection-workflows",
+  "startedAt": "2026-10-11T21:40:52.897Z",
+  "cases": [
+    {
+      "id": "active-cell-undo-redo-keeps-source-and-overlay-in-sync",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "cell-click",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 26,
+            "head": 26
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": []
+        },
+        {
+          "name": "cell-keyboard-start",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 25,
+            "head": 25
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ]
+        },
+        {
+          "name": "cell-history-00-edited",
+          "text": "Before\n\n|H|K|\n|---|---|\n|aXb|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 27,
+            "head": 27
+          },
+          "cellText": "aXb",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 2,
+          "head": 2,
+          "focusNode": {
+            "type": 3,
+            "text": "aXb",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "cell-history-00-edited.png",
+            "sha256": "7121ab97985fc844d11664cb673545e4d3994c637f4e075d0a5a28a82900dc3e",
+            "caret": {
+              "x": 205,
+              "y": 157.5859375,
+              "width": 0.0078125,
+              "height": 16,
+              "top": 157.5859375,
+              "right": 205.0078125,
+              "bottom": 173.5859375,
+              "left": 205
+            },
+            "zoom": {
+              "file": "cell-history-00-edited-caret-2x.png",
+              "sha256": "6c45672271e1c6a23fb03b1edba7a537124adc988d5cc2b2a49b60a0418675db",
+              "clip": {
+                "x": 85,
+                "y": 132.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "cell-history-01",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 26,
+            "head": 26
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "cell-history-01.png",
+            "sha256": "4d9a954ea0b7ea3106dc26364d2fcd93541c3d424daed9b7a9c99e163033f28a",
+            "caret": {
+              "x": 195.0546875,
+              "y": 157.5859375,
+              "width": 0,
+              "height": 16,
+              "top": 157.5859375,
+              "right": 195.0546875,
+              "bottom": 173.5859375,
+              "left": 195.0546875
+            },
+            "zoom": {
+              "file": "cell-history-01-caret-2x.png",
+              "sha256": "206badaa587505481269102d5b428790d4f9e01cb51bf882bab66521d4ff7f5d",
+              "clip": {
+                "x": 75.0546875,
+                "y": 132.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "cell-history-02",
+          "text": "Before\n\n|H|K|\n|---|---|\n|aXb|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 27,
+            "head": 27
+          },
+          "cellText": "aXb",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 2,
+          "head": 2,
+          "focusNode": {
+            "type": 3,
+            "text": "aXb",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "cell-history-02.png",
+            "sha256": "7121ab97985fc844d11664cb673545e4d3994c637f4e075d0a5a28a82900dc3e",
+            "caret": {
+              "x": 205,
+              "y": 157.5859375,
+              "width": 0.0078125,
+              "height": 16,
+              "top": 157.5859375,
+              "right": 205.0078125,
+              "bottom": 173.5859375,
+              "left": 205
+            },
+            "zoom": {
+              "file": "cell-history-02-caret-2x.png",
+              "sha256": "6c45672271e1c6a23fb03b1edba7a537124adc988d5cc2b2a49b60a0418675db",
+              "clip": {
+                "x": 85,
+                "y": 132.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "ms": 2681
+    },
+    {
+      "id": "cell-history-across-tab-keeps-restored-source-and-dom-in-same-cell",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "cell-click",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 26,
+            "head": 26
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": []
+        },
+        {
+          "name": "cell-keyboard-start",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 25,
+            "head": 25
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ]
+        },
+        {
+          "name": "cell-cross-history-00-both-edited",
+          "text": "Before\n\n|H|K|\n|---|---|\n|aXb|YKEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 30,
+            "head": 30
+          },
+          "cellText": "YKEEP",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "YKEEP",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Tab",
+              "code": "Tab",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "cell-cross-history-00-both-edited.png",
+            "sha256": "078a2a636bdde21fd834d530bb5de6928045fd98fdf5e0103456f3cabe0ae765",
+            "caret": {
+              "x": 546.2421875,
+              "y": 157.5859375,
+              "width": 0.0078125,
+              "height": 16,
+              "top": 157.5859375,
+              "right": 546.25,
+              "bottom": 173.5859375,
+              "left": 546.2421875
+            },
+            "zoom": {
+              "file": "cell-cross-history-00-both-edited-caret-2x.png",
+              "sha256": "1ce840efc2db90a91495c23dac569d3fd0b0d375acb3478b3c073bfff2f5a517",
+              "clip": {
+                "x": 426.2421875,
+                "y": 132.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "actual-cell-activation-events",
+          "events": [
+            {
+              "kind": "keyup",
+              "key": "Tab",
+              "trusted": true,
+              "at": 2524.9000000953674,
+              "focus": true,
+              "text": "KEEP",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 1,
+              "textOffset": 4
+            },
+            {
+              "kind": "selectionchange",
+              "at": 2524.9000000953674,
+              "focus": true,
+              "text": "KEEP",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 1,
+              "textOffset": 4
+            },
+            {
+              "kind": "selectionchange",
+              "at": 2532.3000000715256,
+              "focus": true,
+              "text": "KEEP",
+              "head": 0,
+              "anchor": 0,
+              "nodeType": 3,
+              "textOffset": 0
+            },
+            {
+              "kind": "keyup",
+              "key": "Home",
+              "trusted": true,
+              "at": 2533.8000000715256,
+              "focus": true,
+              "text": "KEEP",
+              "head": 0,
+              "anchor": 0,
+              "nodeType": 3,
+              "textOffset": 0
+            },
+            {
+              "kind": "beforeinput",
+              "type": "insertText",
+              "trusted": true,
+              "at": 2535.100000023842,
+              "focus": true,
+              "text": "KEEP",
+              "head": 0,
+              "anchor": 0,
+              "nodeType": 3,
+              "textOffset": 0
+            },
+            {
+              "kind": "selectionchange",
+              "at": 2538.5,
+              "focus": true,
+              "text": "YKEEP",
+              "head": 1,
+              "anchor": 1,
+              "nodeType": 3,
+              "textOffset": 1
+            }
+          ]
+        },
+        {
+          "name": "cell-cross-history-01-restored",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 26,
+            "head": 26
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": [
+            {
+              "key": "Tab",
+              "code": "Tab",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "cell-cross-history-01-restored.png",
+            "sha256": "4d9a954ea0b7ea3106dc26364d2fcd93541c3d424daed9b7a9c99e163033f28a",
+            "caret": {
+              "x": 195.0546875,
+              "y": 157.5859375,
+              "width": 0,
+              "height": 16,
+              "top": 157.5859375,
+              "right": 195.0546875,
+              "bottom": 173.5859375,
+              "left": 195.0546875
+            },
+            "zoom": {
+              "file": "cell-cross-history-01-restored-caret-2x.png",
+              "sha256": "206badaa587505481269102d5b428790d4f9e01cb51bf882bab66521d4ff7f5d",
+              "clip": {
+                "x": 75.0546875,
+                "y": 132.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "ms": 3305
+    }
+  ],
+  "errors": [],
+  "artifact": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-cell-owner\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-cell-owner\\unpacked\\MarkPilot.exe",
+    "runtimeExecutableSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-cell-owner\\unpacked\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.10",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-cell-owner\\unpacked\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-cell-owner\\unpacked\\resources\\app.asar",
+    "asarSha256": "da087df330d99409909ccad8ef58a64de5903319b6272c14703857e463d5cf99",
+    "bootMs": 913,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3",
+        "sourceSha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "clipboard": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T21:41:06.129Z",
+  "passed": true,
+  "frames": [
+    {
+      "file": "cell-history-00-edited.png",
+      "sha256": "7121ab97985fc844d11664cb673545e4d3994c637f4e075d0a5a28a82900dc3e",
+      "caret": {
+        "x": 205,
+        "y": 157.5859375,
+        "width": 0.0078125,
+        "height": 16,
+        "top": 157.5859375,
+        "right": 205.0078125,
+        "bottom": 173.5859375,
+        "left": 205
+      },
+      "zoom": {
+        "file": "cell-history-00-edited-caret-2x.png",
+        "sha256": "6c45672271e1c6a23fb03b1edba7a537124adc988d5cc2b2a49b60a0418675db",
+        "clip": {
+          "x": 85,
+          "y": 132.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "cell-history-01.png",
+      "sha256": "4d9a954ea0b7ea3106dc26364d2fcd93541c3d424daed9b7a9c99e163033f28a",
+      "caret": {
+        "x": 195.0546875,
+        "y": 157.5859375,
+        "width": 0,
+        "height": 16,
+        "top": 157.5859375,
+        "right": 195.0546875,
+        "bottom": 173.5859375,
+        "left": 195.0546875
+      },
+      "zoom": {
+        "file": "cell-history-01-caret-2x.png",
+        "sha256": "206badaa587505481269102d5b428790d4f9e01cb51bf882bab66521d4ff7f5d",
+        "clip": {
+          "x": 75.0546875,
+          "y": 132.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "cell-history-02.png",
+      "sha256": "7121ab97985fc844d11664cb673545e4d3994c637f4e075d0a5a28a82900dc3e",
+      "caret": {
+        "x": 205,
+        "y": 157.5859375,
+        "width": 0.0078125,
+        "height": 16,
+        "top": 157.5859375,
+        "right": 205.0078125,
+        "bottom": 173.5859375,
+        "left": 205
+      },
+      "zoom": {
+        "file": "cell-history-02-caret-2x.png",
+        "sha256": "6c45672271e1c6a23fb03b1edba7a537124adc988d5cc2b2a49b60a0418675db",
+        "clip": {
+          "x": 85,
+          "y": 132.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "cell-cross-history-00-both-edited.png",
+      "sha256": "078a2a636bdde21fd834d530bb5de6928045fd98fdf5e0103456f3cabe0ae765",
+      "caret": {
+        "x": 546.2421875,
+        "y": 157.5859375,
+        "width": 0.0078125,
+        "height": 16,
+        "top": 157.5859375,
+        "right": 546.25,
+        "bottom": 173.5859375,
+        "left": 546.2421875
+      },
+      "zoom": {
+        "file": "cell-cross-history-00-both-edited-caret-2x.png",
+        "sha256": "1ce840efc2db90a91495c23dac569d3fd0b0d375acb3478b3c073bfff2f5a517",
+        "clip": {
+          "x": 426.2421875,
+          "y": 132.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "cell-cross-history-01-restored.png",
+      "sha256": "4d9a954ea0b7ea3106dc26364d2fcd93541c3d424daed9b7a9c99e163033f28a",
+      "caret": {
+        "x": 195.0546875,
+        "y": 157.5859375,
+        "width": 0,
+        "height": 16,
+        "top": 157.5859375,
+        "right": 195.0546875,
+        "bottom": 173.5859375,
+        "left": 195.0546875
+      },
+      "zoom": {
+        "file": "cell-cross-history-01-restored-caret-2x.png",
+        "sha256": "206badaa587505481269102d5b428790d4f9e01cb51bf882bab66521d4ff7f5d",
+        "clip": {
+          "x": 75.0546875,
+          "y": 132.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    }
+  ]
+}

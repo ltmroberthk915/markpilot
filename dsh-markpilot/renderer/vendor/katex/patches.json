@@ -1,0 +1,146 @@
+[
+  {
+    "file": "src/Settings.ts",
+    "id": "setting-schema",
+    "old": "export const SETTINGS_SCHEMA: Schema = {\n    displayMode:",
+    "next": "export const SETTINGS_SCHEMA: Schema = {\n    sourceMap: { type: \"boolean\", default: false },\n    displayMode:"
+  },
+  {
+    "file": "src/Settings.ts",
+    "id": "setting-field",
+    "old": "export default class Settings {\n    displayMode!: boolean;",
+    "next": "export default class Settings {\n    sourceMap!: boolean;\n    displayMode!: boolean;"
+  },
+  {
+    "file": "src/Token.ts",
+    "id": "token-origin-type",
+    "old": "    loc: SourceLocation | null | undefined;\n    noexpand:",
+    "next": "    loc: SourceLocation | null | undefined;\n    __typoraOrigin?: SourceLocation | null;\n    noexpand:"
+  },
+  {
+    "file": "src/types/nodes.ts",
+    "id": "node-source-import",
+    "old": "import type SourceLocation from \"../SourceLocation\";",
+    "next": "import type SourceLocation from \"../SourceLocation\";\nimport type {TyporaSourceRange} from \"../typoraSource\";"
+  },
+  {
+    "file": "src/types/nodes.ts",
+    "id": "node-source-type",
+    "old": "type BaseNode = {\n    mode: Mode;\n    loc?: SourceLocation | null;\n};",
+    "next": "type BaseNode = {\n    mode: Mode;\n    loc?: SourceLocation | null;\n    __typoraSource?: TyporaSourceRange;\n};"
+  },
+  {
+    "file": "src/MacroExpander.ts",
+    "id": "macro-origin-import",
+    "old": "import {Token}",
+    "next": "import {typoraOriginOf} from \"./typoraSource\";\nimport {Token}"
+  },
+  {
+    "file": "src/MacroExpander.ts",
+    "id": "macro-body-origin",
+    "old": "        let tokens = expansion.tokens;\n        const args = this.consumeArgs(expansion.numArgs, expansion.delimiters);\n        if (expansion.numArgs) {",
+    "next": "        let tokens = expansion.tokens;\n        const args = this.consumeArgs(expansion.numArgs, expansion.delimiters);\n        if (this.settings.sourceMap) {\n            const origin = typoraOriginOf(topToken);\n            tokens = tokens.map(token => {\n                const copy = Object.assign(\n                    Object.create(Object.getPrototypeOf(token)), token) as Token;\n                copy.__typoraOrigin = origin;\n                return copy;\n            });\n        }\n        if (expansion.numArgs) {"
+  },
+  {
+    "file": "src/Parser.ts",
+    "id": "parser-origin-import",
+    "old": "import type {AnyParseNode, NodeType, ParseNode, SymbolParseNode, UnsupportedCmdParseNode} from \"./types/nodes\";",
+    "next": "import type {AnyParseNode, NodeType, ParseNode, SymbolParseNode, UnsupportedCmdParseNode} from \"./types/nodes\";\nimport {typoraSourceOf, joinTyporaSources, typoraMappedToken} from \"./typoraSource\";"
+  },
+  {
+    "file": "src/Parser.ts",
+    "id": "parser-result-type",
+    "old": "        let result;\n        // Try to parse an open brace",
+    "next": "        let result: AnyParseNode | null;\n        // Try to parse an open brace"
+  },
+  {
+    "file": "src/Parser.ts",
+    "id": "parser-group-origin",
+    "old": "        }\n        return result;\n    }\n\n    /**\n     * Form ligature-like combinations",
+    "next": "        }\n        if (result && this.settings.sourceMap) {\n            const source = typoraSourceOf(firstToken, this.gullet.lexer);\n            if (source) result.__typoraSource = source;\n        }\n        return result;\n    }\n\n    /**\n     * Form ligature-like combinations"
+  },
+  {
+    "file": "src/Parser.ts",
+    "id": "ligature-three-source",
+    "old": "                        loc: SourceLocation.range(a, afterNext),\n                        text: \"---\",",
+    "next": "                        loc: SourceLocation.range(a, afterNext),\n                        __typoraSource: joinTyporaSources(a.__typoraSource, afterNext.__typoraSource),\n                        text: \"---\","
+  },
+  {
+    "file": "src/Parser.ts",
+    "id": "ligature-two-source",
+    "old": "                        loc: SourceLocation.range(a, next),\n                        text: \"--\",",
+    "next": "                        loc: SourceLocation.range(a, next),\n                        __typoraSource: joinTyporaSources(a.__typoraSource, next.__typoraSource),\n                        text: \"--\","
+  },
+  {
+    "file": "src/Parser.ts",
+    "id": "ligature-quotes-source",
+    "old": "                    loc: SourceLocation.range(a, next),\n                    text: v + v,",
+    "next": "                    loc: SourceLocation.range(a, next),\n                    __typoraSource: joinTyporaSources(a.__typoraSource, next.__typoraSource),\n                    text: v + v,"
+  },
+  {
+    "file": "src/Parser.ts",
+    "id": "unicode-first-origin",
+    "old": "                subsupTokens.push(new Token(uSubsAndSups[lex.text]));",
+    "next": "                subsupTokens.push(typoraMappedToken(uSubsAndSups[lex.text], lex, this.settings.sourceMap));"
+  },
+  {
+    "file": "src/Parser.ts",
+    "id": "unicode-next-origin",
+    "old": "                    const token = this.fetch().text;\n                    if (!(uSubsAndSups[token])) { break; }\n                    if (unicodeSubRegEx.test(token) !== isSub) { break; }\n                    subsupTokens.unshift(new Token(uSubsAndSups[token]));",
+    "next": "                    const sourceToken = this.fetch();\n                    const token = sourceToken.text;\n                    if (!(uSubsAndSups[token])) { break; }\n                    if (unicodeSubRegEx.test(token) !== isSub) { break; }\n                    subsupTokens.unshift(typoraMappedToken(uSubsAndSups[token], sourceToken, this.settings.sourceMap));"
+  },
+  {
+    "file": "src/Parser.ts",
+    "id": "prime-first-source",
+    "old": "                const prime: ParseNode<\"textord\"> = {type: \"textord\", mode: this.mode, text: \"\\\\prime\"};",
+    "next": "                const prime: ParseNode<\"textord\"> = {type: \"textord\", mode: this.mode, text: \"\\\\prime\",\n                    __typoraSource: this.settings.sourceMap ? typoraSourceOf(lex, this.gullet.lexer) : undefined};"
+  },
+  {
+    "file": "src/Parser.ts",
+    "id": "prime-next-source",
+    "old": "                while (this.fetch().text === \"'\") {\n                    // For each one, add another prime to the list\n                    primes.push(prime);\n                    this.consume();",
+    "next": "                while (this.fetch().text === \"'\") {\n                    // For each one, add another prime to the list\n                    primes.push(this.settings.sourceMap ? {...prime,\n                        __typoraSource: typoraSourceOf(this.fetch(), this.gullet.lexer)} : prime);\n                    this.consume();"
+  },
+  {
+    "file": "src/buildHTML.ts",
+    "id": "html-group-source",
+    "old": "        return groupNode;\n    } else {\n        throw new ParseError(",
+    "next": "        typoraMapSource(groupNode, group);\n        return groupNode;\n    } else {\n        throw new ParseError("
+  },
+  {
+    "file": "src/buildHTML.ts",
+    "id": "html-source-helper",
+    "old": "/**\n * Combine an array of HTML DOM nodes (e.g., the output of `buildExpression`)",
+    "next": "// Mapping is developer-owned data; it never enables trusted HTML commands.\nfunction typoraMapSource(node: HtmlDomNode, group: AnyParseNode): void {\n    const own = (value: object, key: PropertyKey) =>\n        Object.prototype.hasOwnProperty.call(value, key);\n    const base = own(group, \"base\") && \"base\" in group ? group.base : null;\n    const direct = own(group, \"__typoraSource\") ? group.__typoraSource : undefined;\n    const loc = direct ?? (base && own(base, \"__typoraSource\") ? base.__typoraSource : undefined);\n    if (!loc) return;\n    const mark = (current: HtmlDomNode): void => {\n        if (current instanceof DocumentFragment) {\n            current.children.forEach(mark);\n            return;\n        }\n        const target = current as HtmlDomNode & {attributes?: Record<string, string>};\n        const attrs = target.attributes ?? (target.attributes = Object.create(null));\n        if (!own(attrs, \"data-typora-source-start\")) {\n            Object.defineProperty(attrs, \"data-typora-source-start\", {\n                value: String(loc.start), enumerable: true, writable: true, configurable: true,\n            });\n            Object.defineProperty(attrs, \"data-typora-source-end\", {\n                value: String(loc.end), enumerable: true, writable: true, configurable: true,\n            });\n        }\n    };\n    mark(node);\n}\n\n/**\n * Combine an array of HTML DOM nodes (e.g., the output of `buildExpression`)"
+  },
+  {
+    "file": "src/domTree.ts",
+    "id": "symbol-attribute-field",
+    "old": "export class SymbolNode implements HtmlDomNode {\n    text: string;",
+    "next": "export class SymbolNode implements HtmlDomNode {\n    attributes: Record<string, string>;\n    text: string;"
+  },
+  {
+    "file": "src/domTree.ts",
+    "id": "symbol-attribute-init",
+    "old": "        this.classes = classes || [];\n        this.style = style || {};\n        this.maxFontSize = 0;",
+    "next": "        this.classes = classes || [];\n        this.style = style || {};\n        this.attributes = Object.create(null);\n        this.maxFontSize = 0;"
+  },
+  {
+    "file": "src/domTree.ts",
+    "id": "symbol-dom-attributes",
+    "old": "        if (span) {\n            span.appendChild(node);\n            return span;",
+    "next": "        for (const key of Object.keys(this.attributes)) {\n            span = span || document.createElement(\"span\");\n            span.setAttribute(key, this.attributes[key]);\n        }\n\n        if (span) {\n            span.appendChild(node);\n            return span;"
+  },
+  {
+    "file": "src/domTree.ts",
+    "id": "symbol-string-attributes",
+    "old": "        const escaped = escape(this.text);\n        if (needsSpan) {",
+    "next": "        for (const key of Object.keys(this.attributes)) {\n            needsSpan = true;\n            markup += \" \" + escape(key) + \"=\\\"\" + escape(this.attributes[key]) + \"\\\"\";\n        }\n\n        const escaped = escape(this.text);\n        if (needsSpan) {"
+  },
+  {
+    "file": "src/buildCommon.ts",
+    "id": "symbol-merge-source-barrier",
+    "old": "const canCombine = (prev: SymbolNode, next: SymbolNode) => {\n    if (createClass(prev.classes)",
+    "next": "const canCombine = (prev: SymbolNode, next: SymbolNode) => {\n    const before = Object.keys(prev.attributes), after = Object.keys(next.attributes);\n    if (before.length !== after.length || before.some(key =>\n            !Object.prototype.hasOwnProperty.call(next.attributes, key) ||\n            prev.attributes[key] !== next.attributes[key])) return false;\n    if (createClass(prev.classes)"
+  }
+]

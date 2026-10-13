@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "at": "2026-10-11T10:25:49.937Z",
+  "node": "v24.14.1",
+  "platform": "win32",
+  "installedBy": "npm ci --ignore-scripts --no-audit --no-fund; engine additionally --legacy-peer-deps",
+  "preflight": {
+    "schema": 1,
+    "total": 124,
+    "syntaxFailures": [],
+    "eagerImportFailures": [],
+    "legacyDependencyPaths": [],
+    "ok": true
+  },
+  "tests": {
+    "passed": 8,
+    "failed": 0,
+    "reporter": "tap",
+    "output": "TAP version 13\n# Subtest: published evidence removes machine paths and bounds large inline payloads\nok 1 - published evidence removes machine paths and bounds large inline payloads\n  ---\n  duration_ms: 1.7403\n  type: 'test'\n  ...\n# Subtest: wrong screenshot hash and traversal cannot be published\nok 2 - wrong screenshot hash and traversal cannot be published\n  ---\n  duration_ms: 33.3505\n  type: 'test'\n  ...\n# Subtest: shared ruler module loads in a clean process and hashes known bytes\nok 3 - shared ruler module loads in a clean process and hashes known bytes\n  ---\n  duration_ms: 126.165\n  type: 'test'\n  ...\n# Subtest: preflight catches the real eager-import failure; lazy closures stay valid\nok 4 - preflight catches the real eager-import failure; lazy closures stay valid\n  ---\n  duration_ms: 4.1983\n  type: 'test'\n  ...\n# Subtest: all supplied probe sources parse and use initialized portable imports\nok 5 - all supplied probe sources parse and use initialized portable imports\n  ---\n  duration_ms: 135.9699\n  type: 'test'\n  ...\n# Subtest: reverting import-order repair makes the actual shared module fail again\nok 6 - reverting import-order repair makes the actual shared module fail again\n  ---\n  duration_ms: 50.6235\n  type: 'test'\n  ...\n# Subtest: app-slot excludes a second owner and rejects ownership changes\nok 7 - app-slot excludes a second owner and rejects ownership changes\n  ---\n  duration_ms: 8.5031\n  type: 'test'\n  ...\n# Subtest: an empty preflight and invalid CLI cannot appear green\nok 8 - an empty preflight and invalid CLI cannot appear green\n  ---\n  duration_ms: 2.9977\n  type: 'test'\n  ...\n1..8\n# tests 8\n# suites 0\n# pass 8\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 422.9217\n"
+  },
+  "newCjsSyntaxChecks": 14,
+  "publishedFrameHashesVerified": true,
+  "pdfHashesVerified": true,
+  "passed": true
+}

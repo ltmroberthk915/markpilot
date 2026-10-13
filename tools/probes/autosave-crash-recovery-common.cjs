@@ -9,7 +9,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn, execFileSync, execSync } = require('node:child_process');
-const { chromium } = require('C:/Windows/System32/node_modules/playwright-core');
+const { chromium } = require('../quality/dependencies.cjs').playwright();
 
 const WINPS = path.join(__dirname, 'autosave-crash-recovery-win.ps1');
 const PWSH = 'C:/WINDOWS/System32/WindowsPowerShell/v1.0/powershell.exe';

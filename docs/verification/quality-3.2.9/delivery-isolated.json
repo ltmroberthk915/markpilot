@@ -1,0 +1,56 @@
+{
+  "schema": 2,
+  "tag": "isolated",
+  "exe": "<repo>\\.mp-verify\\codex-audit\\candidate installation 3.2.9\\installed\\MarkPilot.exe",
+  "sha256": "39197065a983d7a8ff3235b8c6b690ea6d08bf5542fc959203386444da06259a",
+  "asarSha256": "dae852488c3b63e86d807c043f9b46f150ba869b4fe2d5bc5c782a3150e3d0bc",
+  "results": [
+    {
+      "suite": "critical",
+      "scope": "suite",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.9-critical",
+      "total": 26,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "images",
+      "scope": "saved-screenshot-immediate",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.9-images",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "document-workflows",
+      "scope": "history",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.9-history",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "math-workflows",
+      "scope": "math",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.9-math",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "rich-workflows",
+      "scope": "rich",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.9-rich",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    }
+  ],
+  "passed": true,
+  "at": "2026-10-11T20:17:18.944Z"
+}

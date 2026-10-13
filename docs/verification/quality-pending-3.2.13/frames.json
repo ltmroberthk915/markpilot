@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "bytes": 278208,
+  "budgetBytes": 1048576,
+  "frames": [
+    {
+      "bytes": 69503,
+      "sha256": "84dbb2a13c4f54db3e55771d3757211bf1cc67e36f58eb317f7984130f859758",
+      "caseId": "active-cell-source-pane-click-immediate-edit-history-continue",
+      "stage": "04-immediate-R",
+      "file": "frames/84dbb2a13c4f54db3e55771d3757211bf1cc67e36f58eb317f7984130f859758.png",
+      "kind": "full"
+    },
+    {
+      "bytes": 69852,
+      "sha256": "393afff6ecbf25d46d15093bac939e5bc1c6df657d482857bdc31869dd5120bf",
+      "caseId": "active-cell-source-pane-click-immediate-edit-history-continue",
+      "stage": "08-saved",
+      "file": "frames/393afff6ecbf25d46d15093bac939e5bc1c6df657d482857bdc31869dd5120bf.png",
+      "kind": "full"
+    },
+    {
+      "bytes": 69009,
+      "sha256": "a737f387ab1e4a7414676bae9e89e2549aaeacd0c3813fc357c69c0c779feafb",
+      "caseId": "active-cell-source-pane-plain-click-immediate-edit-history-continue",
+      "stage": "04-immediate-R",
+      "file": "frames/a737f387ab1e4a7414676bae9e89e2549aaeacd0c3813fc357c69c0c779feafb.png",
+      "kind": "full"
+    },
+    {
+      "bytes": 69844,
+      "sha256": "0b7d1dde59e16185a376c491e8977eb514ac64d3a72524219e999917ecbb7233",
+      "caseId": "active-cell-source-pane-plain-click-immediate-edit-history-continue",
+      "stage": "08-saved",
+      "file": "frames/0b7d1dde59e16185a376c491e8977eb514ac64d3a72524219e999917ecbb7233.png",
+      "kind": "full"
+    }
+  ],
+  "independentlyViewed": false
+}

@@ -1,0 +1,56 @@
+{
+  "schema": 2,
+  "tag": "portable",
+  "exe": "<repo>\\.mp-verify\\codex-audit\\candidate-3.2.9\\production\\markpilot-3.2.9-portable.exe",
+  "sha256": "00bcb227f2019359e44bea14f56afb1ff556fcfe06550c11aa95f6b332fada02",
+  "asarSha256": "dae852488c3b63e86d807c043f9b46f150ba869b4fe2d5bc5c782a3150e3d0bc",
+  "results": [
+    {
+      "suite": "critical",
+      "scope": "suite",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.9-critical",
+      "total": 26,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "images",
+      "scope": "saved-screenshot-immediate",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.9-images",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "document-workflows",
+      "scope": "history",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.9-history",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "math-workflows",
+      "scope": "math",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.9-math",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "rich-workflows",
+      "scope": "rich",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.9-rich",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    }
+  ],
+  "passed": true,
+  "at": "2026-10-11T20:19:15.270Z"
+}

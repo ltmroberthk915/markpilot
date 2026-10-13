@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "purpose": "katex-source-map-maintained",
+  "upstreamVersion": "0.19.0",
+  "upstreamResolved": "https://registry.npmjs.org/katex/-/katex-0.19.0.tgz",
+  "upstreamIntegrity": "sha512-v6Tznz3zJ7u3niRCoDTsumM2+HA2XXcCu+WAacCeHD2z3p9A9Ks987o5FzfTGBN0e8A0vjEgIDvLbICrXpdw/Q==",
+  "originalVendorSha256": "f118f3355603ee46e0bb949eefa883d15bdae86730b663c349dfe0059ad18e8b",
+  "pins": {
+    "package.json": "279db0fd6fcecf3fe3da1c1244dc9387e527b877d23638be6cf0c5e2a03817ea",
+    "katex.ts": "6c33f01edc0e85988810f46d974374a312f66c11f8f8c090aaea4e6ce0e332d2",
+    "LICENSE": "766ccc1f306c885aa45542a9846bbd0a505b27a0374f146778171c2254ce18e3",
+    "src/Settings.ts": "a3b04291805997c2a7f0c7600f78034b4ea79783ce2f238e5ca81ef52265acb1",
+    "src/Token.ts": "ca3910b6cf424805e01ec08f8572c79013b06cc33efd4fc5deb0157a057300e7",
+    "src/types/nodes.ts": "2d8e80efa0ed566e58a9c793e8338e09e51cc3ac7f280c11919009876c5493e4",
+    "src/MacroExpander.ts": "dca51df6efae6c4f958c2313d566910f4857db7e4930c216c88de6cb3aeb4b27",
+    "src/Parser.ts": "c1aed05097bb0c429b7e1b5fe0862a7db515bd1682b014d6775edeb2e8da0e6a",
+    "src/buildHTML.ts": "9b22eee0850fe5fd5cc3bcd5623e11bebcd3d5fe71b66f36e601c7a0f1ece27f",
+    "src/domTree.ts": "8bfeab3612a83098133013e85fe2da0ea245b8c87aef9f990879ffc8e89df6eb",
+    "src/buildCommon.ts": "0cae9bd3b1dd21b536e8c9a96f11838c87bcbaceaca89927c03b46750a4fba73",
+    "src/unicodeAccents.js": "f3c3358ad79c0cc26a96f2741bfbe0e494ba4f075a0fb400758dc204097a3c55",
+    "src/unicodeSymbols.js": "9c16656286cc5575a3e250b6e47c900802a24fe0a59c1cb0e3bb5c5d51f1f27e"
+  },
+  "patchCount": 24,
+  "modifiedFiles": [
+    "src/MacroExpander.ts",
+    "src/Parser.ts",
+    "src/Settings.ts",
+    "src/Token.ts",
+    "src/buildCommon.ts",
+    "src/buildHTML.ts",
+    "src/domTree.ts",
+    "src/types/nodes.ts",
+    "src/typoraSource.ts"
+  ],
+  "securityGuards": [
+    {
+      "file": "src/Settings.ts",
+      "id": "own-property-setting-processing",
+      "sha256": "3611d400df51ab2688c5ee13e33c25843b2fd5f971cfcf938d0ae48844d226ef"
+    },
+    {
+      "file": "src/MacroExpander.ts",
+      "id": "edef-output-expansion-count",
+      "sha256": "d2771b2c3b3ef13e99093c0b1470422b1b30dcc090843bce6652951fc3df238b"
+    },
+    {
+      "file": "src/Parser.ts",
+      "id": "shared-gullet-subparse",
+      "sha256": "0c20e150d46324a0a903b4bba001c661ee027a649424e4fcd0bf86f4f6be46c6"
+    }
+  ],
+  "inputFileCount": 176,
+  "outputFileCount": 177,
+  "inventory": {
+    "file": "inventory.json",
+    "sha256": "8fcaa59557fc137e7807b16c119d17f9b66cebd6879d49b70c919188b4be455f"
+  },
+  "modifiedOutputs": [
+    {
+      "file": "src/MacroExpander.ts",
+      "sha256": "d141a67a3ca22008f2bc7ac81b139459dfbe41227fec4e54021467fbf343af25",
+      "bytes": 16942
+    },
+    {
+      "file": "src/Parser.ts",
+      "sha256": "cc930cbba7e07a587ea552bc6d7478963f82bb4dafae385f476c521ee25ce24e",
+      "bytes": 40334
+    },
+    {
+      "file": "src/Settings.ts",
+      "sha256": "fe1f884ef74ae3cd197fb2c7207a2e6cf9331a27c70a7def1d3b91c56d1c77a3",
+      "bytes": 13311
+    },
+    {
+      "file": "src/Token.ts",
+      "sha256": "84c3ed1ab0b902457028b50875cb6ebee2552988e553bffc3cd0f2e1f3fb67b6",
+      "bytes": 1650
+    },
+    {
+      "file": "src/buildCommon.ts",
+      "sha256": "9e2130ae06b4b01a9131b068bc458d123143e7222fa377a2a930a5aaea0ac9e2",
+      "bytes": 26592
+    },
+    {
+      "file": "src/buildHTML.ts",
+      "sha256": "5f208e5378f7464e3f4d85151e01654e3db14b805d83dbe42cb3444968041dbc",
+      "bytes": 16241
+    },
+    {
+      "file": "src/domTree.ts",
+      "sha256": "05cbbd5ee32d17e9787811971cf7627d35f18e95deeec0a936e5598caa4ba822",
+      "bytes": 17819
+    },
+    {
+      "file": "src/types/nodes.ts",
+      "sha256": "6094e5ffa8451c62fd308a413f41afbf91950f6285401c22ffb051712f97ada8",
+      "bytes": 9323
+    },
+    {
+      "file": "src/typoraSource.ts",
+      "sha256": "3103ef242ac02f32739891812aff1fca70d9a378ac2ce75bba0bd689365dcd3e",
+      "bytes": 1449
+    }
+  ],
+  "entrySha256": "f3cf28f51e8304efbc37eb408a3cdb51ea088d2d1b4c8d6978215e13cb165925",
+  "generatorSha256": "39d8feb6a87793a1d12c24f876c7b99aca27e92d3008691ef10d274a6280abb1",
+  "builderSha256": "e75e604ded6a75af294a4b62426345fe73642dee01d887209da3e0428c801eed",
+  "build": {
+    "entry": "entry.ts",
+    "bundle": true,
+    "format": "iife",
+    "define": {
+      "__VERSION__": "\"0.19.0\""
+    },
+    "legalComments": "inline",
+    "target": "es2020"
+  },
+  "stage": "generated-source"
+}
