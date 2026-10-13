@@ -1,7 +1,7 @@
 {
   "name": "markpilot-cm6",
   "productName": "MarkPilot",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "description": "MarkPilot — Typora 手感的即时渲染 Markdown 编辑器（独立桌面版）",
   "license": "MIT",
   "author": "jinxi",

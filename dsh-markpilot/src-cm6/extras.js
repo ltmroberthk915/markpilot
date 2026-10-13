@@ -2080,7 +2080,8 @@ export function installExtras(deps) {
           + `<span class="mp-num" data-n="${s.key}-${it.id}" style="margin-left:8px;color:var(--mp-muted);font:12px var(--mp-font-mono)">${it.fmt(cur)}</span>`
           + `</td></tr>`;
       }).join('');
-      return `<p class="k" style="margin:12px 0 4px"><b style="color:var(--mp-fg)">${s.name}</b> · ${s.hint}</p><table>${body}</table>`;
+      const avoidance = s.key === 'float' ? `<tr><td>正文避让</td><td><label style="cursor:pointer"><input id="mp-pref-float-avoidance" type="checkbox"${prefsRead().floatAvoidance !== 0 ? ' checked' : ''} style="accent-color:var(--mp-primary)"> 就近避让正文</label><div class="k">关闭后，预览直接显示在公式源码下方。</div></td></tr>` : '';
+      return `<p class="k" style="margin:12px 0 4px"><b style="color:var(--mp-fg)">${s.name}</b> · ${s.hint}</p><table>${body}${avoidance}</table>`;
     }).join('');
     const outlineSec = `<p class="k" style="margin:12px 0 4px"><b style="color:var(--mp-fg)">大纲</b> · 展示形式（两种并存，随时可换）</p>`
       + `<table><tr><td style="white-space:nowrap">样式</td><td>`
@@ -2167,6 +2168,8 @@ export function installExtras(deps) {
       }
       const sbx = d.querySelector('#mp-pref-statusbar');
       if (sbx) sbx.checked = !!s.statusbar;
+      const avoidance = d.querySelector('#mp-pref-float-avoidance');
+      if (avoidance) avoidance.checked = s.floatAvoidance !== 0;
     };
     try {
       if (unsubPrefs) { unsubPrefs(); unsubPrefs = null; }
@@ -2185,6 +2188,8 @@ export function installExtras(deps) {
     });
     const sb = d.querySelector('#mp-pref-statusbar');
     if (sb) sb.onchange = () => prefWrite('statusbar', sb.checked ? 1 : 0);
+    const avoidance = d.querySelector('#mp-pref-float-avoidance');
+    if (avoidance) avoidance.onchange = () => prefWrite('floatAvoidance', avoidance.checked ? 1 : 0);
     d.querySelectorAll('input[name="mp-outline-mode"]').forEach((el) => {
       el.onchange = () => { try { localStorage.setItem('mp-outline-mode', el.value); } catch { } applyOutlineMode(); };
     });
@@ -2241,7 +2246,7 @@ export function installExtras(deps) {
     if (rst) rst.onclick = () => {
       try { localStorage.removeItem('mp-surfaces'); } catch { }
       // 版式四项一并回默认（否则"恢复默认"只恢复一半，用户会以为没生效）
-      try { for (const k of ['pageWidth', 'zoom', 'island', 'statusbar']) localStorage.removeItem('mp-pref-' + k); } catch { }
+      try { for (const k of ['pageWidth', 'zoom', 'island', 'statusbar', 'floatAvoidance']) localStorage.removeItem('mp-pref-' + k); } catch { }
       if (window.mpEngine && window.mpEngine.applyPrefs) window.mpEngine.applyPrefs();
       applySurfaces(); settingsDialog();
     };
