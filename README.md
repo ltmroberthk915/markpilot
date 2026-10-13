@@ -1,5 +1,13 @@
 **[English](README.en.md)** · 中文
 
+## MarkPilot 3.3.0 · Windows
+
+默认手动保存；自动保存可在设置中开启并选择间隔。新开文档保留已有窗口与撤销历史，长文档滚动和末尾编辑更稳定，带关闭按钮的面板支持 Esc。
+
+公式预览在编辑位置附近避让，移动上限为 96 个视口像素；附近无空位时覆盖显示，滚动时不再持续重新定位。
+
+**[下载 3.3.0 安装版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.3.0/markpilot-Setup-3.3.0.exe)** · **[下载 3.3.0 便携版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.3.0/markpilot-3.3.0-portable.exe)** · [版本说明](docs/RELEASE-3.3.0.md)
+
 # MarkPilot · 万可百律
 
 > ### AI 时代，全新定义 Markdown 编辑器——万有可能，一致百「律」。

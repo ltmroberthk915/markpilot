@@ -82,6 +82,26 @@ async function newWindow(run, owner, file) {
   }
   throw new Error('New window boot timed out');
 }
+async function newBlankWindow(run, owner) {
+  const old=new Set(run.browser.contexts().flatMap(c=>c.pages()));
+  const before=await snapshot(owner);
+  // The generic key diagnostic also emits a char event with Ctrl held. That
+  // injects a literal N, so exercise the real menu callback for this route.
+  const response=await owner.evaluate(()=>window.mpHost.recentTestMenuClick('menu-new-document',true));
+  assert(response.ok,'native new-document menu reached the owning window');
+  let blank;
+  await waitUntil(async()=>{
+    for(const page of run.browser.contexts().flatMap(c=>c.pages())){
+      if(old.has(page))continue;
+      if(await page.evaluate(()=>!!window.mpEngine?._view?.()&&window.mpHost.currentDoc().then(doc=>doc==null)).catch(()=>false)){blank=page;return true;}
+    }
+    return false;
+  },'native new document opens an independent blank window');
+  assert.equal((await snapshot(owner)).text,before.text,'new document preserves the original window source');
+  await blank.bringToFront();
+  await waitUntil(async()=>{const s=await snapshot(blank);return s.text===''&&s.focus;},'new blank window owns native editor focus');
+  return blank;
+}
 function recorder(dir, result) {
   return async (id, body) => {
     const entry={id,status:'running',trace:[]},start=performance.now();
@@ -96,4 +116,4 @@ function recorder(dir, result) {
     if(entry.timeout)throw new Error('Timed out: '+id);
   };
 }
-module.exports={outputDir,snapshot,reset,frame,newWindow,recorder,waitUntil};
+module.exports={outputDir,snapshot,reset,frame,newWindow,newBlankWindow,recorder,waitUntil};

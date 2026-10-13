@@ -41,7 +41,10 @@ async function launch(o, doc, runDir, extraEnv = {}) {
   const hash = sha256(exe);
   if (o['expected-sha256'] && hash !== o['expected-sha256']) throw new Error('Executable SHA256 mismatch');
   const profile = path.join(runDir, 'profile-' + crypto.randomUUID()); fs.mkdirSync(profile);
-  fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify({ restoreLast: false, theme: 'light', winBounds: { width: 1100, height: 800, x: 50, y: 50 } }));
+  // These legacy workflow fixtures explicitly exercise automatic disk writes.
+  // Product defaults remain manual; default-policy probes use a seed without
+  // these opt-in keys and verify the actual upgrade/default path separately.
+  fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify({ restoreLast: false, theme: 'light', autosaveEnabled: true, autosaveIntervalMs: 1000, winBounds: { width: 1100, height: 800, x: 50, y: 50 } }));
   const env = { ...process.env, MP_TEST_NO_DIALOG: '1', MP_TEST_HOOKS: '1', MP_DEBUG: '1', MP_MIGRATE_FROM: path.join(runDir, 'absent-legacy-profile'), ...extraEnv };
   delete env.ELECTRON_RUN_AS_NODE;
   const argv = [...(o.app ? [path.resolve(o.app)] : []), doc, '--remote-debugging-port=0', '--user-data-dir=' + profile, '--enable-logging=stderr'];

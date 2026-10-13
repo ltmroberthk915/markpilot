@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const assert=require('node:assert/strict');
 const {args,launch,acquireSlot,sleep}=require('./lifecycle.cjs');
-const {outputDir,snapshot,frame,newWindow,recorder,waitUntil}=require('./harness.cjs');
+const {outputDir,snapshot,frame,newWindow,newBlankWindow,recorder,waitUntil}=require('./harness.cjs');
 const argv=process.argv.slice(2),si=argv.indexOf('--scope');
 const scope=si<0?'all':argv.splice(si,2)[1];
 if(!['all','sessions','encoding'].includes(scope))throw new Error('Use --scope all|sessions|encoding');
@@ -93,16 +93,16 @@ const o=args(argv);
       });
       // Close-guard regression uses a fresh app so failed/conflicting fixtures cannot alter the oracle.
       result.firstCleanup=await run.cleanup();assert.deepEqual(result.firstCleanup.residual,[]);run=null;
-      run=await launch(o,aFile,dir,{TEMP:temp,TMP:temp});const primary=run.page;
+      run=await launch(o,aFile,dir,{TEMP:temp,TMP:temp});
       await check('secondary-save-does-not-clear-primary-unsaved-close-guard',async trace=>{
-        await primary.evaluate(()=>window.mpHost.recentTestSendKey({keyCode:'N',modifiers:['control']}));await waitUntil(()=>primary.evaluate(()=>window.mpHost.currentDoc().then(d=>d==null)),'new blank document');await focus(primary);await primary.keyboard.insertText('UNSAVED PRIMARY DRAFT');await sleep(150);
+        const primary=await newBlankWindow(run,run.page);await focus(primary);await primary.keyboard.insertText('UNSAVED PRIMARY DRAFT');await sleep(150);
         const secondary=await newWindow(run,primary,bFile);await focus(secondary);await secondary.keyboard.press('Control+End');await secondary.keyboard.insertText('SAVED SECONDARY');await settled(secondary);await capture(primary,'unsaved-primary');await focus(primary);
         const r=await primary.evaluate(()=>window.mpHost.recentTestMenuClick('menu-close-window',true)).catch(e=>({closed:primary.isClosed(),error:e.message}));await sleep(600);const log=fs.readFileSync(path.join(run.profile,'main-debug.log'),'utf8');trace.push({clicked:r,closed:primary.isClosed(),nativeConfirmationRequested:log.includes('doc:close-confirm')});assert.equal(primary.isClosed(),false,'native close requires save/discard confirmation for A');assert(log.includes('doc:close-confirm'),'this close actually entered the native unsaved confirmation');
       });
       result.closeGuardCleanup=await run.cleanup();assert.deepEqual(result.closeGuardCleanup.residual,[]);run=null;
       run=await launch(o,aFile,dir,{MP_TEST_SAVE_AS_CANCEL:'1',MP_TEST_CLOSE_RESPONSE:'0',TEMP:temp,TMP:temp});
       await check('save-and-close-with-cancelled-save-as-keeps-draft-and-cancels-close-intent',async trace=>{
-        const x=run.page;await x.evaluate(()=>window.mpHost.recentTestSendKey({keyCode:'N',modifiers:['control']}));await waitUntil(()=>x.evaluate(()=>window.mpHost.currentDoc().then(d=>d==null)),'blank document');await focus(x);await x.keyboard.insertText('CANCELLED CLOSE DRAFT');
+        const x=await newBlankWindow(run,run.page);await focus(x);await x.keyboard.insertText('CANCELLED CLOSE DRAFT');
         await x.evaluate(()=>window.mpHost.docDirty(dirty,{documentId,revision}));
         await x.evaluate(()=>window.mpHost.recentTestMenuClick('menu-close-window',true));await sleep(400);assert(!x.isClosed());assert.equal((await snapshot(x)).text,'CANCELLED CLOSE DRAFT');assert((await snapshot(x)).title.startsWith('●'));
         const log=fs.readFileSync(path.join(run.profile,'main-debug.log'),'utf8');assert(log.includes('doc:close-confirm'));assert(/doc:close-save-cancelled .*"hadCloseIntent":true/.test(log),'cancelled Save As clears the actual pending close intent');trace.push({state:await snapshot(x),dialogSelection:'test-only native response 0; Save As cancellation hook'});

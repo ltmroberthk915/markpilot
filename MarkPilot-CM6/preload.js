@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld('mpHost', {
   debugNativeTheme: () => ipcRenderer.invoke('debug:native-theme'),
   /* 【文件多开】在新窗口里打开一个文件（不传则用当前文件）。 */
   openInNewWindow: (filePath) => ipcRenderer.invoke('win:openInNewWindow', filePath),
+  openDocument: (filePath) => ipcRenderer.invoke('file:openDocument', filePath),
   settingGet: (key) => ipcRenderer.invoke('setting:get', key),
   settingSet: (key, value) => ipcRenderer.invoke('setting:set', { key, value }),
   /* 图片右键：图片进剪贴板 / 另存为（都在主进程做，渲染侧不碰文件系统）。 */
@@ -103,6 +104,7 @@ contextBridge.exposeInMainWorld('mpHost', {
   // 全屏切换（工具栏「全屏」按钮）：壳层负责，返回新状态供渲染侧提示
   toggleFullscreen: () => ipcRenderer.invoke('win:fullscreen'),
   onMenu: (cb) => ipcRenderer.on('menu', (_e, cmd) => cb(cmd)),
+  onSetting: (cb) => ipcRenderer.on('setting', (_e, payload) => cb(payload)),
   onDoc: (cb) => ipcRenderer.on('doc', (_e, payload) => cb(payload)),
   onTheme: (cb) => ipcRenderer.on('theme', (_e, payload) => cb(payload)),
 });

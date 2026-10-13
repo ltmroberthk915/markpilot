@@ -13,3 +13,19 @@ test('vertical scrolling is requested only after no full-height safe band fits',
  assert.equal(verticalFrame(base).constrained,true);assert.equal(verticalFrame({...base,height:20}).constrained,false);
  assert.equal(verticalFrame({...base,minimumHeight:40}),null);
 });
+test('formula avoidance is bounded in both directions and distant bands use the covering anchor',async()=>{
+ const {previewFrame,PREVIEW_MAX_DISPLACEMENT}=await modulePromise;
+ assert.equal(PREVIEW_MAX_DISPLACEMENT,96);
+ const base={bounds:{top:0,bottom:800},anchor:{top:350,bottom:370},legacyTop:376,left:0,width:200,height:50};
+ for(const band of [[100,150],[650,700]]){
+  const obstacles=[{left:0,right:200,top:0,bottom:band[0]},{left:0,right:200,top:band[1],bottom:800}];
+  const result=previewFrame({...base,obstacles});assert.equal(result.top,376);assert.equal(result.overlay,true);
+ }
+ const near=previewFrame({...base,obstacles:[{left:0,right:200,top:0,bottom:420},{left:0,right:200,top:475,bottom:800}]});
+ assert.equal(near.overlay,false);assert(Math.abs(near.top-base.legacyTop)<=96);
+});
+test('a fully blocked viewport still displays the legacy covering preview; tall previews remain scrollable',async()=>{
+ const {previewFrame}=await modulePromise;
+ const result=previewFrame({bounds:{top:0,bottom:300},anchor:{top:230,bottom:260},left:0,width:200,height:500,minimumHeight:24,obstacles:[{left:0,right:200,top:0,bottom:300}]});
+ assert.equal(result.top,266);assert.equal(result.height,34);assert(result.overlay&&result.constrained);
+});

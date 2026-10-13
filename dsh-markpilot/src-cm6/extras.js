@@ -249,8 +249,46 @@ export function installExtras(deps) {
   const host = () => (document.body || (getView() ? getView().dom : null));
   let pop = null, outlineEl = null, toastEl = null, dlgEl = null, currentPalette = null, unsubPrefs = null;
 
-  const closePop = () => { if (pop) { pop.remove(); pop = null; } };
-  const closeDlg = () => { if (dlgEl) { dlgEl.remove(); dlgEl = null; } };
+  const panelLifecycles = new WeakMap();
+  function armPanel(el, onClose = null) {
+    if (!panelLifecycles.has(el)) panelLifecycles.set(el, {
+      focus: document.activeElement, ticket: window.mpEngine?.commands.capture(),
+      onClose, cleanup: new Set(), recording: null,
+    });
+    return panelLifecycles.get(el);
+  }
+  function closePanel(el, restoreFocus = false) {
+    if (!el) return;
+    const lifecycle = panelLifecycles.get(el);
+    const active = document.activeElement;
+    // Closing a panel is a new explicit focus intent. Keep a newer editor or
+    // external native-input owner when the panel did not own the current focus.
+    const returnFocus = restoreFocus && (el.contains(active) || active === document.body || (active === lifecycle?.focus && !getView()?.hasFocus));
+    panelLifecycles.delete(el);
+    if (pop === el) pop = null;
+    if (dlgEl === el) dlgEl = null;
+    el.remove();
+    if (lifecycle) {
+      for (const cleanup of lifecycle.cleanup) cleanup();
+      lifecycle.onClose?.();
+      if (returnFocus) {
+        const previous = lifecycle.focus;
+        const commands = window.mpEngine?.commands;
+        const sameDocument = lifecycle.ticket && commands?.valid(lifecycle.ticket, { source: false, intent: false });
+        if (sameDocument && previous?.isConnected && previous.matches('input, textarea, [contenteditable="true"]') &&
+            !previous.closest('.cm-editor') && previous.getClientRects().length) {
+          previous.focus({ preventScroll: true });
+          if (previous.contains(document.activeElement)) return;
+        }
+        if (lifecycle.ticket && commands?.resume(lifecycle.ticket, { intent: false })) return;
+        // A different document invalidates the old owner. Explicit panel close
+        // may return to the current editor, without reviving an old selection.
+        if (document.hasFocus() && document.activeElement === document.body) window.mpEngine?.focus();
+      }
+    }
+  }
+  const closePop = () => closePanel(pop);
+  const closeDlg = () => closePanel(dlgEl);
   /** 提示条。第三参 action = { label, onClick } 时渲染成"文字 + 可点链接"，停留时间拉到 ≥6s（够点）。 */
   function toast(text, ms = 1800, action = null) {
     const h = host(); if (!h) return;
@@ -350,6 +388,7 @@ export function installExtras(deps) {
     closePop();
     pop = document.createElement('div');
     pop.className = 'mp-pop';
+    armPanel(pop);
     /* 【定位·2026-10-08】锚点必须**可见**才按它定位：阅读模式下工具栏 `display:none`，
        锚点的 rect 全是 0，照着算会把菜单顶到 (6,6) 甚至负坐标（用户报障形态：菜单"跑到屏幕外"）。
        锚点不可见（或被隐藏）时退回**视口右上角**（阅读态唯一合理的落点）。 */
@@ -367,11 +406,12 @@ export function installExtras(deps) {
        在每处各自加必然漏；这里是**唯一**的构造点（`openPop`）。
        顺手解决"点了别处才关"的旧问题：以前只能点空白处关闭，鼠标离得远时不方便。 */
     if (!pop.querySelector('.mp-pop-close')) {
+      const panel = pop;
       const x = document.createElement('span');
       x.className = 'mp-pop-close';
       x.textContent = '✕';
       x.title = '关闭（Esc）';
-      x.onclick = (e) => { e.stopPropagation(); closePop(); };
+      x.onclick = (e) => { e.stopPropagation(); closePanel(panel, true); };
       pop.insertBefore(x, pop.firstChild);
     }
     h.appendChild(pop);
@@ -381,8 +421,10 @@ export function installExtras(deps) {
       if (pr.bottom > hr.bottom - 4) pop.style.top = Math.max(4, (top - (pr.bottom - hr.bottom) - 4)) + 'px';
       if (pr.right > hr.right - 4) pop.style.left = Math.max(4, (hr.right - 4 - pr.width) - hr.left) + 'px';
     } catch { /* 量不到就保持初值 */ }
-    const away = (e) => { if (pop && !pop.contains(e.target) && e.target !== anchor) { closePop(); document.removeEventListener('mousedown', away, true); } };
-    setTimeout(() => document.addEventListener('mousedown', away, true), 0);
+    const panel = pop, lifecycle = panelLifecycles.get(panel);
+    const away = e => { if (panel.isConnected && !panel.contains(e.target) && e.target !== anchor) closePanel(panel); };
+    const awayTimer = setTimeout(() => { if (panel.isConnected) document.addEventListener('mousedown', away, true); }, 0);
+    lifecycle.cleanup.add(() => { clearTimeout(awayTimer); document.removeEventListener('mousedown', away, true); });
   }
 
   /* ── 快捷键设置（Compartment 重配 keymap；白名单动作） ── */
@@ -1573,10 +1615,17 @@ export function installExtras(deps) {
   /* 【Esc 关弹层·2026-10-10 普查实测】原来 Esc 关不掉「更多」等弹层（只有点外面/滚动才关）。
      菜单开着时 Esc 优先关菜单，并且不再往下传（否则会顺手退出阅读模式）。 */
   const closePopOnEsc = (e) => {
-    if (!pop) return;
     if (e.key !== 'Escape' && e.keyCode !== 27) return;
-    closePop();
-    try { e.preventDefault(); e.stopPropagation(); } catch { /* 忽略 */ }
+    const layers = [...document.querySelectorAll('.mp-pop, .mp-dlg, .cm-panel')].filter(el => el.getClientRects().length && (el === pop || el.querySelector('.mp-pop-close, .close, button[name="close"]')));
+    const el = layers.sort((a,b) => (Number(getComputedStyle(a).zIndex)||0) - (Number(getComputedStyle(b).zIndex)||0)).at(-1);
+    if (!el) return;
+    if (!e.repeat) {
+      const lifecycle = panelLifecycles.get(el);
+      if (lifecycle?.recording) lifecycle.recording();
+      else if (el.classList.contains('cm-panel')) el.querySelector('button[name="close"]')?.click();
+      else closePanel(el, true);
+    }
+    try { e.preventDefault(); e.stopImmediatePropagation(); } catch { /* 忽略 */ }
   };
   document.addEventListener('keydown', closePopOnEsc, true);
   window.addEventListener('wheel', closePopOnScroll, { passive: true, capture: true });
@@ -2067,6 +2116,10 @@ export function installExtras(deps) {
       + `<tr><td style="white-space:nowrap">启动</td><td>`
       + `<label style="cursor:pointer"><input type="checkbox" id="mp-restore-last"> 打开上次的文件</label>`
       + `<div class="k" style="margin-top:2px">打开应用时自动接着上次的文件；关掉则每次开空白文档。上次的文件若已被移走，则自动往后找最近一个仍在的。</div></td></tr>`
+      + `<tr><td style="white-space:nowrap">保存</td><td>`
+      + `<label style="cursor:pointer"><input type="checkbox" id="mp-autosave" disabled> 自动保存</label>`
+      + `<label style="margin-left:14px">间隔 <input id="mp-autosave-seconds" type="number" min="1" max="3600" step="1" value="30" disabled style="width:72px"> 秒</label>`
+      + `<div class="k" style="margin-top:2px">默认手动保存，按 Ctrl+S 写入文件。开启后按间隔保存有修改的文件；未命名文档需先另存为。</div></td></tr>`
       + `<tr><td style="white-space:nowrap">Typora 主题</td><td>`
       + `<button class="mp-key" id="mp-theme-install">安装 .css…</button>`
       + `<span class="k" style="margin-left:8px">当前：<b id="mp-theme-name">${userThemeName() || '未安装'}</b>${userThemeCss() ? `（${Math.round(userThemeCss().length / 1024)} KB）` : ''}</span>`
@@ -2078,6 +2131,29 @@ export function installExtras(deps) {
       + `<p style="margin-top:10px"><button class="mp-key" data-act="reset">恢复默认</button>`
       + `<button class="mp-key" data-act="keys" style="margin-left:8px">快捷键设置…</button></p>`);
     const d = dlgEl; if (!d) return;
+    {
+      const hp = window.mpHost, enabled = d.querySelector('#mp-autosave'), seconds = d.querySelector('#mp-autosave-seconds');
+      let current = { enabled: false, seconds: 30 }, busy = false;
+      const show = () => { enabled.checked = current.enabled; seconds.value = current.seconds; enabled.disabled = busy; seconds.disabled = busy || !current.enabled; };
+      const changed = event => { current = { enabled: event.detail.enabled, seconds: Math.round(event.detail.intervalMs / 1000) }; show(); };
+      window.addEventListener('mp:save-policy', changed);
+      panelLifecycles.get(d).cleanup.add(() => window.removeEventListener('mp:save-policy', changed));
+      const read = async () => {
+        const [a,b] = await Promise.all([hp.settingGet('autosaveEnabled'), hp.settingGet('autosaveIntervalMs')]);
+        current = { enabled: a?.value === true, seconds: Math.round(Number(b?.value || 30000)/1000) }; show();
+      };
+      const write = async (key, value) => {
+        busy = true; show();
+        try { const r = await hp.settingSet(key, value); if (!r?.ok) throw new Error(r?.error || '未知错误'); await read(); }
+        catch (error) { toast('保存设置失败：' + error.message); }
+        finally { busy = false; show(); }
+      };
+      if (hp?.settingGet && hp?.settingSet) {
+        void read().catch(error => toast('读取保存设置失败：' + error.message));
+        enabled.onchange = () => { const value = enabled.checked; void write('autosaveEnabled', value); };
+        seconds.onchange = () => { const value = Number(seconds.value); if (!Number.isInteger(value) || value < 1 || value > 3600) { show(); toast('保存间隔需为 1～3600 秒的整数'); return; } void write('autosaveIntervalMs', value * 1000); };
+      }
+    }
     /* 【双向同步·2026-10-06】面板订阅引擎的偏好广播：**别处**改了值（`Ctrl+=/-/0`、Ctrl+滚轮、
        状态栏数字口、菜单里的不透明度滑杆）时，把这里的滑杆与数字刷新到同一个值。
        改前是单向的——面板读一次初始值就再也不更新，"面板数字不动"会让用户以为滑杆是假的。 */
@@ -2095,6 +2171,8 @@ export function installExtras(deps) {
     try {
       if (unsubPrefs) { unsubPrefs(); unsubPrefs = null; }
       unsubPrefs = window.mpPrefs && window.mpPrefs.subscribe ? window.mpPrefs.subscribe((snap) => refreshFromPrefs(snap)) : null;
+      const subscription = unsubPrefs;
+      if (subscription) panelLifecycles.get(d).cleanup.add(() => { subscription(); if (unsubPrefs === subscription) unsubPrefs = null; });
     } catch { /* 没有订阅口就退化为单向 */ }
     d.querySelectorAll('input.mp-rng[data-p]').forEach((el) => {
       el.oninput = () => {
@@ -2370,13 +2448,14 @@ export function installExtras(deps) {
         if (el.classList.contains("mp-outline") || el.classList.contains("mp-outline-dock")) return;   // 大纲除外
         /* 【右键菜单不带关闭键·2026-10-10】菜单不补 ✕；已经补过的（旧版本注入的）顺手摘掉。 */
         if (el.classList.contains("mp-pop-menu")) { const old = el.querySelector(".mp-pop-close"); if (old) old.remove(); return; }
+        armPanel(el);
         if (el.querySelector(".mp-pop-close, .close")) return;                                          // 已有（dialog 自带）
         const isDlg = el.classList.contains("mp-dlg");
         const x = document.createElement("span");
         x.className = isDlg ? "close" : "mp-pop-close";
         x.textContent = "✕";
         x.title = "关闭（Esc）";
-        x.onclick = (e) => { e.stopPropagation(); if (isDlg) closeDlg(); else closePop(); };
+        x.onclick = (e) => { e.stopPropagation(); closePanel(el, true); };
         el.insertBefore(x, el.firstChild);
       } catch { /* 补不上也不影响面板本身 */ }
     };
@@ -2504,13 +2583,15 @@ export function installExtras(deps) {
     applyReading();
   })();
 
-  function dialog(title, bodyHtml) {
+  function dialog(title, bodyHtml, onClose = null) {
     const h = host(); if (!h) return;
     closeDlg();
     dlgEl = document.createElement('div');
     dlgEl.className = 'mp-dlg';
+    armPanel(dlgEl, onClose);
     dlgEl.innerHTML = `<span class="close">✕</span><h3>${title}</h3>${bodyHtml}`;
-    dlgEl.querySelector('.close').onclick = closeDlg;
+    const panel = dlgEl;
+    dlgEl.querySelector('.close').onclick = () => closePanel(panel, true);
     h.appendChild(dlgEl);
   }
   async function about() {
@@ -2538,12 +2619,19 @@ export function installExtras(deps) {
     const names = { bold: '加粗', italic: '斜体', underline: '下划线', strike: '删除线', code: '行内代码', quote: '引用', list: '无序列表', save: '保存文件', outline: '大纲面板', export: '导出 HTML' };
     dialog('快捷键设置', `<p class="k">点右侧键位后按下新组合键（Esc 取消，退格恢复默认）。</p><table id="mp-keys">` +
       Object.entries(cfg).map(([a, c]) => `<tr><td>${names[a] || a}</td><td><span class="mp-key" data-a="${a}">${showCombo(c)}</span></td></tr>`).join('') + '</table>');
+    const lifecycle = panelLifecycles.get(dlgEl);
     dlgEl.querySelectorAll('.mp-key').forEach((el) => {
       el.onclick = () => {
+        lifecycle.recording?.();
         el.classList.add('editing'); el.textContent = '按下组合键…';
+        const finish = () => {
+          el.classList.remove('editing'); el.textContent = showCombo(keyConfig()[el.dataset.a]);
+          document.removeEventListener('keydown', onKey, true);
+          lifecycle.cleanup.delete(finish); lifecycle.recording = null;
+        };
         const onKey = (e) => {
           e.preventDefault(); e.stopPropagation();
-          if (e.key === 'Escape') { el.classList.remove('editing'); el.textContent = showCombo(keyConfig()[el.dataset.a]); document.removeEventListener('keydown', onKey, true); return; }
+          if (e.key === 'Escape') { finish(); return; }
           /* 【普查实测·2026-10-10】改前：任何 keydown 都当场落定 ⇒ 真实按 Ctrl+Shift+Y 时，
              第一个事件是 Control，于是组合被记成单键 'Mod'（后续按键再没人接）。
              现在：**纯修饰键不落定**，继续等真正的那个键（此时修饰位仍按着，comboOf 能拿到完整组合）。 */
@@ -2555,8 +2643,9 @@ export function installExtras(deps) {
           }
           if (e.key === 'Backspace') { setKey(el.dataset.a, DEFAULT_KEYS[el.dataset.a]); el.textContent = showCombo(DEFAULT_KEYS[el.dataset.a]); }
           else { const combo = comboOf(e); setKey(el.dataset.a, combo); el.textContent = showCombo(combo); }
-          el.classList.remove('editing'); document.removeEventListener('keydown', onKey, true);
+          finish();
         };
+        lifecycle.cleanup.add(finish); lifecycle.recording = finish;
         document.addEventListener('keydown', onKey, true);
       };
     });
@@ -3122,12 +3211,15 @@ export function installExtras(deps) {
    *  @returns {Promise<string|null>} 取消 ⇒ null（与"确认了空串"区分开） */
   function promptLine({ title, placeholder = '', value = '', okText = '确定' }) {
     return new Promise((resolve) => {
+      let settled = false;
+      const settle = value => { if (!settled) { settled = true; resolve(value); } };
       dialog(title, '<p><input class="mp-line-input" type="text" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--mp-border);border-radius:6px;background:transparent;color:var(--mp-fg);font:inherit" placeholder="' + placeholder + '" value="' + value + '"></p>'
-        + '<p style="text-align:right;margin-top:12px"><button class="mp-key" data-ok>' + okText + '</button></p>');
+        + '<p style="text-align:right;margin-top:12px"><button class="mp-key" data-ok>' + okText + '</button></p>', () => settle(null));
       const inp = dlgEl && dlgEl.querySelector('input.mp-line-input');
       if (!inp) { resolve(null); return; }
+      const panel = dlgEl;
       inp.focus(); inp.select();                 // 默认聚焦 + 全选：用户可直接覆盖
-      const done = (val) => { closeDlg(); resolve(val); };
+      const done = (val) => { settle(val); closePanel(panel, true); };
       dlgEl.querySelector('[data-ok]').onclick = () => done(inp.value);
       inp.addEventListener('keydown', (ev) => {
         if (ev.key === 'Enter') { ev.preventDefault(); done(inp.value); }

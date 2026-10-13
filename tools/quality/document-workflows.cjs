@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const { args, launch, acquireSlot, sleep } = require('./lifecycle.cjs');
-const { outputDir, snapshot, frame, recorder, waitUntil, newWindow } = require('./harness.cjs');
+const { outputDir, snapshot, frame, recorder, waitUntil, newWindow, newBlankWindow } = require('./harness.cjs');
 
 async function focus(page) {
   await page.bringToFront();
@@ -82,10 +82,12 @@ async function main() {
       await p.keyboard.press('Control+a');await p.keyboard.press('Backspace');await saved(p,file,'');
       await observed(p,dir,trace,'new-01-old-empty');
       const old=await p.evaluate(()=>documentId);
-      const answer=await p.evaluate(()=>window.mpHost.recentTestMenuClick('menu-new-document',true));assert(answer?.ok,'native menu callback');
-      await waitUntil(()=>p.evaluate(old=>documentId!==old&&filePath===null,old),'new untitled identity');
-      await focus(p);await p.keyboard.press('Control+z');await sleep(200);
-      const after=await observed(p,dir,trace,'new-02-after-undo');assert.equal(after.text,'','new blank document has empty history');assert.equal(fs.readFileSync(file,'utf8'),'','old file remains saved empty');
+      const blank=await newBlankWindow(run,p);
+      assert.notEqual(await blank.evaluate(()=>documentId),old,'new blank has an independent identity');
+      assert.equal(await p.evaluate(()=>documentId),old,'old document keeps its identity');
+      await focus(blank);await blank.keyboard.press('Control+z');await sleep(200);
+      const after=await observed(blank,dir,trace,'new-02-after-undo');assert.equal(after.text,'','new blank document has empty history');assert.equal(fs.readFileSync(file,'utf8'),'','old file remains saved empty');
+      assert.equal((await snapshot(p)).text,'','old source remains saved empty');
       return{historyIsolated:true};
     });
     await test('new-file-cannot-redo-old-file-edit',async trace=>{

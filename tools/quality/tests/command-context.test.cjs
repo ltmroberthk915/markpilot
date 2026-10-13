@@ -98,6 +98,16 @@ async function main() {
     assert.equal(cc.resume({ ...t2, owner: { kind: 'native' } }), false, 'native owner never resumed');
   });
 
+  test('MODEL explicit panel close permits newer close intent but preserves owner guards', () => {
+    const r = rig(newView('abc')), ticket = r.cc.capture({flush:false});
+    r.cc.invalidate(); assert.equal(r.cc.resume(ticket),false);
+    assert.equal(r.cc.resume(ticket,{intent:false}),true);
+    activeEl = {tagName:'INPUT'}; assert.equal(r.cc.resume(ticket,{intent:false}),false); activeEl=null;
+    focusOn=false; assert.equal(r.cc.resume(ticket,{intent:false}),false); focusOn=true;
+    r.set({epoch:2}); assert.equal(r.cc.resume(ticket,{intent:false}),false);
+    assert.deepEqual(r.resumes,['cm']);
+  });
+
   test('MODEL command focus creates no content/history', () => {
     const v = newView('hello region world'); const r = rig(v); const { cc } = r;
     const doc0 = v.state.doc, d0 = undoDepth(v.state);

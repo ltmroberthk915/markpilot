@@ -9,7 +9,9 @@ if(!opts.runtime||!opts.out)throw new Error('--runtime and --out are required');
 (async()=>{
  const out=outputDir(opts.out,'staged-app'),runtime=path.resolve(opts.runtime),source=path.resolve(opts.app||path.join(ROOT,'MarkPilot-CM6')),app=path.join(out,'app-source'),bin=path.join(out,'unpacked');
  const name=['electron.exe','MarkPilot.exe'].find(n=>fs.existsSync(path.join(runtime,n)));if(!name)throw new Error('Runtime executable is missing');
- fs.cpSync(runtime,bin,{recursive:true,filter:f=>!['resources/app.asar','resources/default_app.asar'].includes(path.relative(runtime,f).replaceAll('\\','/'))});
+ // An installed application may supply the matching Electron runtime. Its
+ // generated uninstaller belongs to that installation, never to a new payload.
+ fs.cpSync(runtime,bin,{recursive:true,filter:f=>!['resources/app.asar','resources/default_app.asar','Uninstall MarkPilot.exe','uninstallerIcon.ico'].includes(path.relative(runtime,f).replaceAll('\\','/'))});
  if(name!=='MarkPilot.exe')fs.renameSync(path.join(bin,name),path.join(bin,'MarkPilot.exe'));
  fs.mkdirSync(app);
  for(const rel of ['package.json','main.js','preload.js','export-folder.js','export-pdf.js','shell','renderer','build'])fs.cpSync(path.join(source,rel),path.join(app,rel),{recursive:true});

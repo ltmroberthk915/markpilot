@@ -154,7 +154,7 @@ function dbg(...parts) {
 
 /** Application preferences are shared; each window owns its document session. */
 const state = { ...createSession(), unresponsiveAt: 0, unresponsiveCount: 0, unresponsiveTotalMs: 0,
-  settings: { theme: 'system', recent: [], recentFiles: [], winBounds: null, restoreLast: true } };
+  settings: { theme: 'system', recent: [], recentFiles: [], winBounds: null, restoreLast: true, autosaveEnabled: false, autosaveIntervalMs: 30000 } };
 const sessions = new Map();
 function registerSession(wc, session) { sessions.set(wc.id, session); }
 function unregisterSession(wc) { if (wc) sessions.delete(wc.id); }
@@ -263,7 +263,7 @@ function recentMenuItems() {
       ? { type: 'separator' }
       : {
         id: m.id, label: m.label, sublabel: m.sublabel, enabled: m.enabled,
-        click: m.path ? () => { void openPath(m.path); } : () => clearRecent(),
+        click: m.path ? () => { void openDocument(m.path); } : () => clearRecent(),
       }));
 }
 
@@ -529,7 +529,7 @@ async function pickOpen(W = activeWindow()) {
   const r = await dialog.showOpenDialog(W, { title: '打开 Markdown',
     filters: [{ name: 'Markdown', extensions: ['md', 'markdown', 'mdx', 'txt'] }, { name: '全部文件', extensions: ['*'] }], properties: ['openFile'] });
   if (r.canceled || !r.filePaths[0]) return { ok: false, canceled: true };
-  return openPath(r.filePaths[0], { win: W, session: sessionOf(W.webContents) });
+  return openDocument(r.filePaths[0]);
 }
 let testSaveAsIndex = 0;
 async function pickSaveAs(S, W) {
@@ -663,15 +663,57 @@ function newSession() {
   return createSession();
 }
 /** 在新窗口里打开一个文件（OS 二次启动、菜单「在新窗口中打开」都走这里）。 */
-function openInNewWindow(filePath) {
+async function openInNewWindow(filePath) {
+  let createdWindow = null;
   try {
     const S = newSession();
+    // Read before creating a renderer: an unreadable file leaves every existing
+    // window intact and does not create an empty failed document.
+    if (filePath) await readDoc(filePath, S);
     const W = createWindow(S);          // 3a 已参数化：窗口与会话一一对应
+    createdWindow = W;
     try { S.__tag = 'newwin-' + Date.now(); dbg('newwin:session', { tag: S.__tag, isPrimary: S === state, wcId: W.webContents.id }); } catch { }
-    W.once('ready-to-show', () => { try { if (filePath) openPath(filePath, { win: W, session: S }); } catch (e) { dbg('newwin:open-failed', String((e && e.message) || e)); } });
+    await new Promise((resolve, reject) => {
+      const finish = error => {
+        clearTimeout(timer); W.removeListener('ready-to-show', ready); W.removeListener('closed', closed);
+        W.webContents.removeListener('did-fail-load', failed);
+        error ? reject(error) : resolve();
+      };
+      const ready = () => finish(), closed = () => finish(failure('MP_SESSION_CLOSED', '打开期间窗口已关闭'));
+      const failed = (_event, code, description) => finish(failure('MP_WINDOW_LOAD', description || String(code)));
+      const timer = setTimeout(() => { finish(failure('MP_WINDOW_LOAD', '编辑窗口启动超时')); if (!W.isDestroyed()) W.destroy(); }, 15000);
+      W.once('ready-to-show', ready); W.once('closed', closed); W.webContents.once('did-fail-load', failed);
+    });
     dbg('newwin:created', { filePath: filePath || null, sessions: sessions.size });
-    return { ok: true };
-  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+    return { ok: true, windowId: W.id, documentId: S.documentId };
+  } catch (e) {
+    if (createdWindow && !createdWindow.isDestroyed()) createdWindow.destroy();
+    return { ok: false, error: String((e && e.message) || e), code: e.code };
+  }
+}
+const documentOpens = new Map();
+async function openDocument(filePath) {
+  try {
+    if (typeof filePath !== 'string' || !filePath) throw failure('MP_BAD_PATH', '没有指定文件路径');
+    const canonical = await documents.canonical(filePath), key = documents.key(canonical);
+    if (documentOpens.has(key)) return documentOpens.get(key);
+    const job = (async () => {
+      for (const W of BrowserWindow.getAllWindows()) {
+        if (W.isDestroyed() || !sessions.has(W.webContents.id)) continue;
+        const S = sessionOf(W.webContents);
+        if (!S.filePath) continue;
+        const identity = { documentId: S.documentId, filePath: S.filePath };
+        const candidate = documents.key(await documents.canonical(identity.filePath));
+        if (candidate !== key || W.isDestroyed() || S.documentId !== identity.documentId || S.filePath !== identity.filePath) continue;
+        if (W.isMinimized()) W.restore(); W.show(); W.focus();
+        pushRecent(S.filePath);
+        return { ok: true, existing: true, windowId: W.id, documentId: S.documentId };
+      }
+      return openInNewWindow(canonical);
+    })();
+    documentOpens.set(key, job);
+    try { return await job; } finally { if (documentOpens.get(key) === job) documentOpens.delete(key); }
+  } catch (error) { return { ok: false, error: error.message, code: error.code }; }
 }
 function createWindow(session = state) {   // 【文件多开·第 3 步·3a】可指定会话；默认主会话 ⇒ 老行为
   /* 【S6·主窗口语义·2026-10-10（用户批准 ✓）】几何**只记主窗口** ✓：
@@ -791,7 +833,7 @@ else {
        就是这条路径（系统里双击另一个 .md / 命令行再启一次）。
        同时修掉一条回归：改前这里是 `if (win) { if (W.isMinimized()) W.restore(); W.focus(); }`，
        而 `W` 在本作用域不存在（3a 的区块替换范围过大把这段一起改名了）⇒ 第二次启动会抛错。 */
-    if (p) openInNewWindow(p);
+    if (p) { void openDocument(p); return; }
     const alive = BrowserWindow.getAllWindows().filter((x) => !x.isDestroyed());
     if (alive.length) { const w2 = alive[alive.length - 1]; try { if (w2.isMinimized()) w2.restore(); w2.focus(); } catch { /* 忽略 */ } }
   });
@@ -872,6 +914,7 @@ handle('file:cancelCloseSave', e => {
 });
 handle('file:open', e => pickOpen(windowOf(e)));
 handle('file:openPath', (e, p) => openPath(p, { win: windowOf(e), session: sessionOf(e.sender) }));
+handle('file:openDocument', (_e, p) => openDocument(p));
 handle('win:openInNewWindow', (e, p) => openInNewWindow(p === undefined ? sessionOf(e.sender).filePath : p));
 handle('file:reload', (e, opts) => reloadDoc(opts || {}, sessionOf(e.sender), windowOf(e)));
 
@@ -891,7 +934,7 @@ const recentView = () => {
   return { file: RECENTS_FILE, limit: RECENT_LIMIT, aumid: APP_USER_MODEL_ID, files };
 };
 handle('recent:list', () => recentView());
-handle('recent:open', (e, p) => openPath(p, { win: windowOf(e), session: sessionOf(e.sender) }));
+handle('recent:open', (_e, p) => openDocument(p));
 handle('recent:clear', () => clearRecent());
 if (MP_TEST_HOOKS) {
   dbg('test-hooks:on');
@@ -1067,6 +1110,7 @@ watchIpc('file:saveAs', e => pickSaveAs(sessionOf(e.sender), windowOf(e)));
 handle('file:requestSave', e => { sendTo(windowOf(e), 'menu', 'save'); return { ok: true }; });
 handle('file:save', async (e, { filePath, text, ...metadata }) => {
   try {
+    if (metadata.automatic && state.settings.autosaveEnabled !== true) return { ok: false, code: 'MP_AUTOSAVE_DISABLED' };
     const S = sessionOf(e.sender);
     const r = await writeDoc(filePath, text, S, metadata);
     if (r.current) syncPathUi(S, windowOf(e));
@@ -1309,7 +1353,7 @@ handle('edit:history', (e, cmd) => {
 /* 【通用设置通道·2026-10-10】渲染侧只允许改这几个键（白名单）：
    设置面板要加的开关会越来越多，但**不能**给渲染侧一个万能写入口 —— 
    state.settings 里有 recentFiles/winBounds 这类壳层自己维护的字段，被渲染侧覆盖会丢数据。 */
-const SETTING_WRITABLE = new Set(['restoreLast', 'theme', 'zoom', 'fontFamily', 'fontSize', 'lineHeight', 'mathScale']);
+const SETTING_WRITABLE = new Set(['restoreLast', 'theme', 'zoom', 'fontFamily', 'fontSize', 'lineHeight', 'mathScale', 'autosaveEnabled', 'autosaveIntervalMs']);
 /* 【文件多开·第 1 步】会话读数（只读）：给探针与后续步骤当验收口。 */
 /* 【只读调试口·S4①·2026-10-10（settings-truth 族）】原生主题的**真源读数**（主进程侧）。
    复核"启动时 theme 是否落到 nativeTheme"必须读这里 —— 渲染侧的 `matchMedia('(prefers-color-scheme: dark)')`
@@ -1331,23 +1375,32 @@ handle('debug:sessions', (e) => {
     };
   } catch (err) { return { ok: false, error: String((err && err.message) || err) }; }
 });
-handle('setting:get', (_e, key) => { const k = String(key || ''); return { key: k, value: state.settings[k] }; });
+handle('setting:get', (_e, key) => {
+  const k = String(key || ''), policy = require('./shell/save-policy').normalize(state.settings.autosaveEnabled, state.settings.autosaveIntervalMs);
+  return { key: k, value: k === 'autosaveEnabled' ? policy.enabled : k === 'autosaveIntervalMs' ? policy.intervalMs : state.settings[k] };
+});
 handle('setting:set', (_e, payload = {}) => {
   const k = String(payload.key || '');
   if (!SETTING_WRITABLE.has(k)) return { ok: false, error: 'readonly-key', key: k };
+  const existed = Object.hasOwn(state.settings, k), previous = state.settings[k];
+  if (k === 'autosaveEnabled' && typeof payload.value !== 'boolean') return { ok: false, error: 'invalid-value', key: k };
+  if (k === 'autosaveIntervalMs' && (!Number.isFinite(payload.value) || payload.value < 1000 || payload.value > 3600000)) return { ok: false, error: 'invalid-value', key: k };
   state.settings[k] = payload.value;
   /* 【数据丢失修复·2026-10-10（corrupt-config A7）】原来无条件 `return { ok: true }` ⇒
      只读 settings.json 时面板改设置"**回执成功、磁盘没变、零提示**"（OS 拒绝写入）。
      现在让写盘结果说话：失败即如实回报，用户看得见。 */
   const w = saveSettings();
   dbg("setting:set", { key: k, value: payload.value, wrote: !!(w && w.ok) });
-  if (w && w.ok === false) return { ok: false, error: 'write-failed', key: k, detail: w.error || '无法写入设置文件' };
+  if (w && w.ok === false) {
+    if (existed) state.settings[k] = previous; else delete state.settings[k];
+    return { ok: false, error: 'write-failed', key: k, detail: w.error || '无法写入设置文件' };
+  }
   /* 【S5 折中·2026-10-10（用户批准 ✓）】写盘成功后，**全局观感类**设置广播到所有窗口 ✓ ⇒ 其它已开窗口
      的面板/正文立即跟上 ✓（原来只有发起操作的那个窗口重算 ✗）。**`zoom` 明确排除** ✗ —— 视图类保持
      各窗口独立 ✓（折中的关键：缩放/滚动不互相干扰 ✓）。渲染侧收到后用**既有 applier** 应用 ✓
      （引擎的 `window.mpEngine.applyPrefs()` 与主题的 `themeGet/applyTheme` ✓，不新写第二份 ✗）。 */
-  const GLOBAL_LOOK = new Set(['theme', 'fontFamily', 'fontSize', 'lineHeight', 'mathScale']);
-  if (GLOBAL_LOOK.has(k)) { try { sendAll('setting', { key: k, value: state.settings[k] }); } catch { /* 忽略 */ } }
+  const GLOBAL_LOOK = new Set(['theme', 'fontFamily', 'fontSize', 'lineHeight', 'mathScale', 'autosaveEnabled', 'autosaveIntervalMs']);
+  if (GLOBAL_LOOK.has(k)) { try { sendAll('setting', { key: k, value: state.settings[k], savePolicy: require('./shell/save-policy').normalize(state.settings.autosaveEnabled, state.settings.autosaveIntervalMs) }); } catch { /* 忽略 */ } }
   return { ok: true, key: k, value: payload.value };
 });
 /* 【图片右键·2026-10-10 用户报"图片右键没反应"】Typora 的图片右键有「复制图片 / 另存为图片」等；

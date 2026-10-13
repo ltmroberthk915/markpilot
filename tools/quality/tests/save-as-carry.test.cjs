@@ -6,11 +6,11 @@ function repositoryRoot(start){let p=fs.realpathSync(start);for(;;){if(fs.exists
 const ROOT=repositoryRoot(__dirname),HOST=path.join(ROOT,'MarkPilot-CM6/renderer/host.js');
 const bytes=fs.readFileSync(HOST),hash=b=>crypto.createHash('sha256').update(b).digest('hex'),hostSha=hash(bytes),source=bytes.toString('utf8');
 const mode=process.argv[2]||'off';assert(['on','off'].includes(mode),'Use node save-as-carry.test.cjs on|off');
-const startAnchor='async function doSave(force = false, grant = null, saveAsOperation = null) {',endAnchor='async function saveAsFlow() {';
+const startAnchor='async function doSave(force = false, grant = null, saveAsOperation = null, automatic = null) {',endAnchor='async function saveAsFlow() {';
 assert.equal(source.split(startAnchor).length,2,'Unique production doSave start');assert.equal(source.split(endAnchor).length,2,'Unique following production function');
 const start=source.indexOf(startAnchor),end=source.indexOf(endAnchor,start);assert(end>start);
 const original=source.slice(start,end).trim();assert(original.endsWith('}'),'Exact function end');
-const carry='return doSave(force, grant, saveAsOperation);';assert.equal(original.split(carry).length,2,'Unique recursive carry anchor');
+const carry='return doSave(force, grant, saveAsOperation, automatic);';assert.equal(original.split(carry).length,2,'Unique recursive carry anchor');
 assert(original.includes('await saveTask;')&&original.includes('await currentText()')&&original.includes('!operationCurrent()'),'Production await/guard sanity');
 const extracted=mode==='on'?original.replace(carry,'return doSave(force, grant);'):original;
 assert.equal(hash(fs.readFileSync(HOST)),hostSha,'String mutation leaves production exact bytes unchanged');

@@ -63,7 +63,34 @@ let recoverySerial = 0;
 let saveAsSerial = 0;
 let reloadPending = null;
 const consumedReloads = new Set();
-const SAVE_DEBOUNCE_MS = 500;
+let savePolicy = MarkPilotSavePolicy.normalize(false, undefined);
+let autoGeneration = 0, policyReadSerial = 0;
+function autoTicket() { return { generation: autoGeneration, documentId }; }
+function autoCurrent(ticket) { return savePolicy.enabled && ticket?.generation === autoGeneration && ticket.documentId === documentId; }
+function retireAutosave() { autoGeneration++; clearTimeout(saveTimer); saveTimer = 0; }
+function applySavePolicy(enabled, intervalMs) {
+  const next = MarkPilotSavePolicy.normalize(enabled, intervalMs);
+  if (next.enabled !== savePolicy.enabled || next.intervalMs !== savePolicy.intervalMs) { retireAutosave(); savePolicy = next; scheduleSave(); }
+  window.dispatchEvent(new CustomEvent('mp:save-policy', { detail: savePolicy }));
+}
+async function refreshSavePolicy() {
+  const serial = ++policyReadSerial;
+  try {
+    const [enabled, interval] = await Promise.all([window.mpHost.settingGet('autosaveEnabled'), window.mpHost.settingGet('autosaveIntervalMs')]);
+    if (serial !== policyReadSerial) return;
+    applySavePolicy(enabled?.value, interval?.value);
+  } catch (error) { console.error('[host] save policy unavailable', error); }
+}
+void refreshSavePolicy();
+window.mpHost.onSetting?.(payload => {
+  // The authoritative snapshot cancels a timer immediately, before any read IPC.
+  policyReadSerial++;
+  if (payload?.savePolicy) applySavePolicy(payload.savePolicy.enabled, payload.savePolicy.intervalMs);
+  if (payload?.key === 'autosaveEnabled' || payload?.key === 'autosaveIntervalMs') return;
+  void window.mpHost.themeGet().then(r => applyTheme(r.dark)).catch(() => {});
+  window.mpEngine?.applyPrefs?.();
+});
+window.addEventListener('pagehide', retireAutosave);
 /* 【体积骤降守卫·2026-10-09】当前文档的"已知体积"：装载时=文件长度，每次成功保存后=写入长度。
    为什么要它：实测到过一次**磁盘级数据丢失**的形态——换文档时旧的非空选区被映射拉成整篇，
    用户敲的第一个字把整篇替换掉，500ms 去抖的自动保存**如实**把那几个字节写回原路径
@@ -144,7 +171,7 @@ function publishDocDir(filePathForDir) {
 
 /* ── 文档装载 ── */
 function applyDoc(text, path, id, loadedRevision = 0, loadKind = 'replace', ticket = null) {
-  clearTimeout(saveTimer); saveTimer = 0;
+  retireAutosave();
   // Supply the resource base before mounting. Commit metadata only after the
   // source was accepted; an engine failure must keep the existing buffer.
   publishDocDir(path || null);
@@ -263,16 +290,17 @@ function saveTrace(step, detail) {
   } catch { /* 诊断不许影响主流程 */ }
 }
 function scheduleSave() {
-  clearTimeout(saveTimer); saveTimer = 0;
-  if (saveBlocked) return;
-  saveTimer = setTimeout(() => { saveTimer = 0; void doSave(); }, SAVE_DEBOUNCE_MS);
+  if (saveTimer || saveInFlight || !savePolicy.enabled || !dirty || !filePath || saveBlocked || lastSaveError) return;
+  const ticket = autoTicket();
+  saveTimer = setTimeout(() => { saveTimer = 0; if (autoCurrent(ticket)) void doSave(false, null, null, ticket); }, savePolicy.intervalMs);
 }
 async function flushSave() {
   window.mpEngine?.commands.capture(); syncSource();
+  const ticket = autoTicket();
   const pending = !!saveTimer || !!saveTask;
   clearTimeout(saveTimer); saveTimer = 0;
   if (saveTask) await saveTask;
-  if (dirty && !saveBlocked) await doSave();
+  if (dirty && !saveBlocked && autoCurrent(ticket)) await doSave(false, null, null, ticket);
   return pending;
 }
 window.mpFlushSave = flushSave;
@@ -285,9 +313,9 @@ function saveFailure(r, path) {
     ...(!saveBlocked ? [{ label: '重试', run: () => { void doSave(true); } }] : []),
   ]);
 }
-async function doSave(force = false, grant = null, saveAsOperation = null) {
+async function doSave(force = false, grant = null, saveAsOperation = null, automatic = null) {
   const operationCurrent = () => saveAsOperation === null || saveAsOperation === saveAsSerial;
-  if (!operationCurrent()) return false;
+  if (!operationCurrent() || (!force && (!automatic || !autoCurrent(automatic)))) return false;
   if (window.mpEngine?.commands && !window.mpEngine.commands.capture()) return false;
   syncSource();
   if (!filePath && !grant) {
@@ -297,8 +325,8 @@ async function doSave(force = false, grant = null, saveAsOperation = null) {
   if (saveInFlight) {
     const id = documentId;
     await saveTask;
-    if (documentId !== id || !operationCurrent()) return false;
-    if (force || dirty) return doSave(force, grant, saveAsOperation);
+    if (documentId !== id || !operationCurrent() || (!force && !autoCurrent(automatic))) return false;
+    if (force || dirty) return doSave(force, grant, saveAsOperation, automatic);
     return true;
   }
   if (saveBlocked && !grant) return false;
@@ -311,7 +339,7 @@ async function doSave(force = false, grant = null, saveAsOperation = null) {
     try {
       const immediate = engineValue();
       const text = typeof immediate === 'string' ? immediate : await currentText();
-      if (documentId !== capture.documentId || revision !== capture.revision || !operationCurrent()) return false;
+      if (documentId !== capture.documentId || revision !== capture.revision || !operationCurrent() || (!force && !autoCurrent(automatic))) return false;
       if (typeof text !== 'string') throw new Error('取不到文档内容');
       if (!force && knownLen >= SHRINK_MIN && text.length < knownLen * SHRINK_RATIO) {
         showBanner('自动保存被拦下：文档从 ' + knownLen + ' 字骤降到 ' + text.length + ' 字。确认这是你要的结果吗？', [
@@ -319,10 +347,10 @@ async function doSave(force = false, grant = null, saveAsOperation = null) {
           { label: '放弃这次自动保存', run: () => {} },
         ]); return false;
       }
-      const r = await window.mpHost.save(capture.filePath, text, { documentId: capture.documentId, revision: capture.revision, ...(grant ? { saveAsToken: grant.saveAsToken } : {}) });
+      const r = await window.mpHost.save(capture.filePath, text, { documentId: capture.documentId, revision: capture.revision, ...(!force ? { automatic: true } : {}), ...(grant ? { saveAsToken: grant.saveAsToken } : {}) });
       saveTrace('doSave:saved', { filePath: capture.filePath, ok: !!r?.ok, revision: capture.revision, code: r?.code, error: r?.error });
       if (documentId !== capture.documentId || recoverySerial !== capture.recoverySerial || !operationCurrent()) return false;
-      if (!r?.ok) { saveFailure(r, capture.filePath); return false; }
+      if (!r?.ok) { if (r?.code !== 'MP_AUTOSAVE_DISABLED') saveFailure(r, capture.filePath); return false; }
       if (!r.current) return false;
       filePath = r.filePath; publishDocDir(filePath); knownLen = text.length;
       dirty = revision !== capture.revision;
@@ -335,7 +363,7 @@ async function doSave(force = false, grant = null, saveAsOperation = null) {
       return false;
     } finally {
       saveInFlight = false; saveTask = null;
-      if (documentId === capture.documentId && recoverySerial === capture.recoverySerial && dirty && !saveBlocked && !lastSaveError) scheduleSave();
+      scheduleSave();
     }
   });
   return saveTask;
@@ -366,8 +394,13 @@ async function saveAsFlow() {
     }
   }
 }
-async function newDocument() {
+async function newDocument({ replace = false } = {}) {
   if (exportActive) { exportBanner('请先完成或取消 PDF 导出'); return false; }
+  if (!replace && (filePath || dirty || revision || engineValue())) {
+    const r = await window.mpHost.openInNewWindow(null);
+    if (!r?.ok) showBanner(r?.error || '新建窗口失败');
+    return !!r?.ok;
+  }
   const id = documentId;
   if (dirty && !(await confirmDiscard())) return false;
   if (documentId !== id) return false;
@@ -461,7 +494,7 @@ window.mpHost.onMenu(async (cmd) => {
     case 'save': if (!(await doSave(true))) await window.mpHost.cancelCloseSave(); break;
     case 'saveThenReload': if (await doSave(true)) await window.mpHost.reloadView(); break;
     case 'saveAs': await saveAsFlow(); break;
-    case 'closeFile': await newDocument(); break;
+    case 'closeFile': await newDocument({ replace: true }); break;
 
     case 'theme': await toggleTheme(); break;
     /* 【S5 折中·2026-10-10（用户批准 ✓）】壳层广播过来的**全局观感类**设置 ⇒ 用**既有 applier** 应用 ✓：
@@ -472,6 +505,7 @@ window.mpHost.onMenu(async (cmd) => {
        两个 applier 都是幂等的 ✓ ⇒ 一律都跑一遍即可，**不依赖广播载荷的字段名** ✓（少一处猜 ✗）。
        注意：`zoom`/滚动**不在广播之列** ✗ —— 视图类各窗口独立 ✓（折中的关键对照 ✓）。 */
     case 'setting':
+      await refreshSavePolicy();
       try { const r = await window.mpHost.themeGet(); applyTheme(r.dark); } catch { /* 忽略 */ }
       try { if (window.mpEngine && window.mpEngine.applyPrefs) window.mpEngine.applyPrefs(); } catch { /* 忽略 */ }
       break;
@@ -645,8 +679,8 @@ window.addEventListener('drop', async (e) => {
   const f = files[0];
   const p = window.mpHost.pathForFile(f);
   if (!p) return;
-  if (dirty && !(await confirmDiscard())) return;   // 用户点「取消」⇒ 到此为止，文档一个字节都不动
-  await window.mpHost.openPath(p);
+  const r = await window.mpHost.openDocument(p);
+  if (!r?.ok && !r?.canceled) showBanner(r?.error || '打开失败');
 }, true);
 
 /* ── 外改探测：窗口获得焦点时比对磁盘 mtime ── */

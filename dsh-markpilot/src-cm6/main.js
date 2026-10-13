@@ -9,7 +9,7 @@ import { createAsyncMarkdown } from './async-markdown.js';
 // - 桥契约与 vditor 版同形（open/init/change/setValue），tab 壳与桥一行不改。
 
 import { EditorState, EditorSelection, StateField, StateEffect, Transaction, Annotation, Prec, Compartment, Text } from "@codemirror/state";
-import { EditorView, ViewPlugin, Decoration, WidgetType, keymap, scrollPastEnd } from "@codemirror/view";
+import { EditorView, ViewPlugin, Decoration, WidgetType, keymap } from "@codemirror/view";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
@@ -33,7 +33,7 @@ import { breakParagraph as kpBreakParagraph, NO_BREAK_BEFORE, NO_BREAK_AFTER } f
 import { tableKeys, tableBlockOf, tableLead, isSeparatorBody, displayWidth, fitWidths, applyEnter, applyEnterBr, applyTab, setTableHint, isFenceAt } from "./tables.js";
 import { mathCompletion } from "./completion.js";
 import { horizontalFrame, localPoint, horizontalScrollbarHit } from './floating-layout.js';
-import { verticalFrame, controlObstacles, textObstacles } from './overlay-layout.js';
+import { previewFrame, PREVIEW_MAX_DISPLACEMENT, controlObstacles, textObstacles } from './overlay-layout.js';
 import { createRegionIndex, regionAt, regionsBetween } from './region-index.js';
 import { createRegionSession, activateRegion, retireRegion, expandRegionPayload } from './region-session.js';
 import { containerContext, createContainerContextReader, bindContainer } from './container-presentation.js';
@@ -2661,7 +2661,13 @@ const headingDecorations = EditorView.decorations.compute(["selection", lineStyl
     if (notIn(line)) out.push(Decoration.replace({}).range(mark.from, mark.to)); // 光标不在 → 隐藏井号
   }
   for (const line of hrs) {
-    if (notIn(line)) out.push(Decoration.line({ class: "mp-hr" }).range(line.from)); // 分割线投影
+    if (notIn(line)) {
+      out.push(Decoration.line({ class: "mp-hr" }).range(line.from));
+      // Structural lines have different height from prose. Keep their literal
+      // source in a semantic span so CM's short-text metric sampling cannot
+      // promote an HR's 34px line-height to the entire virtual document.
+      out.push(Decoration.mark({ attributes: { 'data-mp-line-metric': 'structural' } }).range(line.from, line.to));
+    }
   }
   // 围栏行（```）阅读态压扁隐藏（vditor 隐藏围栏观感）；光标入行显源码
   for (const line of fenceLines) {
@@ -3331,6 +3337,18 @@ const regionIndexField = createRegionIndex(state => {
   return rows;
 }, [imgBaseField]);
 const regionSessionField = createRegionSession(regionIndexField);
+// Normal editing needs a small end margin. An active image/source session needs
+// the viewport-sized margin used by the locked CM6 scrollPastEnd implementation
+// so expansion can retain its visual anchor, including in a short document.
+const tailSpacePlugin = ViewPlugin.fromClass(class {
+  constructor() { this.height = 48; this.attrs = { style: 'padding-bottom: 48px' }; }
+  update({ view }) {
+    const activeImage = !!view.state.field(regionSessionField).imageId;
+    const height = activeImage ? Math.max(48, view.viewState.editorHeight - view.defaultLineHeight - view.documentPadding.top - 0.5) : 48;
+    if (height !== this.height) { this.height = height; this.attrs = { style: `padding-bottom: ${height}px` }; }
+  }
+});
+const tailSpace = [tailSpacePlugin, EditorView.contentAttributes.of(view => view.plugin(tailSpacePlugin)?.attrs || null)];
 const rendererLifecycle = createRenderLifecycle(regionIndexField);
 const viewportIntent = createViewportIntent(regionIndexField, mpZoomOf);
 
@@ -3525,11 +3543,11 @@ class InlineFloatWidget extends WidgetType {
       if (floatScrollbarHit(box, e)) { e.stopPropagation(); return; }
       if (floatClickToSource(box, view, e)) { e.preventDefault(); e.stopPropagation(); }
     });
-    positionInlineFloats(view);
+    registerFloat(view, box, lease);
     return box;
   }
   get estimatedHeight() { return -1; } // 纯浮动层：不参与高度图
-  destroy(dom) { rendererLifecycle.release(dom); }
+  destroy(dom) { unregisterFloat(dom); rendererLifecycle.release(dom); }
   ignoreEvent() { return false; }
 }
 /** 浮动预览框内点击 → 源码精确落位（与点渲染体同一套 K10 五级判定）。
@@ -3581,79 +3599,121 @@ const mathPointerGesture = EditorView.domEventObservers({
  *  为什么不在元素自己身上读：多数元素没有 zoom 属性，getComputedStyle(el).zoom 会拿到 "normal"。
  *  ⚠️ 全仓**只此一条** zoom 判定路径（表格浮条与浮动公式预览共用），别在别处再写第二套。
  *  取值域：非有限值 / ≤0 / >3 ⇒ 当 1（避免把坐标算成 Infinity）。 */
-function mpZoomOf(el) {
+function mpZoomOf(el, cache = null) {
+  const visited = [];
+  const resolved = value => {
+    if (cache) for (const node of visited) cache.set(node, value);
+    return value;
+  };
   let n = el;
   while (n && n !== document.documentElement) {
+    if (cache?.has(n)) return resolved(cache.get(n));
+    if (cache) visited.push(n);
     const z = parseFloat(getComputedStyle(n).zoom);
-    if (Number.isFinite(z) && z > 0 && z !== 1) return z > 3 ? 1 : z;
+    if (Number.isFinite(z) && z > 0 && z !== 1) return resolved(z > 3 ? 1 : z);
     n = n.parentElement;
   }
   const t = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--mp-zoom"));
-  return (Number.isFinite(t) && t > 0 && t <= 3) ? t : 1;
+  return resolved((Number.isFinite(t) && t > 0 && t <= 3) ? t : 1);
 }
 const floatMeasureKey = {};
+const floatRegistry = new WeakMap(), floatOwners = new WeakMap(), floatSettlements = new WeakMap();
+function registerFloat(v, box, lease) {
+  let entries=floatRegistry.get(v);if(!entries)floatRegistry.set(v,entries=new Map());
+  entries.set(box,{lease,phase:0});floatOwners.set(box,v);
+  positionInlineFloats(v);
+}
+function unregisterFloat(box) {
+  const v=floatOwners.get(box);if(!v)return;
+  floatOwners.delete(box);const entries=floatRegistry.get(v);entries?.delete(box);
+  if(!entries?.size){const pending=floatSettlements.get(v);if(pending)cancelAnimationFrame(pending.raf);floatSettlements.delete(v);}
+}
+function settleFloats(v,epoch) {
+  const previous=floatSettlements.get(v);if(previous?.epoch===epoch)return;
+  if(previous)cancelAnimationFrame(previous.raf);
+  const task={epoch,raf:0};floatSettlements.set(v,task);
+  // Leave this CM measure cycle so its initial scrollTarget can run. This is a
+  // single mount settlement, never a scroll/resize/caret tracking loop.
+  task.raf=requestAnimationFrame(()=>{
+    if(floatSettlements.get(v)!==task)return;floatSettlements.delete(v);
+    // Unrelated edits may reuse this valid pending widget. Read the current
+    // document; the per-node lease still rejects obsolete regions and results.
+    if(v.state.field(regionIndexField).epoch===epoch)positionInlineFloats(v);
+  });
+}
 function positionInlineFloats(inputView) {
-  if (!inputView) return;
+  if (!inputView || !floatRegistry.get(inputView)?.size) return;
   inputView.requestMeasure({
     key: floatMeasureKey,
     read(v) {
-      const floats = v.dom.querySelectorAll('.mp-inline-float');
-      const measured = {state: v.state, rows: []};
-      if (!floats.length) return measured;
+      const entries=floatRegistry.get(v),index=v.state.field(regionIndexField),session=v.state.field(regionSessionField);
+      const measured = {doc:v.state.doc,epoch:index.epoch,rows:[]};
+      if(!entries?.size)return measured;
       const sc = v.scrollDOM, content = v.contentDOM;
       const sr = sc.getBoundingClientRect(), cr = content.getBoundingClientRect();
-      const sz = mpZoomOf(sc), cz = mpZoomOf(content), cs = getComputedStyle(content);
+      // The cache lives for this read only, so zoom changes never reuse stale geometry.
+      const zoomCache = new Map();
+      const sz = mpZoomOf(sc,zoomCache), cz = mpZoomOf(content,zoomCache), cs = getComputedStyle(content);
       const px = (style, key) => parseFloat(style[key]) || 0;
       const columnLeft = Math.max(sr.left + sc.clientLeft * sz + 6,
         cr.left + (content.clientLeft + px(cs, 'paddingLeft')) * cz);
       const columnRight = Math.min(sr.left + (sc.clientLeft + sc.clientWidth) * sz - 6,
         cr.right - (px(cs, 'paddingRight') + px(cs, 'borderRightWidth')) * cz);
-      const spans = v.state.field(mathSpansField, false)?.spans ?? [];
-      const obstacles = [...textObstacles(v),...controlObstacles(v)];
-      for (const f of floats) {
+      for (const [f,entry] of entries) {
+        if(entry.phase>=2||!f.isConnected||!v.dom.contains(f)||entry.lease&&!entry.lease.valid())continue;
         const from = Number(f.dataset.mpFrom), to = Number(f.dataset.mpTo);
-        if (!spans.some(s => s.from === from && s.to === to)) continue;
-        let a, b;
-        try { a = v.coordsAtPos(from); b = v.coordsAtPos(to); } catch { }
-        if (!a || !b) continue;
-        if (b.bottom < sr.top || a.top > Math.min(sr.bottom,innerHeight)) { measured.rows.push({f,from,to,hidden:true,reason:'offscreen'});continue; }
-        const parent = f.offsetParent || v.dom, pr = parent.getBoundingClientRect(), z = mpZoomOf(parent);
+        const region=index.byId.get(f.dataset.mpRegion);
+        if(!region||region.kind!=='math'||region.from!==from||region.to!==to||!session.presentation.get(region.id)?.preview)continue;
+        const parent = f.offsetParent || v.dom, z = mpZoomOf(parent,zoomCache);
         const line = f.closest('.cm-line') || content, lr = line.getBoundingClientRect();
-        const ls = getComputedStyle(line), lz = mpZoomOf(line), r = f.getBoundingClientRect();
+        const ls = getComputedStyle(line), lz = mpZoomOf(line,zoomCache);
         const left = Math.max(columnLeft, lr.left + (line.clientLeft + px(ls, 'paddingLeft')) * lz);
         const right = Math.min(columnRight, lr.right - (px(ls, 'paddingRight') + px(ls, 'borderRightWidth')) * lz);
+        if(right<=left)continue;
+        const base={f,entry,phase:entry.phase,id:region.id,contextVersion:region.contextVersion,from,to,maxWidth:(right-left)/z};
+        if(!entry.phase){measured.rows.push({...base,widthOnly:true});continue;}
+        const pr = parent.getBoundingClientRect(), r = f.getBoundingClientRect();
         const naturalWidth = r.width + Math.max(0, f.scrollWidth - f.clientWidth) * z;
-        const frame = horizontalFrame({left, right, naturalWidth, preferredLeft: a.left,
+        // The preview is a zero-length widget at `to`. Bias toward the source
+        // on both boundaries so the widget can never become its own anchor.
+        let a,b;try{a=v.coordsAtPos(from,1);b=v.coordsAtPos(to,-1);}catch{}
+        const frame = horizontalFrame({left, right, naturalWidth, preferredLeft: a?.left??left,
           center: f.classList.contains('mp-inline-float-display')});
+        if(!frame)continue;
+        if(!a||!b){measured.rows.push({...base,hidden:true});continue;}
         const naturalHeight = Math.max(r.height,(f.scrollHeight+f.offsetHeight-f.clientHeight)*z);
-        const vertical = frame && verticalFrame({bounds:{top:Math.max(sr.top,0)+4,bottom:Math.min(sr.bottom,innerHeight)-4},
-          anchor:{top:a.top,bottom:b.bottom},left:frame.left,width:frame.width,height:naturalHeight,obstacles,
-          minimumHeight:(parseFloat(getComputedStyle(f).fontSize)||14)*z+6});
+        const bounds={top:Math.max(sr.top,0)+4,bottom:Math.min(sr.bottom,innerHeight)-4},minimumHeight=(parseFloat(getComputedStyle(f).fontSize)||14)*z+6;
+        const offscreen=b.bottom<bounds.top||a.top>bounds.bottom;
+        const legacyTop=offscreen?b.bottom+6:Math.max(bounds.top,Math.min(b.bottom+6,bounds.bottom-minimumHeight));
+        const interest={left:frame.left,right:frame.left+frame.width,top:Math.max(bounds.top,legacyTop-PREVIEW_MAX_DISPLACEMENT-2),bottom:Math.min(bounds.bottom,legacyTop+PREVIEW_MAX_DISPLACEMENT+naturalHeight+2)};
+        const vertical=offscreen?{top:legacyTop,height:naturalHeight,constrained:false,overlay:true}:
+          previewFrame({bounds,legacyTop,anchor:{top:a.top,bottom:b.bottom},left:frame.left,width:frame.width,height:naturalHeight,
+            obstacles:[...textObstacles(v,interest),...controlObstacles(v)],minimumHeight});
         const point = vertical && localPoint({left: frame.left, top: vertical.top}, {
           left: pr.left, top: pr.top, zoom: z, clientLeft: parent.clientLeft,
           clientTop: parent.clientTop, scrollLeft: parent.scrollLeft, scrollTop: parent.scrollTop,
         });
-        if (point) measured.rows.push({f, from, to, left: point.left, top: point.top, maxWidth: frame.maxWidth / z,maxHeight:vertical.height/z,constrained:vertical.constrained});
-        else measured.rows.push({f,from,to,hidden:true});
+        if (point) measured.rows.push({...base,left:point.left,top:point.top,maxHeight:vertical.height/z,constrained:vertical.constrained,overlay:vertical.overlay});
+        else measured.rows.push({...base,hidden:true});
       }
       return measured;
     },
     write(measured, v) {
-      if (v.state !== measured.state) return;
+      const index=v.state.field(regionIndexField),entries=floatRegistry.get(v);
+      if(v.state.doc!==measured.doc||index.epoch!==measured.epoch)return;
+      let settle=false;
       for (const row of measured.rows) {
         const {f, from, to} = row;
-        if (!f.isConnected || !v.dom.contains(f) || Number(f.dataset.mpFrom) !== from || Number(f.dataset.mpTo) !== to) continue;
-        const styles = row.hidden ? {visibility:'hidden'} : {left: row.left + 'px', top: row.top + 'px', maxWidth: row.maxWidth + 'px',boxSizing:'border-box',height:row.maxHeight+'px',maxHeight:row.maxHeight+'px',overflowY:row.constrained?'auto':'hidden', visibility: 'visible', zIndex: '20'};
-        f.dataset.mpPlacement = row.hidden ? row.reason || 'no-room' : row.constrained ? 'constrained' : 'free';
+        const region=index.byId.get(row.id);
+        if(!region||region.contextVersion!==row.contextVersion||!v.state.field(regionSessionField).presentation.get(row.id)?.preview||entries?.get(f)!==row.entry||row.entry.phase!==row.phase||!f.isConnected||!v.dom.contains(f)||row.entry.lease&&!row.entry.lease.valid()||Number(f.dataset.mpFrom)!==from||Number(f.dataset.mpTo)!==to)continue;
+        const styles = row.widthOnly ? {maxWidth:row.maxWidth+'px',visibility:'hidden'} : row.hidden ? {visibility:'hidden'} : {left: row.left + 'px', top: row.top + 'px', maxWidth: row.maxWidth + 'px',boxSizing:'border-box',height:row.maxHeight+'px',maxHeight:row.maxHeight+'px',overflowY:row.constrained?'auto':'hidden', visibility: 'visible', zIndex: '20'};
+        f.dataset.mpPlacement = row.widthOnly?'pending':row.hidden?'no-room':row.overlay?'overlay':row.constrained?'constrained':'free';
         for (const [key, value] of Object.entries(styles)) if (f.style[key] !== value) f.style[key] = value;
+        row.entry.phase++;settle ||= row.widthOnly;
       }
+      if(settle)settleFloats(v,measured.epoch);
     },
   });
-}
-// Creation, scrolling and geometry changes share CM6's deduplicated read/write
-// cycle. In particular, a quote line may be the actual offsetParent.
-function scheduleFloatPosition(inputView = view) {
-  positionInlineFloats(inputView?.requestMeasure ? inputView : view);
 }
 
 /* ══ 行中段 `$$…$$`「收笔即换行」（用户 2026-10-07 裁定）══
@@ -4750,6 +4810,9 @@ table.mp-row td.mp-sel-col, table.mp-row th.mp-sel-col { background: color-mix(i
    完全不在这个盒子里，宽度/缩放都不受影响。数值由 JS 按「窗口宽 × 百分比 ÷ 缩放」算成
    文档坐标像素写进 --mp-page-width（zoom 的百分比按未缩放父盒解析，见 applyEnginePrefs 注释）。 */
 .mp-zoom-wrap { width: 100%; height: 100%; }
+/* The fixed footer sits outside content zoom. Reserve its actual viewport space
+   so it cannot cover the native scrollbar's bottom hit target. */
+html[data-mp-statusbar="1"] .mp-zoom-wrap { height: calc(100% - 24px); }
 /* 版心（正文列）＝ max(1240px, 视口−320px)，居中：与「页面宽度」设置叠加时取更窄的那个。
    左内边距 24px 是**引用框的落位留白**（3px 竖条 + 呼吸）：引用行把方框画进这段留白里，
    ⇒ 引用框与选中高亮都不会越过正文列、也不会挤窄正文。
@@ -4895,7 +4958,7 @@ const themeVars = EditorView.theme({
   "&": { height: "100%", fontSize: "14px", color: "var(--mp-fg)", backgroundColor: "var(--mp-bg)" },
   ".cm-scroller": {
     fontFamily: "var(--mp-font-body)", lineHeight: "1.8", letterSpacing: "0",
-    overflow: "auto", padding: "16px 0 40vh 0", backgroundColor: "var(--mp-bg)",
+    overflow: "auto", padding: "16px 0 24px 0", backgroundColor: "var(--mp-bg)",
   },
   ".cm-content": { caretColor: "var(--mp-primary)" },
   /* 【A3-D12/A7-D9】CM6 基主题给 .cm-line 6px/2px 内边距＝正文全局右移 6px
@@ -5329,7 +5392,6 @@ function boot(content) {
               else post("change", { len: u.state.doc.length, ...window.mpEngine?.documentSession() });
             }
           }
-          if (u.selectionSet || u.geometryChanged || u.viewportChanged) scheduleFloatPosition(u.view);
           // 双开（形态 B）状态转发：从视图只读镜像主视图文档。分屏关闭时 mirror() 第一行返回
           //（零成本）；开着时按 Text 对象同一性判脏，纯选区/几何更新不做任何工作。
           /* 【β2】表格工具栏状态键：**必须挂在 if 之外** —— 点格只 dispatch setActiveCell（不落选区、
@@ -5339,7 +5401,7 @@ function boot(content) {
         }),
         themeVars,
         EditorView.lineWrapping,
-        scrollPastEnd(), // Keep image/source anchors reachable even in a short document.
+        tailSpace,
       ],
     }),
     parent: document.getElementById("editor"),
@@ -5357,8 +5419,6 @@ function boot(content) {
   // 表格格编辑覆盖层随滚动重定位
   /* 【β2】滚动钩子合并：先覆盖层、再表格工具栏（监听器数量不变，rAF 数量不增）。 */
   view.scrollDOM.addEventListener("scroll", () => { positionCellOverlay(); positionTableBar(); }, { passive: true });
-  // 公式浮动预览随滚动/几何变化重定位（固定内容坐标会因高度图收敛而失准，见 scheduleFloatPosition）
-  view.scrollDOM.addEventListener("scroll", scheduleFloatPosition, { passive: true });
   /* Ctrl+滚轮 ＝ 内容缩放（Typora/v2.3.3 同款手感）：只在指针位于**编辑面**内时接管，
      按 10% 一档、与快捷键共用同一个 setter；`passive:false` 才能 preventDefault 掉页面缩放。
      注意方向：deltaY < 0（向上滚）＝放大。 */
@@ -5486,7 +5546,7 @@ function boot(content) {
       try { view.setState(fresh); } finally { suppressChange = false; }
       view.scrollDOM.scrollTop = view.scrollDOM.scrollLeft = 0;
       window.mpSplit && window.mpSplit.mirror(fresh);
-      scheduleTableChrome(); positionTableBar(); scheduleFloatPosition();
+      scheduleTableChrome(); positionTableBar();
       const active = document.activeElement;
       if (!active || active === document.body || active === document.documentElement ||
           view.contentDOM.contains(active) || cellOverlay?.contains(active)) view.focus();
@@ -5552,7 +5612,6 @@ function boot(content) {
     },
   };
   commands.install();
-  document.addEventListener('mp:overlay', () => scheduleFloatPosition());
   // 双开（形态 B）：主视图＝现在的即时渲染编辑面；从视图＝同一份文档的只读源码。  // 【扩展数组纪律】installSplit 不向主视图的扩展数组注入任何东西（它返回 {toggle,open,close,mirror,…}，
   // 从视图在 open() 时用**自己的最小 state**现场创建）——故这里不需要 Compartment，扩展数组结构零改动；
   // 引擎侧唯一的钩子就是上面 updateListener 里的那一行 mirror(u.state)。

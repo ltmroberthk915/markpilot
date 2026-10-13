@@ -23,8 +23,8 @@ export function createCommandContext({ getView, epochOf, owner, flushOwner, resu
     const view = getView();
     return !!ticket && !!view && ticket.epoch === epochOf(view) && (!source || ticket.doc === view.state.doc) && (!intent || ticket.serial === serial);
   }
-  function resume(ticket) {
-    if (!document.hasFocus() || !valid(ticket, { source: false }) || ticket.owner.kind === 'native' || ticket.owner.kind === 'none') return false;
+  function resume(ticket, { intent = true } = {}) {
+    if (!document.hasFocus() || !valid(ticket, { source: false, intent }) || ticket.owner.kind === 'native' || ticket.owner.kind === 'none') return false;
     if (native(document.activeElement)) return false;
     suspended = null;
     return resumeOwner(ticket.owner);

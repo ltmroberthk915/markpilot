@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const { sleep, sha256, acquireSlot, args, launch } = require('./lifecycle.cjs');
-const { snapshot, reset, frame, outputDir } = require('./harness.cjs');
+const { snapshot, reset, frame, outputDir, waitUntil } = require('./harness.cjs');
 (async () => {
   const o = args(process.argv.slice(2)), dir = outputDir(o.out, 'acceptance'), release = acquireSlot();
   const aFile = path.join(dir, 'mp-quality-a.md'), bFile = path.join(dir, 'mp-quality-b.md'), saveAsFile = path.join(dir, 'mp-quality-save-as.md');
@@ -30,8 +30,7 @@ const { snapshot, reset, frame, outputDir } = require('./harness.cjs');
     });
     await check('real-unicode-input-autosave', async () => {
       await page.keyboard.press('Control+End'); await page.keyboard.insertText('中文🙂 append');
-      await page.waitForFunction(() => !document.title.startsWith('●'), { timeout:10000 });
-      await sleep(600);
+      await waitUntil(() => fs.readFileSync(aFile,'utf8') === initial+'中文🙂 append', 'periodic autosave writes exact Unicode bytes', 5000);
       const text = (await snapshot(page)).text; assert.equal(text, initial+'中文🙂 append'); assert.equal(fs.readFileSync(aFile,'utf8'), text);
       return { characters:text.length, diskSha256:sha256(aFile) };
     });
@@ -159,7 +158,7 @@ const { snapshot, reset, frame, outputDir } = require('./harness.cjs');
       await second.evaluate(()=>window.mpEngine.focus());
       assert((await snapshot(second)).focus);
       await second.keyboard.press('Control+End'); await second.keyboard.insertText('SECOND-EDIT');
-      await sleep(1000);
+      await waitUntil(async () => fs.readFileSync(bFile,'utf8') === (await snapshot(second)).text, 'secondary periodic autosave writes its own exact bytes', 5000);
       const a=await snapshot(page), b=await snapshot(second);
       assert.equal(a.text,before.text,'first document preserved');
       assert.equal(fs.readFileSync(bFile,'utf8'),b.text,'secondary saves its own document');

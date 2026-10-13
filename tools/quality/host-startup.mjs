@@ -16,7 +16,7 @@ const {DocumentStore, createSession} = require(path.join(root, 'MarkPilot-CM6/sh
 const read = file => fs.readFileSync(path.join(root, 'MarkPilot-CM6', file), 'utf8');
 const hostSource = read('renderer/host.js');
 const mainSource = read('main.js');
-const files = ['main.js', 'renderer/host.js', 'shell/document-store.js', 'shell/text-codec.js'];
+const files = ['main.js', 'renderer/host.js', 'shell/document-store.js', 'shell/text-codec.js', 'shell/save-policy.js'];
 const hashes = Object.fromEntries(files.map(file => [file,
   crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'MarkPilot-CM6', file))).digest('hex')]));
 const options={};
@@ -68,6 +68,7 @@ function fixture({holdReady = false, holdPath = false, themeReady = false} = {})
     exactHandler('doc:ready') + '\n' + exactHandler('doc:path'))(
     (name, fn) => { mainHandlers[name] = fn; }, store, () => S, () => W, sendTo, () => {}, null);
   const mpHost = {
+    settingGet: key => Promise.resolve({ value: key === 'autosaveEnabled' ? false : 30000 }),
     themeGet: () => themeReply.promise,
     currentDoc: () => { currentCalls++; return currentReply.promise; },
     docReady: () => {
@@ -99,6 +100,7 @@ function fixture({holdReady = false, holdPath = false, themeReady = false} = {})
     setTimeout: () => 0, clearTimeout() {}, Date,
   });
   // This suffix only exposes read-only state and the existing command to tests.
+  vm.runInContext(read('shell/save-policy.js'), context);
   vm.runInContext(hostSource + '\nglobalThis.inspect = () => ({booted,pendingDoc,filePath,documentId,revision,dirty,charCount}); globalThis.newDoc = newDocument;', context);
   if (themeReady) themeReply.resolve({dark: false});
   function register() {
@@ -198,7 +200,7 @@ newCancelsTest.options = {holdReady: true};
 await test('explicit new cancels old load while late blank ready cannot overwrite new id', newCancelsTest);
 await test('stale discard confirmation cannot reset a subsequently pushed document', async h => {
   h.register(); h.receive(h.store.metadata(h.S)); h.edit('dirty A');
-  const c = deferred(); h.confirm(() => c.promise); const run = h.newDoc();
+  const c = deferred(); h.confirm(() => c.promise); const run = h.newDoc({replace: true});
   h.store.reset(h.S); h.S.filePath = 'D:/controlled/B.md'; h.S.savedText = 'B'; h.receive(h.store.metadata(h.S));
   c.resolve(true); assert.equal(await run, false); assert.equal(h.text, 'B');
   assert.equal(h.resets, 1); assert.equal(h.docPathCalls, 0);

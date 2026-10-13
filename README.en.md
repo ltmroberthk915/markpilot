@@ -1,5 +1,13 @@
 # MarkPilot — AI-native Markdown editor for Windows, VS Code & Trae
 
+## MarkPilot 3.3.0 for Windows
+
+Save manually with Ctrl+S, or enable autosave and choose its interval in Settings. Open additional documents in independent windows while retaining existing documents and undo histories. Large documents have steadier scrolling and less trailing space; panels with a close button also support Esc.
+
+Formula previews avoid nearby content within 96 viewport pixels and use their original covering position when no nearby space is available. Scrolling no longer continuously repositions an open preview.
+
+**[Download the 3.3.0 installer](https://github.com/ltmroberthk915/markpilot/releases/download/v3.3.0/markpilot-Setup-3.3.0.exe)** · **[Download the portable build](https://github.com/ltmroberthk915/markpilot/releases/download/v3.3.0/markpilot-3.3.0-portable.exe)**
+
 **A free Typora alternative with inline AI completion, live math editing, and print-quality typography.**
 
 [![latest 3.2.5](https://img.shields.io/badge/latest-3.2.5-4f46e5?style=for-the-badge)](https://github.com/ltmroberthk915/markpilot/releases/latest)

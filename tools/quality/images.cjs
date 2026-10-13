@@ -4,7 +4,7 @@ const fs = require("node:fs"), path = require("node:path"), assert = require("no
 const { pathToFileURL } = require("node:url");
 const { execFileSync } = require("node:child_process");
 const { args, launch, acquireSlot, sleep, sha256 } = require("./lifecycle.cjs");
-const { outputDir, snapshot, reset, frame, newWindow, recorder, waitUntil } = require("./harness.cjs");
+const { outputDir, snapshot, reset, frame, newWindow, newBlankWindow, recorder, waitUntil } = require("./harness.cjs");
 const { bitmap, verifyBitmap, verifyText } = require("./clipboard.cjs");
 (async () => {
   const argv = process.argv.slice(2);
@@ -603,17 +603,18 @@ const { bitmap, verifyBitmap, verifyText } = require("./clipboard.cjs");
     });
     await check("unsaved-screenshot-renders-without-path", async (trace) => {
       await p.evaluate(() => window.mpHost.docDirty(false));
-      const key = await p.evaluate(() => window.mpHost.recentTestSendKey({ keyCode: "N", modifiers: ["control"] }));
-      assert(key.ok && key.focused);
-      await waitUntil(() => p.evaluate(() => window.mpHost.currentDoc().then((d) => d == null)), "unsaved document");
-      await reset(p, "\u672A\u547D\u540D\n", 4);
-      await paste();
-      await decoded();
-      const s = await snapshot(p);
+      const blank = await newBlankWindow(run, p);
+      await reset(blank, "\u672A\u547D\u540D\n", 4);
+      await paste(fixtureA, blank);
+      await decoded(blank);
+      const s = await snapshot(blank);
       assert(s.text.includes("data:image/png;base64,"));
       assert(!s.text.includes("assets/"));
-      trace.push({ state: await state(), images: await images() });
-      await capture("unsaved-inline");
+      trace.push({ state: await state(blank), images: await images(blank) });
+      await capture("unsaved-inline", blank);
+      await blank.evaluate(() => window.mpHost.docDirty(false));
+      await blank.close();
+      await p.bringToFront();
       await reopen(doc);
     });
     await check("mouse-combination-drag-copy-preserve-image-markdown", async (trace) => {

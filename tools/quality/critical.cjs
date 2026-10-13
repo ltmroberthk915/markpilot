@@ -3,7 +3,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const assert=require('node:assert/strict');
 const {args,launch,acquireSlot,sleep,sha256}=require('./lifecycle.cjs');
-const {outputDir,snapshot,reset,frame,newWindow,recorder,waitUntil}=require('./harness.cjs');
+const {outputDir,snapshot,reset,frame,newWindow,newBlankWindow,recorder,waitUntil}=require('./harness.cjs');
 const {bitmap}=require('./clipboard.cjs');
 (async()=>{
   const o=args(process.argv.slice(2)),dir=outputDir(o.out,'critical'),release=acquireSlot();
@@ -85,13 +85,12 @@ const {bitmap}=require('./clipboard.cjs');
       });
       await check('unsaved-document-bitmap-paste-falls-back-inline',async trace=>{
         await sleep(700);
-        const nativeKey=await p.evaluate(()=>window.mpHost.recentTestSendKey({keyCode:'N',modifiers:['control']}));trace.push({nativeKey});assert(nativeKey.ok&&nativeKey.focused);
-        await waitUntil(()=>p.evaluate(()=>window.mpHost.currentDoc().then(d=>d==null)),'new blank document');
-        await reset(p,'未命名截图\n',6);
-        const info=await p.evaluate(()=>window.mpHost.currentDoc());assert.equal(info,null,'fixture is genuinely unsaved');
-        await p.keyboard.press('Control+v');await sleep(1100);const s=await snapshot(p);trace.push(s);await capture(p,'clipboard-unsaved');
+        const blank=await newBlankWindow(run,p);
+        await reset(blank,'未命名截图\n',6);
+        const info=await blank.evaluate(()=>window.mpHost.currentDoc());assert.equal(info,null,'fixture is genuinely unsaved');
+        await blank.keyboard.press('Control+v');await sleep(1100);const s=await snapshot(blank);trace.push(s);await capture(blank,'clipboard-unsaved');
         assert(s.text.includes('data:image/png;base64,'),'unsaved document keeps image inline');
-        await p.evaluate(()=>window.mpHost.docDirty(false)); // teardown only: discard this synthetic unsaved fixture
+        await blank.evaluate(()=>window.mpHost.docDirty(false)); // teardown only: discard this synthetic unsaved fixture
         const opened=await p.evaluate(file=>window.mpHost.openPath(file),aFile);assert(opened.ok);await sleep(500);
       });
       result.clipboardCleanup=await clip.restore();clip=null;
@@ -188,9 +187,7 @@ const {bitmap}=require('./clipboard.cjs');
     fs.writeFileSync(aFile,'PRIMARY GUARD FIXTURE\n');fs.writeFileSync(bFile,'SECONDARY GUARD FIXTURE\n');
     run=await launch(o,aFile,dir,{TEMP:runtimeTemp,TMP:runtimeTemp});
     await check('unsaved-native-close-control-keeps-window-open',async trace=>{
-      const primary=run.page;
-      await primary.evaluate(()=>window.mpHost.recentTestSendKey({keyCode:'N',modifiers:['control']}));
-      await waitUntil(()=>primary.evaluate(()=>window.mpHost.currentDoc().then(d=>d==null)),'new blank document');
+      const primary=await newBlankWindow(run,run.page);
       await primary.evaluate(()=>window.mpEngine.focus());await primary.keyboard.insertText('UNSAVED CONTROL DRAFT');await sleep(200);trace.push({before:await snapshot(primary)});
       assert(trace[0].before.title.startsWith('●'));
       const focus=await primary.evaluate(()=>window.mpHost.recentTestSendKey({keyCode:'Escape',modifiers:[]}));assert(focus.focused);
@@ -198,10 +195,9 @@ const {bitmap}=require('./clipboard.cjs');
       await sleep(800);trace.push({primaryClosed:primary.isClosed()});assert.equal(primary.isClosed(),false,'control really exercises native unsaved guard');
     });
     const controlCleanup=await run.cleanup();assert.deepEqual(controlCleanup.residual,[]);result.controlCleanup=controlCleanup;run=null;
-    run=await launch(o,aFile,dir,{TEMP:runtimeTemp,TMP:runtimeTemp});const primary=run.page;
+    run=await launch(o,aFile,dir,{TEMP:runtimeTemp,TMP:runtimeTemp});
     await check('secondary-save-does-not-clear-primary-unsaved-close-guard',async trace=>{
-      await primary.evaluate(()=>window.mpHost.recentTestSendKey({keyCode:'N',modifiers:['control']}));
-      await waitUntil(()=>primary.evaluate(()=>window.mpHost.currentDoc().then(d=>d==null)),'new blank document');
+      const primary=await newBlankWindow(run,run.page);
       await primary.evaluate(()=>window.mpEngine.focus());await primary.keyboard.insertText('UNSAVED PRIMARY DRAFT');await sleep(200);
       const before=await snapshot(primary);assert(before.title.startsWith('●'),'primary has unsaved changes');trace.push({before});await capture(primary,'unsaved-primary-before');
       const secondary=await newWindow(run,primary,bFile);await secondary.bringToFront();await secondary.evaluate(()=>window.mpEngine.focus());await secondary.keyboard.press('Control+End');await secondary.keyboard.insertText('SAVED SECONDARY');
