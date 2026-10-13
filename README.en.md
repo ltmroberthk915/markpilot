@@ -1,5 +1,13 @@
 # MarkPilot — AI-native Markdown editor for Windows, VS Code & Trae
 
+## MarkPilot 3.3.2 for Windows
+
+Search and replace immediately use the latest text in their input fields. Right-clicking the split source view preserves the selection in the editor, so you can apply formatting and keep typing. Right-clicks in search fields and other panels no longer invoke document formatting commands.
+
+Manual saving, configurable autosave intervals, independent document windows, and optional formula preview avoidance remain available. Formula previews use a 3px horizontal scrollbar.
+
+**[Download installer](https://github.com/ltmroberthk915/markpilot/releases/download/v3.3.2/markpilot-Setup-3.3.2.exe)** · **[Download portable](https://github.com/ltmroberthk915/markpilot/releases/download/v3.3.2/markpilot-3.3.2-portable.exe)** · [Release notes](docs/RELEASE-3.3.2.md)
+
 ## MarkPilot 3.3.0 for Windows
 
 Save manually with Ctrl+S, or enable autosave and choose its interval in Settings. Open additional documents in independent windows while retaining existing documents and undo histories. Large documents have steadier scrolling and less trailing space; panels with a close button also support Esc.

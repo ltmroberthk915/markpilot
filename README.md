@@ -1,5 +1,13 @@
 **[English](README.en.md)** · 中文
 
+## MarkPilot 3.3.2 · Windows
+
+查找与替换会立即使用输入框中的最新内容。分屏源码右键保留正文选区，加粗后可以直接继续输入；查找框等面板中的右键操作也不会误用正文格式菜单。
+
+继续支持手动保存、可设置间隔的自动保存、多文档独立窗口，以及可关闭避让的公式预览。公式预览横向滚动条为 3px。
+
+**[下载安装版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.3.2/markpilot-Setup-3.3.2.exe)** · **[下载便携版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.3.2/markpilot-3.3.2-portable.exe)** · [更新说明](docs/RELEASE-3.3.2.md)
+
 ## MarkPilot 3.3.0 · Windows
 
 默认手动保存；自动保存可在设置中开启并选择间隔。新开文档保留已有窗口与撤销历史，长文档滚动和末尾编辑更稳定，带关闭按钮的面板支持 Esc。
