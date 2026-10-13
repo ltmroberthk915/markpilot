@@ -18,17 +18,18 @@ export function verticalFrame({ bounds, anchor, left, width, height, obstacles =
   if(!slots.length)return null;
   return slots.sort((a,b)=>b.height-a.height||a.cost-b.cost)[0];
 }
-export const PREVIEW_MAX_DISPLACEMENT = 96;
+export const PREVIEW_MAX_DISPLACEMENT = 67.2;
 // Only formula previews opt into this limit. Completion keeps the unrestricted
 // policy. When the nearby band is full, return the legacy covering anchor.
 export function previewFrame(options) {
-  const {bounds,anchor,height,minimumHeight=20}=options;
+  const {bounds,anchor,height,minimumHeight=20,avoidance=true}=options;
   const maxDisplacement=options.maxDisplacement??PREVIEW_MAX_DISPLACEMENT;
-  const legacyTop=options.legacyTop??Math.max(bounds.top,Math.min(anchor.bottom+6,bounds.bottom-minimumHeight));
+  const legacyTop=options.legacyTop??(avoidance?Math.max(bounds.top,Math.min(anchor.bottom+6,bounds.bottom-minimumHeight)):anchor.bottom+6);
+  const cover={top:legacyTop,height,constrained:false,overlay:true,displacement:0};
+  if(!avoidance)return cover;
   const slot=verticalFrame({...options,anchor:{...anchor,bottom:legacyTop-6},maxDisplacement});
-  if(slot)return {...slot,overlay:false,displacement:slot.top-legacyTop};
-  const available=Math.max(minimumHeight,bounds.bottom-legacyTop),h=Math.min(height,available);
-  return {top:legacyTop,height:h,constrained:h<height,overlay:true,displacement:0};
+  if(slot&&!slot.constrained)return {...slot,overlay:false,displacement:slot.top-legacyTop};
+  return cover;
 }
 export const overlap = (a,b) => a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
 const controls = [['.mp-toolbar',4],['.mp-pop,.mp-dialog,.cm-search,#mp-banner',3],['.mp-complete,.mp-table-bar,.mp-cell-overlay',2]];

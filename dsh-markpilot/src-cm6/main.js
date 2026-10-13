@@ -501,6 +501,7 @@ const MP_PREFS = [
   { id: "zoom", def: 100, min: 50, max: 300 },       // 内容缩放（%）
   { id: "island", def: 100, min: 80, max: 140 },     // 工具岛尺寸（%），与缩放互不影响
   { id: "statusbar", def: 1, min: 0, max: 1 },       // 底部状态栏开关
+  { id: "floatAvoidance", def: 1, min: 0, max: 1 }, // 公式预渲染框就近避让
 ];
 const mpPref = (id) => {
   const spec = MP_PREFS.find((p) => p.id === id) || { def: 100, min: 0, max: 1e9 };
@@ -516,7 +517,8 @@ const mpSetPref = (id, v) => {
   const n = Math.min(spec.max, Math.max(spec.min, Number(v)));
   if (!Number.isFinite(n)) return;
   try { localStorage.setItem("mp-pref-" + id, String(n)); } catch { /* 无存储 */ }
-  applyEnginePrefs();
+  if (id === 'floatAvoidance') applyFloatPreference();
+  else applyEnginePrefs();
   mpPrefNotify([id]);
 };
 const mpPrefsAll = () => { const o = {}; for (const p of MP_PREFS) o[p.id] = mpPref(p.id); return o; };
@@ -543,6 +545,7 @@ function applyEnginePrefs() {
   root.dataset.mpStatusbar = p.statusbar ? "1" : "0";
   if (zoomWrap) zoomWrap.style.setProperty("--mp-zoom", (p.zoom / 100).toFixed(4));
   schedulePageWidth();
+  applyFloatPreference();
 }
 function schedulePageWidth() {
   if (mpPageRaf) return;
@@ -3618,27 +3621,47 @@ function mpZoomOf(el, cache = null) {
 }
 const floatMeasureKey = {};
 const floatRegistry = new WeakMap(), floatOwners = new WeakMap(), floatSettlements = new WeakMap();
+const floatViews = new Set();
+let floatAvoidanceEnabled = !!mpPref('floatAvoidance'), floatLayoutVersion = 0;
+function applyFloatPreference() {
+  const enabled = !!mpPref('floatAvoidance');
+  if (enabled === floatAvoidanceEnabled) return;
+  floatAvoidanceEnabled = enabled; floatLayoutVersion++;
+  for (const v of floatViews) {
+    const pending = floatSettlements.get(v);
+    if (pending) cancelAnimationFrame(pending.raf);
+    floatSettlements.delete(v);
+    for (const entry of floatRegistry.get(v)?.values() || []) entry.phase = 0;
+    positionInlineFloats(v);
+  }
+}
+window.addEventListener('storage', event => {
+  if (event.key === 'mp-pref-floatAvoidance' || event.key === null) {
+    applyFloatPreference(); mpPrefNotify(['floatAvoidance']);
+  }
+});
 function registerFloat(v, box, lease) {
   let entries=floatRegistry.get(v);if(!entries)floatRegistry.set(v,entries=new Map());
+  floatViews.add(v);
   entries.set(box,{lease,phase:0});floatOwners.set(box,v);
   positionInlineFloats(v);
 }
 function unregisterFloat(box) {
   const v=floatOwners.get(box);if(!v)return;
   floatOwners.delete(box);const entries=floatRegistry.get(v);entries?.delete(box);
-  if(!entries?.size){const pending=floatSettlements.get(v);if(pending)cancelAnimationFrame(pending.raf);floatSettlements.delete(v);}
+  if(!entries?.size){floatViews.delete(v);const pending=floatSettlements.get(v);if(pending)cancelAnimationFrame(pending.raf);floatSettlements.delete(v);}
 }
-function settleFloats(v,epoch) {
-  const previous=floatSettlements.get(v);if(previous?.epoch===epoch)return;
+function settleFloats(v,epoch,layoutVersion) {
+  const previous=floatSettlements.get(v);if(previous?.epoch===epoch&&previous.layoutVersion===layoutVersion)return;
   if(previous)cancelAnimationFrame(previous.raf);
-  const task={epoch,raf:0};floatSettlements.set(v,task);
+  const task={epoch,layoutVersion,raf:0};floatSettlements.set(v,task);
   // Leave this CM measure cycle so its initial scrollTarget can run. This is a
   // single mount settlement, never a scroll/resize/caret tracking loop.
   task.raf=requestAnimationFrame(()=>{
     if(floatSettlements.get(v)!==task)return;floatSettlements.delete(v);
     // Unrelated edits may reuse this valid pending widget. Read the current
     // document; the per-node lease still rejects obsolete regions and results.
-    if(v.state.field(regionIndexField).epoch===epoch)positionInlineFloats(v);
+    if(v.state.field(regionIndexField).epoch===epoch&&floatLayoutVersion===layoutVersion)positionInlineFloats(v);
   });
 }
 function positionInlineFloats(inputView) {
@@ -3647,7 +3670,7 @@ function positionInlineFloats(inputView) {
     key: floatMeasureKey,
     read(v) {
       const entries=floatRegistry.get(v),index=v.state.field(regionIndexField),session=v.state.field(regionSessionField);
-      const measured = {doc:v.state.doc,epoch:index.epoch,rows:[]};
+      const measured = {doc:v.state.doc,epoch:index.epoch,layoutVersion:floatLayoutVersion,rows:[]};
       if(!entries?.size)return measured;
       const sc = v.scrollDOM, content = v.contentDOM;
       const sr = sc.getBoundingClientRect(), cr = content.getBoundingClientRect();
@@ -3681,14 +3704,16 @@ function positionInlineFloats(inputView) {
           center: f.classList.contains('mp-inline-float-display')});
         if(!frame)continue;
         if(!a||!b){measured.rows.push({...base,hidden:true});continue;}
-        const naturalHeight = Math.max(r.height,(f.scrollHeight+f.offsetHeight-f.clientHeight)*z);
+        const naturalHeight = Math.ceil(Math.max(r.height/z,f.scrollHeight+f.offsetHeight-f.clientHeight))*z;
         const bounds={top:Math.max(sr.top,0)+4,bottom:Math.min(sr.bottom,innerHeight)-4},minimumHeight=(parseFloat(getComputedStyle(f).fontSize)||14)*z+6;
         const offscreen=b.bottom<bounds.top||a.top>bounds.bottom;
-        const legacyTop=offscreen?b.bottom+6:Math.max(bounds.top,Math.min(b.bottom+6,bounds.bottom-minimumHeight));
-        const interest={left:frame.left,right:frame.left+frame.width,top:Math.max(bounds.top,legacyTop-PREVIEW_MAX_DISPLACEMENT-2),bottom:Math.min(bounds.bottom,legacyTop+PREVIEW_MAX_DISPLACEMENT+naturalHeight+2)};
-        const vertical=offscreen?{top:legacyTop,height:naturalHeight,constrained:false,overlay:true}:
-          previewFrame({bounds,legacyTop,anchor:{top:a.top,bottom:b.bottom},left:frame.left,width:frame.width,height:naturalHeight,
+        const legacyTop=!floatAvoidanceEnabled||offscreen?b.bottom+6:Math.max(bounds.top,Math.min(b.bottom+6,bounds.bottom-minimumHeight));
+        let vertical={top:legacyTop,height:naturalHeight,constrained:false,overlay:true};
+        if(floatAvoidanceEnabled&&!offscreen){
+          const interest={left:frame.left,right:frame.left+frame.width,top:Math.max(bounds.top,legacyTop-PREVIEW_MAX_DISPLACEMENT-2),bottom:Math.min(bounds.bottom,legacyTop+PREVIEW_MAX_DISPLACEMENT+naturalHeight+2)};
+          vertical=previewFrame({bounds,legacyTop,anchor:{top:a.top,bottom:b.bottom},left:frame.left,width:frame.width,height:naturalHeight,
             obstacles:[...textObstacles(v,interest),...controlObstacles(v)],minimumHeight});
+        }
         const point = vertical && localPoint({left: frame.left, top: vertical.top}, {
           left: pr.left, top: pr.top, zoom: z, clientLeft: parent.clientLeft,
           clientTop: parent.clientTop, scrollLeft: parent.scrollLeft, scrollTop: parent.scrollTop,
@@ -3700,18 +3725,18 @@ function positionInlineFloats(inputView) {
     },
     write(measured, v) {
       const index=v.state.field(regionIndexField),entries=floatRegistry.get(v);
-      if(v.state.doc!==measured.doc||index.epoch!==measured.epoch)return;
+      if(v.state.doc!==measured.doc||index.epoch!==measured.epoch||floatLayoutVersion!==measured.layoutVersion)return;
       let settle=false;
       for (const row of measured.rows) {
         const {f, from, to} = row;
         const region=index.byId.get(row.id);
         if(!region||region.contextVersion!==row.contextVersion||!v.state.field(regionSessionField).presentation.get(row.id)?.preview||entries?.get(f)!==row.entry||row.entry.phase!==row.phase||!f.isConnected||!v.dom.contains(f)||row.entry.lease&&!row.entry.lease.valid()||Number(f.dataset.mpFrom)!==from||Number(f.dataset.mpTo)!==to)continue;
-        const styles = row.widthOnly ? {maxWidth:row.maxWidth+'px',visibility:'hidden'} : row.hidden ? {visibility:'hidden'} : {left: row.left + 'px', top: row.top + 'px', maxWidth: row.maxWidth + 'px',boxSizing:'border-box',height:row.maxHeight+'px',maxHeight:row.maxHeight+'px',overflowY:row.constrained?'auto':'hidden', visibility: 'visible', zIndex: '20'};
+        const styles = row.widthOnly ? {maxWidth:row.maxWidth+'px',height:'auto',maxHeight:'none',overflowY:'hidden',visibility:'hidden'} : row.hidden ? {visibility:'hidden'} : {left: row.left + 'px', top: row.top + 'px', maxWidth: row.maxWidth + 'px',boxSizing:'border-box',height:row.maxHeight+'px',maxHeight:'none',overflowY:'hidden', visibility: 'visible', zIndex: '20'};
         f.dataset.mpPlacement = row.widthOnly?'pending':row.hidden?'no-room':row.overlay?'overlay':row.constrained?'constrained':'free';
         for (const [key, value] of Object.entries(styles)) if (f.style[key] !== value) f.style[key] = value;
         row.entry.phase++;settle ||= row.widthOnly;
       }
-      if(settle)settleFloats(v,measured.epoch);
+      if(settle)settleFloats(v,measured.epoch,measured.layoutVersion);
     },
   });
 }
@@ -4513,16 +4538,31 @@ ${editorKaiRuleCss()}
   overflow-y: hidden;
   background: var(--mp-codeBg);
   background: var(--mp-float-tint);
-  border: 1px dashed var(--mp-border);
-  border-color: color-mix(in srgb, var(--mp-border) 60%, var(--mp-fg));
+  border: 1px solid var(--mp-border);
+  border-color: color-mix(in srgb, var(--mp-border) 82%, var(--mp-fg));
   border-radius: 4px;
   padding: 2px 3px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-  box-shadow: 0 2px 10px color-mix(in srgb, var(--mp-fg) 20%, transparent),
-              0 0 0 1px color-mix(in srgb, var(--mp-fg) 7%, transparent);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--mp-fg) 12%, transparent),
+              0 0 0 1px color-mix(in srgb, var(--mp-fg) 5%, transparent);
   pointer-events: auto; /* 浮层可点：点字形 → 精确回源码（见 floatClickToSource）；不可点时点击会穿到被盖住的下一行 */
   cursor: text;
   white-space: nowrap;
+}
+.mp-inline-float::-webkit-scrollbar { height: 3px; }
+.mp-inline-float::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.mp-inline-float::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--mp-fg) 5%, transparent);
+  border-radius: 2px;
+}
+.mp-inline-float::-webkit-scrollbar-thumb {
+  background: var(--mp-border);
+  background: color-mix(in srgb, var(--mp-fg) 28%, transparent);
+  border-radius: 2px;
+  min-width: 24px;
+}
+.mp-inline-float::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--mp-fg) 42%, transparent);
 }
 @supports ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
   .mp-inline-float {

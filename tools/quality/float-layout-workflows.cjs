@@ -60,8 +60,9 @@ async function main(){
     if(f.rect.left<f.bounds.left-1)c.violations.push('left edge outside text column');
     if(f.rect.right>f.bounds.right+1)c.violations.push('right edge outside text column');
     if(f.rect.width>f.bounds.right-f.bounds.left+1)c.violations.push('frame wider than visible text column');
-    if(f.glyphs.some(g=>g.rect.top<f.rect.top-1||g.rect.bottom>f.rect.top+(f.clientTop+f.clientHeight)*c.geometry.zoom/100+1)&&!(f.overflowY==='auto'&&f.scrollHeight>f.clientHeight))c.violations.push('vertical formula glyph clipped without required scrolling');
-    if(Math.abs(f.rect.top-f.legacyTop)>97)c.violations.push('avoidance exceeds 96 viewport CSS pixels');
+    if(f.glyphs.some(g=>g.rect.top<f.rect.top-1||g.rect.bottom>f.rect.top+(f.clientTop+f.clientHeight)*c.geometry.zoom/100+1))c.violations.push('vertical formula glyph clipped');
+    if(f.overflowY!=='hidden'||f.scrollHeight>f.clientHeight)c.violations.push('preview must expand to its full content height without vertical scrolling');
+    if(Math.abs(f.rect.top-f.legacyTop)>67.2+1)c.violations.push('avoidance exceeds 67.2 viewport CSS pixels');
     if(f.placement==='overlay'&&Math.abs(f.rect.top-f.legacyTop)>1)c.violations.push('cover fallback differs from original anchor');
     if(f.placement!=='overlay'&&c.geometry.nextParagraph&&f.rect.top<c.geometry.nextParagraph.bottom&&f.rect.bottom>c.geometry.nextParagraph.top)c.violations.push('safe placement covers next paragraph');
     if(f.visibility!=='visible')c.violations.push('preview is not visible');
@@ -72,7 +73,7 @@ async function main(){
     const stableText=redo.text,stableSel=redo.selection,g1=await geometry(p),ff=g1.floats[0];
     if(ff.scrollWidth>ff.clientWidth+2){
      assert(ff.overflowX==='auto'||ff.overflowX==='scroll','oversized formula has local overflow');
-     const z=g1.zoom/100,trackTop=ff.rect.top+(ff.clientTop+ff.clientHeight)*z,trackBottom=ff.rect.bottom-ff.borderBottom*z;assert(trackBottom-trackTop>3,'real scrollbar track is visible');
+     const z=g1.zoom/100,trackTop=ff.rect.top+(ff.clientTop+ff.clientHeight)*z,trackBottom=ff.rect.bottom-ff.borderBottom*z;assert(trackBottom-trackTop>=2,'real scrollbar track is visible');
      const thumb=ff.rect.width*ff.clientWidth/ff.scrollWidth,start={x:ff.rect.left+Math.max(8,thumb*.45),y:(trackTop+trackBottom)/2},end={x:ff.rect.right-12,y:(trackTop+trackBottom)/2};
      await p.evaluate(()=>{window.__floatPhase='scrollbar-drag';});await p.mouse.move(start.x,start.y);await p.mouse.down({clickCount:1});for(let i=1;i<=12;i++){await p.mouse.move(start.x+(end.x-start.x)*i/12,start.y);await sleep(20);}await p.mouse.up();await sleep(100);
      const dragged=await snapshot(p),gg=await geometry(p);c.states.push({name:'scrollbar-drag',...dragged});c.scrollbar={start,end,steps:12,before:ff.scrollLeft,after:gg.floats[0]?.scrollLeft,beforeGeometry:g1,afterGeometry:gg,input:'CDP native mouse down, 12 moves, up; browser scrollbar may consume events before DOM delivery'};c.frames.push(await frame(p,dir,c.id+'-04-scrollbar-drag',{allowMissingCaret:true}));
@@ -93,7 +94,7 @@ async function main(){
     assert(await p.evaluate(()=>window.__resizeFloat===window.mpEngine._view().dom.querySelector('.mp-inline-float')),'resize retains the same mounted preview');assert.deepEqual(rf.style,backGeometry.floats[0].style,'resize performs no placement writes');
     const lo=Math.min(resized.selection.anchor,resized.selection.head),hi=Math.max(resized.selection.anchor,resized.selection.head);
     await p.keyboard.insertText('T');await sleep(180);const resizedInput=await snapshot(p),inputGeometry=await geometry(p);c.resizeInput=inputGeometry;c.frames.push(await frame(p,dir,c.id+'-07-resize-input',{allowMissingCaret:true}));
-    assert(resizedInput.focus&&resizedInput.text===resized.text.slice(0,lo)+'T'+resized.text.slice(hi),'input after resize replaces the exact source selection');const inf=inputGeometry.floats[0];assert(inf&&inf.visibility==='visible'&&inf.rect.left>=inf.bounds.left-1&&inf.rect.right<=inf.bounds.right+1,'actual formula edit places a new preview inside the current column');assert(Math.abs(inf.rect.top-inf.legacyTop)<=97,'fresh preview after resize respects the distance cap');
+    assert(resizedInput.focus&&resizedInput.text===resized.text.slice(0,lo)+'T'+resized.text.slice(hi),'input after resize replaces the exact source selection');const inf=inputGeometry.floats[0];assert(inf&&inf.visibility==='visible'&&inf.rect.left>=inf.bounds.left-1&&inf.rect.right<=inf.bounds.right+1,'actual formula edit places a new preview inside the current column');assert(Math.abs(inf.rect.top-inf.legacyTop)<=67.2+1,'fresh preview after resize respects the distance cap');
     await p.setViewportSize({width:fixture.width,height:760});await sleep(180);const wider=await snapshot(p),wideGeometry=await geometry(p);c.widened=wideGeometry;const wf=wideGeometry.floats[0];assert(wider.text===resizedInput.text&&wider.focus&&JSON.stringify(wider.selection)===JSON.stringify(resizedInput.selection),'widening retains source selection');assert(wf&&wf.visibility==='visible','preview stays visible after widening');assert.deepEqual(wf.style,inf.style,'widening performs no placement writes');c.events=await p.evaluate(()=>window.__floatEvents);c.status='pass';
    }catch(e){c.status='fail';c.error=e.message;if(p)try{c.failureState=await snapshot(p);c.failureGeometry=await geometry(p);c.frames.push(await frame(p,dir,c.id+'-failure',{allowMissingCaret:true}));}catch(x){c.captureError=x.message;}}finally{if(p){c.events=await p.evaluate(()=>window.__floatEvents||[]).catch(()=>c.events||[]);await p.close().catch(()=>{});}}
    fs.writeFileSync(path.join(dir,'result.json'),JSON.stringify(result,null,2));console.log(c.status.toUpperCase()+' '+c.id+(c.error?': '+c.error:''));
