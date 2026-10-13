@@ -1,0 +1,3261 @@
+{
+  "schema": 1,
+  "suite": "math-paste-workflows",
+  "kind": "actual-ui-probe",
+  "startedAt": "2026-10-11T22:42:28.755Z",
+  "cases": [
+    {
+      "id": "html-ordinary-replace-inline-y-history-continue",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "glyph-target",
+          "glyph": {
+            "text": "y",
+            "x": 238.425,
+            "y": 63.25,
+            "start": "2",
+            "end": "3"
+          }
+        },
+        {
+          "name": "html-ordinary-01-rendered",
+          "text": "PRE $x+y$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "html-ordinary.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "html-ordinary-01-rendered.png",
+            "sha256": "298053d189d5e49a3891bd5605432dffae0c9e10e5b46660c83f57acc75680ea",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "html-ordinary-01-rendered-caret-2x.png",
+              "sha256": "d0f83800b96896a75366c7fb4d088228ae601e8c9bc3f1d0829462eb6612426b",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "html-ordinary-02-clicked",
+          "text": "PRE $x+y$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 8
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 232.8828125,
+            "right": 232.8828125,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "html-ordinary.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "html-ordinary-02-clicked.png",
+            "sha256": "8ef98467d3944fd5711c0dd74ca97577529bb37f3fd08b4df511e2a90025c18b",
+            "caret": {
+              "left": 232.8828125,
+              "right": 232.8828125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "html-ordinary-02-clicked-caret-2x.png",
+              "sha256": "907b05684b1c9481ba69da2615814a69d300f9000b0ef341eed96c619f952d22",
+              "clip": {
+                "x": 112.8828125,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "html-ordinary-03-selected",
+          "text": "PRE $x+y$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 225.9921875,
+            "right": 225.9921875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "html-ordinary.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "html-ordinary-03-selected.png",
+            "sha256": "427b23c5f574ca4f1a8f8e3d3ced84357aa59b073bac64ec4327b86c28c8bdcc",
+            "caret": {
+              "left": 225.9921875,
+              "right": 225.9921875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "html-ordinary-03-selected-caret-2x.png",
+              "sha256": "bb03ebcac55360f5ce636b6da89e13c75c752e1ca1f16047a2de57eace909518",
+              "clip": {
+                "x": 105.9921875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "key": "Control+v",
+          "fixturePayload": {
+            "text": "Q",
+            "html": "<p>Q</p>"
+          },
+          "written": {
+            "ok": true,
+            "bytes": 1,
+            "hasHtml": true
+          },
+          "text": {
+            "length": 1,
+            "matches": true
+          },
+          "html": {
+            "matches": true,
+            "length": 185
+          },
+          "expectedHTML": true,
+          "matches": true
+        },
+        {
+          "name": "html-ordinary-04-pasted",
+          "text": "PRE $x+Q$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 8
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 236.40625,
+            "right": 236.40625,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● html-ordinary.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "v",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "html-ordinary-04-pasted.png",
+            "sha256": "173b97a21ac75b7ff371de03f4a2f73c5c187bbc8b6ccce145d647dabfd70f39",
+            "caret": {
+              "left": 236.40625,
+              "right": 236.40625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "html-ordinary-04-pasted-caret-2x.png",
+              "sha256": "a947342843306b6e977f033a2fe3068ebc5b616aa8dcd2f83b6d6da274227ffb",
+              "clip": {
+                "x": 116.40625,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "paste-entry-and-clipboard-after",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "v",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "paste": {
+            "trusted": true,
+            "defaultPreventedAtCapture": false,
+            "types": [
+              "text/plain",
+              "text/html"
+            ],
+            "plainMatches": true,
+            "plainLength": 1,
+            "htmlHasFixture": true,
+            "htmlLength": 80,
+            "syntheticHTMLCarrier": "<html>\r\n<body>\r\n<!--StartFragment--><p>Q</p><!--EndFragment-->\r\n</body>\r\n</html>",
+            "carrierBodyText": "\nQ\n\n",
+            "targetInEditor": true
+          },
+          "clipboard": {
+            "text": {
+              "matches": true,
+              "length": 1
+            },
+            "html": {
+              "length": 185,
+              "matches": true
+            },
+            "expectedHTML": true,
+            "matches": true
+          }
+        },
+        {
+          "name": "html-ordinary-05-undo",
+          "text": "PRE $x+y$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 225.9921875,
+            "right": 225.9921875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● html-ordinary.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "v",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "html-ordinary-05-undo.png",
+            "sha256": "427b23c5f574ca4f1a8f8e3d3ced84357aa59b073bac64ec4327b86c28c8bdcc",
+            "caret": {
+              "left": 225.9921875,
+              "right": 225.9921875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "html-ordinary-05-undo-caret-2x.png",
+              "sha256": "bb03ebcac55360f5ce636b6da89e13c75c752e1ca1f16047a2de57eace909518",
+              "clip": {
+                "x": 105.9921875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "html-ordinary-06-redo",
+          "text": "PRE $x+Q$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 225.9921875,
+            "right": 225.9921875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● html-ordinary.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "v",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "html-ordinary-06-redo.png",
+            "sha256": "e4c4d27f2d9448fb1ca0250fa81d2128ce0d3f897084c22ea48c97ddb7181360",
+            "caret": {
+              "left": 225.9921875,
+              "right": 225.9921875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "html-ordinary-06-redo-caret-2x.png",
+              "sha256": "4c319c435458901df694b0fd82f1716366ed612cb79aa6c66bf8d1a7756ca8c9",
+              "clip": {
+                "x": 105.9921875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "html-ordinary-07-before-continue",
+          "text": "PRE $x+Q$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 8
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 236.40625,
+            "right": 236.40625,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● html-ordinary.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "v",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "html-ordinary-07-before-continue.png",
+            "sha256": "173b97a21ac75b7ff371de03f4a2f73c5c187bbc8b6ccce145d647dabfd70f39",
+            "caret": {
+              "left": 236.40625,
+              "right": 236.40625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "html-ordinary-07-before-continue-caret-2x.png",
+              "sha256": "a947342843306b6e977f033a2fe3068ebc5b616aa8dcd2f83b6d6da274227ffb",
+              "clip": {
+                "x": 116.40625,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "html-ordinary-08-continued",
+          "text": "PRE $x+QR$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 9,
+            "head": 9
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 246.234375,
+            "right": 246.234375,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● html-ordinary.md · 21 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "v",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "html-ordinary-08-continued.png",
+            "sha256": "4699a263a5591ef6e38a3bccb1ce84a0115d346e751ba01282a27fd19f4fdc5d",
+            "caret": {
+              "left": 246.234375,
+              "right": 246.234375,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "html-ordinary-08-continued-caret-2x.png",
+              "sha256": "9d581bc14733cb40189b48359f3fbafc0505c8c3cc62bf8bcb38e09284818987",
+              "clip": {
+                "x": 126.234375,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "entryConfirmed": true,
+      "stage": "complete",
+      "entryTransport": "renderer-CDP",
+      "electronAcceleratorVerified": false,
+      "detail": {
+        "key": "Control+v",
+        "tokenFrom": 7,
+        "from": 7,
+        "to": 8,
+        "literal": "Q",
+        "collapsed": false,
+        "crossFormula": false,
+        "expectedSource": "PRE $x+Q$ POST\nTAIL\n",
+        "continuedExpected": "PRE $x+QR$ POST\nTAIL\n",
+        "foldedRedo": true,
+        "entryConfirmed": true,
+        "electronAcceleratorVerified": false,
+        "undoRedo": "CM commands through renderer keys"
+      },
+      "ms": 5769
+    },
+    {
+      "id": "html-plain-shortcut-replace-inline-y-history-continue",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "glyph-target",
+          "glyph": {
+            "text": "y",
+            "x": 238.425,
+            "y": 63.25,
+            "start": "2",
+            "end": "3"
+          }
+        },
+        {
+          "name": "html-plain-shortcut-01-rendered",
+          "text": "PRE $x+y$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "html-plain-shortcut.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "html-plain-shortcut-01-rendered.png",
+            "sha256": "298053d189d5e49a3891bd5605432dffae0c9e10e5b46660c83f57acc75680ea",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "html-plain-shortcut-01-rendered-caret-2x.png",
+              "sha256": "d0f83800b96896a75366c7fb4d088228ae601e8c9bc3f1d0829462eb6612426b",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "html-plain-shortcut-02-clicked",
+          "text": "PRE $x+y$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 8
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 232.8828125,
+            "right": 232.8828125,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "html-plain-shortcut.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "html-plain-shortcut-02-clicked.png",
+            "sha256": "8ef98467d3944fd5711c0dd74ca97577529bb37f3fd08b4df511e2a90025c18b",
+            "caret": {
+              "left": 232.8828125,
+              "right": 232.8828125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "html-plain-shortcut-02-clicked-caret-2x.png",
+              "sha256": "907b05684b1c9481ba69da2615814a69d300f9000b0ef341eed96c619f952d22",
+              "clip": {
+                "x": 112.8828125,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "html-plain-shortcut-03-selected",
+          "text": "PRE $x+y$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 225.9921875,
+            "right": 225.9921875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "html-plain-shortcut.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "html-plain-shortcut-03-selected.png",
+            "sha256": "427b23c5f574ca4f1a8f8e3d3ced84357aa59b073bac64ec4327b86c28c8bdcc",
+            "caret": {
+              "left": 225.9921875,
+              "right": 225.9921875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "html-plain-shortcut-03-selected-caret-2x.png",
+              "sha256": "bb03ebcac55360f5ce636b6da89e13c75c752e1ca1f16047a2de57eace909518",
+              "clip": {
+                "x": 105.9921875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "key": "Control+Shift+V",
+          "fixturePayload": {
+            "text": "Q",
+            "html": "<p>Q</p>"
+          },
+          "written": {
+            "ok": true,
+            "bytes": 1,
+            "hasHtml": true
+          },
+          "text": {
+            "matches": true,
+            "length": 1
+          },
+          "html": {
+            "matches": true,
+            "length": 185
+          },
+          "expectedHTML": true,
+          "matches": true
+        },
+        {
+          "name": "html-plain-shortcut-04-pasted",
+          "text": "PRE $x+Q$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 8
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 236.40625,
+            "right": 236.40625,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● html-plain-shortcut.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": true,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "V",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "html-plain-shortcut-04-pasted.png",
+            "sha256": "173b97a21ac75b7ff371de03f4a2f73c5c187bbc8b6ccce145d647dabfd70f39",
+            "caret": {
+              "left": 236.40625,
+              "right": 236.40625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "html-plain-shortcut-04-pasted-caret-2x.png",
+              "sha256": "a947342843306b6e977f033a2fe3068ebc5b616aa8dcd2f83b6d6da274227ffb",
+              "clip": {
+                "x": 116.40625,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "paste-entry-and-clipboard-after",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": true,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "V",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": true,
+              "trusted": true
+            }
+          ],
+          "paste": {
+            "trusted": true,
+            "defaultPreventedAtCapture": false,
+            "types": [
+              "text/plain"
+            ],
+            "plainMatches": true,
+            "plainLength": 1,
+            "htmlHasFixture": false,
+            "htmlLength": 0,
+            "syntheticHTMLCarrier": "",
+            "carrierBodyText": "",
+            "targetInEditor": true
+          },
+          "clipboard": {
+            "text": {
+              "matches": true,
+              "length": 1
+            },
+            "html": {
+              "matches": true,
+              "length": 185
+            },
+            "expectedHTML": true,
+            "matches": true
+          }
+        },
+        {
+          "name": "html-plain-shortcut-05-undo",
+          "text": "PRE $x+y$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 225.9921875,
+            "right": 225.9921875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● html-plain-shortcut.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": true,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "V",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "html-plain-shortcut-05-undo.png",
+            "sha256": "427b23c5f574ca4f1a8f8e3d3ced84357aa59b073bac64ec4327b86c28c8bdcc",
+            "caret": {
+              "left": 225.9921875,
+              "right": 225.9921875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "html-plain-shortcut-05-undo-caret-2x.png",
+              "sha256": "bb03ebcac55360f5ce636b6da89e13c75c752e1ca1f16047a2de57eace909518",
+              "clip": {
+                "x": 105.9921875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "html-plain-shortcut-06-redo",
+          "text": "PRE $x+Q$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 225.9921875,
+            "right": 225.9921875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● html-plain-shortcut.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": true,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "V",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "html-plain-shortcut-06-redo.png",
+            "sha256": "e4c4d27f2d9448fb1ca0250fa81d2128ce0d3f897084c22ea48c97ddb7181360",
+            "caret": {
+              "left": 225.9921875,
+              "right": 225.9921875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "html-plain-shortcut-06-redo-caret-2x.png",
+              "sha256": "4c319c435458901df694b0fd82f1716366ed612cb79aa6c66bf8d1a7756ca8c9",
+              "clip": {
+                "x": 105.9921875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "html-plain-shortcut-07-before-continue",
+          "text": "PRE $x+Q$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 8
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 236.40625,
+            "right": 236.40625,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● html-plain-shortcut.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": true,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "V",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "html-plain-shortcut-07-before-continue.png",
+            "sha256": "173b97a21ac75b7ff371de03f4a2f73c5c187bbc8b6ccce145d647dabfd70f39",
+            "caret": {
+              "left": 236.40625,
+              "right": 236.40625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "html-plain-shortcut-07-before-continue-caret-2x.png",
+              "sha256": "a947342843306b6e977f033a2fe3068ebc5b616aa8dcd2f83b6d6da274227ffb",
+              "clip": {
+                "x": 116.40625,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "html-plain-shortcut-08-continued",
+          "text": "PRE $x+QR$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 9,
+            "head": 9
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 246.234375,
+            "right": 246.234375,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● html-plain-shortcut.md · 21 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": true,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "V",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "html-plain-shortcut-08-continued.png",
+            "sha256": "4699a263a5591ef6e38a3bccb1ce84a0115d346e751ba01282a27fd19f4fdc5d",
+            "caret": {
+              "left": 246.234375,
+              "right": 246.234375,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "html-plain-shortcut-08-continued-caret-2x.png",
+              "sha256": "9d581bc14733cb40189b48359f3fbafc0505c8c3cc62bf8bcb38e09284818987",
+              "clip": {
+                "x": 126.234375,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "entryConfirmed": true,
+      "stage": "complete",
+      "entryTransport": "renderer-CDP",
+      "electronAcceleratorVerified": false,
+      "detail": {
+        "key": "Control+Shift+V",
+        "tokenFrom": 7,
+        "from": 7,
+        "to": 8,
+        "literal": "Q",
+        "collapsed": false,
+        "crossFormula": false,
+        "expectedSource": "PRE $x+Q$ POST\nTAIL\n",
+        "continuedExpected": "PRE $x+QR$ POST\nTAIL\n",
+        "foldedRedo": true,
+        "entryConfirmed": true,
+        "electronAcceleratorVerified": false,
+        "undoRedo": "CM commands through renderer keys"
+      },
+      "ms": 6201
+    },
+    {
+      "id": "text-only-replace-inline-y-history-continue",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "glyph-target",
+          "glyph": {
+            "text": "y",
+            "x": 238.425,
+            "y": 63.25,
+            "start": "2",
+            "end": "3"
+          }
+        },
+        {
+          "name": "text-only-01-rendered",
+          "text": "PRE $x+y$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "text-only.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "text-only-01-rendered.png",
+            "sha256": "298053d189d5e49a3891bd5605432dffae0c9e10e5b46660c83f57acc75680ea",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "text-only-01-rendered-caret-2x.png",
+              "sha256": "d0f83800b96896a75366c7fb4d088228ae601e8c9bc3f1d0829462eb6612426b",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "text-only-02-clicked",
+          "text": "PRE $x+y$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 8
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 232.8828125,
+            "right": 232.8828125,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "text-only.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "text-only-02-clicked.png",
+            "sha256": "8ef98467d3944fd5711c0dd74ca97577529bb37f3fd08b4df511e2a90025c18b",
+            "caret": {
+              "left": 232.8828125,
+              "right": 232.8828125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "text-only-02-clicked-caret-2x.png",
+              "sha256": "907b05684b1c9481ba69da2615814a69d300f9000b0ef341eed96c619f952d22",
+              "clip": {
+                "x": 112.8828125,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "text-only-03-selected",
+          "text": "PRE $x+y$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 225.9921875,
+            "right": 225.9921875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "text-only.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "text-only-03-selected.png",
+            "sha256": "427b23c5f574ca4f1a8f8e3d3ced84357aa59b073bac64ec4327b86c28c8bdcc",
+            "caret": {
+              "left": 225.9921875,
+              "right": 225.9921875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "text-only-03-selected-caret-2x.png",
+              "sha256": "bb03ebcac55360f5ce636b6da89e13c75c752e1ca1f16047a2de57eace909518",
+              "clip": {
+                "x": 105.9921875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before",
+          "key": "Control+v",
+          "fixturePayload": {
+            "text": "Q"
+          },
+          "written": {
+            "ok": true,
+            "bytes": 1,
+            "hasHtml": false
+          },
+          "text": {
+            "matches": true,
+            "length": 1
+          },
+          "html": {
+            "matches": true,
+            "length": 0
+          },
+          "expectedHTML": false,
+          "matches": true
+        },
+        {
+          "name": "text-only-04-pasted",
+          "text": "PRE $x+Q$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 8
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 236.40625,
+            "right": 236.40625,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● text-only.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "v",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "text-only-04-pasted.png",
+            "sha256": "173b97a21ac75b7ff371de03f4a2f73c5c187bbc8b6ccce145d647dabfd70f39",
+            "caret": {
+              "left": 236.40625,
+              "right": 236.40625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "text-only-04-pasted-caret-2x.png",
+              "sha256": "a947342843306b6e977f033a2fe3068ebc5b616aa8dcd2f83b6d6da274227ffb",
+              "clip": {
+                "x": 116.40625,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "paste-entry-and-clipboard-after",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "v",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "paste": {
+            "trusted": true,
+            "defaultPreventedAtCapture": false,
+            "types": [
+              "text/plain"
+            ],
+            "plainMatches": true,
+            "plainLength": 1,
+            "htmlHasFixture": false,
+            "htmlLength": 0,
+            "syntheticHTMLCarrier": "",
+            "carrierBodyText": "",
+            "targetInEditor": true
+          },
+          "clipboard": {
+            "text": {
+              "length": 1,
+              "matches": true
+            },
+            "html": {
+              "matches": true,
+              "length": 0
+            },
+            "expectedHTML": false,
+            "matches": true
+          }
+        },
+        {
+          "name": "text-only-05-undo",
+          "text": "PRE $x+y$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 225.9921875,
+            "right": 225.9921875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● text-only.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "v",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "text-only-05-undo.png",
+            "sha256": "427b23c5f574ca4f1a8f8e3d3ced84357aa59b073bac64ec4327b86c28c8bdcc",
+            "caret": {
+              "left": 225.9921875,
+              "right": 225.9921875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "text-only-05-undo-caret-2x.png",
+              "sha256": "bb03ebcac55360f5ce636b6da89e13c75c752e1ca1f16047a2de57eace909518",
+              "clip": {
+                "x": 105.9921875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "text-only-06-redo",
+          "text": "PRE $x+Q$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 225.9921875,
+            "right": 225.9921875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● text-only.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "v",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "text-only-06-redo.png",
+            "sha256": "e4c4d27f2d9448fb1ca0250fa81d2128ce0d3f897084c22ea48c97ddb7181360",
+            "caret": {
+              "left": 225.9921875,
+              "right": 225.9921875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "text-only-06-redo-caret-2x.png",
+              "sha256": "4c319c435458901df694b0fd82f1716366ed612cb79aa6c66bf8d1a7756ca8c9",
+              "clip": {
+                "x": 105.9921875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "text-only-07-before-continue",
+          "text": "PRE $x+Q$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 8,
+            "head": 8
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 236.40625,
+            "right": 236.40625,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● text-only.md · 20 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "v",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "text-only-07-before-continue.png",
+            "sha256": "173b97a21ac75b7ff371de03f4a2f73c5c187bbc8b6ccce145d647dabfd70f39",
+            "caret": {
+              "left": 236.40625,
+              "right": 236.40625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "text-only-07-before-continue-caret-2x.png",
+              "sha256": "a947342843306b6e977f033a2fe3068ebc5b616aa8dcd2f83b6d6da274227ffb",
+              "clip": {
+                "x": 116.40625,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "text-only-08-continued",
+          "text": "PRE $x+QR$ POST\nTAIL\n",
+          "selection": {
+            "anchor": 9,
+            "head": 9
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 246.234375,
+            "right": 246.234375,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● text-only.md · 21 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "ArrowLeft",
+              "code": "ArrowLeft",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "v",
+              "code": "KeyV",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "z",
+              "code": "KeyZ",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "y",
+              "code": "KeyY",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "text-only-08-continued.png",
+            "sha256": "4699a263a5591ef6e38a3bccb1ce84a0115d346e751ba01282a27fd19f4fdc5d",
+            "caret": {
+              "left": 246.234375,
+              "right": 246.234375,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "text-only-08-continued-caret-2x.png",
+              "sha256": "9d581bc14733cb40189b48359f3fbafc0505c8c3cc62bf8bcb38e09284818987",
+              "clip": {
+                "x": 126.234375,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "entryConfirmed": true,
+      "stage": "complete",
+      "entryTransport": "renderer-CDP",
+      "electronAcceleratorVerified": false,
+      "detail": {
+        "key": "Control+v",
+        "tokenFrom": 7,
+        "from": 7,
+        "to": 8,
+        "literal": "Q",
+        "collapsed": false,
+        "crossFormula": false,
+        "expectedSource": "PRE $x+Q$ POST\nTAIL\n",
+        "continuedExpected": "PRE $x+QR$ POST\nTAIL\n",
+        "foldedRedo": true,
+        "entryConfirmed": true,
+        "electronAcceleratorVerified": false,
+        "undoRedo": "CM commands through renderer keys"
+      },
+      "ms": 6937
+    }
+  ],
+  "errors": [],
+  "transport": {
+    "keyboard": "renderer-CDP",
+    "mouse": "renderer-CDP",
+    "clipboard": "host writes actual OS clipboard; separate Windows STA readback",
+    "electronAcceleratorVerified": false
+  },
+  "source": {
+    "main.js": "9785673e49995f2c35333e06539054cc4e75b27b4af2b1e6d45f573ce260ecfe",
+    "extras.js": "8293b1929b7360f9286c672ba5aad44858fd7a1cc3a191c79554e5b482daa4c9"
+  },
+  "probe": {
+    "file": "tools/quality/math-paste-workflows.cjs",
+    "sha256": "6941962cfe563912c77864ae70532b290ea166bb05dfefa6b652cffae7f4c086"
+  },
+  "artifact": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-common-mutations-3.2.11\\restored-math-paste\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-common-mutations-3.2.11\\restored-math-paste\\unpacked\\MarkPilot.exe",
+    "runtimeExecutableSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-common-mutations-3.2.11\\restored-math-paste\\unpacked\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.11",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-common-mutations-3.2.11\\restored-math-paste\\unpacked\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-common-mutations-3.2.11\\restored-math-paste\\unpacked\\resources\\app.asar",
+    "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+    "bootMs": 944,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+        "sourceSha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "clipboard": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T22:42:55.528Z",
+  "entryUnconfirmed": [],
+  "productFailures": [],
+  "passed": true,
+  "verdict": "renderer-CDP-chain-pass",
+  "frames": [
+    {
+      "file": "html-ordinary-01-rendered.png",
+      "sha256": "298053d189d5e49a3891bd5605432dffae0c9e10e5b46660c83f57acc75680ea",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "html-ordinary-01-rendered-caret-2x.png",
+        "sha256": "d0f83800b96896a75366c7fb4d088228ae601e8c9bc3f1d0829462eb6612426b",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "html-ordinary-02-clicked.png",
+      "sha256": "8ef98467d3944fd5711c0dd74ca97577529bb37f3fd08b4df511e2a90025c18b",
+      "caret": {
+        "left": 232.8828125,
+        "right": 232.8828125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "html-ordinary-02-clicked-caret-2x.png",
+        "sha256": "907b05684b1c9481ba69da2615814a69d300f9000b0ef341eed96c619f952d22",
+        "clip": {
+          "x": 112.8828125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "html-ordinary-03-selected.png",
+      "sha256": "427b23c5f574ca4f1a8f8e3d3ced84357aa59b073bac64ec4327b86c28c8bdcc",
+      "caret": {
+        "left": 225.9921875,
+        "right": 225.9921875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "html-ordinary-03-selected-caret-2x.png",
+        "sha256": "bb03ebcac55360f5ce636b6da89e13c75c752e1ca1f16047a2de57eace909518",
+        "clip": {
+          "x": 105.9921875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "html-ordinary-04-pasted.png",
+      "sha256": "173b97a21ac75b7ff371de03f4a2f73c5c187bbc8b6ccce145d647dabfd70f39",
+      "caret": {
+        "left": 236.40625,
+        "right": 236.40625,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "html-ordinary-04-pasted-caret-2x.png",
+        "sha256": "a947342843306b6e977f033a2fe3068ebc5b616aa8dcd2f83b6d6da274227ffb",
+        "clip": {
+          "x": 116.40625,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "html-ordinary-05-undo.png",
+      "sha256": "427b23c5f574ca4f1a8f8e3d3ced84357aa59b073bac64ec4327b86c28c8bdcc",
+      "caret": {
+        "left": 225.9921875,
+        "right": 225.9921875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "html-ordinary-05-undo-caret-2x.png",
+        "sha256": "bb03ebcac55360f5ce636b6da89e13c75c752e1ca1f16047a2de57eace909518",
+        "clip": {
+          "x": 105.9921875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "html-ordinary-06-redo.png",
+      "sha256": "e4c4d27f2d9448fb1ca0250fa81d2128ce0d3f897084c22ea48c97ddb7181360",
+      "caret": {
+        "left": 225.9921875,
+        "right": 225.9921875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "html-ordinary-06-redo-caret-2x.png",
+        "sha256": "4c319c435458901df694b0fd82f1716366ed612cb79aa6c66bf8d1a7756ca8c9",
+        "clip": {
+          "x": 105.9921875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "html-ordinary-07-before-continue.png",
+      "sha256": "173b97a21ac75b7ff371de03f4a2f73c5c187bbc8b6ccce145d647dabfd70f39",
+      "caret": {
+        "left": 236.40625,
+        "right": 236.40625,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "html-ordinary-07-before-continue-caret-2x.png",
+        "sha256": "a947342843306b6e977f033a2fe3068ebc5b616aa8dcd2f83b6d6da274227ffb",
+        "clip": {
+          "x": 116.40625,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "html-ordinary-08-continued.png",
+      "sha256": "4699a263a5591ef6e38a3bccb1ce84a0115d346e751ba01282a27fd19f4fdc5d",
+      "caret": {
+        "left": 246.234375,
+        "right": 246.234375,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "html-ordinary-08-continued-caret-2x.png",
+        "sha256": "9d581bc14733cb40189b48359f3fbafc0505c8c3cc62bf8bcb38e09284818987",
+        "clip": {
+          "x": 126.234375,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "html-plain-shortcut-01-rendered.png",
+      "sha256": "298053d189d5e49a3891bd5605432dffae0c9e10e5b46660c83f57acc75680ea",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "html-plain-shortcut-01-rendered-caret-2x.png",
+        "sha256": "d0f83800b96896a75366c7fb4d088228ae601e8c9bc3f1d0829462eb6612426b",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "html-plain-shortcut-02-clicked.png",
+      "sha256": "8ef98467d3944fd5711c0dd74ca97577529bb37f3fd08b4df511e2a90025c18b",
+      "caret": {
+        "left": 232.8828125,
+        "right": 232.8828125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "html-plain-shortcut-02-clicked-caret-2x.png",
+        "sha256": "907b05684b1c9481ba69da2615814a69d300f9000b0ef341eed96c619f952d22",
+        "clip": {
+          "x": 112.8828125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "html-plain-shortcut-03-selected.png",
+      "sha256": "427b23c5f574ca4f1a8f8e3d3ced84357aa59b073bac64ec4327b86c28c8bdcc",
+      "caret": {
+        "left": 225.9921875,
+        "right": 225.9921875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "html-plain-shortcut-03-selected-caret-2x.png",
+        "sha256": "bb03ebcac55360f5ce636b6da89e13c75c752e1ca1f16047a2de57eace909518",
+        "clip": {
+          "x": 105.9921875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "html-plain-shortcut-04-pasted.png",
+      "sha256": "173b97a21ac75b7ff371de03f4a2f73c5c187bbc8b6ccce145d647dabfd70f39",
+      "caret": {
+        "left": 236.40625,
+        "right": 236.40625,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "html-plain-shortcut-04-pasted-caret-2x.png",
+        "sha256": "a947342843306b6e977f033a2fe3068ebc5b616aa8dcd2f83b6d6da274227ffb",
+        "clip": {
+          "x": 116.40625,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "html-plain-shortcut-05-undo.png",
+      "sha256": "427b23c5f574ca4f1a8f8e3d3ced84357aa59b073bac64ec4327b86c28c8bdcc",
+      "caret": {
+        "left": 225.9921875,
+        "right": 225.9921875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "html-plain-shortcut-05-undo-caret-2x.png",
+        "sha256": "bb03ebcac55360f5ce636b6da89e13c75c752e1ca1f16047a2de57eace909518",
+        "clip": {
+          "x": 105.9921875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "html-plain-shortcut-06-redo.png",
+      "sha256": "e4c4d27f2d9448fb1ca0250fa81d2128ce0d3f897084c22ea48c97ddb7181360",
+      "caret": {
+        "left": 225.9921875,
+        "right": 225.9921875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "html-plain-shortcut-06-redo-caret-2x.png",
+        "sha256": "4c319c435458901df694b0fd82f1716366ed612cb79aa6c66bf8d1a7756ca8c9",
+        "clip": {
+          "x": 105.9921875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "html-plain-shortcut-07-before-continue.png",
+      "sha256": "173b97a21ac75b7ff371de03f4a2f73c5c187bbc8b6ccce145d647dabfd70f39",
+      "caret": {
+        "left": 236.40625,
+        "right": 236.40625,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "html-plain-shortcut-07-before-continue-caret-2x.png",
+        "sha256": "a947342843306b6e977f033a2fe3068ebc5b616aa8dcd2f83b6d6da274227ffb",
+        "clip": {
+          "x": 116.40625,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "html-plain-shortcut-08-continued.png",
+      "sha256": "4699a263a5591ef6e38a3bccb1ce84a0115d346e751ba01282a27fd19f4fdc5d",
+      "caret": {
+        "left": 246.234375,
+        "right": 246.234375,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "html-plain-shortcut-08-continued-caret-2x.png",
+        "sha256": "9d581bc14733cb40189b48359f3fbafc0505c8c3cc62bf8bcb38e09284818987",
+        "clip": {
+          "x": 126.234375,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "text-only-01-rendered.png",
+      "sha256": "298053d189d5e49a3891bd5605432dffae0c9e10e5b46660c83f57acc75680ea",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "text-only-01-rendered-caret-2x.png",
+        "sha256": "d0f83800b96896a75366c7fb4d088228ae601e8c9bc3f1d0829462eb6612426b",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "text-only-02-clicked.png",
+      "sha256": "8ef98467d3944fd5711c0dd74ca97577529bb37f3fd08b4df511e2a90025c18b",
+      "caret": {
+        "left": 232.8828125,
+        "right": 232.8828125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "text-only-02-clicked-caret-2x.png",
+        "sha256": "907b05684b1c9481ba69da2615814a69d300f9000b0ef341eed96c619f952d22",
+        "clip": {
+          "x": 112.8828125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "text-only-03-selected.png",
+      "sha256": "427b23c5f574ca4f1a8f8e3d3ced84357aa59b073bac64ec4327b86c28c8bdcc",
+      "caret": {
+        "left": 225.9921875,
+        "right": 225.9921875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "text-only-03-selected-caret-2x.png",
+        "sha256": "bb03ebcac55360f5ce636b6da89e13c75c752e1ca1f16047a2de57eace909518",
+        "clip": {
+          "x": 105.9921875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "text-only-04-pasted.png",
+      "sha256": "173b97a21ac75b7ff371de03f4a2f73c5c187bbc8b6ccce145d647dabfd70f39",
+      "caret": {
+        "left": 236.40625,
+        "right": 236.40625,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "text-only-04-pasted-caret-2x.png",
+        "sha256": "a947342843306b6e977f033a2fe3068ebc5b616aa8dcd2f83b6d6da274227ffb",
+        "clip": {
+          "x": 116.40625,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "text-only-05-undo.png",
+      "sha256": "427b23c5f574ca4f1a8f8e3d3ced84357aa59b073bac64ec4327b86c28c8bdcc",
+      "caret": {
+        "left": 225.9921875,
+        "right": 225.9921875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "text-only-05-undo-caret-2x.png",
+        "sha256": "bb03ebcac55360f5ce636b6da89e13c75c752e1ca1f16047a2de57eace909518",
+        "clip": {
+          "x": 105.9921875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "text-only-06-redo.png",
+      "sha256": "e4c4d27f2d9448fb1ca0250fa81d2128ce0d3f897084c22ea48c97ddb7181360",
+      "caret": {
+        "left": 225.9921875,
+        "right": 225.9921875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "text-only-06-redo-caret-2x.png",
+        "sha256": "4c319c435458901df694b0fd82f1716366ed612cb79aa6c66bf8d1a7756ca8c9",
+        "clip": {
+          "x": 105.9921875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "text-only-07-before-continue.png",
+      "sha256": "173b97a21ac75b7ff371de03f4a2f73c5c187bbc8b6ccce145d647dabfd70f39",
+      "caret": {
+        "left": 236.40625,
+        "right": 236.40625,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "text-only-07-before-continue-caret-2x.png",
+        "sha256": "a947342843306b6e977f033a2fe3068ebc5b616aa8dcd2f83b6d6da274227ffb",
+        "clip": {
+          "x": 116.40625,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "text-only-08-continued.png",
+      "sha256": "4699a263a5591ef6e38a3bccb1ce84a0115d346e751ba01282a27fd19f4fdc5d",
+      "caret": {
+        "left": 246.234375,
+        "right": 246.234375,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "text-only-08-continued-caret-2x.png",
+        "sha256": "9d581bc14733cb40189b48359f3fbafc0505c8c3cc62bf8bcb38e09284818987",
+        "clip": {
+          "x": 126.234375,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ]
+}

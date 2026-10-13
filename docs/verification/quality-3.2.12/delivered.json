@@ -1,0 +1,15 @@
+{
+  "schema": 2,
+  "version": "3.2.12",
+  "passed": true,
+  "installed": true,
+  "pushed": false,
+  "asarSha256": "f794e8c23ea631afe1b66552c8674d9bd8c0a48eaf4b957b581832b57b624143",
+  "runtimeExecutableSha256": "d300992b1003765f2f64417269c124f0c7b14af65ce415ad2488d166e6f63e13",
+  "deliveryCases": {
+    "portable": 10,
+    "isolated": 52,
+    "installed": 28
+  },
+  "at": "2026-10-12T01:16:28.208Z"
+}

@@ -43,8 +43,11 @@ const {bitmap}=require('./clipboard.cjs');
           assert(trace[0].clipboard.hasImage,'Windows clipboard contains a bitmap');
           await p.keyboard.press('Control+v');await sleep(1800);
           const s=await snapshot(p),events=await p.evaluate(()=>window.__qualityPastes.slice(-1));trace.push({after:s,events});
+          const immediate=await p.evaluate(()=>[...document.querySelectorAll('.cm-content .mp-img img')].map(i=>({complete:i.complete,width:i.naturalWidth,height:i.naturalHeight,visible:i.getBoundingClientRect().width>0&&!i.closest('.is-failed')})));
+          trace.push({immediateImages:immediate});
           await capture(p,'clipboard-'+mode);assert(events[0]?.trusted,'trusted browser paste event');
           assert(s.text.includes('![]('),'Ctrl+V inserts Markdown image');
+          assert(immediate.some(i=>i.complete&&i.width>0&&i.visible),'Ctrl+V renders image before any caret movement or further input');
           if(mode==='assets') {
             const rel=/!\[\]\((assets\/[^)]+)\)/.exec(s.text)?.[1];assert(rel,'assets link inserted');
             const disk=path.resolve(dir,rel);assert(fs.existsSync(disk),'image file exists');

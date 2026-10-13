@@ -12,6 +12,7 @@ if(options['builder-cache'])process.env.ELECTRON_BUILDER_CACHE=options['builder-
 const run=(file,args,extra={})=>execFileSync(file,args,{cwd:ROOT,stdio:'inherit',windowsHide:true,timeout:600000,...extra});
 run(process.execPath,[path.join(__dirname,'stage-app.cjs'),'--runtime',options.runtime,'--out',path.join(dir,'stage')]);
 const stage=JSON.parse(fs.readFileSync(path.join(dir,'stage/artifact.json'),'utf8')),unpacked=path.dirname(stage.executable);
+assert(stage.files.find(f=>f.file==='renderer/cm6/markdown-worker.js')?.sha256,'Build the parser Worker before packaging');
 run(options.rcedit,[stage.executable,'--set-icon',path.join(app,'build/icon.ico'),'--set-version-string','ProductName','MarkPilot','--set-version-string','FileDescription','MarkPilot — Markdown 编辑器','--set-file-version',pkg.version+'.0','--set-product-version',pkg.version]);
 const resource=JSON.parse(execFileSync(process.env.MP_PWSH||'pwsh.exe',['-NoProfile','-NonInteractive','-Command',"$v=(Get-Item -LiteralPath $env:MP_CANDIDATE_EXE).VersionInfo; @{fileVersion=$v.FileVersion;productVersion=$v.ProductVersion;productName=$v.ProductName}|ConvertTo-Json -Compress"],{encoding:'utf8',windowsHide:true,env:{...process.env,MP_CANDIDATE_EXE:stage.executable},timeout:10000}));
 assert.equal(resource.fileVersion,pkg.version+'.0');assert.equal(resource.productVersion,pkg.version);assert.equal(resource.productName,'MarkPilot');

@@ -1,0 +1,123 @@
+{
+  "schema": 1,
+  "at": "2026-10-11T22:01:35.783Z",
+  "version": "3.2.10",
+  "files": [
+    {
+      "file": "production/markpilot-3.2.10-portable.exe",
+      "archiveSha256": "bb76ccf914bc303fbd6b9f15eb197cacb5152ee2689957cf43308d846cee764a",
+      "exeSha256": "a045aa49b9111dda6b18d692f8a6a3026b387fb200706a71f50314e082c8ede8",
+      "asarSha256": "da087df330d99409909ccad8ef58a64de5903319b6272c14703857e463d5cf99",
+      "sources": [
+        {
+          "file": "main.js",
+          "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+        },
+        {
+          "file": "preload.js",
+          "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+        },
+        {
+          "file": "renderer/host.js",
+          "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+        },
+        {
+          "file": "shell/document-store.js",
+          "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+        },
+        {
+          "file": "shell/text-codec.js",
+          "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+        },
+        {
+          "file": "renderer/cm6/app.js",
+          "sha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3"
+        },
+        {
+          "file": "renderer/cm6/markdown-worker.js",
+          "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+        }
+      ],
+      "extractExitCode": 0,
+      "matched": true
+    },
+    {
+      "file": "production/markpilot-Setup-3.2.10.exe",
+      "archiveSha256": "54d3963399945ad7787867869a498390accaafdad3b7311102c5bcd5b3a1208a",
+      "exeSha256": "a045aa49b9111dda6b18d692f8a6a3026b387fb200706a71f50314e082c8ede8",
+      "asarSha256": "da087df330d99409909ccad8ef58a64de5903319b6272c14703857e463d5cf99",
+      "sources": [
+        {
+          "file": "main.js",
+          "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+        },
+        {
+          "file": "preload.js",
+          "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+        },
+        {
+          "file": "renderer/host.js",
+          "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+        },
+        {
+          "file": "shell/document-store.js",
+          "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+        },
+        {
+          "file": "shell/text-codec.js",
+          "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+        },
+        {
+          "file": "renderer/cm6/app.js",
+          "sha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3"
+        },
+        {
+          "file": "renderer/cm6/markdown-worker.js",
+          "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+        }
+      ],
+      "extractExitCode": 0,
+      "matched": true
+    },
+    {
+      "file": "isolated/markpilot-quality-Setup-3.2.10.exe",
+      "archiveSha256": "965757fa82de4012a7e713474e0b1fb99e98045ecbe38e96995968a0f15bd5f2",
+      "exeSha256": "a045aa49b9111dda6b18d692f8a6a3026b387fb200706a71f50314e082c8ede8",
+      "asarSha256": "da087df330d99409909ccad8ef58a64de5903319b6272c14703857e463d5cf99",
+      "sources": [
+        {
+          "file": "main.js",
+          "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+        },
+        {
+          "file": "preload.js",
+          "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+        },
+        {
+          "file": "renderer/host.js",
+          "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+        },
+        {
+          "file": "shell/document-store.js",
+          "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+        },
+        {
+          "file": "shell/text-codec.js",
+          "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+        },
+        {
+          "file": "renderer/cm6/app.js",
+          "sha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3"
+        },
+        {
+          "file": "renderer/cm6/markdown-worker.js",
+          "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+        }
+      ],
+      "extractExitCode": 0,
+      "matched": true
+    }
+  ],
+  "passed": true,
+  "frames": []
+}

@@ -35,3 +35,28 @@ test('caret zoom has its own verified hash and traversal protection',()=>{
     data.frames[0].zoom={file:'zoom.png',sha256:sha256(zoom)};fs.writeFileSync(path.join(input,'result.json'),JSON.stringify(data));publish(input,path.join(dir,'valid'));assert.equal(fs.readFileSync(path.join(dir,'valid/zoom.png'),'utf8'),'zoom');
   } finally {const resolved=fs.realpathSync(dir);assert.equal(path.dirname(resolved),fs.realpathSync(os.tmpdir()));assert(path.basename(resolved).startsWith('mp-quality-zoom-'));fs.rmSync(resolved,{recursive:true,force:true});}
 });
+
+test('selective evidence copies full and zoom together, rejects unknown names and still verifies omitted frames',()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'mp-quality-selective-'));
+  try {
+    const input=path.join(dir,'input');fs.mkdirSync(input);
+    for(const name of ['full.png','zoom.png','omitted.png'])fs.writeFileSync(path.join(input,name),name);
+    const data={frames:[{file:'full.png',sha256:sha256(path.join(input,'full.png')),zoom:{file:'zoom.png',sha256:sha256(path.join(input,'zoom.png'))}},{file:'omitted.png',sha256:sha256(path.join(input,'omitted.png'))}]};
+    fs.writeFileSync(path.join(input,'result.json'),JSON.stringify(data));
+    assert.throws(()=>publish(input,path.join(dir,'unknown'),['typo.png']),/Unknown selected/);
+    const result=publish(input,path.join(dir,'valid'),['full.png']);assert.equal(result.frames,1);assert(fs.existsSync(path.join(dir,'valid/zoom.png')));assert(!fs.existsSync(path.join(dir,'valid/omitted.png')));
+    assert.equal(JSON.parse(fs.readFileSync(path.join(dir,'valid/result.json'),'utf8')).frames[1].published,false);
+    fs.writeFileSync(path.join(input,'omitted.png'),'modified');assert.throws(()=>publish(input,path.join(dir,'corrupt'),['full.png']),/SHA256 mismatch/);
+  }finally{const resolved=fs.realpathSync(dir);assert.equal(path.dirname(resolved),fs.realpathSync(os.tmpdir()));assert(path.basename(resolved).startsWith('mp-quality-selective-'));fs.rmSync(resolved,{recursive:true,force:true});}
+});
+
+test('workflow trace screenshots publish with verified zoom and reject conflicting identities',()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'mp-quality-workflow-evidence-'));
+  try {
+    const input=path.join(dir,'input');fs.mkdirSync(input);for(const name of ['full.png','zoom.png'])fs.writeFileSync(path.join(input,name),name);
+    const shot={file:'full.png',sha256:sha256(path.join(input,'full.png')),zoom:{file:'zoom.png',sha256:sha256(path.join(input,'zoom.png'))}};
+    const result={cases:[{trace:[{name:'actual-input-state',screenshot:shot},{name:'same-state-reference',screenshot:shot}]}]};
+    fs.writeFileSync(path.join(input,'result.json'),JSON.stringify(result));const valid=path.join(dir,'valid');assert.equal(publish(input,valid,['full.png']).frames,1);assert(fs.existsSync(path.join(valid,'zoom.png')));assert.equal(JSON.parse(fs.readFileSync(path.join(valid,'result.json'))).frames.length,1);
+    result.cases[0].trace[1].screenshot={...shot,sha256:'0'.repeat(64)};fs.writeFileSync(path.join(input,'result.json'),JSON.stringify(result));assert.throws(()=>publish(input,path.join(dir,'conflict')),/Conflicting frame identity/);
+  } finally {const resolved=fs.realpathSync(dir);assert.equal(path.dirname(resolved),fs.realpathSync(os.tmpdir()));assert(path.basename(resolved).startsWith('mp-quality-workflow-evidence-'));fs.rmSync(resolved,{recursive:true,force:true});}
+});

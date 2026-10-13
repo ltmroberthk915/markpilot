@@ -1,0 +1,977 @@
+{
+  "schema": 3,
+  "version": "3.2.11",
+  "tag": "portable",
+  "exe": "<repo>\\.mp-verify\\codex-audit\\candidate-3.2.11\\production\\markpilot-3.2.11-portable.exe",
+  "sha256": "2f2ac4870997b397dcfb103bfd2f47a9f109c3a702d3e9fceb625bfa735aa5cb",
+  "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+  "expectedCases": 20,
+  "results": [
+    {
+      "suite": "selection-workflows",
+      "scope": "selection-workflows",
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.11-selection-workflows",
+      "expectedTotal": 6,
+      "caseIds": [
+        "early-cell-focus-survives-boot-fallback",
+        "active-cell-undo-redo-keeps-source-and-overlay-in-sync",
+        "cell-tab-home-keeps-caret-before-next-input",
+        "cell-mouse-click-immediate-input-keeps-ratio-caret",
+        "cell-plain-paste-pipes-has-one-source-encoding-and-history",
+        "boot-open-document-direct-typing-needs-no-click"
+      ],
+      "caseFilter": "^(early-cell-focus-survives-boot-fallback|active-cell-undo-redo-keeps-source-and-overlay-in-sync|cell-tab-home-keeps-caret-before-next-input|cell-mouse-click-immediate-input-keeps-ratio-caret|cell-plain-paste-pipes-has-one-source-encoding-and-history|boot-open-document-direct-typing-needs-no-click)$",
+      "fullImageSuite": false,
+      "passed": true,
+      "exitCode": 0,
+      "artifact": {
+        "executable": "markpilot-3.2.11-portable.exe",
+        "executablePath": "<repo>\\.mp-verify\\codex-audit\\candidate-3.2.11\\production\\markpilot-3.2.11-portable.exe",
+        "exeSha256": "2f2ac4870997b397dcfb103bfd2f47a9f109c3a702d3e9fceb625bfa735aa5cb",
+        "runtimeExecutablePath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\MarkPilot.exe",
+        "runtimeExecutableSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+        "artifactRoot": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "app": {
+          "name": "MarkPilot",
+          "version": "3.2.11",
+          "platform": "win32",
+          "versions": {
+            "node": "20.18.3",
+            "acorn": "8.14.0",
+            "ada": "2.9.2",
+            "ares": "1.34.4",
+            "base64": "0.5.2",
+            "brotli": "1.0.9",
+            "cjs_module_lexer": "1.4.1",
+            "cldr": "44.1",
+            "icu": "74.2",
+            "llhttp": "8.1.2",
+            "modules": "130",
+            "napi": "9",
+            "nghttp2": "1.61.0",
+            "openssl": "0.0.0",
+            "simdutf": "5.6.4",
+            "tz": "2024a",
+            "undici": "6.21.1",
+            "unicode": "15.1",
+            "uv": "1.46.0",
+            "uvwasi": "0.0.21",
+            "v8": "13.0.245.25-electron.0",
+            "zlib": "1.3.0.1-motley",
+            "electron": "33.4.11",
+            "chrome": "130.0.6723.191"
+          }
+        },
+        "sourceMode": false,
+        "resourcesPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources",
+        "asarPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+        "bootMs": 3601,
+        "node": "v24.14.1",
+        "platform": "win32",
+        "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+        "ramGiB": 23,
+        "engineBundleSha256": null,
+        "artifactFiles": [
+          {
+            "file": "main.js",
+            "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+            "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+          },
+          {
+            "file": "preload.js",
+            "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+            "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+          },
+          {
+            "file": "renderer/host.js",
+            "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+            "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+          },
+          {
+            "file": "shell/document-store.js",
+            "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+            "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+          },
+          {
+            "file": "shell/text-codec.js",
+            "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+            "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+          },
+          {
+            "file": "renderer/cm6/app.js",
+            "sha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+            "sourceSha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+          },
+          {
+            "file": "renderer/cm6/markdown-worker.js",
+            "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+            "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+          }
+        ]
+      },
+      "total": 6,
+      "cleanup": {
+        "residual": []
+      },
+      "clipboard": {
+        "restored": true
+      }
+    },
+    {
+      "suite": "images",
+      "scope": "saved-screenshot-immediate",
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.11-saved-screenshot-immediate",
+      "expectedTotal": 1,
+      "caseIds": [
+        "saved-screenshot-immediate"
+      ],
+      "caseFilter": null,
+      "fullImageSuite": false,
+      "passed": true,
+      "exitCode": 0,
+      "artifact": {
+        "executable": "markpilot-3.2.11-portable.exe",
+        "executablePath": "<repo>\\.mp-verify\\codex-audit\\candidate-3.2.11\\production\\markpilot-3.2.11-portable.exe",
+        "exeSha256": "2f2ac4870997b397dcfb103bfd2f47a9f109c3a702d3e9fceb625bfa735aa5cb",
+        "runtimeExecutablePath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\MarkPilot.exe",
+        "runtimeExecutableSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+        "artifactRoot": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "app": {
+          "name": "MarkPilot",
+          "version": "3.2.11",
+          "platform": "win32",
+          "versions": {
+            "node": "20.18.3",
+            "acorn": "8.14.0",
+            "ada": "2.9.2",
+            "ares": "1.34.4",
+            "base64": "0.5.2",
+            "brotli": "1.0.9",
+            "cjs_module_lexer": "1.4.1",
+            "cldr": "44.1",
+            "icu": "74.2",
+            "llhttp": "8.1.2",
+            "modules": "130",
+            "napi": "9",
+            "nghttp2": "1.61.0",
+            "openssl": "0.0.0",
+            "simdutf": "5.6.4",
+            "tz": "2024a",
+            "undici": "6.21.1",
+            "unicode": "15.1",
+            "uv": "1.46.0",
+            "uvwasi": "0.0.21",
+            "v8": "13.0.245.25-electron.0",
+            "zlib": "1.3.0.1-motley",
+            "electron": "33.4.11",
+            "chrome": "130.0.6723.191"
+          }
+        },
+        "sourceMode": false,
+        "resourcesPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources",
+        "asarPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+        "bootMs": 3836,
+        "node": "v24.14.1",
+        "platform": "win32",
+        "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+        "ramGiB": 23,
+        "engineBundleSha256": null,
+        "artifactFiles": [
+          {
+            "file": "main.js",
+            "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+            "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+          },
+          {
+            "file": "preload.js",
+            "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+            "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+          },
+          {
+            "file": "renderer/host.js",
+            "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+            "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+          },
+          {
+            "file": "shell/document-store.js",
+            "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+            "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+          },
+          {
+            "file": "shell/text-codec.js",
+            "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+            "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+          },
+          {
+            "file": "renderer/cm6/app.js",
+            "sha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+            "sourceSha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+          },
+          {
+            "file": "renderer/cm6/markdown-worker.js",
+            "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+            "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+          }
+        ],
+        "imageHostDelayMs": 5000
+      },
+      "total": 1,
+      "cleanup": {
+        "residual": []
+      },
+      "clipboard": {
+        "restored": true
+      }
+    },
+    {
+      "suite": "document-workflows",
+      "scope": "history",
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.11-history",
+      "expectedTotal": 3,
+      "caseIds": [
+        "same-text-other-file-starts-empty-history",
+        "open-from-active-cell-immediately-types-in-new-document",
+        "open-keeps-focused-persistent-settings-control"
+      ],
+      "caseFilter": "^(same-text-other-file-starts-empty-history|open-from-active-cell-immediately-types-in-new-document|open-keeps-focused-persistent-settings-control)$",
+      "fullImageSuite": false,
+      "passed": true,
+      "exitCode": 0,
+      "artifact": {
+        "executable": "markpilot-3.2.11-portable.exe",
+        "executablePath": "<repo>\\.mp-verify\\codex-audit\\candidate-3.2.11\\production\\markpilot-3.2.11-portable.exe",
+        "exeSha256": "2f2ac4870997b397dcfb103bfd2f47a9f109c3a702d3e9fceb625bfa735aa5cb",
+        "runtimeExecutablePath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\MarkPilot.exe",
+        "runtimeExecutableSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+        "artifactRoot": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "app": {
+          "name": "MarkPilot",
+          "version": "3.2.11",
+          "platform": "win32",
+          "versions": {
+            "node": "20.18.3",
+            "acorn": "8.14.0",
+            "ada": "2.9.2",
+            "ares": "1.34.4",
+            "base64": "0.5.2",
+            "brotli": "1.0.9",
+            "cjs_module_lexer": "1.4.1",
+            "cldr": "44.1",
+            "icu": "74.2",
+            "llhttp": "8.1.2",
+            "modules": "130",
+            "napi": "9",
+            "nghttp2": "1.61.0",
+            "openssl": "0.0.0",
+            "simdutf": "5.6.4",
+            "tz": "2024a",
+            "undici": "6.21.1",
+            "unicode": "15.1",
+            "uv": "1.46.0",
+            "uvwasi": "0.0.21",
+            "v8": "13.0.245.25-electron.0",
+            "zlib": "1.3.0.1-motley",
+            "electron": "33.4.11",
+            "chrome": "130.0.6723.191"
+          }
+        },
+        "sourceMode": false,
+        "resourcesPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources",
+        "asarPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+        "bootMs": 3693,
+        "node": "v24.14.1",
+        "platform": "win32",
+        "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+        "ramGiB": 23,
+        "engineBundleSha256": null,
+        "artifactFiles": [
+          {
+            "file": "main.js",
+            "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+            "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+          },
+          {
+            "file": "preload.js",
+            "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+            "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+          },
+          {
+            "file": "renderer/host.js",
+            "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+            "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+          },
+          {
+            "file": "shell/document-store.js",
+            "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+            "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+          },
+          {
+            "file": "shell/text-codec.js",
+            "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+            "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+          },
+          {
+            "file": "renderer/cm6/app.js",
+            "sha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+            "sourceSha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+          },
+          {
+            "file": "renderer/cm6/markdown-worker.js",
+            "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+            "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+          }
+        ]
+      },
+      "total": 3,
+      "cleanup": {
+        "residual": []
+      },
+      "clipboard": null
+    },
+    {
+      "suite": "math-workflows",
+      "scope": "math",
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.11-math",
+      "expectedTotal": 1,
+      "caseIds": [
+        "multiline-quoted-block-glyph-click-edit-undo-redo"
+      ],
+      "caseFilter": "^(multiline-quoted-block-glyph-click-edit-undo-redo)$",
+      "fullImageSuite": false,
+      "passed": true,
+      "exitCode": 0,
+      "artifact": {
+        "executable": "markpilot-3.2.11-portable.exe",
+        "executablePath": "<repo>\\.mp-verify\\codex-audit\\candidate-3.2.11\\production\\markpilot-3.2.11-portable.exe",
+        "exeSha256": "2f2ac4870997b397dcfb103bfd2f47a9f109c3a702d3e9fceb625bfa735aa5cb",
+        "runtimeExecutablePath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\MarkPilot.exe",
+        "runtimeExecutableSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+        "artifactRoot": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "app": {
+          "name": "MarkPilot",
+          "version": "3.2.11",
+          "platform": "win32",
+          "versions": {
+            "node": "20.18.3",
+            "acorn": "8.14.0",
+            "ada": "2.9.2",
+            "ares": "1.34.4",
+            "base64": "0.5.2",
+            "brotli": "1.0.9",
+            "cjs_module_lexer": "1.4.1",
+            "cldr": "44.1",
+            "icu": "74.2",
+            "llhttp": "8.1.2",
+            "modules": "130",
+            "napi": "9",
+            "nghttp2": "1.61.0",
+            "openssl": "0.0.0",
+            "simdutf": "5.6.4",
+            "tz": "2024a",
+            "undici": "6.21.1",
+            "unicode": "15.1",
+            "uv": "1.46.0",
+            "uvwasi": "0.0.21",
+            "v8": "13.0.245.25-electron.0",
+            "zlib": "1.3.0.1-motley",
+            "electron": "33.4.11",
+            "chrome": "130.0.6723.191"
+          }
+        },
+        "sourceMode": false,
+        "resourcesPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources",
+        "asarPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+        "bootMs": 3576,
+        "node": "v24.14.1",
+        "platform": "win32",
+        "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+        "ramGiB": 23,
+        "engineBundleSha256": null,
+        "artifactFiles": [
+          {
+            "file": "main.js",
+            "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+            "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+          },
+          {
+            "file": "preload.js",
+            "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+            "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+          },
+          {
+            "file": "renderer/host.js",
+            "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+            "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+          },
+          {
+            "file": "shell/document-store.js",
+            "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+            "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+          },
+          {
+            "file": "shell/text-codec.js",
+            "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+            "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+          },
+          {
+            "file": "renderer/cm6/app.js",
+            "sha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+            "sourceSha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+          },
+          {
+            "file": "renderer/cm6/markdown-worker.js",
+            "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+            "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+          }
+        ]
+      },
+      "total": 1,
+      "cleanup": {
+        "residual": []
+      },
+      "clipboard": {
+        "restored": true
+      }
+    },
+    {
+      "suite": "rich-workflows",
+      "scope": "rich",
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.11-rich",
+      "expectedTotal": 1,
+      "caseIds": [
+        "mixed-html-preserve-all-content-in-order"
+      ],
+      "caseFilter": "^(mixed-html-preserve-all-content-in-order)$",
+      "fullImageSuite": false,
+      "passed": true,
+      "exitCode": 0,
+      "artifact": {
+        "executable": "markpilot-3.2.11-portable.exe",
+        "executablePath": "<repo>\\.mp-verify\\codex-audit\\candidate-3.2.11\\production\\markpilot-3.2.11-portable.exe",
+        "exeSha256": "2f2ac4870997b397dcfb103bfd2f47a9f109c3a702d3e9fceb625bfa735aa5cb",
+        "runtimeExecutablePath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\MarkPilot.exe",
+        "runtimeExecutableSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+        "artifactRoot": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "app": {
+          "name": "MarkPilot",
+          "version": "3.2.11",
+          "platform": "win32",
+          "versions": {
+            "node": "20.18.3",
+            "acorn": "8.14.0",
+            "ada": "2.9.2",
+            "ares": "1.34.4",
+            "base64": "0.5.2",
+            "brotli": "1.0.9",
+            "cjs_module_lexer": "1.4.1",
+            "cldr": "44.1",
+            "icu": "74.2",
+            "llhttp": "8.1.2",
+            "modules": "130",
+            "napi": "9",
+            "nghttp2": "1.61.0",
+            "openssl": "0.0.0",
+            "simdutf": "5.6.4",
+            "tz": "2024a",
+            "undici": "6.21.1",
+            "unicode": "15.1",
+            "uv": "1.46.0",
+            "uvwasi": "0.0.21",
+            "v8": "13.0.245.25-electron.0",
+            "zlib": "1.3.0.1-motley",
+            "electron": "33.4.11",
+            "chrome": "130.0.6723.191"
+          }
+        },
+        "sourceMode": false,
+        "resourcesPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources",
+        "asarPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+        "bootMs": 4703,
+        "node": "v24.14.1",
+        "platform": "win32",
+        "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+        "ramGiB": 23,
+        "engineBundleSha256": null,
+        "artifactFiles": [
+          {
+            "file": "main.js",
+            "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+            "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+          },
+          {
+            "file": "preload.js",
+            "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+            "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+          },
+          {
+            "file": "renderer/host.js",
+            "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+            "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+          },
+          {
+            "file": "shell/document-store.js",
+            "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+            "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+          },
+          {
+            "file": "shell/text-codec.js",
+            "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+            "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+          },
+          {
+            "file": "renderer/cm6/app.js",
+            "sha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+            "sourceSha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+          },
+          {
+            "file": "renderer/cm6/markdown-worker.js",
+            "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+            "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+          }
+        ]
+      },
+      "total": 1,
+      "cleanup": {
+        "residual": []
+      },
+      "clipboard": {
+        "restored": true
+      }
+    },
+    {
+      "suite": "math-entry-workflows",
+      "scope": "math-entry",
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.11-math-entry",
+      "expectedTotal": 1,
+      "caseIds": [
+        "quoted-down-immediate-type-undo-redo"
+      ],
+      "caseFilter": "^(quoted-down-immediate-type-undo-redo)$",
+      "fullImageSuite": false,
+      "passed": true,
+      "exitCode": 0,
+      "artifact": {
+        "executable": "markpilot-3.2.11-portable.exe",
+        "executablePath": "<repo>\\.mp-verify\\codex-audit\\candidate-3.2.11\\production\\markpilot-3.2.11-portable.exe",
+        "exeSha256": "2f2ac4870997b397dcfb103bfd2f47a9f109c3a702d3e9fceb625bfa735aa5cb",
+        "runtimeExecutablePath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\MarkPilot.exe",
+        "runtimeExecutableSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+        "artifactRoot": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "app": {
+          "name": "MarkPilot",
+          "version": "3.2.11",
+          "platform": "win32",
+          "versions": {
+            "node": "20.18.3",
+            "acorn": "8.14.0",
+            "ada": "2.9.2",
+            "ares": "1.34.4",
+            "base64": "0.5.2",
+            "brotli": "1.0.9",
+            "cjs_module_lexer": "1.4.1",
+            "cldr": "44.1",
+            "icu": "74.2",
+            "llhttp": "8.1.2",
+            "modules": "130",
+            "napi": "9",
+            "nghttp2": "1.61.0",
+            "openssl": "0.0.0",
+            "simdutf": "5.6.4",
+            "tz": "2024a",
+            "undici": "6.21.1",
+            "unicode": "15.1",
+            "uv": "1.46.0",
+            "uvwasi": "0.0.21",
+            "v8": "13.0.245.25-electron.0",
+            "zlib": "1.3.0.1-motley",
+            "electron": "33.4.11",
+            "chrome": "130.0.6723.191"
+          }
+        },
+        "sourceMode": false,
+        "resourcesPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources",
+        "asarPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+        "bootMs": 4322,
+        "node": "v24.14.1",
+        "platform": "win32",
+        "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+        "ramGiB": 23,
+        "engineBundleSha256": null,
+        "artifactFiles": [
+          {
+            "file": "main.js",
+            "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+            "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+          },
+          {
+            "file": "preload.js",
+            "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+            "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+          },
+          {
+            "file": "renderer/host.js",
+            "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+            "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+          },
+          {
+            "file": "shell/document-store.js",
+            "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+            "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+          },
+          {
+            "file": "shell/text-codec.js",
+            "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+            "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+          },
+          {
+            "file": "renderer/cm6/app.js",
+            "sha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+            "sourceSha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+          },
+          {
+            "file": "renderer/cm6/markdown-worker.js",
+            "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+            "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+          }
+        ]
+      },
+      "total": 1,
+      "cleanup": {
+        "residual": []
+      },
+      "clipboard": {
+        "restored": true
+      }
+    },
+    {
+      "suite": "math-paste-workflows",
+      "scope": "math-paste",
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.11-math-paste",
+      "expectedTotal": 2,
+      "caseIds": [
+        "html-ordinary-replace-inline-y-history-continue",
+        "html-only-replace-inline-y-history-continue"
+      ],
+      "caseFilter": "^(html-ordinary-replace-inline-y-history-continue|html-only-replace-inline-y-history-continue)$",
+      "fullImageSuite": false,
+      "passed": true,
+      "exitCode": 0,
+      "artifact": {
+        "executable": "markpilot-3.2.11-portable.exe",
+        "executablePath": "<repo>\\.mp-verify\\codex-audit\\candidate-3.2.11\\production\\markpilot-3.2.11-portable.exe",
+        "exeSha256": "2f2ac4870997b397dcfb103bfd2f47a9f109c3a702d3e9fceb625bfa735aa5cb",
+        "runtimeExecutablePath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\MarkPilot.exe",
+        "runtimeExecutableSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+        "artifactRoot": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "app": {
+          "name": "MarkPilot",
+          "version": "3.2.11",
+          "platform": "win32",
+          "versions": {
+            "node": "20.18.3",
+            "acorn": "8.14.0",
+            "ada": "2.9.2",
+            "ares": "1.34.4",
+            "base64": "0.5.2",
+            "brotli": "1.0.9",
+            "cjs_module_lexer": "1.4.1",
+            "cldr": "44.1",
+            "icu": "74.2",
+            "llhttp": "8.1.2",
+            "modules": "130",
+            "napi": "9",
+            "nghttp2": "1.61.0",
+            "openssl": "0.0.0",
+            "simdutf": "5.6.4",
+            "tz": "2024a",
+            "undici": "6.21.1",
+            "unicode": "15.1",
+            "uv": "1.46.0",
+            "uvwasi": "0.0.21",
+            "v8": "13.0.245.25-electron.0",
+            "zlib": "1.3.0.1-motley",
+            "electron": "33.4.11",
+            "chrome": "130.0.6723.191"
+          }
+        },
+        "sourceMode": false,
+        "resourcesPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources",
+        "asarPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+        "bootMs": 4748,
+        "node": "v24.14.1",
+        "platform": "win32",
+        "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+        "ramGiB": 23,
+        "engineBundleSha256": null,
+        "artifactFiles": [
+          {
+            "file": "main.js",
+            "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+            "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+          },
+          {
+            "file": "preload.js",
+            "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+            "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+          },
+          {
+            "file": "renderer/host.js",
+            "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+            "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+          },
+          {
+            "file": "shell/document-store.js",
+            "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+            "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+          },
+          {
+            "file": "shell/text-codec.js",
+            "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+            "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+          },
+          {
+            "file": "renderer/cm6/app.js",
+            "sha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+            "sourceSha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+          },
+          {
+            "file": "renderer/cm6/markdown-worker.js",
+            "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+            "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+          }
+        ]
+      },
+      "total": 2,
+      "cleanup": {
+        "residual": []
+      },
+      "clipboard": {
+        "restored": true
+      }
+    },
+    {
+      "suite": "search-workflows",
+      "scope": "search",
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.11-search",
+      "expectedTotal": 4,
+      "caseIds": [
+        "body-ctrl-f-search-focus-positive-control",
+        "toolbar-find-replace-search-focus-positive-control",
+        "active-cell-ctrl-f-opens-search-without-document-edit",
+        "search-cell-immediate-return-type-history"
+      ],
+      "caseFilter": "^(body-ctrl-f-search-focus-positive-control|toolbar-find-replace-search-focus-positive-control|active-cell-ctrl-f-opens-search-without-document-edit|search-cell-immediate-return-type-history)$",
+      "fullImageSuite": false,
+      "passed": true,
+      "exitCode": 0,
+      "artifact": {
+        "executable": "markpilot-3.2.11-portable.exe",
+        "executablePath": "<repo>\\.mp-verify\\codex-audit\\candidate-3.2.11\\production\\markpilot-3.2.11-portable.exe",
+        "exeSha256": "2f2ac4870997b397dcfb103bfd2f47a9f109c3a702d3e9fceb625bfa735aa5cb",
+        "runtimeExecutablePath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\MarkPilot.exe",
+        "runtimeExecutableSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+        "artifactRoot": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "app": {
+          "name": "MarkPilot",
+          "version": "3.2.11",
+          "platform": "win32",
+          "versions": {
+            "node": "20.18.3",
+            "acorn": "8.14.0",
+            "ada": "2.9.2",
+            "ares": "1.34.4",
+            "base64": "0.5.2",
+            "brotli": "1.0.9",
+            "cjs_module_lexer": "1.4.1",
+            "cldr": "44.1",
+            "icu": "74.2",
+            "llhttp": "8.1.2",
+            "modules": "130",
+            "napi": "9",
+            "nghttp2": "1.61.0",
+            "openssl": "0.0.0",
+            "simdutf": "5.6.4",
+            "tz": "2024a",
+            "undici": "6.21.1",
+            "unicode": "15.1",
+            "uv": "1.46.0",
+            "uvwasi": "0.0.21",
+            "v8": "13.0.245.25-electron.0",
+            "zlib": "1.3.0.1-motley",
+            "electron": "33.4.11",
+            "chrome": "130.0.6723.191"
+          }
+        },
+        "sourceMode": false,
+        "resourcesPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources",
+        "asarPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+        "bootMs": 4575,
+        "node": "v24.14.1",
+        "platform": "win32",
+        "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+        "ramGiB": 23,
+        "engineBundleSha256": null,
+        "artifactFiles": [
+          {
+            "file": "main.js",
+            "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+            "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+          },
+          {
+            "file": "preload.js",
+            "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+            "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+          },
+          {
+            "file": "renderer/host.js",
+            "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+            "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+          },
+          {
+            "file": "shell/document-store.js",
+            "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+            "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+          },
+          {
+            "file": "shell/text-codec.js",
+            "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+            "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+          },
+          {
+            "file": "renderer/cm6/app.js",
+            "sha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+            "sourceSha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+          },
+          {
+            "file": "renderer/cm6/markdown-worker.js",
+            "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+            "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+          }
+        ]
+      },
+      "total": 4,
+      "cleanup": {
+        "residual": []
+      },
+      "clipboard": {
+        "touched": false
+      }
+    },
+    {
+      "suite": "mixed-selection-workflows",
+      "scope": "mixed",
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.11-mixed",
+      "expectedTotal": 1,
+      "caseIds": [
+        "mouse-reverse-drag-mixed-copy-replace-history"
+      ],
+      "caseFilter": "^(mouse-reverse-drag-mixed-copy-replace-history)$",
+      "fullImageSuite": false,
+      "passed": true,
+      "exitCode": 0,
+      "artifact": {
+        "executable": "markpilot-3.2.11-portable.exe",
+        "executablePath": "<repo>\\.mp-verify\\codex-audit\\candidate-3.2.11\\production\\markpilot-3.2.11-portable.exe",
+        "exeSha256": "2f2ac4870997b397dcfb103bfd2f47a9f109c3a702d3e9fceb625bfa735aa5cb",
+        "runtimeExecutablePath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\MarkPilot.exe",
+        "runtimeExecutableSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+        "artifactRoot": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "app": {
+          "name": "MarkPilot",
+          "version": "3.2.11",
+          "platform": "win32",
+          "versions": {
+            "node": "20.18.3",
+            "acorn": "8.14.0",
+            "ada": "2.9.2",
+            "ares": "1.34.4",
+            "base64": "0.5.2",
+            "brotli": "1.0.9",
+            "cjs_module_lexer": "1.4.1",
+            "cldr": "44.1",
+            "icu": "74.2",
+            "llhttp": "8.1.2",
+            "modules": "130",
+            "napi": "9",
+            "nghttp2": "1.61.0",
+            "openssl": "0.0.0",
+            "simdutf": "5.6.4",
+            "tz": "2024a",
+            "undici": "6.21.1",
+            "unicode": "15.1",
+            "uv": "1.46.0",
+            "uvwasi": "0.0.21",
+            "v8": "13.0.245.25-electron.0",
+            "zlib": "1.3.0.1-motley",
+            "electron": "33.4.11",
+            "chrome": "130.0.6723.191"
+          }
+        },
+        "sourceMode": false,
+        "resourcesPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources",
+        "asarPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+        "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+        "bootMs": 4550,
+        "node": "v24.14.1",
+        "platform": "win32",
+        "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+        "ramGiB": 23,
+        "engineBundleSha256": null,
+        "artifactFiles": [
+          {
+            "file": "main.js",
+            "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+            "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+          },
+          {
+            "file": "preload.js",
+            "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+            "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+          },
+          {
+            "file": "renderer/host.js",
+            "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+            "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+          },
+          {
+            "file": "shell/document-store.js",
+            "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+            "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+          },
+          {
+            "file": "shell/text-codec.js",
+            "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+            "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+          },
+          {
+            "file": "renderer/cm6/app.js",
+            "sha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+            "sourceSha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+          },
+          {
+            "file": "renderer/cm6/markdown-worker.js",
+            "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+            "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+          }
+        ]
+      },
+      "total": 1,
+      "cleanup": {
+        "residual": []
+      },
+      "clipboard": {
+        "restored": true
+      }
+    }
+  ],
+  "passed": true,
+  "at": "2026-10-11T23:13:03.633Z"
+}

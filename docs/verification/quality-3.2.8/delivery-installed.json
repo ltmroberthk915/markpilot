@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "tag": "installed",
+  "exe": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\MarkPilot.exe",
+  "sha256": "56579c5bba04a6b86853ba66ebc001bf6cde869322d6f5caf62e0558e18bd720",
+  "results": [
+    {
+      "suite": "critical",
+      "scope": "suite",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.8-critical",
+      "total": 26,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "images",
+      "scope": "saved-screenshot-immediate",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.8-images",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "images",
+      "scope": "viewport",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.8-viewport",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "images",
+      "scope": "size",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.8-size",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "images",
+      "scope": "copy-save",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.8-copy-save",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    }
+  ],
+  "passed": true,
+  "at": "2026-10-11T18:58:00.795Z"
+}

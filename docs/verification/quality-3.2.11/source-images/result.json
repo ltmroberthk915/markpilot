@@ -1,0 +1,3305 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T22:56:15.090Z",
+  "cases": [
+    {
+      "id": "saved-screenshot-immediate",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "# 图片\n\n正文\n![](assets/pasted-image.png)",
+            "selection": {
+              "anchor": 37,
+              "head": 37
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 916.5,
+              "right": 916.5,
+              "top": 149.390625,
+              "bottom": 630.34375
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 37 字 — MarkPilot",
+            "banner": ""
+          },
+          "images": [
+            {
+              "src": "file:///<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-images/%E4%B8%AD%E6%96%87%20%E6%88%AA%E5%9B%BE%20%23%25%28%29",
+              "complete": true,
+              "naturalWidth": 1369,
+              "naturalHeight": 857,
+              "width": 756,
+              "failed": false
+            }
+          ],
+          "ms": 5938,
+          "event": {
+            "trusted": true,
+            "types": [
+              "Files"
+            ],
+            "files": [
+              {
+                "type": "image/png",
+                "size": 32322
+              }
+            ]
+          }
+        }
+      ],
+      "ms": 6703
+    },
+    {
+      "id": "long-document-paste-is-visible-without-extra-input",
+      "status": "pass",
+      "trace": [
+        {
+          "phase": "decoded",
+          "top": 637.5703125,
+          "bottom": 797.5703125,
+          "visibleBottom": 667,
+          "scrollTop": 10155,
+          "caret": {
+            "left": 560.5,
+            "right": 560.5,
+            "top": 495.0703125,
+            "bottom": 662.765625
+          }
+        },
+        {
+          "phase": "settled",
+          "top": 495.0703125,
+          "bottom": 655.0703125,
+          "visibleBottom": 667,
+          "scrollTop": 10297.5,
+          "caret": {
+            "left": 560.5,
+            "right": 560.5,
+            "top": 495.0703125,
+            "bottom": 662.765625
+          }
+        },
+        {
+          "fixtureBytes": 10269327,
+          "imageHostDelayMs": 5000
+        }
+      ],
+      "ms": 10803
+    },
+    {
+      "id": "image-start-boundary",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "![](assets/fixture-a.png)",
+            "selection": {
+              "anchor": 0,
+              "head": 0
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 160.5,
+              "right": 160.5,
+              "top": 50,
+              "bottom": 530.953125
+            },
+            "scrollTop": 0,
+            "title": "新建 Markdown 文档.md · 10269357 字 — MarkPilot",
+            "banner": ""
+          },
+          "images": [
+            {
+              "src": "file:///<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-images/%E4%B8%AD%E6%96%87%20%E6%88%AA%E5%9B%BE%20%23%25%28%29",
+              "complete": true,
+              "naturalWidth": 1369,
+              "naturalHeight": 857,
+              "width": 756,
+              "failed": false
+            }
+          ]
+        }
+      ],
+      "ms": 579
+    },
+    {
+      "id": "image-end-boundary",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "![](assets/fixture-a.png)",
+            "selection": {
+              "anchor": 25,
+              "head": 25
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 916.5,
+              "right": 916.5,
+              "top": 50,
+              "bottom": 530.953125
+            },
+            "scrollTop": 0,
+            "title": "新建 Markdown 文档.md · 10269357 字 — MarkPilot",
+            "banner": ""
+          },
+          "images": [
+            {
+              "src": "file:///<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-images/%E4%B8%AD%E6%96%87%20%E6%88%AA%E5%9B%BE%20%23%25%28%29",
+              "complete": true,
+              "naturalWidth": 1369,
+              "naturalHeight": 857,
+              "width": 756,
+              "failed": false
+            }
+          ]
+        }
+      ],
+      "ms": 508
+    },
+    {
+      "id": "ordinary-character-delete-creates-image",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "![x](assets/fixture-a.png)\n\n正文",
+            "selection": {
+              "anchor": 30,
+              "head": 30
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 560.6484375,
+              "width": 0,
+              "height": 16,
+              "top": 560.6484375,
+              "right": 188.5,
+              "bottom": 576.6484375,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 30 字 — MarkPilot",
+            "banner": ""
+          },
+          "images": [
+            {
+              "src": "file:///<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-images/%E4%B8%AD%E6%96%87%20%E6%88%AA%E5%9B%BE%20%23%25%28%29",
+              "complete": true,
+              "naturalWidth": 1369,
+              "naturalHeight": 857,
+              "width": 756,
+              "failed": false
+            }
+          ]
+        }
+      ],
+      "ms": 545
+    },
+    {
+      "id": "source-address-remains-editable-inside",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "![](assets/fixture-a.png)",
+          "selection": {
+            "anchor": 1,
+            "head": 1
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 165.140625,
+            "right": 165.140625,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● 新建 Markdown 文档.md · 30 字 — MarkPilot",
+          "banner": "自动保存被拦下：文档从 10269357 字骤降到 25 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+        }
+      ],
+      "ms": 545
+    },
+    {
+      "id": "inline-screenshot-immediate",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "---\nmp-image-mode: inline\n---\n\n正文\n![](data:image/png;base64,[bitmap bytes omitted])",
+            "selection": {
+              "anchor": 43157,
+              "head": 43157
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 916.5,
+              "right": 916.5,
+              "top": 182.0859375,
+              "bottom": 663.0390625
+            },
+            "scrollTop": 13.5,
+            "title": "● 新建 Markdown 文档.md · 43157 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 43157 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          },
+          "images": [
+            {
+              "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABVkAAANZCAIAAACa1qknAAAgAElEQVR4Aezdba8c5Zkv+v0t/AH8BXi1pR3JL86rSLyIFEXaSjQajaIdKVqazCjWSBOxIx1GTkZCjLIhE0IOOzuEDB",
+              "complete": true,
+              "naturalWidth": 1369,
+              "naturalHeight": 857,
+              "width": 756,
+              "failed": false
+            }
+          ]
+        }
+      ],
+      "ms": 2428
+    },
+    {
+      "id": "selection-replacement-undo-redo",
+      "status": "pass",
+      "trace": [
+        {
+          "phase": "initial-paste",
+          "state": {
+            "text": "before SELECT after",
+            "selection": {
+              "anchor": 7,
+              "head": 13
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 255.328125,
+              "right": 255.328125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 43157 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 19 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          },
+          "images": []
+        },
+        {
+          "phase": "redo-native-selection",
+          "state": {
+            "text": "before ![](assets/pasted-image.png) after",
+            "selection": {
+              "anchor": 7,
+              "head": 35
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 370.328125,
+              "right": 370.328125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 41 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 41 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          },
+          "images": []
+        }
+      ],
+      "ms": 13602
+    },
+    {
+      "id": "paste-keeps-origin-while-typing",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "before ![](assets/pasted-image.png)TYPED after",
+            "selection": {
+              "anchor": 40,
+              "head": 40
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 205.9453125,
+              "right": 205.9453125,
+              "top": 560.6484375,
+              "bottom": 576.6484375
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 46 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 18 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          },
+          "images": [
+            {
+              "src": "file:///<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-images/%E4%B8%AD%E6%96%87%20%E6%88%AA%E5%9B%BE%20%23%25%28%29",
+              "complete": true,
+              "naturalWidth": 1369,
+              "naturalHeight": 857,
+              "width": 756,
+              "failed": false
+            }
+          ]
+        }
+      ],
+      "ms": 5570
+    },
+    {
+      "id": "paste-replaced-selection-is-canceled",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "before REPLACED after",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 277.0546875,
+            "right": 277.0546875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● 新建 Markdown 文档.md · 21 字 — MarkPilot",
+          "banner": "自动保存被拦下：文档从 10269357 字骤降到 21 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+        }
+      ],
+      "ms": 6087
+    },
+    {
+      "id": "same-text-reload-cancels-pending-image",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "same document\n",
+          "selection": {
+            "anchor": 14,
+            "head": 14
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 160.5,
+            "y": 79.6953125,
+            "width": 0,
+            "height": 16,
+            "top": 79.6953125,
+            "right": 160.5,
+            "bottom": 95.6953125,
+            "left": 160.5
+          },
+          "scrollTop": 0,
+          "title": "● 新建 Markdown 文档.md · 21 字 — MarkPilot",
+          "banner": "自动保存被拦下：文档从 10269357 字骤降到 14 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+        }
+      ],
+      "ms": 6119
+    },
+    {
+      "id": "switch-document-cancels-pending-image",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "OTHER DOCUMENT\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 160.5,
+            "right": 160.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "other.md · 15 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 6503
+    },
+    {
+      "id": "two-pastes-keep-request-order",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "![](assets/pasted-image.png)![](assets/pasted-image-2.png)AB\n",
+            "selection": {
+              "anchor": 58,
+              "head": 58
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 160.5,
+              "right": 160.5,
+              "top": 640.40625,
+              "bottom": 656.40625
+            },
+            "scrollTop": 376,
+            "title": "● 新建 Markdown 文档.md · 61 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 31 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          },
+          "refs": [
+            "assets/pasted-image.png",
+            "assets/pasted-image-2.png"
+          ],
+          "pixels": [
+            [
+              228,
+              243,
+              253,
+              255
+            ],
+            [
+              248,
+              220,
+              215,
+              255
+            ]
+          ],
+          "hashes": [
+            "1ba74b8ca03f31b7265248a418343536ac7348e330a676d59c11c4e7aedb7548",
+            "35da6ba2023b2b843da22e93e9e8bc005548aa3dad8f790afe1e4fddaebf9b62"
+          ]
+        }
+      ],
+      "ms": 12376
+    },
+    {
+      "id": "undo-cancels-pending-image",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "CANCEL\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 79.6953125,
+            "width": 0,
+            "height": 16,
+            "top": 79.6953125,
+            "right": 170.5,
+            "bottom": 95.6953125,
+            "left": 170.5
+          },
+          "scrollTop": 0,
+          "title": "fresh-history-undo.md · 7 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 8493
+    },
+    {
+      "id": "delete-image-balanced-url",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "![x](assets/a(b).png)\n\n正文",
+          "selection": {
+            "anchor": 25,
+            "head": 25
+          },
+          "focus": false,
+          "activeElement": {
+            "tag": "BODY",
+            "class": ""
+          },
+          "caret": {
+            "x": 188.5,
+            "y": 560.6484375,
+            "width": 0,
+            "height": 16,
+            "top": 560.6484375,
+            "right": 188.5,
+            "bottom": 576.6484375,
+            "left": 188.5
+          },
+          "scrollTop": 0,
+          "title": "● 新建 Markdown 文档.md · 25 字 — MarkPilot",
+          "banner": "自动保存被拦下：文档从 10269357 字骤降到 25 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+        }
+      ],
+      "ms": 1116
+    },
+    {
+      "id": "delete-image-html",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "<img src=\"assets/fixture-a.png\" height=\"80\" alt=\"a>b\">\n\n正文",
+          "selection": {
+            "anchor": 58,
+            "head": 58
+          },
+          "focus": false,
+          "activeElement": {
+            "tag": "BODY",
+            "class": ""
+          },
+          "caret": {
+            "x": 188.5,
+            "y": 167.390625,
+            "width": 0,
+            "height": 16,
+            "top": 167.390625,
+            "right": 188.5,
+            "bottom": 183.390625,
+            "left": 188.5
+          },
+          "scrollTop": 0,
+          "title": "● 新建 Markdown 文档.md · 58 字 — MarkPilot",
+          "banner": "自动保存被拦下：文档从 10269357 字骤降到 58 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+        }
+      ],
+      "ms": 1032
+    },
+    {
+      "id": "image-address-edit-and-stale-dialog-guard",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "OTHER DOCUMENT\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": false,
+          "activeElement": {
+            "tag": "BODY",
+            "class": ""
+          },
+          "caret": {
+            "left": 160.5,
+            "right": 160.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "other.md · 15 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 3283
+    },
+    {
+      "id": "size-presets-are-distinct-stable-and-reversible",
+      "status": "pass",
+      "trace": [
+        {
+          "percent": 25,
+          "stored": 189,
+          "display": 189,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"189\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 205.703125,
+              "width": 0,
+              "height": 16,
+              "top": 205.703125,
+              "right": 188.5,
+              "bottom": 221.703125,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "percent": 50,
+          "stored": 378,
+          "display": 378,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"378\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 324.015625,
+              "width": 0,
+              "height": 16,
+              "top": 324.015625,
+              "right": 188.5,
+              "bottom": 340.015625,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 48 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          }
+        },
+        {
+          "percent": 75,
+          "stored": 567,
+          "display": 567,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"567\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 442.328125,
+              "width": 0,
+              "height": 16,
+              "top": 442.328125,
+              "right": 188.5,
+              "bottom": 458.328125,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 48 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          }
+        },
+        {
+          "percent": 100,
+          "stored": 756,
+          "display": 756,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"756\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 560.6484375,
+              "width": 0,
+              "height": 16,
+              "top": 560.6484375,
+              "right": 188.5,
+              "bottom": 576.6484375,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 48 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          }
+        },
+        {
+          "percent": 50,
+          "stored": 378,
+          "display": 378,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"378\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 324.015625,
+              "width": 0,
+              "height": 16,
+              "top": 324.015625,
+              "right": 188.5,
+              "bottom": 340.015625,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 48 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          }
+        },
+        {
+          "percent": 25,
+          "stored": 189,
+          "display": 189,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"189\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 205.703125,
+              "width": 0,
+              "height": 16,
+              "top": 205.703125,
+              "right": 188.5,
+              "bottom": 221.703125,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 48 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          }
+        },
+        {
+          "percent": 100,
+          "stored": 756,
+          "display": 756,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"756\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 560.6484375,
+              "width": 0,
+              "height": 16,
+              "top": 560.6484375,
+              "right": 188.5,
+              "bottom": 576.6484375,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 48 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          }
+        }
+      ],
+      "ms": 6665
+    },
+    {
+      "id": "size-presets-respect-editor-zoom",
+      "status": "pass",
+      "trace": [
+        {
+          "zoom": 150,
+          "natural": 1369,
+          "available": 488,
+          "stored": 244,
+          "display": 366
+        },
+        {
+          "zoom": 100,
+          "natural": 1369,
+          "available": 756,
+          "stored": 378,
+          "display": 378
+        }
+      ],
+      "ms": 2407
+    },
+    {
+      "id": "image-menu-uses-second-image-identity",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "![](assets/fixture-a.png) <img src=\"assets/fixture-a.png\" width=\"189\">\n\n正文",
+          "selection": {
+            "anchor": 74,
+            "head": 74
+          },
+          "focus": false,
+          "activeElement": {
+            "tag": "BODY",
+            "class": ""
+          },
+          "caret": {
+            "x": 188.5,
+            "y": 642.15625,
+            "width": 0,
+            "height": 16,
+            "top": 642.15625,
+            "right": 188.5,
+            "bottom": 658.15625,
+            "left": 188.5
+          },
+          "scrollTop": 44.5,
+          "title": "● 新建 Markdown 文档.md · 74 字 — MarkPilot",
+          "banner": "自动保存被拦下：文档从 10269357 字骤降到 55 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+        }
+      ],
+      "ms": 1015
+    },
+    {
+      "id": "image-attrs-quoted-greater",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" alt=\"a>b\" title=\"caption\" data-typora-align=\"center\" height=\"80\">\n\n正文",
+            "selection": {
+              "anchor": 101,
+              "head": 101
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 167.390625,
+              "width": 0,
+              "height": 16,
+              "top": 167.390625,
+              "right": 188.5,
+              "bottom": 183.390625,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 101 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 74 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          },
+          "actual": {
+            "alt": "a>b",
+            "height": "80",
+            "title": "caption",
+            "src": "file:///<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-images/%E4%B8%AD%E6%96%87%20%E6%88%AA%E5%9B%BE%20%23%25%28%29/v3.2.5/assets/fixture-a.png"
+          }
+        }
+      ],
+      "ms": 1082
+    },
+    {
+      "id": "image-attrs-balanced-parentheses",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "<img src=\"assets/a(b).png\" alt=\"x\" data-typora-align=\"center\">\n\n正文",
+            "selection": {
+              "anchor": 66,
+              "head": 66
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 560.6484375,
+              "width": 0,
+              "height": 16,
+              "top": 560.6484375,
+              "right": 188.5,
+              "bottom": 576.6484375,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 66 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 25 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          },
+          "actual": {
+            "alt": "x",
+            "height": null,
+            "title": "",
+            "src": "file:///<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-images/%E4%B8%AD%E6%96%87%20%E6%88%AA%E5%9B%BE%20%23%25%28%29/v3.2.5/assets/a(b).png"
+          }
+        }
+      ],
+      "ms": 1026
+    },
+    {
+      "id": "image-attrs-html-entities",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "<img src=\"assets/a&amp;b.png\" alt=\"one &amp; two\" data-typora-align=\"center\" height=\"80\">\n\n正文",
+            "selection": {
+              "anchor": 93,
+              "head": 93
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 167.390625,
+              "width": 0,
+              "height": 16,
+              "top": 167.390625,
+              "right": 188.5,
+              "bottom": 183.390625,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 93 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 66 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          },
+          "actual": {
+            "alt": "one & two",
+            "height": "80",
+            "title": "",
+            "src": "file:///<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-images/%E4%B8%AD%E6%96%87%20%E6%88%AA%E5%9B%BE%20%23%25%28%29/v3.2.5/assets/a&b.png"
+          }
+        }
+      ],
+      "ms": 1028
+    },
+    {
+      "id": "image-attrs-data-src-boundary",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" data-typora-align=\"center\">\n\n正文",
+            "selection": {
+              "anchor": 63,
+              "head": 63
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 560.6484375,
+              "width": 0,
+              "height": 16,
+              "top": 560.6484375,
+              "right": 188.5,
+              "bottom": 576.6484375,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 63 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 59 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          },
+          "actual": {
+            "alt": "",
+            "height": null,
+            "title": "",
+            "src": "file:///<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-images/%E4%B8%AD%E6%96%87%20%E6%88%AA%E5%9B%BE%20%23%25%28%29/v3.2.5/assets/fixture-a.png"
+          }
+        }
+      ],
+      "ms": 1075
+    },
+    {
+      "id": "equal-length-middle-url-change-shows-new-pixels",
+      "status": "pass",
+      "trace": [
+        {
+          "pixel": [
+            248,
+            220,
+            215,
+            255
+          ],
+          "state": {
+            "text": "![](assets/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaBzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz.png)\n\n正文",
+            "selection": {
+              "anchor": 93,
+              "head": 93
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 560.6484375,
+              "width": 0,
+              "height": 16,
+              "top": 560.6484375,
+              "right": 188.5,
+              "bottom": 576.6484375,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 63 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 93 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          },
+          "images": [
+            {
+              "src": "file:///<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-images/%E4%B8%AD%E6%96%87%20%E6%88%AA%E5%9B%BE%20%23%25%28%29",
+              "complete": true,
+              "naturalWidth": 1369,
+              "naturalHeight": 857,
+              "width": 756,
+              "failed": false
+            }
+          ]
+        }
+      ],
+      "ms": 474
+    },
+    {
+      "id": "relative-file-data-copy-and-save-use-real-bytes",
+      "status": "pass",
+      "trace": [
+        {
+          "kind": "relative",
+          "copied": {
+            "ok": true,
+            "width": 1369,
+            "height": 857
+          },
+          "saved": {
+            "ok": true,
+            "path": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-images\\saved-image.bin",
+            "bytes": 40730
+          }
+        },
+        {
+          "kind": "file",
+          "copied": {
+            "ok": true,
+            "width": 1369,
+            "height": 857
+          },
+          "saved": {
+            "ok": true,
+            "path": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-images\\saved-image.bin",
+            "bytes": 40730
+          }
+        },
+        {
+          "kind": "data",
+          "copied": {
+            "ok": true,
+            "width": 1369,
+            "height": 857
+          },
+          "saved": {
+            "ok": true,
+            "path": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-images\\saved-image.bin",
+            "bytes": 40730
+          }
+        }
+      ],
+      "ms": 9568
+    },
+    {
+      "id": "two-windows-use-their-own-image-directory",
+      "status": "pass",
+      "trace": [
+        {
+          "copied": {
+            "ok": true,
+            "width": 1369,
+            "height": 857
+          },
+          "saved": {
+            "ok": true,
+            "path": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-images\\saved-image.bin",
+            "bytes": 40673
+          },
+          "primary": {
+            "ok": true,
+            "width": 1369,
+            "height": 857
+          }
+        }
+      ],
+      "ms": 10146
+    },
+    {
+      "id": "window-boot-and-new-document-preserve-session-identity",
+      "status": "pass",
+      "trace": [
+        {
+          "beforeNew": {
+            "text": "",
+            "selection": {
+              "anchor": 0,
+              "head": 0
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 170.5,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 170.5,
+              "bottom": 70.5,
+              "left": 170.5
+            },
+            "scrollTop": 0,
+            "title": "未命名 — MarkPilot",
+            "banner": ""
+          },
+          "initial": {
+            "filePath": null,
+            "documentId": "360ff993-4844-43d7-8f75-55b55b877534",
+            "name": null
+          },
+          "ready": {
+            "documentId": "360ff993-4844-43d7-8f75-55b55b877534",
+            "revision": 0,
+            "filePath": null,
+            "text": "",
+            "bom": false,
+            "eol": "\n",
+            "encoding": "utf8"
+          }
+        },
+        {
+          "menu": {
+            "ok": true,
+            "id": "menu-new-document",
+            "forced": false,
+            "enabled": true
+          }
+        },
+        {
+          "initial": {
+            "filePath": null,
+            "documentId": "360ff993-4844-43d7-8f75-55b55b877534",
+            "name": null
+          },
+          "current": {
+            "filePath": null,
+            "documentId": "330f5390-f15e-4d90-85fd-5c53ecbdb66d",
+            "name": null
+          },
+          "staleRequestsDenied": 3,
+          "nativeInput": true
+        }
+      ],
+      "ms": 1626
+    },
+    {
+      "id": "concurrent-equal-size-images-never-overwrite-assets",
+      "status": "pass",
+      "trace": [
+        [
+          {
+            "ok": true,
+            "relPath": "assets/same%20%23%25%28%29.png",
+            "absPath": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-images\\中文 截图 #%()\\v3.2.5\\assets\\same #%().png",
+            "renamed": false,
+            "reused": false,
+            "bytes": 40730,
+            "mime": "image/png"
+          },
+          {
+            "ok": true,
+            "relPath": "assets/same%20%23%25%28%29-1.png",
+            "absPath": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-images\\中文 截图 #%()\\v3.2.5\\assets\\same #%()-1.png",
+            "renamed": true,
+            "reused": false,
+            "bytes": 40730,
+            "mime": "image/png"
+          }
+        ]
+      ],
+      "ms": 10037
+    },
+    {
+      "id": "asset-created-during-save-is-never-overwritten",
+      "status": "pass",
+      "trace": [
+        {
+          "observedTemp": true,
+          "externalCreated": true,
+          "saved": {
+            "ok": true,
+            "relPath": "assets/raced-1.png",
+            "absPath": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-images\\external-asset-race\\assets\\raced-1.png",
+            "renamed": true,
+            "reused": false,
+            "bytes": 25206554,
+            "mime": "image/png"
+          },
+          "externalSha256": "06029c3d48738c85a0fd12286233082ead19a888dcc753c8566cfb8c4b533e47"
+        }
+      ],
+      "ms": 6352
+    },
+    {
+      "id": "failed-assets-write-keeps-inline-image",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "正文\n![](data:image/png;base64,[bitmap bytes omitted])",
+            "selection": {
+              "anchor": 43126,
+              "head": 43126
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 916.5,
+              "right": 916.5,
+              "top": 75.1953125,
+              "bottom": 556.1484375
+            },
+            "scrollTop": 0,
+            "title": "● blocked.md · 43126 字 — MarkPilot",
+            "banner": ""
+          },
+          "toast": "assets 落盘失败：目标文件已存在：<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-images\\blocked\\assets（EEXIST），已改为内联"
+        }
+      ],
+      "ms": 7196
+    },
+    {
+      "id": "unsaved-screenshot-renders-without-path",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "未命名\n![](data:image/png;base64,[bitmap bytes omitted])",
+            "selection": {
+              "anchor": 43127,
+              "head": 43127
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 916.5,
+              "right": 916.5,
+              "top": 75.1953125,
+              "bottom": 556.1484375
+            },
+            "scrollTop": 0,
+            "title": "● 未命名 · 43127 字 — MarkPilot",
+            "banner": ""
+          },
+          "images": [
+            {
+              "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABVkAAANZCAIAAACa1qknAAAgAElEQVR4Aezdba8c5Zkv+v0t/AH8BXi1pR3JL86rSLyIFEXaSjQajaIdKVqazCjWSBOxIx1GTkZCjLIhE0IOOzuEDB",
+              "complete": true,
+              "naturalWidth": 1369,
+              "naturalHeight": 857,
+              "width": 756,
+              "failed": false
+            }
+          ]
+        }
+      ],
+      "ms": 2495
+    },
+    {
+      "id": "mouse-combination-drag-copy-preserve-image-markdown",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "BEFORE words\n\n![](assets/fixture-a.png)\n\nAFTER words",
+            "selection": {
+              "anchor": 0,
+              "head": 52
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 246.9765625,
+              "right": 246.9765625,
+              "top": 155.28125,
+              "bottom": 171.28125
+            },
+            "scrollTop": 0,
+            "title": "新建 Markdown 文档.md · 10269357 字 — MarkPilot",
+            "banner": ""
+          },
+          "selected": "BEFORE words\n\n![](assets/fixture-a.png)\n\nAFTER words"
+        }
+      ],
+      "ms": 5204
+    },
+    {
+      "id": "readonly-directory-keeps-inline-image",
+      "status": "pass",
+      "trace": [
+        {
+          "mode": "block",
+          "ok": true,
+          "directory": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-images\\readonly ����"
+        },
+        {
+          "state": {
+            "text": "正文\n![](data:image/png;base64,[bitmap bytes omitted])",
+            "selection": {
+              "anchor": 43126,
+              "head": 43126
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 916.5,
+              "right": 916.5,
+              "top": 75.1953125,
+              "bottom": 556.1484375
+            },
+            "scrollTop": 0,
+            "title": "● readonly.md · 43126 字 — MarkPilot",
+            "banner": ""
+          },
+          "toast": "assets 落盘失败：系统拒绝了这次操作：<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-images\\readonly 中文\\assets（EPERM），已改为内联"
+        },
+        {
+          "directory": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-images\\readonly ����",
+          "mode": "restore",
+          "ok": true
+        }
+      ],
+      "ms": 8461
+    },
+    {
+      "id": "jpeg-webp-copy-save-preserve-format-bytes",
+      "status": "pass",
+      "trace": [
+        {
+          "mime": "image/jpeg",
+          "pixels": {
+            "hasImage": true,
+            "expectedHeight": 857,
+            "matches": true,
+            "expectedWidth": 1369,
+            "meanDifference": 0.026896831234716378,
+            "tolerance": 2
+          }
+        },
+        {
+          "mime": "image/jpeg",
+          "copied": {
+            "ok": true,
+            "width": 1369,
+            "height": 857
+          },
+          "saved": {
+            "ok": true,
+            "path": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-images\\saved-image.bin",
+            "bytes": 34309
+          },
+          "sha256": "911b2ea5391ff7f8232e5d5aec61af56356804b158f5b457279d2a23017a4e54"
+        },
+        {
+          "mime": "image/webp",
+          "pixels": {
+            "expectedWidth": 1369,
+            "tolerance": 0,
+            "meanDifference": 0,
+            "matches": true,
+            "hasImage": true,
+            "expectedHeight": 857
+          }
+        },
+        {
+          "mime": "image/webp",
+          "copied": {
+            "ok": true,
+            "width": 1369,
+            "height": 857
+          },
+          "saved": {
+            "ok": true,
+            "path": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-images\\saved-image.bin",
+            "bytes": 8628
+          },
+          "sha256": "c2fdd880495b665ee8325a8954703ef182386a32c7bb08ccc8a95758795afdcd"
+        }
+      ],
+      "ms": 8637
+    },
+    {
+      "id": "http-image-copy-save-use-original-bytes",
+      "status": "pass",
+      "trace": [
+        {
+          "copied": {
+            "ok": true,
+            "width": 1369,
+            "height": 857
+          },
+          "saved": {
+            "ok": true,
+            "path": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-images\\saved-image.bin",
+            "bytes": 40730
+          },
+          "requests": [
+            {
+              "url": "/screenshot.png?literal=%23%25%28%29",
+              "referer": null
+            },
+            {
+              "url": "/screenshot.png?literal=%23%25%28%29",
+              "referer": null
+            }
+          ]
+        }
+      ],
+      "ms": 8256
+    },
+    {
+      "id": "predecode-faults-do-not-swallow-real-screenshot",
+      "status": "pass",
+      "trace": [
+        {
+          "mode": "reject",
+          "elapsed": 5804,
+          "imageHostDelayMs": 5000,
+          "calls": 1,
+          "state": {
+            "text": "Predecode reject\n![](assets/pasted-image.png)",
+            "selection": {
+              "anchor": 45,
+              "head": 45
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 916.5,
+              "right": 916.5,
+              "top": 75.1953125,
+              "bottom": 556.1484375
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 45 字 — MarkPilot",
+            "banner": ""
+          },
+          "images": [
+            {
+              "src": "file:///<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-images/%E4%B8%AD%E6%96%87%20%E6%88%AA%E5%9B%BE%20%23%25%28%29",
+              "complete": true,
+              "naturalWidth": 1369,
+              "naturalHeight": 857,
+              "width": 756,
+              "failed": false
+            }
+          ]
+        },
+        {
+          "mode": "timeout",
+          "elapsed": 16025,
+          "imageHostDelayMs": 5000,
+          "calls": 1,
+          "state": {
+            "text": "Predecode timeout\n![](assets/pasted-image.png)",
+            "selection": {
+              "anchor": 46,
+              "head": 46
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 916.5,
+              "right": 916.5,
+              "top": 75.1953125,
+              "bottom": 556.1484375
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 46 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 18 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          },
+          "images": [
+            {
+              "src": "file:///<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-images/%E4%B8%AD%E6%96%87%20%E6%88%AA%E5%9B%BE%20%23%25%28%29",
+              "complete": true,
+              "naturalWidth": 1369,
+              "naturalHeight": 857,
+              "width": 756,
+              "failed": false
+            }
+          ]
+        }
+      ],
+      "ms": 22796
+    },
+    {
+      "id": "custom-image-scale-has-useful-small-and-large-limits",
+      "status": "pass",
+      "trace": [
+        {
+          "source": "assets/small.png",
+          "sizes": [
+            {
+              "percent": 5,
+              "stored": 5,
+              "display": 5,
+              "natural": 100,
+              "available": 756
+            },
+            {
+              "percent": 100,
+              "stored": 100,
+              "display": 100,
+              "natural": 100,
+              "available": 756
+            },
+            {
+              "percent": 400,
+              "stored": 400,
+              "display": 400,
+              "natural": 100,
+              "available": 756
+            },
+            {
+              "percent": 100,
+              "stored": 100,
+              "display": 100,
+              "natural": 100,
+              "available": 756
+            }
+          ]
+        },
+        {
+          "source": "assets/fixture-a.png",
+          "sizes": [
+            {
+              "percent": 5,
+              "stored": 38,
+              "display": 38,
+              "natural": 1369,
+              "available": 756
+            },
+            {
+              "percent": 100,
+              "stored": 756,
+              "display": 756,
+              "natural": 1369,
+              "available": 756
+            },
+            {
+              "percent": 400,
+              "stored": 3024,
+              "display": 756,
+              "natural": 1369,
+              "available": 756
+            },
+            {
+              "percent": 100,
+              "stored": 756,
+              "display": 756,
+              "natural": 1369,
+              "available": 756
+            }
+          ]
+        }
+      ],
+      "ms": 8578
+    },
+    {
+      "id": "size-presets-follow-current-page-width",
+      "status": "pass",
+      "trace": [
+        {
+          "pageWidth": 55,
+          "natural": 1369,
+          "available": 550,
+          "stored": 275,
+          "display": 275
+        },
+        {
+          "pageWidth": 90,
+          "natural": 1369,
+          "available": 930,
+          "stored": 465,
+          "display": 465
+        },
+        {
+          "pageWidth": 55,
+          "natural": 1369,
+          "available": 550,
+          "stored": 275,
+          "display": 275
+        }
+      ],
+      "ms": 3563
+    },
+    {
+      "id": "high-image-next-to-table-keeps-image-menu",
+      "status": "pass",
+      "trace": [
+        {
+          "order": "before",
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"189\">\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n\n正文",
+            "selection": {
+              "anchor": 83,
+              "head": 83
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 317.2890625,
+              "width": 0,
+              "height": 16,
+              "top": 317.2890625,
+              "right": 188.5,
+              "bottom": 333.2890625,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 83 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 64 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          }
+        },
+        {
+          "order": "after",
+          "state": {
+            "text": "| a | b |\n| --- | --- |\n| 1 | 2 |\n\n<img src=\"assets/fixture-a.png\" width=\"189\">\n\n正文",
+            "selection": {
+              "anchor": 83,
+              "head": 83
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 317.2890625,
+              "width": 0,
+              "height": 16,
+              "top": 317.2890625,
+              "right": 188.5,
+              "bottom": 333.2890625,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 83 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 64 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          }
+        }
+      ],
+      "ms": 2146
+    },
+    {
+      "id": "document-switch-same-relative-name-updates-pixels",
+      "status": "pass",
+      "trace": [
+        {
+          "pixel": [
+            248,
+            220,
+            215,
+            255
+          ],
+          "images": [
+            {
+              "src": "file:///<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-images/same%20relative%20name/assets/fixture-a.png",
+              "complete": true,
+              "naturalWidth": 1369,
+              "naturalHeight": 857,
+              "width": 756,
+              "failed": false
+            }
+          ]
+        }
+      ],
+      "ms": 1393
+    },
+    {
+      "id": "extract-inline-image-cancels-on-concurrent-edit",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "![](data:image/png;base64,[bitmap bytes omitted])\n\n正文TYPED",
+            "selection": {
+              "anchor": 54344,
+              "head": 54344
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 233.9453125,
+              "y": 560.6484375,
+              "width": 0,
+              "height": 16,
+              "top": 560.6484375,
+              "right": 233.9453125,
+              "bottom": 576.6484375,
+              "left": 233.9453125
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 54344 字 — MarkPilot",
+            "banner": "自动保存被拦下：文档从 10269357 字骤降到 54344 字。确认这是你要的结果吗？仍要保存放弃这次自动保存"
+          },
+          "toast": "文档已变化，图片转换已取消"
+        }
+      ],
+      "ms": 6637
+    }
+  ],
+  "frames": [
+    {
+      "file": "before-paste.png",
+      "sha256": "6122869561217bc0cb7e204c82f12dc7c1e38b9cc267f862440b6db7e4ec9308",
+      "caret": {
+        "x": 160.5,
+        "y": 153.890625,
+        "width": 0,
+        "height": 16,
+        "top": 153.890625,
+        "right": 160.5,
+        "bottom": 169.890625,
+        "left": 160.5
+      },
+      "zoom": {
+        "file": "before-paste-caret-2x.png",
+        "sha256": "9701e69a5bdbda87362f8dd78abacc04d26eb5ff821ca06e4640a92127cc7cbd",
+        "clip": {
+          "x": 40.5,
+          "y": 128.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "immediate-assets.png",
+      "sha256": "53e942e2a991acf5d8cecc91941eb26c207d56b1e093694e19bbf832c11d1f03",
+      "caret": {
+        "left": 916.5,
+        "right": 916.5,
+        "top": 149.390625,
+        "bottom": 630.34375
+      },
+      "zoom": {
+        "file": "immediate-assets-caret-2x.png",
+        "sha256": "c32986f4996bd78e871db1a9178cf6f0422c54e773b05f1c928e7d7d7f412f66",
+        "clip": {
+          "x": 787,
+          "y": 124.390625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "long-document-before-paste.png",
+      "sha256": "2779eece484ec58e0d4857d714159b34b7a7a9ba3be936ec621d48b4f7157d8a",
+      "caret": {
+        "left": 916.5,
+        "right": 916.5,
+        "top": 10135.25,
+        "bottom": 10616.203125
+      },
+      "zoom": {
+        "file": "long-document-before-paste-caret-2x.png",
+        "sha256": "54b79cbeef887863500a63722657d90f9267c54bf8fa11d39d1e4e13585518d7",
+        "clip": {
+          "x": 787,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "long-document-immediate-paste.png",
+      "sha256": "f092de0eacfc0e6638064a6b1cacb19d9fada4aa3877be9ee54ddad0a79e44ac",
+      "caret": {
+        "left": 560.5,
+        "right": 560.5,
+        "top": 495.0703125,
+        "bottom": 662.765625
+      },
+      "zoom": {
+        "file": "long-document-immediate-paste-caret-2x.png",
+        "sha256": "07390ebd1c228241bad898cf1ef3fc7bee7cd61d2c9e4b068f6181f140315a0c",
+        "clip": {
+          "x": 440.5,
+          "y": 470.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "boundary-start.png",
+      "sha256": "4108adb6e640a1d9df312157932022b256a459dc2b618b9181db3ab788eb40fc",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 50,
+        "bottom": 530.953125
+      },
+      "zoom": {
+        "file": "boundary-start-caret-2x.png",
+        "sha256": "d282533e3bd6e466c67d57ae451d4f9cbb737c43afa824f1ebdce93e7e00b50e",
+        "clip": {
+          "x": 40.5,
+          "y": 25,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "boundary-end.png",
+      "sha256": "ff4b035ea4453ff9126ac02cd447af6b98c3f4eb2a9502f90f5ef078cf185311",
+      "caret": {
+        "left": 916.5,
+        "right": 916.5,
+        "top": 50,
+        "bottom": 530.953125
+      },
+      "zoom": {
+        "file": "boundary-end-caret-2x.png",
+        "sha256": "018f4bb6346bf867e329d65f0a634cb84ee2eab00f4094c9d35956e3915530f8",
+        "clip": {
+          "x": 787,
+          "y": 25,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "candidate-delete.png",
+      "sha256": "f448138320112765c491ac46da1a03998dbc8ccab8eeea88eb743d5322a73746",
+      "caret": {
+        "x": 188.5,
+        "y": 560.6484375,
+        "width": 0,
+        "height": 16,
+        "top": 560.6484375,
+        "right": 188.5,
+        "bottom": 576.6484375,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "candidate-delete-caret-2x.png",
+        "sha256": "68a9dc5c912224d866610e43da8ff1ab3b05be4e6e5da0dc5a156d4e1cb621a9",
+        "clip": {
+          "x": 68.5,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "source-interior.png",
+      "sha256": "163bc4908c5d6282547100429dbb2056d5e264a83f11037a4e670ca8a39a6fa8",
+      "caret": {
+        "left": 165.140625,
+        "right": 165.140625,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "source-interior-caret-2x.png",
+        "sha256": "455f7cbf98e69d07ea25ccf70afa843ac619dff130ad917791ba7e096a093127",
+        "clip": {
+          "x": 45.140625,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "immediate-inline.png",
+      "sha256": "36211b76604e4eb8db9b4ba9982dbda96d1b7fdc38b4ad6b262d4eb7e837ef5b",
+      "caret": {
+        "left": 916.5,
+        "right": 916.5,
+        "top": 182.0859375,
+        "bottom": 663.0390625
+      },
+      "zoom": {
+        "file": "immediate-inline-caret-2x.png",
+        "sha256": "5d63a74c9e71df4f6ff5dfabea582c4c9b189ac8f8b412e488c4eb4360652f51",
+        "clip": {
+          "x": 787,
+          "y": 157.0859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "undo-redo.png",
+      "sha256": "918f10ba197e596cafb15e22b3d49160272c01a7aa2e4d0f616250a2e1fb7d9e",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 560.6484375,
+        "bottom": 576.6484375
+      },
+      "zoom": {
+        "file": "undo-redo-caret-2x.png",
+        "sha256": "f06187f5395e736a7898dabe80ec2b8d702dba3ad80b5d88cbbd2cfe70f794ff",
+        "clip": {
+          "x": 40.5,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "typing-during-write.png",
+      "sha256": "ccea2d0a6f4e4a269aa11895ad06aef4ab000a9e285e54b501f561bf2b243b85",
+      "caret": {
+        "left": 205.9453125,
+        "right": 205.9453125,
+        "top": 560.6484375,
+        "bottom": 576.6484375
+      },
+      "zoom": {
+        "file": "typing-during-write-caret-2x.png",
+        "sha256": "479ae0daa7ab49c8303cd795bab6f5a183551c622202fb8c72506c25b4a6e890",
+        "clip": {
+          "x": 85.9453125,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "selection-canceled.png",
+      "sha256": "58334c497d257d69f450d48454dd397b4ae9a9b81159d75845929ec66d04245a",
+      "caret": {
+        "left": 277.0546875,
+        "right": 277.0546875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "selection-canceled-caret-2x.png",
+        "sha256": "2d6b2bc7b86afac72a49693ba5ef5207b6106a679c6d8c9e58adf595325fb13a",
+        "clip": {
+          "x": 157.0546875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "same-text-canceled.png",
+      "sha256": "7e6fa95a912f5cf89aa383feeba6dd24a97a644c336125f0c20ad9b8d8b7b061",
+      "caret": {
+        "x": 160.5,
+        "y": 79.6953125,
+        "width": 0,
+        "height": 16,
+        "top": 79.6953125,
+        "right": 160.5,
+        "bottom": 95.6953125,
+        "left": 160.5
+      },
+      "zoom": {
+        "file": "same-text-canceled-caret-2x.png",
+        "sha256": "abbfc33097b9502d70f74b5967340a347266fc52a663ccbf5302460043bdd467",
+        "clip": {
+          "x": 40.5,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "switch-canceled.png",
+      "sha256": "45f7ed7393e20b073ddeee3cb491e84f62b25875f648c0cc5db56211de072a2c",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "switch-canceled-caret-2x.png",
+        "sha256": "e06de1ee297f544ec5c9576c17caa7ae8b35ce100ec4fe06c699c276c7935d76",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "two-pastes.png",
+      "sha256": "c51ee850d8d74b135e907da2f2ca93beb05aa215edc2528ff099f3f6f7c5c0e4",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 640.40625,
+        "bottom": 656.40625
+      },
+      "zoom": {
+        "file": "two-pastes-caret-2x.png",
+        "sha256": "9c0faec5dcaddd25400f9a095ddecf720117f57c9c5d652ad25990fdd5b88c67",
+        "clip": {
+          "x": 40.5,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "undo-pending.png",
+      "sha256": "fcd484b2289d23c13cf89560cfcbc0bd58bce553a1a777d43a277cd3c0f29c4d",
+      "caret": {
+        "x": 170.5,
+        "y": 79.6953125,
+        "width": 0,
+        "height": 16,
+        "top": 79.6953125,
+        "right": 170.5,
+        "bottom": 95.6953125,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "undo-pending-caret-2x.png",
+        "sha256": "2768bfc9997b450e51d09f367364f953369cc70550dde579f5d748da6e956336",
+        "clip": {
+          "x": 50.5,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "delete-balanced-url.png",
+      "sha256": "0afec10d7544af1130b4c58e1403154dbfdc48ad7b0f685afb73fb96bb5b24da",
+      "caret": {
+        "x": 188.5,
+        "y": 560.6484375,
+        "width": 0,
+        "height": 16,
+        "top": 560.6484375,
+        "right": 188.5,
+        "bottom": 576.6484375,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "delete-balanced-url-caret-2x.png",
+        "sha256": "0b90f7b9b8997e6a9f3474789ce89d032c99ada0ab5da920736a9e07696c6868",
+        "clip": {
+          "x": 68.5,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "delete-html.png",
+      "sha256": "8d5413a23e8e1d8b1ce4c311bf4d9c41da3a1d87b9cfdac9326c4035fb87eaaa",
+      "caret": {
+        "x": 188.5,
+        "y": 167.390625,
+        "width": 0,
+        "height": 16,
+        "top": 167.390625,
+        "right": 188.5,
+        "bottom": 183.390625,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "delete-html-caret-2x.png",
+        "sha256": "57ae8c43ab77d42fb0f33416d9e7bd1c64da49feb61475389e927f2729562688",
+        "clip": {
+          "x": 68.5,
+          "y": 142.390625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "edited-address.png",
+      "sha256": "39d525ae56ad52b334445fdc68dbbd684fc7dae48f575301c94a748bf27ffc68",
+      "caret": {
+        "x": 188.5,
+        "y": 560.6484375,
+        "width": 0,
+        "height": 16,
+        "top": 560.6484375,
+        "right": 188.5,
+        "bottom": 576.6484375,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "edited-address-caret-2x.png",
+        "sha256": "0b90f7b9b8997e6a9f3474789ce89d032c99ada0ab5da920736a9e07696c6868",
+        "clip": {
+          "x": 68.5,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-25-1.png",
+      "sha256": "5edfc11e7d666a7d549ac532a619f1c934eb39fab5d2e730d646a4a6361a51e5",
+      "caret": {
+        "x": 188.5,
+        "y": 205.703125,
+        "width": 0,
+        "height": 16,
+        "top": 205.703125,
+        "right": 188.5,
+        "bottom": 221.703125,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-25-1-caret-2x.png",
+        "sha256": "0b90f7b9b8997e6a9f3474789ce89d032c99ada0ab5da920736a9e07696c6868",
+        "clip": {
+          "x": 68.5,
+          "y": 180.703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-50-2.png",
+      "sha256": "4f8c290bbcedf0d314697308bf120e55d7e7c9c20e45f25944a4b2467cfa494e",
+      "caret": {
+        "x": 188.5,
+        "y": 324.015625,
+        "width": 0,
+        "height": 16,
+        "top": 324.015625,
+        "right": 188.5,
+        "bottom": 340.015625,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-50-2-caret-2x.png",
+        "sha256": "57ae8c43ab77d42fb0f33416d9e7bd1c64da49feb61475389e927f2729562688",
+        "clip": {
+          "x": 68.5,
+          "y": 299.015625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-75-3.png",
+      "sha256": "a4ffb29618d21379ac21bbfed6a90893883bc219204273f35a8e3a01d7952c74",
+      "caret": {
+        "x": 188.5,
+        "y": 442.328125,
+        "width": 0,
+        "height": 16,
+        "top": 442.328125,
+        "right": 188.5,
+        "bottom": 458.328125,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-75-3-caret-2x.png",
+        "sha256": "7ae68854cb19773f4f445d3d6521ad7a264a1867791e3e013383e1ace343666d",
+        "clip": {
+          "x": 68.5,
+          "y": 417.328125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-100-4.png",
+      "sha256": "1582bce9f5bb2ea8dbfe4374a2968697b1f8561ebf159fde294c289d3e6cfc67",
+      "caret": {
+        "x": 188.5,
+        "y": 560.6484375,
+        "width": 0,
+        "height": 16,
+        "top": 560.6484375,
+        "right": 188.5,
+        "bottom": 576.6484375,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-100-4-caret-2x.png",
+        "sha256": "0b90f7b9b8997e6a9f3474789ce89d032c99ada0ab5da920736a9e07696c6868",
+        "clip": {
+          "x": 68.5,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-50-5.png",
+      "sha256": "4f8c290bbcedf0d314697308bf120e55d7e7c9c20e45f25944a4b2467cfa494e",
+      "caret": {
+        "x": 188.5,
+        "y": 324.015625,
+        "width": 0,
+        "height": 16,
+        "top": 324.015625,
+        "right": 188.5,
+        "bottom": 340.015625,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-50-5-caret-2x.png",
+        "sha256": "57ae8c43ab77d42fb0f33416d9e7bd1c64da49feb61475389e927f2729562688",
+        "clip": {
+          "x": 68.5,
+          "y": 299.015625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-25-6.png",
+      "sha256": "b8ede723a9714cb0a106b7acea4b4579bdc11926503e9c1162ae925eaf56b720",
+      "caret": {
+        "x": 188.5,
+        "y": 205.703125,
+        "width": 0,
+        "height": 16,
+        "top": 205.703125,
+        "right": 188.5,
+        "bottom": 221.703125,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-25-6-caret-2x.png",
+        "sha256": "0b90f7b9b8997e6a9f3474789ce89d032c99ada0ab5da920736a9e07696c6868",
+        "clip": {
+          "x": 68.5,
+          "y": 180.703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-100-7.png",
+      "sha256": "1582bce9f5bb2ea8dbfe4374a2968697b1f8561ebf159fde294c289d3e6cfc67",
+      "caret": {
+        "x": 188.5,
+        "y": 560.6484375,
+        "width": 0,
+        "height": 16,
+        "top": 560.6484375,
+        "right": 188.5,
+        "bottom": 576.6484375,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-100-7-caret-2x.png",
+        "sha256": "0b90f7b9b8997e6a9f3474789ce89d032c99ada0ab5da920736a9e07696c6868",
+        "clip": {
+          "x": 68.5,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "zoom-150.png",
+      "sha256": "0ec85f2d7449de6f110a99fcf2d485321fe20e0f52db4332b71f82298a312fc2",
+      "caret": {
+        "x": 212,
+        "y": 360.2109375,
+        "width": 0,
+        "height": 24,
+        "top": 360.2109375,
+        "right": 212,
+        "bottom": 384.2109375,
+        "left": 212
+      },
+      "zoom": {
+        "file": "zoom-150-caret-2x.png",
+        "sha256": "065a59b517a256bf4e46806d5516c52a0a1468d74ed859f6e91513c7c7b53f68",
+        "clip": {
+          "x": 92,
+          "y": 335.2109375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "zoom-100.png",
+      "sha256": "4f8c290bbcedf0d314697308bf120e55d7e7c9c20e45f25944a4b2467cfa494e",
+      "caret": {
+        "x": 188.5,
+        "y": 324.015625,
+        "width": 0,
+        "height": 16,
+        "top": 324.015625,
+        "right": 188.5,
+        "bottom": 340.015625,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "zoom-100-caret-2x.png",
+        "sha256": "57ae8c43ab77d42fb0f33416d9e7bd1c64da49feb61475389e927f2729562688",
+        "clip": {
+          "x": 68.5,
+          "y": 299.015625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "second-image.png",
+      "sha256": "9c76921a83e21e3ab6d3eebbbc274efe6b71ff34bb1cb8030235a66fb52c462e",
+      "caret": {
+        "x": 188.5,
+        "y": 642.15625,
+        "width": 0,
+        "height": 16,
+        "top": 642.15625,
+        "right": 188.5,
+        "bottom": 658.15625,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "second-image-caret-2x.png",
+        "sha256": "868502b4669a13617f54c94240534dc46612ef4e3ae14d64f5bdd32591b6b4d5",
+        "clip": {
+          "x": 68.5,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "attrs-quoted-greater.png",
+      "sha256": "0235eb309719d475b5d2da6d7f5d07c1c0afdbbc5a5e5c923b2959690efe11bb",
+      "caret": {
+        "x": 188.5,
+        "y": 167.390625,
+        "width": 0,
+        "height": 16,
+        "top": 167.390625,
+        "right": 188.5,
+        "bottom": 183.390625,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "attrs-quoted-greater-caret-2x.png",
+        "sha256": "57ae8c43ab77d42fb0f33416d9e7bd1c64da49feb61475389e927f2729562688",
+        "clip": {
+          "x": 68.5,
+          "y": 142.390625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "attrs-balanced-parentheses.png",
+      "sha256": "c0c68188de7703f9d482cdf5033f8cf5b885adc52cc7149653a25af6733b53f4",
+      "caret": {
+        "x": 188.5,
+        "y": 560.6484375,
+        "width": 0,
+        "height": 16,
+        "top": 560.6484375,
+        "right": 188.5,
+        "bottom": 576.6484375,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "attrs-balanced-parentheses-caret-2x.png",
+        "sha256": "0b90f7b9b8997e6a9f3474789ce89d032c99ada0ab5da920736a9e07696c6868",
+        "clip": {
+          "x": 68.5,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "attrs-html-entities.png",
+      "sha256": "916f86bd77fcd07212c16c302b0dc0fe7de3bf97c4a224a00a2554d65449cfdd",
+      "caret": {
+        "x": 188.5,
+        "y": 167.390625,
+        "width": 0,
+        "height": 16,
+        "top": 167.390625,
+        "right": 188.5,
+        "bottom": 183.390625,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "attrs-html-entities-caret-2x.png",
+        "sha256": "57ae8c43ab77d42fb0f33416d9e7bd1c64da49feb61475389e927f2729562688",
+        "clip": {
+          "x": 68.5,
+          "y": 142.390625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "attrs-data-src-boundary.png",
+      "sha256": "732d7422d923322d30bdd752ff1eb2b55f684648eee22d52481109d37c5500ab",
+      "caret": {
+        "x": 188.5,
+        "y": 560.6484375,
+        "width": 0,
+        "height": 16,
+        "top": 560.6484375,
+        "right": 188.5,
+        "bottom": 576.6484375,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "attrs-data-src-boundary-caret-2x.png",
+        "sha256": "0b90f7b9b8997e6a9f3474789ce89d032c99ada0ab5da920736a9e07696c6868",
+        "clip": {
+          "x": 68.5,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "middle-url-change.png",
+      "sha256": "f561a9088c5b8207800c5557251f517fe5de7494ea94089cc1b32720d7e77124",
+      "caret": {
+        "x": 188.5,
+        "y": 560.6484375,
+        "width": 0,
+        "height": 16,
+        "top": 560.6484375,
+        "right": 188.5,
+        "bottom": 576.6484375,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "middle-url-change-caret-2x.png",
+        "sha256": "68a9dc5c912224d866610e43da8ff1ab3b05be4e6e5da0dc5a156d4e1cb621a9",
+        "clip": {
+          "x": 68.5,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "secondary-image.png",
+      "sha256": "c10f6160cb3dacadaaa4199ff828239e305344924f4c8ee7f93fc2f68a49a8ab",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 50,
+        "bottom": 568.5078125
+      },
+      "zoom": {
+        "file": "secondary-image-caret-2x.png",
+        "sha256": "8eb672617567dd2e6c9b1ff7c835677c4af7dbaa51f50da8c5ca3cb6c69d936d",
+        "clip": {
+          "x": 50.5,
+          "y": 25,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "blank-window-native-input.png",
+      "sha256": "f679a94a674b0799f607f6e63fc8300ed746db61459ff58cdab4a8e0b4b4964c",
+      "caret": {
+        "left": 284.46875,
+        "right": 284.46875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "blank-window-native-input-caret-2x.png",
+        "sha256": "af8702c13bf074a1de5f1fbb4b7f19520055de8d37bbafcd30d5aa6729256e76",
+        "clip": {
+          "x": 164.46875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "failed-write-inline.png",
+      "sha256": "9c649c95a2f2f19f1fb5e16952acbcc8def90797e4891ff6e7d69b26fc1b4a9c",
+      "caret": {
+        "left": 916.5,
+        "right": 916.5,
+        "top": 75.1953125,
+        "bottom": 556.1484375
+      },
+      "zoom": {
+        "file": "failed-write-inline-caret-2x.png",
+        "sha256": "1d7c18f4a8c536bcfd470ba509f5a2eda0aa051dea5b4f394b34b257f4e859af",
+        "clip": {
+          "x": 787,
+          "y": 50.1953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "unsaved-inline.png",
+      "sha256": "b8cd8c69ddde8b7af7d4c0d112ea9d8d79b54e2446eaf430fed289e5b1b9c2fb",
+      "caret": {
+        "left": 916.5,
+        "right": 916.5,
+        "top": 75.1953125,
+        "bottom": 556.1484375
+      },
+      "zoom": {
+        "file": "unsaved-inline-caret-2x.png",
+        "sha256": "1d7c18f4a8c536bcfd470ba509f5a2eda0aa051dea5b4f394b34b257f4e859af",
+        "clip": {
+          "x": 787,
+          "y": 50.1953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "double-click.png",
+      "sha256": "07ddb3705fcd27800e4e637038ee86f93ade2468f056dbb70ec1038a3da0ed36",
+      "caret": {
+        "left": 216.5703125,
+        "right": 216.5703125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "double-click-caret-2x.png",
+        "sha256": "f13a341e29b6808fe9a0ebd640bccfc0be257e2a7f859f13b7e62e206958d48c",
+        "clip": {
+          "x": 96.5703125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-click.png",
+      "sha256": "aab3e965d0d7589241f6b4821ffc06d99d879475a4c735be278305de599a6a90",
+      "caret": {
+        "left": 240.9296875,
+        "right": 240.9296875,
+        "top": 155.28125,
+        "bottom": 171.28125
+      },
+      "zoom": {
+        "file": "shift-click-caret-2x.png",
+        "sha256": "104e8667769e38352c9ffbfdf7ed9dc673fee8882f7ae49621a6ff4965f7ecc9",
+        "clip": {
+          "x": 120.9296875,
+          "y": 130.28125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "drag-copy.png",
+      "sha256": "0b958d4106d54c2a04f556473ecdff79e86ff2ade2ab71b6e2dc65afdcdeae99",
+      "caret": {
+        "left": 246.9765625,
+        "right": 246.9765625,
+        "top": 155.28125,
+        "bottom": 171.28125
+      },
+      "zoom": {
+        "file": "drag-copy-caret-2x.png",
+        "sha256": "afbbac0e75ded8948750e51012f179f8c4abcc60ebfac116f762068a6a61eaec",
+        "clip": {
+          "x": 126.9765625,
+          "y": 130.28125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "readonly-inline.png",
+      "sha256": "6eb37a3ff51d770c95d84f08a32aabd8308857fcb105c9572375386e029f5f34",
+      "caret": {
+        "left": 916.5,
+        "right": 916.5,
+        "top": 75.1953125,
+        "bottom": 556.1484375
+      },
+      "zoom": {
+        "file": "readonly-inline-caret-2x.png",
+        "sha256": "1d7c18f4a8c536bcfd470ba509f5a2eda0aa051dea5b4f394b34b257f4e859af",
+        "clip": {
+          "x": 787,
+          "y": 50.1953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "http-image.png",
+      "sha256": "30c1ac6c690fe9c08a2388d177c3f04457d315112ffd34b573316c6d203d57a5",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 50,
+        "bottom": 530.953125
+      },
+      "zoom": {
+        "file": "http-image-caret-2x.png",
+        "sha256": "e63195db18a2e4e66036faeadefba0e3bab60918e6ae8670538e8c679f53267d",
+        "clip": {
+          "x": 40.5,
+          "y": 25,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "predecode-reject.png",
+      "sha256": "ec0b4032a7e8ab1754639285b91d7f5c73cafb17066e9a8f2f599f6607c87c35",
+      "caret": {
+        "left": 916.5,
+        "right": 916.5,
+        "top": 75.1953125,
+        "bottom": 556.1484375
+      },
+      "zoom": {
+        "file": "predecode-reject-caret-2x.png",
+        "sha256": "1d7c18f4a8c536bcfd470ba509f5a2eda0aa051dea5b4f394b34b257f4e859af",
+        "clip": {
+          "x": 787,
+          "y": 50.1953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "predecode-timeout.png",
+      "sha256": "70c2cf85085517be897c2a16641f99fc205441529586586693e52281bf511fbf",
+      "caret": {
+        "left": 916.5,
+        "right": 916.5,
+        "top": 75.1953125,
+        "bottom": 556.1484375
+      },
+      "zoom": {
+        "file": "predecode-timeout-caret-2x.png",
+        "sha256": "1d7c18f4a8c536bcfd470ba509f5a2eda0aa051dea5b4f394b34b257f4e859af",
+        "clip": {
+          "x": 787,
+          "y": 50.1953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "custom-scale-100.png",
+      "sha256": "6017014ba0ad8c4cdf3ae381668abc811bc6240356b2d83322d5fa9fcffedce9",
+      "caret": {
+        "left": 283.765625,
+        "right": 283.765625,
+        "top": 147.390625,
+        "bottom": 163.390625
+      },
+      "zoom": {
+        "file": "custom-scale-100-caret-2x.png",
+        "sha256": "0c7b6f966cd293fbe4937e88a285ff85721fa3bc6ea868f6f5576aa4322a8e25",
+        "clip": {
+          "x": 163.765625,
+          "y": 122.390625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "custom-scale-1369.png",
+      "sha256": "4e47d4598187a222f4ed5afd429c2c46b56b8b0aa534183cdb45720877b578ad",
+      "caret": {
+        "left": 283.765625,
+        "right": 283.765625,
+        "top": 560.6484375,
+        "bottom": 576.6484375
+      },
+      "zoom": {
+        "file": "custom-scale-1369-caret-2x.png",
+        "sha256": "ceafb372fdd1067bfe5198491ef7b3472c6b329c75b25958939698eba022864f",
+        "clip": {
+          "x": 163.765625,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "page-width-55-1.png",
+      "sha256": "ba7a3db8ba4dd11bcbbf4d027ae84275ba5fdc66b3457366798b0034889ecb72",
+      "caret": {
+        "x": 291.5,
+        "y": 259.5390625,
+        "width": 0,
+        "height": 16,
+        "top": 259.5390625,
+        "right": 291.5,
+        "bottom": 275.5390625,
+        "left": 291.5
+      },
+      "zoom": {
+        "file": "page-width-55-1-caret-2x.png",
+        "sha256": "57ae8c43ab77d42fb0f33416d9e7bd1c64da49feb61475389e927f2729562688",
+        "clip": {
+          "x": 171.5,
+          "y": 234.5390625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "page-width-90-2.png",
+      "sha256": "f3dded9de0dc81c6c19d984cfa707754fb75856d99b015d3b8603103243a3d58",
+      "caret": {
+        "x": 101.5,
+        "y": 378.4765625,
+        "width": 0,
+        "height": 16,
+        "top": 378.4765625,
+        "right": 101.5,
+        "bottom": 394.4765625,
+        "left": 101.5
+      },
+      "zoom": {
+        "file": "page-width-90-2-caret-2x.png",
+        "sha256": "e389936c295a1cf1d13b4ea5203bf1a205901f2336efe2715f02d9404334c5fd",
+        "clip": {
+          "x": 0,
+          "y": 353.4765625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "page-width-55-3.png",
+      "sha256": "710db65a7a9ed6284888f4dae136f650d33b2d4b8a70b8259da9e3e5e47cda0a",
+      "caret": {
+        "x": 291.5,
+        "y": 259.5390625,
+        "width": 0,
+        "height": 16,
+        "top": 259.5390625,
+        "right": 291.5,
+        "bottom": 275.5390625,
+        "left": 291.5
+      },
+      "zoom": {
+        "file": "page-width-55-3-caret-2x.png",
+        "sha256": "57ae8c43ab77d42fb0f33416d9e7bd1c64da49feb61475389e927f2729562688",
+        "clip": {
+          "x": 171.5,
+          "y": 234.5390625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "adjacent-table-before.png",
+      "sha256": "0d1f57c7ca494a39bd719663abae238cc7ecfdf7033291d063c03a07c35486e6",
+      "caret": {
+        "x": 188.5,
+        "y": 317.2890625,
+        "width": 0,
+        "height": 16,
+        "top": 317.2890625,
+        "right": 188.5,
+        "bottom": 333.2890625,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "adjacent-table-before-caret-2x.png",
+        "sha256": "7ae68854cb19773f4f445d3d6521ad7a264a1867791e3e013383e1ace343666d",
+        "clip": {
+          "x": 68.5,
+          "y": 292.2890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "adjacent-table-after.png",
+      "sha256": "806beb687a8dfca5d97c50e2e432aa5ec92f595be43836cd2a79ec3a58872097",
+      "caret": {
+        "x": 188.5,
+        "y": 317.2890625,
+        "width": 0,
+        "height": 16,
+        "top": 317.2890625,
+        "right": 188.5,
+        "bottom": 333.2890625,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "adjacent-table-after-caret-2x.png",
+        "sha256": "7ae68854cb19773f4f445d3d6521ad7a264a1867791e3e013383e1ace343666d",
+        "clip": {
+          "x": 68.5,
+          "y": 292.2890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "directory-change-same-source.png",
+      "sha256": "df3e58697ad845fb7b95a1139ec1b0e1e9584378b056c9fc746765c6bce8e67d",
+      "caret": {
+        "x": 188.5,
+        "y": 560.6484375,
+        "width": 0,
+        "height": 16,
+        "top": 560.6484375,
+        "right": 188.5,
+        "bottom": 576.6484375,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "directory-change-same-source-caret-2x.png",
+        "sha256": "68a9dc5c912224d866610e43da8ff1ab3b05be4e6e5da0dc5a156d4e1cb621a9",
+        "clip": {
+          "x": 68.5,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "extract-canceled.png",
+      "sha256": "429cba49622ad2157cbfc6ad808628efc6286d2d7a06544c7222cad5b54c7012",
+      "caret": {
+        "x": 233.9453125,
+        "y": 560.6484375,
+        "width": 0,
+        "height": 16,
+        "top": 560.6484375,
+        "right": 233.9453125,
+        "bottom": 576.6484375,
+        "left": 233.9453125
+      },
+      "zoom": {
+        "file": "extract-canceled-caret-2x.png",
+        "sha256": "3ed12840a22d5140f6038abed3c5cb20e95f4c62292bc799a0983999493fd4dd",
+        "clip": {
+          "x": 113.9453125,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ],
+  "observations": [],
+  "metadata": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-common-final-source-3.2.11\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-common-final-source-3.2.11\\unpacked\\MarkPilot.exe",
+    "runtimeExecutableSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\cm6-common-final-source-3.2.11\\unpacked\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.11",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\cm6-common-final-source-3.2.11\\unpacked\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\cm6-common-final-source-3.2.11\\unpacked\\resources\\app.asar",
+    "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+    "bootMs": 947,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+        "sourceSha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ],
+    "imageHostDelayMs": 5000
+  },
+  "clipboardCleanup": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "completedAt": "2026-10-11T23:00:06.752Z",
+  "passed": true
+}

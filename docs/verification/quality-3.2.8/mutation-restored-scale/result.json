@@ -1,0 +1,503 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T18:37:34.423Z",
+  "cases": [
+    {
+      "id": "size-presets-are-distinct-stable-and-reversible",
+      "status": "pass",
+      "trace": [
+        {
+          "percent": 25,
+          "stored": 189,
+          "display": 189,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"189\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 205.703125,
+              "width": 0,
+              "height": 16,
+              "top": 205.703125,
+              "right": 188.5,
+              "bottom": 221.703125,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "percent": 50,
+          "stored": 378,
+          "display": 378,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"378\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 324.015625,
+              "width": 0,
+              "height": 16,
+              "top": 324.015625,
+              "right": 188.5,
+              "bottom": 340.015625,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "percent": 75,
+          "stored": 567,
+          "display": 567,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"567\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 442.328125,
+              "width": 0,
+              "height": 16,
+              "top": 442.328125,
+              "right": 188.5,
+              "bottom": 458.328125,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "percent": 100,
+          "stored": 756,
+          "display": 756,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"756\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 560.6484375,
+              "width": 0,
+              "height": 16,
+              "top": 560.6484375,
+              "right": 188.5,
+              "bottom": 576.6484375,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "percent": 50,
+          "stored": 378,
+          "display": 378,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"378\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 324.015625,
+              "width": 0,
+              "height": 16,
+              "top": 324.015625,
+              "right": 188.5,
+              "bottom": 340.015625,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "percent": 25,
+          "stored": 189,
+          "display": 189,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"189\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 205.703125,
+              "width": 0,
+              "height": 16,
+              "top": 205.703125,
+              "right": 188.5,
+              "bottom": 221.703125,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "percent": 100,
+          "stored": 756,
+          "display": 756,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"756\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 560.6484375,
+              "width": 0,
+              "height": 16,
+              "top": 560.6484375,
+              "right": 188.5,
+              "bottom": 576.6484375,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 5510
+    }
+  ],
+  "frames": [
+    {
+      "file": "size-25-1.png",
+      "sha256": "ac51d4ff90e340e9e4eb0a9e234db12b94ac398f0931340146b1117f9ea1b72b",
+      "caret": {
+        "x": 188.5,
+        "y": 205.703125,
+        "width": 0,
+        "height": 16,
+        "top": 205.703125,
+        "right": 188.5,
+        "bottom": 221.703125,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-25-1-caret-2x.png",
+        "sha256": "4ccd449664a048a05340cfe39f4bcc001dba7bb707229961c128950c88a4bbd4",
+        "clip": {
+          "x": 68.5,
+          "y": 180.703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-50-2.png",
+      "sha256": "0325f9b476a88b52078c44f620b1deefbc2851a53c3c78a28ed7d80add1ee555",
+      "caret": {
+        "x": 188.5,
+        "y": 324.015625,
+        "width": 0,
+        "height": 16,
+        "top": 324.015625,
+        "right": 188.5,
+        "bottom": 340.015625,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-50-2-caret-2x.png",
+        "sha256": "5435258fd9e0a97ed126e49cac4377eec0c4e7a4c80a92005a8035452929b00b",
+        "clip": {
+          "x": 68.5,
+          "y": 299.015625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-75-3.png",
+      "sha256": "174a28e3d8d1ccd80f61fd805a43c24755fc91408a903e73b4ef113d2d174048",
+      "caret": {
+        "x": 188.5,
+        "y": 442.328125,
+        "width": 0,
+        "height": 16,
+        "top": 442.328125,
+        "right": 188.5,
+        "bottom": 458.328125,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-75-3-caret-2x.png",
+        "sha256": "24f61f512755064110d80af29ef182c80030ede59576d064c7e8ed57367d25bb",
+        "clip": {
+          "x": 68.5,
+          "y": 417.328125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-100-4.png",
+      "sha256": "2f9ea9d34f9a30edb319a8801091cbcd045114f1c4162370a3f2cdd6f7c043f8",
+      "caret": {
+        "x": 188.5,
+        "y": 560.6484375,
+        "width": 0,
+        "height": 16,
+        "top": 560.6484375,
+        "right": 188.5,
+        "bottom": 576.6484375,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-100-4-caret-2x.png",
+        "sha256": "4ccd449664a048a05340cfe39f4bcc001dba7bb707229961c128950c88a4bbd4",
+        "clip": {
+          "x": 68.5,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-50-5.png",
+      "sha256": "0325f9b476a88b52078c44f620b1deefbc2851a53c3c78a28ed7d80add1ee555",
+      "caret": {
+        "x": 188.5,
+        "y": 324.015625,
+        "width": 0,
+        "height": 16,
+        "top": 324.015625,
+        "right": 188.5,
+        "bottom": 340.015625,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-50-5-caret-2x.png",
+        "sha256": "5435258fd9e0a97ed126e49cac4377eec0c4e7a4c80a92005a8035452929b00b",
+        "clip": {
+          "x": 68.5,
+          "y": 299.015625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-25-6.png",
+      "sha256": "9a6119c2ef2cceb236d55f28b6bff94e0bd8e578611b378785a848c104864e38",
+      "caret": {
+        "x": 188.5,
+        "y": 205.703125,
+        "width": 0,
+        "height": 16,
+        "top": 205.703125,
+        "right": 188.5,
+        "bottom": 221.703125,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-25-6-caret-2x.png",
+        "sha256": "4ccd449664a048a05340cfe39f4bcc001dba7bb707229961c128950c88a4bbd4",
+        "clip": {
+          "x": 68.5,
+          "y": 180.703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-100-7.png",
+      "sha256": "2f9ea9d34f9a30edb319a8801091cbcd045114f1c4162370a3f2cdd6f7c043f8",
+      "caret": {
+        "x": 188.5,
+        "y": 560.6484375,
+        "width": 0,
+        "height": 16,
+        "top": 560.6484375,
+        "right": 188.5,
+        "bottom": 576.6484375,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-100-7-caret-2x.png",
+        "sha256": "4ccd449664a048a05340cfe39f4bcc001dba7bb707229961c128950c88a4bbd4",
+        "clip": {
+          "x": 68.5,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ],
+  "observations": [],
+  "metadata": {
+    "executable": "MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.8",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "bootMs": 826,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "178bb51a146b37ac15d6c913ddcaf50c9b80386751e8f51cdf0ba1c9e578bef8",
+        "sourceSha256": "178bb51a146b37ac15d6c913ddcaf50c9b80386751e8f51cdf0ba1c9e578bef8"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "81301eef4e4f09a3d499c50d2fe21f21604fc996c41173024ba7469ee191182d",
+        "sourceSha256": "81301eef4e4f09a3d499c50d2fe21f21604fc996c41173024ba7469ee191182d"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+        "sourceSha256": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ],
+    "imageHostDelayMs": 5000
+  },
+  "clipboardCleanup": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "completedAt": "2026-10-11T18:37:47.880Z",
+  "passed": true
+}

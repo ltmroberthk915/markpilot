@@ -1,0 +1,835 @@
+{
+  "suite": "document-workflows",
+  "schema": 1,
+  "startedAt": "2026-10-11T22:03:19.957Z",
+  "cases": [
+    {
+      "id": "same-text-other-file-starts-empty-history",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "same-text-01-before-edit",
+          "text": "A base\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 160.5,
+            "y": 79.6953125,
+            "width": 0,
+            "height": 16,
+            "top": 79.6953125,
+            "right": 160.5,
+            "bottom": 95.6953125,
+            "left": 160.5
+          },
+          "scrollTop": 0,
+          "title": "history-A.md · 7 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "4bb5a439-a964-4288-be62-2c6686b49e01",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.10-history\\history-A.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "same-text-01-before-edit.png",
+            "sha256": "f1b7900edcacc79957de4b7e76caf81169fd63b41a05ddb48433169b469b72ad",
+            "caret": {
+              "x": 160.5,
+              "y": 79.6953125,
+              "width": 0,
+              "height": 16,
+              "top": 79.6953125,
+              "right": 160.5,
+              "bottom": 95.6953125,
+              "left": 160.5
+            },
+            "zoom": {
+              "file": "same-text-01-before-edit-caret-2x.png",
+              "sha256": "42d82e0338d76ba214ae3585cb3da87a3c76d950b43d544e4aabe868475d5517",
+              "clip": {
+                "x": 40.5,
+                "y": 54.6953125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "same-text-02-A-edited",
+          "text": "A base\nFROM_A",
+          "selection": {
+            "anchor": 13,
+            "head": 13
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 220.5,
+            "right": 220.5,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "history-A.md · 13 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "4bb5a439-a964-4288-be62-2c6686b49e01",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.10-history\\history-A.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "same-text-02-A-edited.png",
+            "sha256": "d83afca2e759a93fec96d90276e037679e74cd50466b0b979ead3d767a24eaec",
+            "caret": {
+              "left": 220.5,
+              "right": 220.5,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "zoom": {
+              "file": "same-text-02-A-edited-caret-2x.png",
+              "sha256": "6f6c0219182699c40aadf7480755d8e0688938ab60ffd65c3435293e3d961d0b",
+              "clip": {
+                "x": 100.5,
+                "y": 54.6953125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "same-text-03-B-before-undo",
+          "text": "A base\nFROM_A",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 160.5,
+            "right": 160.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "history-B.md · 13 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "962636d7-5873-4cf0-bbb8-bd4d5c3b289c",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.10-history\\history-B.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "same-text-03-B-before-undo.png",
+            "sha256": "0f39df31d6cd0edaf6ca286b063cba507d71d6b5f14c4cf1d7997da986c4a90d",
+            "caret": {
+              "left": 160.5,
+              "right": 160.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "same-text-03-B-before-undo-caret-2x.png",
+              "sha256": "61379eec73d592d741aa9ee92c3816d32022e6a927e739de1f3eafa76014f162",
+              "clip": {
+                "x": 40.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "same-text-04-B-after-undo",
+          "text": "A base\nFROM_A",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 160.5,
+            "right": 160.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "history-B.md · 13 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "962636d7-5873-4cf0-bbb8-bd4d5c3b289c",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.10-history\\history-B.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "same-text-04-B-after-undo.png",
+            "sha256": "0f39df31d6cd0edaf6ca286b063cba507d71d6b5f14c4cf1d7997da986c4a90d",
+            "caret": {
+              "left": 160.5,
+              "right": 160.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "same-text-04-B-after-undo-caret-2x.png",
+              "sha256": "61379eec73d592d741aa9ee92c3816d32022e6a927e739de1f3eafa76014f162",
+              "clip": {
+                "x": 40.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "disk-after-undo",
+          "A": "A base\nFROM_A",
+          "B": "A base\nFROM_A"
+        }
+      ],
+      "detail": {
+        "historyIsolated": true,
+        "documentIdentityChanged": true
+      },
+      "ms": 2350
+    },
+    {
+      "id": "open-from-active-cell-immediately-types-in-new-document",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "cell-click-target",
+          "box": {
+            "x": 171,
+            "y": 93.6953125,
+            "width": 407.5,
+            "height": 42.1953125
+          },
+          "cell": {
+            "text": "alpha",
+            "row": "31",
+            "col": "0"
+          }
+        },
+        {
+          "name": "active-cell-01-before-open",
+          "text": "| Name | Value |\n| --- | --- |\n| alpha | one |\n\nEnd\n",
+          "selection": {
+            "anchor": 35,
+            "head": 35
+          },
+          "focus": false,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "caret": {
+            "left": 986.5,
+            "right": 986.5,
+            "top": 93.1953125,
+            "bottom": 136.390625
+          },
+          "scrollTop": 0,
+          "title": "active-cell-old.md · 52 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "17c19a82-b31d-407b-92c3-0ed4dd551137",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.10-history\\active-cell-old.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "active-cell-01-before-open.png",
+            "sha256": "babcb2437e0fdb1528bd5b1a8c3e47918bd0bc28a3b5fd0be374ba8e46fc4ebc",
+            "caret": {
+              "x": 202.4375,
+              "y": 107.1953125,
+              "width": 0.0078125,
+              "height": 16,
+              "top": 107.1953125,
+              "right": 202.4453125,
+              "bottom": 123.1953125,
+              "left": 202.4375
+            },
+            "zoom": {
+              "file": "active-cell-01-before-open-caret-2x.png",
+              "sha256": "08898ea20043a780dca74c34b74c1e3c15d30d6be5cf2dd325087595b1411315",
+              "clip": {
+                "x": 82.4375,
+                "y": 82.1953125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "active-cell-02-after-open",
+          "text": "B second document\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "active-cell-new.md · 18 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "5da9a6a8-6875-44a9-b910-82682f7462fc",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.10-history\\active-cell-new.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "active-cell-02-after-open.png",
+            "sha256": "948345d9ee71c2ecec4c3249efde846a4aad850aa9691097a9dcbf5ac949128a",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "active-cell-02-after-open-caret-2x.png",
+              "sha256": "9384c3db6b4d7d57679e8876343cb940f48564e66ebd6677972076ca57ff4a6f",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "active-cell-03-immediate-typing",
+          "text": "NEW_B second document\n",
+          "selection": {
+            "anchor": 4,
+            "head": 4
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 213.046875,
+            "right": 213.046875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● active-cell-new.md · 22 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "5da9a6a8-6875-44a9-b910-82682f7462fc",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.10-history\\active-cell-new.md",
+            "dirty": true,
+            "saveInFlight": false,
+            "saveTimer": true
+          },
+          "screenshot": {
+            "file": "active-cell-03-immediate-typing.png",
+            "sha256": "2feabdf63533089e1b38cdeb9d1a24cc9a39a306bf766be3fa376719e5668e37",
+            "caret": {
+              "left": 213.046875,
+              "right": 213.046875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "active-cell-03-immediate-typing-caret-2x.png",
+              "sha256": "366a147b04cfb211d1be8864024590159b75abb3530b737e28fe34f65abb81f9",
+              "clip": {
+                "x": 93.046875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "inputFocus": true,
+        "oldOverlayRetired": true
+      },
+      "ms": 2440
+    },
+    {
+      "id": "open-keeps-focused-persistent-settings-control",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "settings-focus-01-before-open",
+          "text": "A settings control\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": false,
+          "activeElement": {
+            "tag": "INPUT",
+            "class": "mp-rng"
+          },
+          "caret": {
+            "left": 194,
+            "right": 194,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "settings-focus-old.md · 19 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "717d23dd-616e-4916-b555-642985df4b88",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.10-history\\settings-focus-old.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "settings-focus-01-before-open.png",
+            "sha256": "d4d889c27ac181a2e14ec7470f64018a78ff74e23539b5bb5b34be51996c760d",
+            "caret": null,
+            "zoom": {
+              "file": "settings-focus-01-before-open-caret-2x.png",
+              "sha256": "69c7b91edbd6a07d73810ab81c05b2f3dedf079e3e59fb1bb69700d8b5d4e845",
+              "clip": {
+                "x": 368.390625,
+                "y": 130.2890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              },
+              "contextKind": "focused-ui-control"
+            }
+          }
+        },
+        {
+          "name": "settings-focus-02-after-open",
+          "text": "B settings control\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": false,
+          "activeElement": {
+            "tag": "INPUT",
+            "class": "mp-rng"
+          },
+          "caret": {
+            "left": 194,
+            "right": 194,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "settings-focus-new.md · 19 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "7f899c04-23c3-4e50-a2a1-8398db31f3ed",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.10-history\\settings-focus-new.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "settings-focus-02-after-open.png",
+            "sha256": "14caf3efec8d1afe4d49777d6ad6f4c91e7b3590fb9106ecb3f1d8aa812109a6",
+            "caret": null,
+            "zoom": {
+              "file": "settings-focus-02-after-open-caret-2x.png",
+              "sha256": "69c7b91edbd6a07d73810ab81c05b2f3dedf079e3e59fb1bb69700d8b5d4e845",
+              "clip": {
+                "x": 368.390625,
+                "y": 130.2890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              },
+              "contextKind": "focused-ui-control"
+            }
+          }
+        },
+        {
+          "name": "settings-key-after-open",
+          "before": {
+            "focused": true,
+            "value": 70,
+            "step": 1,
+            "max": 100
+          },
+          "retained": {
+            "focused": true,
+            "connected": true
+          },
+          "after": {
+            "value": 71,
+            "event": {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "trusted": true
+            }
+          }
+        }
+      ],
+      "detail": {
+        "persistentControlFocus": true,
+        "realKeyboardInput": true
+      },
+      "ms": 2624
+    }
+  ],
+  "input": "CDP real key events and insertText; file opening uses real host IPC",
+  "artifact": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\candidate installation 3.2.10\\installed\\MarkPilot.exe",
+    "exeSha256": "a045aa49b9111dda6b18d692f8a6a3026b387fb200706a71f50314e082c8ede8",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\candidate installation 3.2.10\\installed\\MarkPilot.exe",
+    "runtimeExecutableSha256": "a045aa49b9111dda6b18d692f8a6a3026b387fb200706a71f50314e082c8ede8",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\candidate installation 3.2.10\\installed\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.10",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\candidate installation 3.2.10\\installed\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\candidate installation 3.2.10\\installed\\resources\\app.asar",
+    "asarSha256": "da087df330d99409909ccad8ef58a64de5903319b6272c14703857e463d5cf99",
+    "bootMs": 1003,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3",
+        "sourceSha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T22:03:33.569Z",
+  "passed": true,
+  "frames": [
+    {
+      "file": "same-text-01-before-edit.png",
+      "sha256": "f1b7900edcacc79957de4b7e76caf81169fd63b41a05ddb48433169b469b72ad",
+      "caret": {
+        "x": 160.5,
+        "y": 79.6953125,
+        "width": 0,
+        "height": 16,
+        "top": 79.6953125,
+        "right": 160.5,
+        "bottom": 95.6953125,
+        "left": 160.5
+      },
+      "zoom": {
+        "file": "same-text-01-before-edit-caret-2x.png",
+        "sha256": "42d82e0338d76ba214ae3585cb3da87a3c76d950b43d544e4aabe868475d5517",
+        "clip": {
+          "x": 40.5,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "same-text-02-A-edited.png",
+      "sha256": "d83afca2e759a93fec96d90276e037679e74cd50466b0b979ead3d767a24eaec",
+      "caret": {
+        "left": 220.5,
+        "right": 220.5,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "same-text-02-A-edited-caret-2x.png",
+        "sha256": "6f6c0219182699c40aadf7480755d8e0688938ab60ffd65c3435293e3d961d0b",
+        "clip": {
+          "x": 100.5,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "same-text-03-B-before-undo.png",
+      "sha256": "0f39df31d6cd0edaf6ca286b063cba507d71d6b5f14c4cf1d7997da986c4a90d",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "same-text-03-B-before-undo-caret-2x.png",
+        "sha256": "61379eec73d592d741aa9ee92c3816d32022e6a927e739de1f3eafa76014f162",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "same-text-04-B-after-undo.png",
+      "sha256": "0f39df31d6cd0edaf6ca286b063cba507d71d6b5f14c4cf1d7997da986c4a90d",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "same-text-04-B-after-undo-caret-2x.png",
+        "sha256": "61379eec73d592d741aa9ee92c3816d32022e6a927e739de1f3eafa76014f162",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "active-cell-01-before-open.png",
+      "sha256": "babcb2437e0fdb1528bd5b1a8c3e47918bd0bc28a3b5fd0be374ba8e46fc4ebc",
+      "caret": {
+        "x": 202.4375,
+        "y": 107.1953125,
+        "width": 0.0078125,
+        "height": 16,
+        "top": 107.1953125,
+        "right": 202.4453125,
+        "bottom": 123.1953125,
+        "left": 202.4375
+      },
+      "zoom": {
+        "file": "active-cell-01-before-open-caret-2x.png",
+        "sha256": "08898ea20043a780dca74c34b74c1e3c15d30d6be5cf2dd325087595b1411315",
+        "clip": {
+          "x": 82.4375,
+          "y": 82.1953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "active-cell-02-after-open.png",
+      "sha256": "948345d9ee71c2ecec4c3249efde846a4aad850aa9691097a9dcbf5ac949128a",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "active-cell-02-after-open-caret-2x.png",
+        "sha256": "9384c3db6b4d7d57679e8876343cb940f48564e66ebd6677972076ca57ff4a6f",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "active-cell-03-immediate-typing.png",
+      "sha256": "2feabdf63533089e1b38cdeb9d1a24cc9a39a306bf766be3fa376719e5668e37",
+      "caret": {
+        "left": 213.046875,
+        "right": 213.046875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "active-cell-03-immediate-typing-caret-2x.png",
+        "sha256": "366a147b04cfb211d1be8864024590159b75abb3530b737e28fe34f65abb81f9",
+        "clip": {
+          "x": 93.046875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "settings-focus-01-before-open.png",
+      "sha256": "d4d889c27ac181a2e14ec7470f64018a78ff74e23539b5bb5b34be51996c760d",
+      "caret": null,
+      "zoom": {
+        "file": "settings-focus-01-before-open-caret-2x.png",
+        "sha256": "69c7b91edbd6a07d73810ab81c05b2f3dedf079e3e59fb1bb69700d8b5d4e845",
+        "clip": {
+          "x": 368.390625,
+          "y": 130.2890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "contextKind": "focused-ui-control",
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "settings-focus-02-after-open.png",
+      "sha256": "14caf3efec8d1afe4d49777d6ad6f4c91e7b3590fb9106ecb3f1d8aa812109a6",
+      "caret": null,
+      "zoom": {
+        "file": "settings-focus-02-after-open-caret-2x.png",
+        "sha256": "69c7b91edbd6a07d73810ab81c05b2f3dedf079e3e59fb1bb69700d8b5d4e845",
+        "clip": {
+          "x": 368.390625,
+          "y": 130.2890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "contextKind": "focused-ui-control",
+        "published": false
+      },
+      "published": false
+    }
+  ]
+}

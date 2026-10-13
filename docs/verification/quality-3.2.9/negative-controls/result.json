@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T19:50:30.251Z",
+  "baselineEngine": "b4b11d263b9bbbe69a2651ecd4be37e0279b443a3061a47b0f0318952df66a7d",
+  "mutations": [
+    {
+      "kind": "history",
+      "suite": "document-workflows",
+      "id": "same-text-other-file-starts-empty-history",
+      "negativeError": "undo in newly opened B must not replay A history\n+ actual - expected\n\n+ 'A base\\n'\n- 'A base\\nFROM_A'\n           ^\n",
+      "mutantEngine": "b4b11d263b9bbbe69a2651ecd4be37e0279b443a3061a47b0f0318952df66a7d",
+      "restoredEngine": "b4b11d263b9bbbe69a2651ecd4be37e0279b443a3061a47b0f0318952df66a7d",
+      "redAsar": "9bd0bcca2e3a3d63a39a96f52e95fc024b8befeefcd450f3601475d2647375a5",
+      "greenAsar": "dae852488c3b63e86d807c043f9b46f150ba869b4fe2d5bc5c782a3150e3d0bc",
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "positive": true
+    },
+    {
+      "kind": "rich",
+      "suite": "rich-workflows",
+      "id": "mixed-html-preserve-all-content-in-order",
+      "negativeError": "every table and surrounding paragraph must survive",
+      "mutantEngine": "044fae29f1a44f24e1ad4decb4bf04c3fce7f86aaac63c1d0513f343a2d64ec0",
+      "restoredEngine": "b4b11d263b9bbbe69a2651ecd4be37e0279b443a3061a47b0f0318952df66a7d",
+      "redAsar": "c29f890c638d163ebdeafc432ba203ae75db64946f1df709273e98dc7b0f84e7",
+      "greenAsar": "dae852488c3b63e86d807c043f9b46f150ba869b4fe2d5bc5c782a3150e3d0bc",
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "positive": true
+    },
+    {
+      "kind": "math",
+      "suite": "math-workflows",
+      "id": "multiline-quoted-block-glyph-click-edit-undo-redo",
+      "negativeError": "clicking last glyph maps to its source endpoint past quote prefixes\n\n18 !== 20\n",
+      "mutantEngine": "f562bb768a726126877c525c597255438622389c1653d5a775251cf6b99c54f7",
+      "restoredEngine": "b4b11d263b9bbbe69a2651ecd4be37e0279b443a3061a47b0f0318952df66a7d",
+      "redAsar": "c635c47454da6f322b5f3a874e1fcee840bad7d751c46f28a36d47b57afffad7",
+      "greenAsar": "dae852488c3b63e86d807c043f9b46f150ba869b4fe2d5bc5c782a3150e3d0bc",
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "positive": true
+    }
+  ],
+  "passed": true,
+  "finishedAt": "2026-10-11T19:51:48.542Z",
+  "frames": []
+}

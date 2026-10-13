@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "results": [
+    {
+      "suite": "critical",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.8-critical",
+      "total": 26,
+      "passed": true
+    },
+    {
+      "suite": "acceptance",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.8-acceptance",
+      "total": 19,
+      "passed": true
+    },
+    {
+      "suite": "editing",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.8-editing",
+      "total": 75,
+      "passed": true
+    },
+    {
+      "suite": "worker-integration",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.8-worker-integration",
+      "total": 28,
+      "passed": true
+    },
+    {
+      "suite": "data-safety",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.8-data-safety",
+      "total": 23,
+      "passed": true
+    },
+    {
+      "suite": "performance",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.8-performance",
+      "total": 7,
+      "passed": true
+    },
+    {
+      "suite": "worker-latency",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.8-worker-latency",
+      "total": 1,
+      "passed": true
+    }
+  ],
+  "passed": true
+}

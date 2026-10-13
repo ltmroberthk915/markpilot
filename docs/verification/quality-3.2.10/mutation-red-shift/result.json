@@ -1,0 +1,955 @@
+{
+  "schema": 1,
+  "suite": "selection-workflows",
+  "startedAt": "2026-10-11T21:38:43.067Z",
+  "cases": [
+    {
+      "id": "shift-forward-glyph-keeps-selection-copy-delete-undo-redo",
+      "status": "fail",
+      "trace": [
+        {
+          "name": "shift-forward-00-ordinary-click",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 10,
+            "head": 10
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 239.6328125,
+            "right": 239.6328125,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-forward.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-forward-00-ordinary-click.png",
+            "sha256": "040ec046512336a471ea44f9293f768c2b36f405b350a845880c32312d5039fb",
+            "caret": {
+              "left": 239.6328125,
+              "right": 239.6328125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-forward-00-ordinary-click-caret-2x.png",
+              "sha256": "1b147822111cfec87739a2a93dfc64b123c02e36f904de329ab1b9a802a0c7ed",
+              "clip": {
+                "x": 119.6328125,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "shift-forward-01-before",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-forward.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-forward-01-before.png",
+            "sha256": "a590eaccec0fa3c622774f10d20f9f8ca7135c4ae80ad3302f37314dfc673542",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-forward-01-before-caret-2x.png",
+              "sha256": "a5ecacc19a0009139f4779766385e94a0bca7035da0842b8dd978581310bdd28",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "shift-forward-02-selected",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 10,
+            "head": 10
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 239.6328125,
+            "right": 239.6328125,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-forward.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "shift": true,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-forward-02-selected.png",
+            "sha256": "040ec046512336a471ea44f9293f768c2b36f405b350a845880c32312d5039fb",
+            "caret": {
+              "left": 239.6328125,
+              "right": 239.6328125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-forward-02-selected-caret-2x.png",
+              "sha256": "1b147822111cfec87739a2a93dfc64b123c02e36f904de329ab1b9a802a0c7ed",
+              "clip": {
+                "x": 119.6328125,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "error": "Shift glyph click preserves original anchor and exact source endpoint\n+ actual - expected\n\n  {\n+   anchor: 10,\n-   anchor: 0,\n    head: 10\n  }\n",
+      "ms": 2383
+    },
+    {
+      "id": "shift-reverse-glyph-keeps-selection-copy-delete-undo-redo",
+      "status": "fail",
+      "trace": [
+        {
+          "name": "shift-reverse-00-ordinary-click",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 10,
+            "head": 10
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 239.6328125,
+            "right": 239.6328125,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-reverse.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-reverse-00-ordinary-click.png",
+            "sha256": "040ec046512336a471ea44f9293f768c2b36f405b350a845880c32312d5039fb",
+            "caret": {
+              "left": 239.6328125,
+              "right": 239.6328125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-reverse-00-ordinary-click-caret-2x.png",
+              "sha256": "1b147822111cfec87739a2a93dfc64b123c02e36f904de329ab1b9a802a0c7ed",
+              "clip": {
+                "x": 119.6328125,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "shift-reverse-01-before",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 17,
+            "head": 17
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 291.640625,
+            "right": 291.640625,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-reverse.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-reverse-01-before.png",
+            "sha256": "a35819d2e09a7c4a898591c921b9fe576bd3f9fe5e285680cb1cbca545298abd",
+            "caret": {
+              "left": 291.640625,
+              "right": 291.640625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-reverse-01-before-caret-2x.png",
+              "sha256": "3e637b71ea33d543e3204e62508b588d26684419a13b1e9548ef8fce3a2a6c62",
+              "clip": {
+                "x": 171.640625,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "shift-reverse-02-selected",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 216.671875,
+            "right": 216.671875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-reverse.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "shift": true,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-reverse-02-selected.png",
+            "sha256": "91cfdd5284b369918c2cb6c467ce28546b53da7442fa57035a2190cd9dc2c097",
+            "caret": {
+              "left": 216.671875,
+              "right": 216.671875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-reverse-02-selected-caret-2x.png",
+              "sha256": "6f41be3d414b19753a66114d16e26cad1d198e267a511764174ab27ae7113cc1",
+              "clip": {
+                "x": 96.671875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "error": "Shift glyph click preserves original anchor and exact source endpoint\n+ actual - expected\n\n  {\n+   anchor: 7,\n-   anchor: 17,\n    head: 7\n  }\n",
+      "ms": 2719
+    },
+    {
+      "id": "shift-float-glyph-keeps-selection-copy-delete-undo-redo",
+      "status": "fail",
+      "trace": [
+        {
+          "name": "shift-float-00-ordinary-click",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 10,
+            "head": 10
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 239.6328125,
+            "right": 239.6328125,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-float.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-float-00-ordinary-click.png",
+            "sha256": "040ec046512336a471ea44f9293f768c2b36f405b350a845880c32312d5039fb",
+            "caret": {
+              "left": 239.6328125,
+              "right": 239.6328125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-float-00-ordinary-click-caret-2x.png",
+              "sha256": "1b147822111cfec87739a2a93dfc64b123c02e36f904de329ab1b9a802a0c7ed",
+              "clip": {
+                "x": 119.6328125,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "shift-float-01-before",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 216.671875,
+            "right": 216.671875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-float.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-float-01-before.png",
+            "sha256": "91cfdd5284b369918c2cb6c467ce28546b53da7442fa57035a2190cd9dc2c097",
+            "caret": {
+              "left": 216.671875,
+              "right": 216.671875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-float-01-before-caret-2x.png",
+              "sha256": "6f41be3d414b19753a66114d16e26cad1d198e267a511764174ab27ae7113cc1",
+              "clip": {
+                "x": 96.671875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "shift-float-02-selected",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 10,
+            "head": 10
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 239.6328125,
+            "right": 239.6328125,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-float.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "shift": true,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-float-02-selected.png",
+            "sha256": "040ec046512336a471ea44f9293f768c2b36f405b350a845880c32312d5039fb",
+            "caret": {
+              "left": 239.6328125,
+              "right": 239.6328125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-float-02-selected-caret-2x.png",
+              "sha256": "1b147822111cfec87739a2a93dfc64b123c02e36f904de329ab1b9a802a0c7ed",
+              "clip": {
+                "x": 119.6328125,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "error": "Shift glyph click preserves original anchor and exact source endpoint\n+ actual - expected\n\n  {\n+   anchor: 10,\n-   anchor: 7,\n    head: 10\n  }\n",
+      "ms": 2633
+    }
+  ],
+  "errors": [],
+  "artifact": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-shift\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-shift\\unpacked\\MarkPilot.exe",
+    "runtimeExecutableSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-shift\\unpacked\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.10",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-shift\\unpacked\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-shift\\unpacked\\resources\\app.asar",
+    "asarSha256": "0ecb836e09ab16110523f2e4987769c6eaf1de3dd1d44c9ed6599a9a707d8a35",
+    "bootMs": 942,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "f754f435fbf54b2018ee42d8536fd30608556afd72491bcdb271799ef65dff42",
+        "sourceSha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "clipboard": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T21:38:58.413Z",
+  "passed": false,
+  "frames": [
+    {
+      "file": "shift-forward-00-ordinary-click.png",
+      "sha256": "040ec046512336a471ea44f9293f768c2b36f405b350a845880c32312d5039fb",
+      "caret": {
+        "left": 239.6328125,
+        "right": 239.6328125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-forward-00-ordinary-click-caret-2x.png",
+        "sha256": "1b147822111cfec87739a2a93dfc64b123c02e36f904de329ab1b9a802a0c7ed",
+        "clip": {
+          "x": 119.6328125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-forward-01-before.png",
+      "sha256": "a590eaccec0fa3c622774f10d20f9f8ca7135c4ae80ad3302f37314dfc673542",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-forward-01-before-caret-2x.png",
+        "sha256": "a5ecacc19a0009139f4779766385e94a0bca7035da0842b8dd978581310bdd28",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-forward-02-selected.png",
+      "sha256": "040ec046512336a471ea44f9293f768c2b36f405b350a845880c32312d5039fb",
+      "caret": {
+        "left": 239.6328125,
+        "right": 239.6328125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-forward-02-selected-caret-2x.png",
+        "sha256": "1b147822111cfec87739a2a93dfc64b123c02e36f904de329ab1b9a802a0c7ed",
+        "clip": {
+          "x": 119.6328125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "shift-reverse-00-ordinary-click.png",
+      "sha256": "040ec046512336a471ea44f9293f768c2b36f405b350a845880c32312d5039fb",
+      "caret": {
+        "left": 239.6328125,
+        "right": 239.6328125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-reverse-00-ordinary-click-caret-2x.png",
+        "sha256": "1b147822111cfec87739a2a93dfc64b123c02e36f904de329ab1b9a802a0c7ed",
+        "clip": {
+          "x": 119.6328125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-reverse-01-before.png",
+      "sha256": "a35819d2e09a7c4a898591c921b9fe576bd3f9fe5e285680cb1cbca545298abd",
+      "caret": {
+        "left": 291.640625,
+        "right": 291.640625,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-reverse-01-before-caret-2x.png",
+        "sha256": "3e637b71ea33d543e3204e62508b588d26684419a13b1e9548ef8fce3a2a6c62",
+        "clip": {
+          "x": 171.640625,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-reverse-02-selected.png",
+      "sha256": "91cfdd5284b369918c2cb6c467ce28546b53da7442fa57035a2190cd9dc2c097",
+      "caret": {
+        "left": 216.671875,
+        "right": 216.671875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-reverse-02-selected-caret-2x.png",
+        "sha256": "6f41be3d414b19753a66114d16e26cad1d198e267a511764174ab27ae7113cc1",
+        "clip": {
+          "x": 96.671875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-float-00-ordinary-click.png",
+      "sha256": "040ec046512336a471ea44f9293f768c2b36f405b350a845880c32312d5039fb",
+      "caret": {
+        "left": 239.6328125,
+        "right": 239.6328125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-float-00-ordinary-click-caret-2x.png",
+        "sha256": "1b147822111cfec87739a2a93dfc64b123c02e36f904de329ab1b9a802a0c7ed",
+        "clip": {
+          "x": 119.6328125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-float-01-before.png",
+      "sha256": "91cfdd5284b369918c2cb6c467ce28546b53da7442fa57035a2190cd9dc2c097",
+      "caret": {
+        "left": 216.671875,
+        "right": 216.671875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-float-01-before-caret-2x.png",
+        "sha256": "6f41be3d414b19753a66114d16e26cad1d198e267a511764174ab27ae7113cc1",
+        "clip": {
+          "x": 96.671875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-float-02-selected.png",
+      "sha256": "040ec046512336a471ea44f9293f768c2b36f405b350a845880c32312d5039fb",
+      "caret": {
+        "left": 239.6328125,
+        "right": 239.6328125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-float-02-selected-caret-2x.png",
+        "sha256": "1b147822111cfec87739a2a93dfc64b123c02e36f904de329ab1b9a802a0c7ed",
+        "clip": {
+          "x": 119.6328125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "at": "2026-10-11T18:35:17.275Z",
+  "scope": "exact disk host and main handlers; real DocumentStore.load/reset; controlled IO/IPC/DOM; no source rewrites or GUI",
+  "hashes": {
+    "main.js": "178bb51a146b37ac15d6c913ddcaf50c9b80386751e8f51cdf0ba1c9e578bef8",
+    "renderer/host.js": "81301eef4e4f09a3d499c50d2fe21f21604fc996c41173024ba7469ee191182d",
+    "shell/document-store.js": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+    "shell/text-codec.js": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+  },
+  "artifactMatches": true,
+  "passed": true,
+  "total": 12,
+  "results": [
+    {
+      "name": "blank startup reads its real identity with zero reset or doc:path",
+      "passed": true
+    },
+    {
+      "name": "ready first keeps a pending real load alive, then applies loaded id/text",
+      "passed": true
+    },
+    {
+      "name": "loaded first ignores an already captured late blank ready reply",
+      "passed": true
+    },
+    {
+      "name": "pre-engine doc remains pending until init creates engine once",
+      "passed": true
+    },
+    {
+      "name": "latest pre-engine authoritative push wins over previous pending push",
+      "passed": true
+    },
+    {
+      "name": "theme initialization has no second currentDoc pull or stale pending overwrite",
+      "passed": true
+    },
+    {
+      "name": "explicit new cancels old load while late blank ready cannot overwrite new id",
+      "passed": true
+    },
+    {
+      "name": "stale discard confirmation cannot reset a subsequently pushed document",
+      "passed": true
+    },
+    {
+      "name": "main null reset rejects missing/old id even with explicit=true",
+      "passed": true
+    },
+    {
+      "name": "delayed successful new reply cannot apply its blank content over newer B",
+      "passed": true
+    },
+    {
+      "name": "clean file ready still pushes and returns complete owner metadata",
+      "passed": true
+    },
+    {
+      "name": "A-to-B loadRequest protection still cancels A and allows B",
+      "passed": true
+    }
+  ]
+}

@@ -1,0 +1,152 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T18:35:18.133Z",
+  "baselineEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+  "mutations": [
+    {
+      "kind": "scan",
+      "id": "ordinary-character-delete-creates-image",
+      "mutantEngine": "8481f5aa72903bae22b449cfdbccec2062a065370a0424154eac12e43f25bda8",
+      "restoredEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "negativeError": "Timed out waiting for immediate screenshot decode",
+      "positive": true,
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "cleanup": true
+    },
+    {
+      "kind": "boundary",
+      "id": "image-end-boundary",
+      "mutantEngine": "9abf4882687bfc90b7f36e0377ef2f2cbbe09be85752cc73d0ff2193a1053257",
+      "restoredEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "negativeError": "Timed out waiting for immediate screenshot decode",
+      "positive": true,
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "cleanup": true
+    },
+    {
+      "kind": "widget-anchor",
+      "id": "image-menu-uses-second-image-identity",
+      "mutantEngine": "b4920110381b3d40e29239ddb69a6740fe928c1718e0383b695e189c422e8305",
+      "restoredEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "negativeError": "only second image is rewritten",
+      "positive": true,
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "cleanup": true
+    },
+    {
+      "kind": "range",
+      "id": "image-attrs-quoted-greater",
+      "mutantEngine": "844b555c4bc07384d0c8a4c20637e1d648f5fd19c0e4e8ffc5f1e964ae1f1892",
+      "restoredEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "negativeError": "image range rewrite leaves no stray attributes or URL suffix\n+ actual - expected\n\n+ 'b\" height=\"80\" title=\"caption\">\\n\\n正文'\n- '正文'\n",
+      "positive": true,
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "cleanup": true
+    },
+    {
+      "kind": "identity",
+      "id": "equal-length-middle-url-change-shows-new-pixels",
+      "mutantEngine": "d089b0577d207c33a16965e35e6b75aa0d1218b884925fbe478372c07af41bd8",
+      "restoredEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "negativeError": "Timed out waiting for new image source",
+      "positive": true,
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "cleanup": true
+    },
+    {
+      "kind": "scale",
+      "id": "size-presets-are-distinct-stable-and-reversible",
+      "mutantEngine": "6cf3a5ff0462687b8330051631fe5f950781ebbf3dff2dd489d9f8485dbd5979",
+      "restoredEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "negativeError": "repeat preset is idempotent",
+      "positive": true,
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "cleanup": true
+    },
+    {
+      "kind": "reset",
+      "id": "same-text-reload-cancels-pending-image",
+      "mutantEngine": "a0e08fb5b2fb529a7657b2d7a2d1903f7c1657168c7e6a39c29d290a6907f472",
+      "restoredEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "negativeError": "Expected values to be strictly equal:\n+ actual - expected\n\n+ 'same document\\n![](assets/pasted-image.png)'\n- 'same document\\n'\n                  ^\n",
+      "positive": true,
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "cleanup": true
+    },
+    {
+      "kind": "order",
+      "id": "two-pastes-keep-request-order",
+      "mutantEngine": "bd28a67583607ea80e1e38558b660ddabb40529bd90e90eb3a6d9deb23dfee1f",
+      "restoredEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "negativeError": "Expected values to be strictly deep-equal:\n+ actual - expected\n\n  [\n    [\n+     248,\n+     220,\n+     215,\n+     255\n+   ],\n+   [\n      228,\n      243,\n      253,\n      255\n    ],\n-   [\n-     248,\n-     220,\n-     215,\n-     255\n-   ]\n  ]\n",
+      "positive": true,
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "cleanup": true
+    },
+    {
+      "kind": "assets",
+      "id": "concurrent-equal-size-images-never-overwrite-assets",
+      "mutantEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "restoredEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "negativeError": "Expected \"actual\" to be strictly unequal to:\n\n'assets/same%20%23%25%28%29.png'",
+      "positive": true,
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "cleanup": true
+    },
+    {
+      "kind": "source",
+      "id": "relative-file-data-copy-and-save-use-real-bytes",
+      "mutantEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "restoredEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "negativeError": "The expression evaluated to a falsy value:\n\n  assert(copied.ok)\n",
+      "positive": true,
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "cleanup": true
+    },
+    {
+      "kind": "format",
+      "id": "jpeg-webp-copy-save-preserve-format-bytes",
+      "mutantEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "restoredEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "negativeError": "The expression evaluated to a falsy value:\n\n  assert(copied.ok)\n",
+      "positive": true,
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "cleanup": true
+    },
+    {
+      "kind": "exclusive",
+      "id": "asset-created-during-save-is-never-overwritten",
+      "mutantEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "restoredEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "negativeError": "Late external asset is never overwritten",
+      "positive": true,
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "cleanup": true
+    },
+    {
+      "kind": "predecode",
+      "id": "long-document-paste-is-visible-without-extra-input",
+      "mutantEngine": "bd8471f647b4d3c876027a803e78af43001ea5d62991399d5cdebf4f0402b3a1",
+      "restoredEngine": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+      "negativeError": "Timed out waiting for entire screenshot visible without any post-paste input",
+      "positive": true,
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "cleanup": true
+    }
+  ],
+  "passed": true,
+  "finishedAt": "2026-10-11T18:41:32.580Z"
+}

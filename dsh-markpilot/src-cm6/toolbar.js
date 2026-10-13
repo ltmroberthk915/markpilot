@@ -130,15 +130,21 @@ function wrapDelimLen(doc, from, to, open, close) {
 
 /** 包围选区的那个**内容跨度**（含内容、不含可能多出的外层斜体星）；没有则 null。 */
 function enclosingSpan(doc, from, to, open, close) {
-  const n = wrapDelimLen(doc, from, to, open, close);
-  if (!n) return null;
-  const outer = n > open.length;                            // 多出的那一层（`***a***` ⇒ 里层是 `**a**`）
+  const openLen = wrapDelimLen(doc, from, to, open, close);
+  if (!openLen) return null;
+  const closeLen = open === close ? openLen : close.length;
+  const outer = openLen > open.length;                            // 多出的那一层（`***a***` ⇒ 里层是 `**a**`）
   const f = from - outer, t = to + outer;
-  return { from: f - n, to: t + n, innerFrom: f, innerTo: t, delim: n, esc: escapedAt(doc, f - n) };
+  return { from: f - openLen, to: t + closeLen, innerFrom: f, innerTo: t, openLen, esc: escapedAt(doc, f - openLen) };
 }
 
 /** 在选区两侧加上/去掉定界符。返回 true＝已处理（调用方不要再走别的分支）。 */
 export function wrap(view, open, close = open) {
+  const command = window.mpEngine?.commands;
+  return command ? command.run(() => wrapSource(view, open, close)) : wrapSource(view, open, close);
+}
+function wrapSource(view, open, close) {
+  if (view.state.selection.ranges.length !== 1) return false;
   const r = view.state.selection.main;
   const doc = view.state.doc;
   const sel = doc.sliceString(r.from, r.to);
@@ -146,7 +152,7 @@ export function wrap(view, open, close = open) {
   if (span && !span.esc) {
     /* 取消包裹：只删两侧定界符，中间的文本一个字节都不动。 */
     view.dispatch({
-      changes: [{ from: span.from, to: span.from + span.delim, insert: '' }, { from: span.innerTo, to: span.to, insert: '' }],
+      changes: [{ from: span.from, to: span.from + span.openLen, insert: '' }, { from: span.innerTo, to: span.to, insert: '' }],
       /* 取消后光标落在内容起点 —— Typora 手感：再按一次可以重新加上 */
       selection: { anchor: span.from },
       userEvent: 'input.format', scrollIntoView: true,
@@ -278,8 +284,8 @@ const ACTIONS = {
   table: (v) => insertBlock(v, "| 列一 | 列二 |\n| --- | --- |\n| 内容 | 内容 |\n"),
   "insert-before": (v) => insertBlankLine(v, true),
   "insert-after": (v) => insertBlankLine(v, false),
-  undo: (v) => { undo(v); v.focus(); },
-  redo: (v) => { redo(v); v.focus(); },
+  undo: (v) => window.mpEngine?.history ? window.mpEngine.history('undo') : undo(v),
+  redo: (v) => window.mpEngine?.history ? window.mpEngine.history('redo') : redo(v),
   /* 【P1-3·2026-10-10 由"人类常用操作普查"查出】原来是 `openSearchPanel(v); v.focus()`：
      面板 mount 时把焦点交给查找框，紧接着这一句 `v.focus()` 又抢回正文 ⇒ 实测点工具栏
      「查找替换 Ctrl+F」后 `focusIsSearchField=false`，用户接着敲的字符**落进了文档**
@@ -402,7 +408,10 @@ function setThemeIcon(btn) {
 /* 【正文右键菜单复用·2026-10-10】把编辑动作表导出去：菜单与工具栏必须是**同一批实现**，
    否则就会出现"工具栏点了有用、菜单点了没反应"（实测根因：菜单走的是 toolbarClick，
    而那张 switch 里只有面板类命令，格式命令全落 default 返回 false）。 */
-export const TOOLBAR_ACTIONS = ACTIONS;
+export const TOOLBAR_ACTIONS = Object.fromEntries(Object.entries(ACTIONS).map(([id, action]) => [id, v => {
+  const commands = window.mpEngine?.commands;
+  return commands ? commands.run(() => action(v), { focus: id === 'find-replace' ? 'control' : 'owner' }) : action(v);
+}]));
 
 export function installToolbar(view) {
   const bar = document.createElement("div");
@@ -422,7 +431,7 @@ export function installToolbar(view) {
       btn.title = item.tip;
       const runItem = () => {
         if (window.mpExtras && window.mpExtras.toolbarClick(item.id, btn)) return;
-        ACTIONS[item.id](view);
+        TOOLBAR_ACTIONS[item.id]?.(view);
       };
       btn.addEventListener("mousedown", (e) => {
         e.preventDefault(); e.stopPropagation();

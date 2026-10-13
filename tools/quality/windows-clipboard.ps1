@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$ImagePath)
+param([string]$ImagePath)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -14,9 +14,11 @@ if ($null -ne $clipOriginal) {
     }
 }
 try {
-    $clipBitmap = [System.Drawing.Image]::FromFile((Resolve-Path -LiteralPath $ImagePath).Path)
-    try { [System.Windows.Forms.Clipboard]::SetImage($clipBitmap) }
-    finally { $clipBitmap.Dispose() }
+    if ($ImagePath) {
+        $clipBitmap = [System.Drawing.Image]::FromFile((Resolve-Path -LiteralPath $ImagePath).Path)
+        try { [System.Windows.Forms.Clipboard]::SetImage($clipBitmap) }
+        finally { $clipBitmap.Dispose() }
+    }
     [Console]::WriteLine((@{ready=$true; formats=@([System.Windows.Forms.Clipboard]::GetDataObject().GetFormats())} | ConvertTo-Json -Compress))
     # EOF also restores the clipboard if the test process exits unexpectedly.
     [void][Console]::ReadLine()

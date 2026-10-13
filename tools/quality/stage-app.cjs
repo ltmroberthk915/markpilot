@@ -18,6 +18,6 @@ if(!opts.runtime||!opts.out)throw new Error('--runtime and --out are required');
  await asar.createPackage(app,path.join(bin,'resources/app.asar'));
  const hash=f=>crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
  const artifact={schema:1,executable:path.join(bin,'MarkPilot.exe'),exeSha256:hash(path.join(bin,'MarkPilot.exe')),asarSha256:hash(path.join(bin,'resources/app.asar')),version:JSON.parse(fs.readFileSync(path.join(source,'package.json'),'utf8')).version,
-  files:['main.js','preload.js','renderer/host.js','shell/document-store.js','shell/text-codec.js','renderer/cm6/app.js'].map(file=>({file,sha256:hash(path.join(source,file))}))};
+  files:require('./artifact-files.cjs').map(file=>({file,sha256:fs.existsSync(path.join(source,file))?hash(path.join(source,file)):null}))};
  fs.writeFileSync(path.join(out,'artifact.json'),JSON.stringify(artifact,null,2));console.log(JSON.stringify(artifact));
 })().catch(e=>{console.error(e.stack);process.exitCode=1;});

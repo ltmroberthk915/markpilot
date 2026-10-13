@@ -33,25 +33,37 @@ async function reset(page, text, anchor = 0, head = anchor) {
   const state=await snapshot(page);
   assert.equal(state.text,text,'fixture text'); assert.deepEqual(state.selection,{anchor,head},'fixture selection'); assert(state.focus,'editor focus');
 }
-async function frame(page, dir, name) {
-  const caret=await page.evaluate(() => {
-    const v=window.mpEngine._view(), r=v.coordsAtPos(v.state.selection.main.head);
+async function frame(page, dir, name, options={}) {
+  const caret=await page.evaluate(options => {
+    const v=window.mpEngine._view();let r;
+    if(options.caret==='dom'){
+      const s=getSelection(),active=document.activeElement;
+      if(!document.hasFocus()||!active?.classList.contains('mp-cell-overlay-text')||!s?.focusNode||!active.contains(s.focusNode))return null;
+      let node=s.focusNode,offset=s.focusOffset;
+      // Replacing textContent can leave a valid collapsed focus at the element
+      // boundary; measure the equivalent adjacent text boundary, not its box.
+      if(node.nodeType===1){const forward=offset<node.childNodes.length;node=node.childNodes[forward?offset:offset-1];while(node&&node.nodeType!==3)node=forward?node.firstChild:node.lastChild;if(!node)return null;offset=forward?0:node.textContent.length;}
+      const range=document.createRange();range.setStart(node,offset);range.collapse(true);r=range.getBoundingClientRect().toJSON();
+    }else r=v.coordsAtPos(v.state.selection.main.head);
     if(!r || !(r.bottom>r.top)) return null;
     const d=document.createElement('div');d.id='quality-caret-marker';
     Object.assign(d.style,{position:'fixed',left:r.left+'px',top:r.top+'px',width:'2px',height:(r.bottom-r.top)+'px',background:'#ff3030',zIndex:'2147483646',pointerEvents:'none'});
     document.body.appendChild(d);return r;
-  });
-  assert(caret && Number.isFinite(caret.left) && caret.bottom>caret.top,'screenshot must include a measurable caret position');
+  },options);
+  assert(options.allowMissingCaret || (caret && Number.isFinite(caret.left) && caret.bottom>caret.top),'screenshot must include a measurable caret position');
   try {
     const bytes=await page.screenshot({path:path.join(dir,name+'.png'),animations:'disabled'});
     const viewport=page.viewportSize()||await page.evaluate(()=>({width:innerWidth,height:innerHeight}));
-    const clip={x:Math.max(0,Math.min(caret.left-120,viewport.width-300)),y:Math.max(0,Math.min(caret.top-25,viewport.height-90)),width:Math.min(300,viewport.width),height:Math.min(90,viewport.height),scale:2};
+    // Missing-caret failure evidence keeps the actual image unmarked. The source
+    // view supplies context only, never a substitute for the absent DOM caret.
+    const context=caret||options.contextBox||await page.evaluate(()=>window.mpEngine._view().coordsAtPos(window.mpEngine._view().state.selection.main.head))||{left:120,top:25};
+    const clip={x:Math.max(0,Math.min(context.left-120,viewport.width-300)),y:Math.max(0,Math.min(context.top-25,viewport.height-90)),width:Math.min(300,viewport.width),height:Math.min(90,viewport.height),scale:2};
     const cdp=await page.context().newCDPSession(page);
     let zoomBytes;
     try {const shot=await cdp.send('Page.captureScreenshot',{format:'png',clip,captureBeyondViewport:false});zoomBytes=Buffer.from(shot.data,'base64');}
     finally {await cdp.detach();}
     fs.writeFileSync(path.join(dir,name+'-caret-2x.png'),zoomBytes);
-    return {file:name+'.png',sha256:crypto.createHash('sha256').update(bytes).digest('hex'),caret,zoom:{file:name+'-caret-2x.png',sha256:crypto.createHash('sha256').update(zoomBytes).digest('hex'),clip}};
+    return {file:name+'.png',sha256:crypto.createHash('sha256').update(bytes).digest('hex'),caret,zoom:{file:name+'-caret-2x.png',sha256:crypto.createHash('sha256').update(zoomBytes).digest('hex'),clip,...(!caret&&options.contextBox?{contextKind:'focused-ui-control'}:{})}};
   } finally { await page.evaluate(()=>document.getElementById('quality-caret-marker')?.remove()).catch(()=>{}); }
 }
 async function newWindow(run, owner, file) {

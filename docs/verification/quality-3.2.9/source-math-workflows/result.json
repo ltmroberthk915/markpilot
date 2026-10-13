@@ -1,0 +1,3831 @@
+{
+  "suite": "math-workflows",
+  "schema": 1,
+  "startedAt": "2026-10-11T20:11:01.464Z",
+  "seed": 32901,
+  "cases": [
+    {
+      "id": "quoted-block-glyph-click-edit-undo-redo",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before-click",
+          "target": {
+            "x": 595.8859375,
+            "y": 113.734375,
+            "text": "y",
+            "start": "2",
+            "end": "3"
+          },
+          "text": "Start\n\n> $$\n> x+y\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "quoted-block.md · 28 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "quoted-block-01-rendered.png",
+            "sha256": "730f243db60beca917f590838b7e628368060cbd353b982826adae95630f0acc",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "quoted-block-01-rendered-caret-2x.png",
+              "sha256": "f088b817e7c29f54c21f28d2e02c3d4ea13f30c6ab1a30db225f24ea0a799981",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clicked-y",
+          "text": "Start\n\n> $$\n> x+y\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 17,
+            "head": 17
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 598.3671875,
+            "right": 598.3671875,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "quoted-block.md · 28 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "quoted-block-02-clicked.png",
+            "sha256": "47f2673d31854ec4d1a3914d1429ee7fbd83ae23523410bbb5f044b816064f89",
+            "caret": {
+              "left": 598.3671875,
+              "right": 598.3671875,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "quoted-block-02-clicked-caret-2x.png",
+              "sha256": "f15910a42b04b4d9069a9450a0ee382b91d5a53d91b2e5acbae4e3c145a572d8",
+              "clip": {
+                "x": 478.3671875,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "edited",
+          "text": "Start\n\n> $$\n> x+yz\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 18,
+            "head": 18
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 601.1640625,
+            "right": 601.1640625,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "● quoted-block.md · 29 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "quoted-block-03-edited.png",
+            "sha256": "df429a4370265228e628d9fb91d83c35e70aa0e05213072ff3f0dd035633ce0d",
+            "caret": {
+              "left": 601.1640625,
+              "right": 601.1640625,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "quoted-block-03-edited-caret-2x.png",
+              "sha256": "1732e33d30a45fda182f6a5312ee0b2174a1fc7c8a19853ee3971fc2c4fc4268",
+              "clip": {
+                "x": 481.1640625,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Start\n\n> $$\n> x+y\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 17,
+            "head": 17
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 598.3671875,
+            "right": 598.3671875,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "● quoted-block.md · 28 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "quoted-block-04-undo.png",
+            "sha256": "47f2673d31854ec4d1a3914d1429ee7fbd83ae23523410bbb5f044b816064f89",
+            "caret": {
+              "left": 598.3671875,
+              "right": 598.3671875,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "quoted-block-04-undo-caret-2x.png",
+              "sha256": "f15910a42b04b4d9069a9450a0ee382b91d5a53d91b2e5acbae4e3c145a572d8",
+              "clip": {
+                "x": 478.3671875,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Start\n\n> $$\n> x+yz\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 18,
+            "head": 18
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 601.1640625,
+            "right": 601.1640625,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "● quoted-block.md · 29 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "quoted-block-05-redo.png",
+            "sha256": "df429a4370265228e628d9fb91d83c35e70aa0e05213072ff3f0dd035633ce0d",
+            "caret": {
+              "left": 601.1640625,
+              "right": 601.1640625,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "quoted-block-05-redo-caret-2x.png",
+              "sha256": "1732e33d30a45fda182f6a5312ee0b2174a1fc7c8a19853ee3971fc2c4fc4268",
+              "clip": {
+                "x": 481.1640625,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "float-click-y",
+          "text": "Start\n\n> $$\n> x+yz\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 17,
+            "head": 17
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 595.5703125,
+            "right": 595.5703125,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "quoted-block.md · 29 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "quoted-block-06-float-click.png",
+            "sha256": "f7acedc966f3d8dd2fe2798dfe524f0e24d077f6e709c92979e414637247d76b",
+            "caret": {
+              "left": 595.5703125,
+              "right": 595.5703125,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "quoted-block-06-float-click-caret-2x.png",
+              "sha256": "0ddf0b728f2fef907299d7005528c96516dcc5c9bc7bfc7ded43b9afa83daa19",
+              "clip": {
+                "x": 475.5703125,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "expectedCaret": 17,
+        "actualCaret": 17,
+        "atomicUndoRedo": true
+      },
+      "ms": 3612
+    },
+    {
+      "id": "nested-quoted-block-glyph-click-edit-undo-redo",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before-click",
+          "target": {
+            "x": 595.8859375,
+            "y": 113.734375,
+            "text": "y",
+            "start": "2",
+            "end": "3"
+          },
+          "text": "Start\n\n> > $$\n> > x+y\n> > $$\n\nEnd\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "nested-quoted-block.md · 34 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "nested-quoted-block-01-rendered.png",
+            "sha256": "33d06f93b6a7cab1fa40cf54d389d353feb0823b8adff6b57ac0ab368ae123cd",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "nested-quoted-block-01-rendered-caret-2x.png",
+              "sha256": "f088b817e7c29f54c21f28d2e02c3d4ea13f30c6ab1a30db225f24ea0a799981",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clicked-y",
+          "text": "Start\n\n> > $$\n> > x+y\n> > $$\n\nEnd\n",
+          "selection": {
+            "anchor": 21,
+            "head": 21
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 604.6640625,
+            "right": 604.6640625,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "nested-quoted-block.md · 34 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "nested-quoted-block-02-clicked.png",
+            "sha256": "79811cd2ab451461de6b36b7c92a58c06f8bbc2c839ebe313f7f66eda6b69816",
+            "caret": {
+              "left": 604.6640625,
+              "right": 604.6640625,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "nested-quoted-block-02-clicked-caret-2x.png",
+              "sha256": "290b05ed6c9e399cd5a3857675e59c4dd4f990cfc745169d33261d8b57e5e697",
+              "clip": {
+                "x": 484.6640625,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "edited",
+          "text": "Start\n\n> > $$\n> > x+yz\n> > $$\n\nEnd\n",
+          "selection": {
+            "anchor": 22,
+            "head": 22
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 607.4609375,
+            "right": 607.4609375,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "● nested-quoted-block.md · 35 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "nested-quoted-block-03-edited.png",
+            "sha256": "9469c024439a42146fcd024fbe001a57e44003d68ae1b09c31c5ec76cc792765",
+            "caret": {
+              "left": 607.4609375,
+              "right": 607.4609375,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "nested-quoted-block-03-edited-caret-2x.png",
+              "sha256": "bfacd05140b5260d9f392b1a36d0e5dc494cd3bf87900b1fca0fa5e6c37eea9d",
+              "clip": {
+                "x": 487.4609375,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Start\n\n> > $$\n> > x+y\n> > $$\n\nEnd\n",
+          "selection": {
+            "anchor": 21,
+            "head": 21
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 604.6640625,
+            "right": 604.6640625,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "● nested-quoted-block.md · 34 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "nested-quoted-block-04-undo.png",
+            "sha256": "79811cd2ab451461de6b36b7c92a58c06f8bbc2c839ebe313f7f66eda6b69816",
+            "caret": {
+              "left": 604.6640625,
+              "right": 604.6640625,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "nested-quoted-block-04-undo-caret-2x.png",
+              "sha256": "290b05ed6c9e399cd5a3857675e59c4dd4f990cfc745169d33261d8b57e5e697",
+              "clip": {
+                "x": 484.6640625,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Start\n\n> > $$\n> > x+yz\n> > $$\n\nEnd\n",
+          "selection": {
+            "anchor": 22,
+            "head": 22
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 607.4609375,
+            "right": 607.4609375,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "● nested-quoted-block.md · 35 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "nested-quoted-block-05-redo.png",
+            "sha256": "9469c024439a42146fcd024fbe001a57e44003d68ae1b09c31c5ec76cc792765",
+            "caret": {
+              "left": 607.4609375,
+              "right": 607.4609375,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "nested-quoted-block-05-redo-caret-2x.png",
+              "sha256": "bfacd05140b5260d9f392b1a36d0e5dc494cd3bf87900b1fca0fa5e6c37eea9d",
+              "clip": {
+                "x": 487.4609375,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "float-click-y",
+          "text": "Start\n\n> > $$\n> > x+yz\n> > $$\n\nEnd\n",
+          "selection": {
+            "anchor": 21,
+            "head": 21
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 601.8671875,
+            "right": 601.8671875,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "nested-quoted-block.md · 35 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "nested-quoted-block-06-float-click.png",
+            "sha256": "3231067d205b0aff46abb7a9812ef814da5379742a346e58b1ab0e50e064c13c",
+            "caret": {
+              "left": 601.8671875,
+              "right": 601.8671875,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "nested-quoted-block-06-float-click-caret-2x.png",
+              "sha256": "6c82f27e6eb513b475a0e0411f35e350f349cd2f3707567ac0d80931885d213f",
+              "clip": {
+                "x": 481.8671875,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "expectedCaret": 21,
+        "actualCaret": 21,
+        "atomicUndoRedo": true
+      },
+      "ms": 3551
+    },
+    {
+      "id": "multiline-quoted-block-glyph-click-edit-undo-redo",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before-click",
+          "target": {
+            "x": 595.8859375,
+            "y": 113.734375,
+            "text": "y",
+            "start": "3",
+            "end": "4"
+          },
+          "text": "Start\n\n> $$\n> x+\n> y\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "multiline-quoted-block.md · 31 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "multiline-quoted-block-01-rendered.png",
+            "sha256": "e2787f323b0c4cc1a67943d7dcbdee55ef0e52ff3460b71725795aa349e24e90",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "multiline-quoted-block-01-rendered-caret-2x.png",
+              "sha256": "f088b817e7c29f54c21f28d2e02c3d4ea13f30c6ab1a30db225f24ea0a799981",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clicked-y",
+          "text": "Start\n\n> $$\n> x+\n> y\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 20,
+            "head": 20
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 591.1328125,
+            "right": 591.1328125,
+            "top": 149.75,
+            "bottom": 164.25
+          },
+          "scrollTop": 0,
+          "title": "multiline-quoted-block.md · 31 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "multiline-quoted-block-02-clicked.png",
+            "sha256": "9d25e16520ea6422c70036d83c3f0b797a74e53bd24fe58ebb3050bc9c6796a0",
+            "caret": {
+              "left": 591.1328125,
+              "right": 591.1328125,
+              "top": 149.75,
+              "bottom": 164.25
+            },
+            "zoom": {
+              "file": "multiline-quoted-block-02-clicked-caret-2x.png",
+              "sha256": "b956dd15a57689c6315388eefabd4609bdaa2ad606a52db32442b80acef9b527",
+              "clip": {
+                "x": 471.1328125,
+                "y": 124.75,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "edited",
+          "text": "Start\n\n> $$\n> x+\n> yz\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 21,
+            "head": 21
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 593.9296875,
+            "right": 593.9296875,
+            "top": 149.75,
+            "bottom": 164.25
+          },
+          "scrollTop": 0,
+          "title": "● multiline-quoted-block.md · 32 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "multiline-quoted-block-03-edited.png",
+            "sha256": "73b4c2d487cd716cf08664314b7b3b4d594e89ca7edd8317c5d2c4d1b7e52327",
+            "caret": {
+              "left": 593.9296875,
+              "right": 593.9296875,
+              "top": 149.75,
+              "bottom": 164.25
+            },
+            "zoom": {
+              "file": "multiline-quoted-block-03-edited-caret-2x.png",
+              "sha256": "66f119f796f467249891ccd1246d6d144dc3fa643d1821fab9aeef382e1f0a77",
+              "clip": {
+                "x": 473.9296875,
+                "y": 124.75,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Start\n\n> $$\n> x+\n> y\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 20,
+            "head": 20
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 591.1328125,
+            "right": 591.1328125,
+            "top": 149.75,
+            "bottom": 164.25
+          },
+          "scrollTop": 0,
+          "title": "● multiline-quoted-block.md · 31 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "multiline-quoted-block-04-undo.png",
+            "sha256": "9d25e16520ea6422c70036d83c3f0b797a74e53bd24fe58ebb3050bc9c6796a0",
+            "caret": {
+              "left": 591.1328125,
+              "right": 591.1328125,
+              "top": 149.75,
+              "bottom": 164.25
+            },
+            "zoom": {
+              "file": "multiline-quoted-block-04-undo-caret-2x.png",
+              "sha256": "b956dd15a57689c6315388eefabd4609bdaa2ad606a52db32442b80acef9b527",
+              "clip": {
+                "x": 471.1328125,
+                "y": 124.75,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Start\n\n> $$\n> x+\n> yz\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 21,
+            "head": 21
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 593.9296875,
+            "right": 593.9296875,
+            "top": 149.75,
+            "bottom": 164.25
+          },
+          "scrollTop": 0,
+          "title": "● multiline-quoted-block.md · 32 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "multiline-quoted-block-05-redo.png",
+            "sha256": "73b4c2d487cd716cf08664314b7b3b4d594e89ca7edd8317c5d2c4d1b7e52327",
+            "caret": {
+              "left": 593.9296875,
+              "right": 593.9296875,
+              "top": 149.75,
+              "bottom": 164.25
+            },
+            "zoom": {
+              "file": "multiline-quoted-block-05-redo-caret-2x.png",
+              "sha256": "66f119f796f467249891ccd1246d6d144dc3fa643d1821fab9aeef382e1f0a77",
+              "clip": {
+                "x": 473.9296875,
+                "y": 124.75,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "float-click-y",
+          "text": "Start\n\n> $$\n> x+\n> yz\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 20,
+            "head": 20
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 588.3359375,
+            "right": 588.3359375,
+            "top": 149.75,
+            "bottom": 164.25
+          },
+          "scrollTop": 0,
+          "title": "multiline-quoted-block.md · 32 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "multiline-quoted-block-06-float-click.png",
+            "sha256": "b9ff78c401fac6aa5bc6032f111f04985f3105faefd5472857f2d28142495281",
+            "caret": {
+              "left": 588.3359375,
+              "right": 588.3359375,
+              "top": 149.75,
+              "bottom": 164.25
+            },
+            "zoom": {
+              "file": "multiline-quoted-block-06-float-click-caret-2x.png",
+              "sha256": "653ace3c4a031e793effaf956b6647e595e84ec732733bc7d5c1b48843ea2022",
+              "clip": {
+                "x": 468.3359375,
+                "y": 124.75,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "expectedCaret": 20,
+        "actualCaret": 20,
+        "atomicUndoRedo": true
+      },
+      "ms": 3593
+    },
+    {
+      "id": "quoted-whitespace-block-glyph-click-edit-undo-redo",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before-click",
+          "target": {
+            "x": 595.8859375,
+            "y": 113.734375,
+            "text": "y",
+            "start": "2",
+            "end": "3"
+          },
+          "text": "Start\n\n> $$\n>   x+y   \n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "quoted-whitespace-block.md · 33 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "quoted-whitespace-block-01-rendered.png",
+            "sha256": "0bce1ebdd4e87a1b51d49ad8e180e5524ad8112a300546d413e20d554fe9b50c",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "quoted-whitespace-block-01-rendered-caret-2x.png",
+              "sha256": "f088b817e7c29f54c21f28d2e02c3d4ea13f30c6ab1a30db225f24ea0a799981",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clicked-y",
+          "text": "Start\n\n> $$\n>   x+y   \n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 19,
+            "head": 19
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 596.8515625,
+            "right": 596.8515625,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "quoted-whitespace-block.md · 33 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "quoted-whitespace-block-02-clicked.png",
+            "sha256": "42527e7bffc2994969f2da7613fac251dd8d92d9506a1054e38bd60c4f7433b8",
+            "caret": {
+              "left": 596.8515625,
+              "right": 596.8515625,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "quoted-whitespace-block-02-clicked-caret-2x.png",
+              "sha256": "95b806242a8753fb2c9add37b47c4fd12cc32816e3c7b6b90989ca1ab869ddf2",
+              "clip": {
+                "x": 476.8515625,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "edited",
+          "text": "Start\n\n> $$\n>   x+yz   \n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 20,
+            "head": 20
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 599.6484375,
+            "right": 599.6484375,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "● quoted-whitespace-block.md · 34 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "quoted-whitespace-block-03-edited.png",
+            "sha256": "18a59171364a17b914031d191a5bd69c57e1e5026d8044e9d14a3a017bd04125",
+            "caret": {
+              "left": 599.6484375,
+              "right": 599.6484375,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "quoted-whitespace-block-03-edited-caret-2x.png",
+              "sha256": "f515723d66d5b61c6357a1b6fb9f5be579609c77eebdacf22d12b53c03fd8b0c",
+              "clip": {
+                "x": 479.6484375,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Start\n\n> $$\n>   x+y   \n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 19,
+            "head": 19
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 596.8515625,
+            "right": 596.8515625,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "● quoted-whitespace-block.md · 33 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "quoted-whitespace-block-04-undo.png",
+            "sha256": "42527e7bffc2994969f2da7613fac251dd8d92d9506a1054e38bd60c4f7433b8",
+            "caret": {
+              "left": 596.8515625,
+              "right": 596.8515625,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "quoted-whitespace-block-04-undo-caret-2x.png",
+              "sha256": "95b806242a8753fb2c9add37b47c4fd12cc32816e3c7b6b90989ca1ab869ddf2",
+              "clip": {
+                "x": 476.8515625,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Start\n\n> $$\n>   x+yz   \n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 20,
+            "head": 20
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 599.6484375,
+            "right": 599.6484375,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "● quoted-whitespace-block.md · 34 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "quoted-whitespace-block-05-redo.png",
+            "sha256": "18a59171364a17b914031d191a5bd69c57e1e5026d8044e9d14a3a017bd04125",
+            "caret": {
+              "left": 599.6484375,
+              "right": 599.6484375,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "quoted-whitespace-block-05-redo-caret-2x.png",
+              "sha256": "f515723d66d5b61c6357a1b6fb9f5be579609c77eebdacf22d12b53c03fd8b0c",
+              "clip": {
+                "x": 479.6484375,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "float-click-y",
+          "text": "Start\n\n> $$\n>   x+yz   \n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 19,
+            "head": 19
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 594.046875,
+            "right": 594.046875,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "quoted-whitespace-block.md · 34 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "quoted-whitespace-block-06-float-click.png",
+            "sha256": "683dd1c59e6c6ebb4672a478e8954313d537822e6d0dc286edb3c561153354f0",
+            "caret": {
+              "left": 594.046875,
+              "right": 594.046875,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "quoted-whitespace-block-06-float-click-caret-2x.png",
+              "sha256": "18e243575e2b0fb97f6a1b31b8a61f481d9f6aaf160b91b2693a58b3ad2c36ba",
+              "clip": {
+                "x": 474.046875,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "expectedCaret": 19,
+        "actualCaret": 19,
+        "atomicUndoRedo": true
+      },
+      "ms": 3416
+    },
+    {
+      "id": "single-dollar-quoted-block-glyph-click-edit-undo-redo",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before-click",
+          "target": {
+            "x": 595.8859375,
+            "y": 135.140625,
+            "text": "y",
+            "start": "18",
+            "end": "19"
+          },
+          "text": "Start\n\n> $\\begin{aligned}\n> x+y\n> \\end{aligned}$\n\nEnd\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "single-dollar-quoted-block.md · 54 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "single-dollar-quoted-block-01-rendered.png",
+            "sha256": "f38cdc7ae9ded77b9a70ce0143dafb8e20df90a5ceea7b52473b5bfa9d408691",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "single-dollar-quoted-block-01-rendered-caret-2x.png",
+              "sha256": "c9f1e7d49832e4548d57685c18b0dadcd5f3fae9e1aaad9434aff0b425777eb2",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clicked-y",
+          "text": "Start\n\n> $\\begin{aligned}\n> x+y\n> \\end{aligned}$\n\nEnd\n",
+          "selection": {
+            "anchor": 31,
+            "head": 31
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 598.3671875,
+            "right": 598.3671875,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "single-dollar-quoted-block.md · 54 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "single-dollar-quoted-block-02-clicked.png",
+            "sha256": "fb9319588c8ac6def06f80014cd69b89adb35f446bbaa2b2c59644f536489d1d",
+            "caret": {
+              "left": 598.3671875,
+              "right": 598.3671875,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "single-dollar-quoted-block-02-clicked-caret-2x.png",
+              "sha256": "38e1e0bc9859fcb3b5d4bd0a0d104390bfd87b4f7a8f5457fac46d9017a9b461",
+              "clip": {
+                "x": 478.3671875,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "edited",
+          "text": "Start\n\n> $\\begin{aligned}\n> x+yz\n> \\end{aligned}$\n\nEnd\n",
+          "selection": {
+            "anchor": 32,
+            "head": 32
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 601.1640625,
+            "right": 601.1640625,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "● single-dollar-quoted-block.md · 55 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "single-dollar-quoted-block-03-edited.png",
+            "sha256": "f4bfd06f4cc422ab89e60bd2442564436580af30314fbfdb2fbaafdc1f8b7241",
+            "caret": {
+              "left": 601.1640625,
+              "right": 601.1640625,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "single-dollar-quoted-block-03-edited-caret-2x.png",
+              "sha256": "28bf809351318499495e59894e671d6dc8ab662a19fe85064ca41ec607455a98",
+              "clip": {
+                "x": 481.1640625,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Start\n\n> $\\begin{aligned}\n> x+y\n> \\end{aligned}$\n\nEnd\n",
+          "selection": {
+            "anchor": 31,
+            "head": 31
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 598.3671875,
+            "right": 598.3671875,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "● single-dollar-quoted-block.md · 54 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "single-dollar-quoted-block-04-undo.png",
+            "sha256": "fb9319588c8ac6def06f80014cd69b89adb35f446bbaa2b2c59644f536489d1d",
+            "caret": {
+              "left": 598.3671875,
+              "right": 598.3671875,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "single-dollar-quoted-block-04-undo-caret-2x.png",
+              "sha256": "38e1e0bc9859fcb3b5d4bd0a0d104390bfd87b4f7a8f5457fac46d9017a9b461",
+              "clip": {
+                "x": 478.3671875,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Start\n\n> $\\begin{aligned}\n> x+yz\n> \\end{aligned}$\n\nEnd\n",
+          "selection": {
+            "anchor": 32,
+            "head": 32
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 601.1640625,
+            "right": 601.1640625,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "● single-dollar-quoted-block.md · 55 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "single-dollar-quoted-block-05-redo.png",
+            "sha256": "f4bfd06f4cc422ab89e60bd2442564436580af30314fbfdb2fbaafdc1f8b7241",
+            "caret": {
+              "left": 601.1640625,
+              "right": 601.1640625,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "single-dollar-quoted-block-05-redo-caret-2x.png",
+              "sha256": "28bf809351318499495e59894e671d6dc8ab662a19fe85064ca41ec607455a98",
+              "clip": {
+                "x": 481.1640625,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "float-click-y",
+          "text": "Start\n\n> $\\begin{aligned}\n> x+yz\n> \\end{aligned}$\n\nEnd\n",
+          "selection": {
+            "anchor": 31,
+            "head": 31
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 595.5703125,
+            "right": 595.5703125,
+            "top": 127.0703125,
+            "bottom": 141.5703125
+          },
+          "scrollTop": 0,
+          "title": "single-dollar-quoted-block.md · 55 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "single-dollar-quoted-block-06-float-click.png",
+            "sha256": "75ed06eeb84cd9f5c3061f09cedc9575fc23152b37f6caa1012d96f1e38c27ee",
+            "caret": {
+              "left": 595.5703125,
+              "right": 595.5703125,
+              "top": 127.0703125,
+              "bottom": 141.5703125
+            },
+            "zoom": {
+              "file": "single-dollar-quoted-block-06-float-click-caret-2x.png",
+              "sha256": "8c5f7f2a9371e484902630878e914144dd957b443efb5e5a40392133bf031ca4",
+              "clip": {
+                "x": 475.5703125,
+                "y": 102.0703125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "expectedCaret": 31,
+        "actualCaret": 31,
+        "atomicUndoRedo": true
+      },
+      "ms": 3492
+    },
+    {
+      "id": "ordinary-block-glyph-click-edit-undo-redo",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before-click",
+          "target": {
+            "x": 595.8859375,
+            "y": 113.734375,
+            "text": "y",
+            "start": "2",
+            "end": "3"
+          },
+          "text": "Start\n\n$$\nx+y\n$$\n\nEnd\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "ordinary-block.md · 22 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "ordinary-block-01-rendered.png",
+            "sha256": "57d7fa906340b47743512c4e2b6e6a1f8794291ae3554cbc35e3d4a683d97861",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "ordinary-block-01-rendered-caret-2x.png",
+              "sha256": "f088b817e7c29f54c21f28d2e02c3d4ea13f30c6ab1a30db225f24ea0a799981",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clicked-y",
+          "text": "Start\n\n$$\nx+y\n$$\n\nEnd\n",
+          "selection": {
+            "anchor": 13,
+            "head": 13
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 589.9765625,
+            "right": 589.9765625,
+            "top": 130.0859375,
+            "bottom": 146.0859375
+          },
+          "scrollTop": 0,
+          "title": "ordinary-block.md · 22 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "ordinary-block-02-clicked.png",
+            "sha256": "6846eda2931bc598c7ac72bd310a0b7e2bcc2c86ac9cd2798e33ded0c99b0aa0",
+            "caret": {
+              "left": 589.9765625,
+              "right": 589.9765625,
+              "top": 130.0859375,
+              "bottom": 146.0859375
+            },
+            "zoom": {
+              "file": "ordinary-block-02-clicked-caret-2x.png",
+              "sha256": "99d722f1989344b5c369aadc01e510b9c491c01008d118a9acc5116e9fdd12c4",
+              "clip": {
+                "x": 469.9765625,
+                "y": 105.0859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "edited",
+          "text": "Start\n\n$$\nx+yz\n$$\n\nEnd\n",
+          "selection": {
+            "anchor": 14,
+            "head": 14
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 593.078125,
+            "right": 593.078125,
+            "top": 130.0859375,
+            "bottom": 146.0859375
+          },
+          "scrollTop": 0,
+          "title": "● ordinary-block.md · 23 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "ordinary-block-03-edited.png",
+            "sha256": "ee9748c912af83802156ea59622f3cef58cf463e1d85f4791ec6772a38634ddb",
+            "caret": {
+              "left": 593.078125,
+              "right": 593.078125,
+              "top": 130.0859375,
+              "bottom": 146.0859375
+            },
+            "zoom": {
+              "file": "ordinary-block-03-edited-caret-2x.png",
+              "sha256": "a1b676968b90138896e0273bac63be6c95b7fb932cbf165a4c55bb65a3457026",
+              "clip": {
+                "x": 473.078125,
+                "y": 105.0859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Start\n\n$$\nx+y\n$$\n\nEnd\n",
+          "selection": {
+            "anchor": 13,
+            "head": 13
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 589.9765625,
+            "right": 589.9765625,
+            "top": 130.0859375,
+            "bottom": 146.0859375
+          },
+          "scrollTop": 0,
+          "title": "● ordinary-block.md · 22 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "ordinary-block-04-undo.png",
+            "sha256": "6846eda2931bc598c7ac72bd310a0b7e2bcc2c86ac9cd2798e33ded0c99b0aa0",
+            "caret": {
+              "left": 589.9765625,
+              "right": 589.9765625,
+              "top": 130.0859375,
+              "bottom": 146.0859375
+            },
+            "zoom": {
+              "file": "ordinary-block-04-undo-caret-2x.png",
+              "sha256": "99d722f1989344b5c369aadc01e510b9c491c01008d118a9acc5116e9fdd12c4",
+              "clip": {
+                "x": 469.9765625,
+                "y": 105.0859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Start\n\n$$\nx+yz\n$$\n\nEnd\n",
+          "selection": {
+            "anchor": 14,
+            "head": 14
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 593.078125,
+            "right": 593.078125,
+            "top": 130.0859375,
+            "bottom": 146.0859375
+          },
+          "scrollTop": 0,
+          "title": "● ordinary-block.md · 23 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "ordinary-block-05-redo.png",
+            "sha256": "ee9748c912af83802156ea59622f3cef58cf463e1d85f4791ec6772a38634ddb",
+            "caret": {
+              "left": 593.078125,
+              "right": 593.078125,
+              "top": 130.0859375,
+              "bottom": 146.0859375
+            },
+            "zoom": {
+              "file": "ordinary-block-05-redo-caret-2x.png",
+              "sha256": "a1b676968b90138896e0273bac63be6c95b7fb932cbf165a4c55bb65a3457026",
+              "clip": {
+                "x": 473.078125,
+                "y": 105.0859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "float-click-y",
+          "text": "Start\n\n$$\nx+yz\n$$\n\nEnd\n",
+          "selection": {
+            "anchor": 13,
+            "head": 13
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 586.8671875,
+            "right": 586.8671875,
+            "top": 130.0859375,
+            "bottom": 146.0859375
+          },
+          "scrollTop": 0,
+          "title": "ordinary-block.md · 23 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "ordinary-block-06-float-click.png",
+            "sha256": "26850dd473ba60e7a038061f2b47ae90f0483e47b589bc035a4a89b5543a7190",
+            "caret": {
+              "left": 586.8671875,
+              "right": 586.8671875,
+              "top": 130.0859375,
+              "bottom": 146.0859375
+            },
+            "zoom": {
+              "file": "ordinary-block-06-float-click-caret-2x.png",
+              "sha256": "09259e9a11d60b0a653aad831c2d312fa82f3e62fc9f55dcbebb72c4da848ecd",
+              "clip": {
+                "x": 466.8671875,
+                "y": 105.0859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "expectedCaret": 13,
+        "actualCaret": 13,
+        "atomicUndoRedo": true
+      },
+      "ms": 3777
+    },
+    {
+      "id": "ordinary-inline-glyph-click-edit-undo-redo",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "before-click",
+          "target": {
+            "x": 246.4328125,
+            "y": 113.640625,
+            "text": "y",
+            "start": "2",
+            "end": "3"
+          },
+          "text": "Start\n\ninline $x+y$ after\n\nEnd\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "ordinary-inline.md · 31 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "ordinary-inline-01-rendered.png",
+            "sha256": "f82e71bd4e059dcb5b84721be89963aaa55e9eb9e22887fe64f866fc9203fa50",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "ordinary-inline-01-rendered-caret-2x.png",
+              "sha256": "bc70d9a1e8eff17be41df3c9f0acc3191bf343f38736e663e18a94e498f41775",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clicked-y",
+          "text": "Start\n\ninline $x+y$ after\n\nEnd\n",
+          "selection": {
+            "anchor": 18,
+            "head": 18
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 240.890625,
+            "right": 240.890625,
+            "top": 104.890625,
+            "bottom": 120.890625
+          },
+          "scrollTop": 0,
+          "title": "ordinary-inline.md · 31 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "ordinary-inline-02-clicked.png",
+            "sha256": "d49b41317efafe7af67592d451c10b2575d2b28a24097f33c8758a87dcb153ca",
+            "caret": {
+              "left": 240.890625,
+              "right": 240.890625,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "zoom": {
+              "file": "ordinary-inline-02-clicked-caret-2x.png",
+              "sha256": "2d4869ddf58a29e184225fb8c9489a86aec44a78473a5ce8257582d8c502b488",
+              "clip": {
+                "x": 120.890625,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "edited",
+          "text": "Start\n\ninline $x+yz$ after\n\nEnd\n",
+          "selection": {
+            "anchor": 19,
+            "head": 19
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 247.109375,
+            "right": 247.109375,
+            "top": 104.890625,
+            "bottom": 120.890625
+          },
+          "scrollTop": 0,
+          "title": "● ordinary-inline.md · 32 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "ordinary-inline-03-edited.png",
+            "sha256": "6877f3b47556b3c4b78d4875d4a205ad74d1a3372d048fdd1ee10952ab3da7e3",
+            "caret": {
+              "left": 247.109375,
+              "right": 247.109375,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "zoom": {
+              "file": "ordinary-inline-03-edited-caret-2x.png",
+              "sha256": "e1a1b3d35971cadc95820efa43a00d0ad1f3a974feff98541cc3329e21190bf9",
+              "clip": {
+                "x": 127.109375,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Start\n\ninline $x+y$ after\n\nEnd\n",
+          "selection": {
+            "anchor": 18,
+            "head": 18
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 240.890625,
+            "right": 240.890625,
+            "top": 104.890625,
+            "bottom": 120.890625
+          },
+          "scrollTop": 0,
+          "title": "● ordinary-inline.md · 31 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "ordinary-inline-04-undo.png",
+            "sha256": "d49b41317efafe7af67592d451c10b2575d2b28a24097f33c8758a87dcb153ca",
+            "caret": {
+              "left": 240.890625,
+              "right": 240.890625,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "zoom": {
+              "file": "ordinary-inline-04-undo-caret-2x.png",
+              "sha256": "2d4869ddf58a29e184225fb8c9489a86aec44a78473a5ce8257582d8c502b488",
+              "clip": {
+                "x": 120.890625,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Start\n\ninline $x+yz$ after\n\nEnd\n",
+          "selection": {
+            "anchor": 19,
+            "head": 19
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 247.109375,
+            "right": 247.109375,
+            "top": 104.890625,
+            "bottom": 120.890625
+          },
+          "scrollTop": 0,
+          "title": "● ordinary-inline.md · 32 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "ordinary-inline-05-redo.png",
+            "sha256": "6877f3b47556b3c4b78d4875d4a205ad74d1a3372d048fdd1ee10952ab3da7e3",
+            "caret": {
+              "left": 247.109375,
+              "right": 247.109375,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "zoom": {
+              "file": "ordinary-inline-05-redo-caret-2x.png",
+              "sha256": "e1a1b3d35971cadc95820efa43a00d0ad1f3a974feff98541cc3329e21190bf9",
+              "clip": {
+                "x": 127.109375,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "float-click-y",
+          "text": "Start\n\ninline $x+yz$ after\n\nEnd\n",
+          "selection": {
+            "anchor": 18,
+            "head": 18
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 240.890625,
+            "right": 240.890625,
+            "top": 104.890625,
+            "bottom": 120.890625
+          },
+          "scrollTop": 0,
+          "title": "ordinary-inline.md · 32 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "ordinary-inline-06-float-click.png",
+            "sha256": "a75d7c5bb5a0bd9b04da20a49e9317afeaab6f36d7e6e3c8970d9f012a9bc30e",
+            "caret": {
+              "left": 240.890625,
+              "right": 240.890625,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "zoom": {
+              "file": "ordinary-inline-06-float-click-caret-2x.png",
+              "sha256": "49d63dd7bb00ad6702d41c6db0eb7f8e6408930cd113cfc7e3dd83c02f3ebc34",
+              "clip": {
+                "x": 120.890625,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "expectedCaret": 18,
+        "actualCaret": 18,
+        "atomicUndoRedo": true
+      },
+      "ms": 4302
+    },
+    {
+      "id": "keyboard-page-navigation-full-source-copy-paste-undo-redo",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "keyboard-01-page-down",
+          "text": "Paragraph 0 with $x+y$ and words.\n\n> $$\n> x+y\n> $$\n\nParagraph 1 with $x+y$ and words.\n\nParagraph 2 with $x+y$ and words.\n\nParagraph 3 with $x+y$ and words.\n\nParagraph 4 with $x+y$ and words.\n\nParagraph 5 with $x+y$ and words.\n\nParagraph 6 with $x+y$ and words.\n\nParagraph 7 with $x+y$ and words.\n\nParagraph 8 with $x+y$ and words.\n\n> $$\n> x+y\n> $$\n\nParagraph 9 with $x+y$ and words.\n\nParagraph 10 with $x+y$ and words.\n\nParagraph 11 with $x+y$ and words.\n\nParagraph 12 with $x+y$ and words.\n\nParagraph 13 with $x+y$ and words.\n\nParagraph 14 with $x+y$ and words.\n\nParagraph 15 with $x+y$ and words.\n\nParagraph 16 with $x+y$ and words.\n\n> $$\n> x+y\n> $$\n\nParagraph 17 with $x+y$ and words.\n\nParagraph 18 with $x+y$ and words.\n\nParagraph 19 with $x+y$ and words.\n\nParagraph 20 with $x+y$ and words.\n\nParagraph 21 with $x+y$ and words.\n\nParagraph 22 with $x+y$ and words.\n\nParagraph 23 with $x+y$ and words.\n\nParagraph 24 with $x+y$ and words.\n\n> $$\n> x+y\n> $$\n\nParagraph 25 with $x+y$ and words.\n\nParagraph 26 with $x+y$ and words.\n\nParagraph 27 with $x+y$ and words.\n\nParagraph 28 with $x+y$ and words.\n\nParagraph 29 with $x+y$ and words.\n\nParagraph 30 with $x+y$ and words.\n\nParagraph 31 with $x+y$ and words.\n\n",
+          "selection": {
+            "anchor": 419,
+            "head": 419
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 54.5078125,
+            "width": 0,
+            "height": 16,
+            "top": 54.5078125,
+            "right": 170.5,
+            "bottom": 70.5078125,
+            "left": 170.5
+          },
+          "scrollTop": 631.5,
+          "title": "keyboard-flow.md · 1210 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "keyboard-01-page-down.png",
+            "sha256": "ff51daaa5b457650f9cab7ebd5ccdfec545b4d87d1a0ec49fa91fd0ebb4ae19d",
+            "caret": {
+              "x": 170.5,
+              "y": 54.5078125,
+              "width": 0,
+              "height": 16,
+              "top": 54.5078125,
+              "right": 170.5,
+              "bottom": 70.5078125,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "keyboard-01-page-down-caret-2x.png",
+              "sha256": "c46552013afa1869402551218f6df91818ba15a5640bfbcaaf1aae1a6496c96c",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5078125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "keyboard-02-page-up",
+          "text": "Paragraph 0 with $x+y$ and words.\n\n> $$\n> x+y\n> $$\n\nParagraph 1 with $x+y$ and words.\n\nParagraph 2 with $x+y$ and words.\n\nParagraph 3 with $x+y$ and words.\n\nParagraph 4 with $x+y$ and words.\n\nParagraph 5 with $x+y$ and words.\n\nParagraph 6 with $x+y$ and words.\n\nParagraph 7 with $x+y$ and words.\n\nParagraph 8 with $x+y$ and words.\n\n> $$\n> x+y\n> $$\n\nParagraph 9 with $x+y$ and words.\n\nParagraph 10 with $x+y$ and words.\n\nParagraph 11 with $x+y$ and words.\n\nParagraph 12 with $x+y$ and words.\n\nParagraph 13 with $x+y$ and words.\n\nParagraph 14 with $x+y$ and words.\n\nParagraph 15 with $x+y$ and words.\n\nParagraph 16 with $x+y$ and words.\n\n> $$\n> x+y\n> $$\n\nParagraph 17 with $x+y$ and words.\n\nParagraph 18 with $x+y$ and words.\n\nParagraph 19 with $x+y$ and words.\n\nParagraph 20 with $x+y$ and words.\n\nParagraph 21 with $x+y$ and words.\n\nParagraph 22 with $x+y$ and words.\n\nParagraph 23 with $x+y$ and words.\n\nParagraph 24 with $x+y$ and words.\n\n> $$\n> x+y\n> $$\n\nParagraph 25 with $x+y$ and words.\n\nParagraph 26 with $x+y$ and words.\n\nParagraph 27 with $x+y$ and words.\n\nParagraph 28 with $x+y$ and words.\n\nParagraph 29 with $x+y$ and words.\n\nParagraph 30 with $x+y$ and words.\n\nParagraph 31 with $x+y$ and words.\n\n",
+          "selection": {
+            "anchor": 33,
+            "head": 33
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 391.9609375,
+            "y": 54.5,
+            "width": 0,
+            "height": 16,
+            "top": 54.5,
+            "right": 391.9609375,
+            "bottom": 70.5,
+            "left": 391.9609375
+          },
+          "scrollTop": 0,
+          "title": "keyboard-flow.md · 1210 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "keyboard-02-page-up.png",
+            "sha256": "aa5bea2958a6cc60a668d0076da2b5ac299269410bb0ef9cb5cb368e8be42547",
+            "caret": {
+              "x": 391.9609375,
+              "y": 54.5,
+              "width": 0,
+              "height": 16,
+              "top": 54.5,
+              "right": 391.9609375,
+              "bottom": 70.5,
+              "left": 391.9609375
+            },
+            "zoom": {
+              "file": "keyboard-02-page-up-caret-2x.png",
+              "sha256": "e5c71a529e3791bff1240520e17b5d182f959c89e93a139d797ce8762ceb169d",
+              "clip": {
+                "x": 271.9609375,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-arm",
+          "write": {
+            "ok": true,
+            "bytes": 16,
+            "hasHtml": false
+          },
+          "length": 16,
+          "matches": true
+        },
+        {
+          "name": "copied-source",
+          "length": 1210,
+          "matches": true
+        },
+        {
+          "name": "clipboard-before-paste",
+          "length": 1210,
+          "matches": true
+        },
+        {
+          "name": "clipboard-after-paste",
+          "matches": true,
+          "length": 1210
+        },
+        {
+          "name": "keyboard-03-copy-paste-redo",
+          "text": "Paragraph 0 with $x+y$ and words.\n\n> $$\n> x+y\n> $$\n\nParagraph 1 with $x+y$ and words.\n\nParagraph 2 with $x+y$ and words.\n\nParagraph 3 with $x+y$ and words.\n\nParagraph 4 with $x+y$ and words.\n\nParagraph 5 with $x+y$ and words.\n\nParagraph 6 with $x+y$ and words.\n\nParagraph 7 with $x+y$ and words.\n\nParagraph 8 with $x+y$ and words.\n\n> $$\n> x+y\n> $$\n\nParagraph 9 with $x+y$ and words.\n\nParagraph 10 with $x+y$ and words.\n\nParagraph 11 with $x+y$ and words.\n\nParagraph 12 with $x+y$ and words.\n\nParagraph 13 with $x+y$ and words.\n\nParagraph 14 with $x+y$ and words.\n\nParagraph 15 with $x+y$ and words.\n\nParagraph 16 with $x+y$ and words.\n\n> $$\n> x+y\n> $$\n\nParagraph 17 with $x+y$ and words.\n\nParagraph 18 with $x+y$ and words.\n\nParagraph 19 with $x+y$ and words.\n\nParagraph 20 with $x+y$ and words.\n\nParagraph 21 with $x+y$ and words.\n\nParagraph 22 with $x+y$ and words.\n\nParagraph 23 with $x+y$ and words.\n\nParagraph 24 with $x+y$ and words.\n\n> $$\n> x+y\n> $$\n\nParagraph 25 with $x+y$ and words.\n\nParagraph 26 with $x+y$ and words.\n\nParagraph 27 with $x+y$ and words.\n\nParagraph 28 with $x+y$ and words.\n\nParagraph 29 with $x+y$ and words.\n\nParagraph 30 with $x+y$ and words.\n\nParagraph 31 with $x+y$ and words.\n\nParagraph 0 with $x+y$ and words.\n\n> $$\n> x+y\n> $$\n\nParagraph 1 with $x+y$ and words.\n\nParagraph 2 with $x+y$ and words.\n\nParagraph 3 with $x+y$ and words.\n\nParagraph 4 with $x+y$ and words.\n\nParagraph 5 with $x+y$ and words.\n\nParagraph 6 with $x+y$ and words.\n\nParagraph 7 with $x+y$ and words.\n\nParagraph 8 with $x+y$ and words.\n\n> $$\n> x+y\n> $$\n\nParagraph 9 with $x+y$ and words.\n\nParagraph 10 with $x+y$ and words.\n\nParagraph 11 with $x+y$ and words.\n\nParagraph 12 with $x+y$ and words.\n\nParagraph 13 with $x+y$ and words.\n\nParagraph 14 with $x+y$ and words.\n\nParagraph 15 with $x+y$ and words.\n\nParagraph 16 with $x+y$ and words.\n\n> $$\n> x+y\n> $$\n\nParagraph 17 with $x+y$ and words.\n\nParagraph 18 with $x+y$ and words.\n\nParagraph 19 with $x+y$ and words.\n\nParagraph 20 with $x+y$ and words.\n\nParagraph 21 with $x+y$ and words.\n\nParagraph 22 with $x+y$ and words.\n\nParagraph 23 with $x+y$ and words.\n\nParagraph 24 with $x+y$ and words.\n\n> $$\n> x+y\n> $$\n\nParagraph 25 with $x+y$ and words.\n\nParagraph 26 with $x+y$ and words.\n\nParagraph 27 with $x+y$ and words.\n\nParagraph 28 with $x+y$ and words.\n\nParagraph 29 with $x+y$ and words.\n\nParagraph 30 with $x+y$ and words.\n\nParagraph 31 with $x+y$ and words.\n\n",
+          "selection": {
+            "anchor": 2420,
+            "head": 2420
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 170.5,
+            "y": 642.109375,
+            "width": 0,
+            "height": 16,
+            "top": 642.109375,
+            "right": 170.5,
+            "bottom": 658.109375,
+            "left": 170.5
+          },
+          "scrollTop": 3047,
+          "title": "● keyboard-flow.md · 2420 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "keyboard-03-copy-paste-redo.png",
+            "sha256": "bfd421490135340ebeca731261c0c2cca6c59923301429e804930a5b5d5e2e0f",
+            "caret": {
+              "x": 170.5,
+              "y": 642.109375,
+              "width": 0,
+              "height": 16,
+              "top": 642.109375,
+              "right": 170.5,
+              "bottom": 658.109375,
+              "left": 170.5
+            },
+            "zoom": {
+              "file": "keyboard-03-copy-paste-redo-caret-2x.png",
+              "sha256": "648f21b4a813a300da959162e6807a98331ee9b1e846c1b294c4cd7a28ad6594",
+              "clip": {
+                "x": 50.5,
+                "y": 601,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "channel": "keyboard and combinations",
+        "sourceCopy": true
+      },
+      "ms": 4785
+    },
+    {
+      "id": "mouse-double-click-text-replace-undo-redo-among-formulas",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "mouse-01-double-click",
+          "text": "alpha $x+y$ omega\n\n> $$\n> x+y\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 0,
+            "head": 5
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 204.7578125,
+            "right": 204.7578125,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "mouse-flow.md · 40 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "mouse-01-double-click.png",
+            "sha256": "d5908c753b87689e44fc221c13c2eef5074fb30b982c1ff25ae2ad4d0ffaa10e",
+            "caret": {
+              "left": 204.7578125,
+              "right": 204.7578125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "mouse-01-double-click-caret-2x.png",
+              "sha256": "180027d93d0e30eae1b7fee93b76c7db7b3a6ef46a61d6d906baf23d89422fa0",
+              "clip": {
+                "x": 84.7578125,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "mouse-02-replaced",
+          "text": "ALPHA $x+y$ omega\n\n> $$\n> x+y\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 5,
+            "head": 5
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 217.6796875,
+            "right": 217.6796875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "mouse-flow.md · 40 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "mouse-02-replaced.png",
+            "sha256": "57cbcd650966e270e6ebd21a0db72e6b3f296b7123a0cd9d7a2f4e1b52c1bb8d",
+            "caret": {
+              "left": 217.6796875,
+              "right": 217.6796875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "mouse-02-replaced-caret-2x.png",
+              "sha256": "02aecb3ea3f23ee805e8794020f3c65d94c19ef8ed645918fb6cff65bff8f686",
+              "clip": {
+                "x": 97.6796875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "channel": "mouse",
+        "clickCount": 2
+      },
+      "ms": 1806
+    },
+    {
+      "id": "shift-mouse-selection-across-inline-formula-copy-paste",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "shift-mouse-01-selected",
+          "text": "alpha $x+y$ omega\n\n> $$\n> x+y\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 0,
+            "head": 17
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 291.640625,
+            "right": 291.640625,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-mouse-flow.md · 40 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "shift-mouse-01-selected.png",
+            "sha256": "f8ddfb71ee4f8d1f23acb11db47c74f7f0ea891cb017ec51604ca4df429ea8f2",
+            "caret": {
+              "left": 291.640625,
+              "right": 291.640625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-mouse-01-selected-caret-2x.png",
+              "sha256": "b161aa62cb5224a1fcd21b2eb247c350efa9a93ad0c459c3a6ff47c08253081a",
+              "clip": {
+                "x": 171.640625,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-arm",
+          "write": {
+            "ok": true,
+            "bytes": 16,
+            "hasHtml": false
+          },
+          "matches": true,
+          "length": 16
+        },
+        {
+          "name": "copied-source",
+          "length": 17,
+          "matches": true
+        },
+        {
+          "name": "clipboard-before-paste",
+          "length": 17,
+          "matches": true
+        },
+        {
+          "name": "clipboard-after-paste",
+          "matches": true,
+          "length": 17
+        },
+        {
+          "name": "shift-mouse-02-paste-redo",
+          "text": "alpha $x+y$ omega\n\n> $$\n> x+y\n> $$\n\nEnd\nalpha $x+y$ omega",
+          "selection": {
+            "anchor": 57,
+            "head": 57
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 291.640625,
+            "right": 291.640625,
+            "top": 181.2890625,
+            "bottom": 197.2890625
+          },
+          "scrollTop": 0,
+          "title": "● shift-mouse-flow.md · 57 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "shift-mouse-02-paste-redo.png",
+            "sha256": "41963b9613f1a11f602d26ae7bd0e6394bd08437814d49bd2a5e89762b018291",
+            "caret": {
+              "left": 291.640625,
+              "right": 291.640625,
+              "top": 181.2890625,
+              "bottom": 197.2890625
+            },
+            "zoom": {
+              "file": "shift-mouse-02-paste-redo-caret-2x.png",
+              "sha256": "52a5c0f7682ecf63025ea8414c6ee71fdab3dc6495586881c240ed794f0616e9",
+              "clip": {
+                "x": 171.640625,
+                "y": 156.2890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "channel": "keyboard and mouse"
+      },
+      "ms": 4510
+    },
+    {
+      "id": "real-drag-formula-text-then-shift-key-copy-paste",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "drag-01-selected",
+          "text": "alpha $x+y$ omega\n\n> $$\n> x+y\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 0,
+            "head": 17
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 291.640625,
+            "right": 291.640625,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "drag-flow.md · 40 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "drag-01-selected.png",
+            "sha256": "f8ddfb71ee4f8d1f23acb11db47c74f7f0ea891cb017ec51604ca4df429ea8f2",
+            "caret": {
+              "left": 291.640625,
+              "right": 291.640625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "drag-01-selected-caret-2x.png",
+              "sha256": "b161aa62cb5224a1fcd21b2eb247c350efa9a93ad0c459c3a6ff47c08253081a",
+              "clip": {
+                "x": 171.640625,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "drag-02-key-shortened",
+          "text": "alpha $x+y$ omega\n\n> $$\n> x+y\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 0,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 277.4609375,
+            "right": 277.4609375,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "drag-flow.md · 40 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "drag-02-key-shortened.png",
+            "sha256": "2221c0b32f5bac7b1a1b1dde365f0a88b63b9fca6a90210a6ac7e1e409672982",
+            "caret": {
+              "left": 277.4609375,
+              "right": 277.4609375,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "drag-02-key-shortened-caret-2x.png",
+              "sha256": "34a7e55c8e53da6f4e3b0a7e5ee48f9f9e2c61a8cd7014e2b01782c900017a00",
+              "clip": {
+                "x": 157.4609375,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-arm",
+          "write": {
+            "ok": true,
+            "bytes": 16,
+            "hasHtml": false
+          },
+          "matches": true,
+          "length": 16
+        },
+        {
+          "name": "copied-source",
+          "matches": true,
+          "length": 15
+        },
+        {
+          "name": "clipboard-before-paste",
+          "length": 15,
+          "matches": true
+        },
+        {
+          "name": "clipboard-after-paste",
+          "matches": true,
+          "length": 15
+        },
+        {
+          "name": "drag-03-paste-redo",
+          "text": "alpha $x+y$ omega\n\n> $$\n> x+y\n> $$\n\nEnd\nalpha $x+y$ ome",
+          "selection": {
+            "anchor": 55,
+            "head": 55
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 277.4609375,
+            "y": 181.2890625,
+            "width": 0,
+            "height": 16,
+            "top": 181.2890625,
+            "right": 277.4609375,
+            "bottom": 197.2890625,
+            "left": 277.4609375
+          },
+          "scrollTop": 0,
+          "title": "● drag-flow.md · 55 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "drag-03-paste-redo.png",
+            "sha256": "3b47c9f9504687d6e1b4da38ff250319f9e799237bc5915fca99618986a1e980",
+            "caret": {
+              "x": 277.4609375,
+              "y": 181.2890625,
+              "width": 0,
+              "height": 16,
+              "top": 181.2890625,
+              "right": 277.4609375,
+              "bottom": 197.2890625,
+              "left": 277.4609375
+            },
+            "zoom": {
+              "file": "drag-03-paste-redo-caret-2x.png",
+              "sha256": "c2266ef09970eb544c7c49e321b85b95befc3113a5082848bc97a0b124dc2c41",
+              "clip": {
+                "x": 157.4609375,
+                "y": 156.2890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "channel": "drag and keyboard",
+        "moves": 12
+      },
+      "ms": 6161
+    }
+  ],
+  "artifact": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-final-source-3.2.9\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-final-source-3.2.9\\unpacked\\MarkPilot.exe",
+    "runtimeExecutableSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-final-source-3.2.9\\unpacked\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.9",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-final-source-3.2.9\\unpacked\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-final-source-3.2.9\\unpacked\\resources\\app.asar",
+    "asarSha256": "dae852488c3b63e86d807c043f9b46f150ba869b4fe2d5bc5c782a3150e3d0bc",
+    "bootMs": 1122,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "07f56591e566c4ceebfc2c49db57cf89eaebcf3b6f7188f00f7240617760059d",
+        "sourceSha256": "07f56591e566c4ceebfc2c49db57cf89eaebcf3b6f7188f00f7240617760059d"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "b4b11d263b9bbbe69a2651ecd4be37e0279b443a3061a47b0f0318952df66a7d",
+        "sourceSha256": "b4b11d263b9bbbe69a2651ecd4be37e0279b443a3061a47b0f0318952df66a7d"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "clipboard": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T20:11:57.615Z",
+  "passed": true,
+  "frames": [
+    {
+      "file": "quoted-block-01-rendered.png",
+      "sha256": "730f243db60beca917f590838b7e628368060cbd353b982826adae95630f0acc",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "quoted-block-01-rendered-caret-2x.png",
+        "sha256": "f088b817e7c29f54c21f28d2e02c3d4ea13f30c6ab1a30db225f24ea0a799981",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "quoted-block-02-clicked.png",
+      "sha256": "47f2673d31854ec4d1a3914d1429ee7fbd83ae23523410bbb5f044b816064f89",
+      "caret": {
+        "left": 598.3671875,
+        "right": 598.3671875,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "quoted-block-02-clicked-caret-2x.png",
+        "sha256": "f15910a42b04b4d9069a9450a0ee382b91d5a53d91b2e5acbae4e3c145a572d8",
+        "clip": {
+          "x": 478.3671875,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "quoted-block-03-edited.png",
+      "sha256": "df429a4370265228e628d9fb91d83c35e70aa0e05213072ff3f0dd035633ce0d",
+      "caret": {
+        "left": 601.1640625,
+        "right": 601.1640625,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "quoted-block-03-edited-caret-2x.png",
+        "sha256": "1732e33d30a45fda182f6a5312ee0b2174a1fc7c8a19853ee3971fc2c4fc4268",
+        "clip": {
+          "x": 481.1640625,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "quoted-block-04-undo.png",
+      "sha256": "47f2673d31854ec4d1a3914d1429ee7fbd83ae23523410bbb5f044b816064f89",
+      "caret": {
+        "left": 598.3671875,
+        "right": 598.3671875,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "quoted-block-04-undo-caret-2x.png",
+        "sha256": "f15910a42b04b4d9069a9450a0ee382b91d5a53d91b2e5acbae4e3c145a572d8",
+        "clip": {
+          "x": 478.3671875,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "quoted-block-05-redo.png",
+      "sha256": "df429a4370265228e628d9fb91d83c35e70aa0e05213072ff3f0dd035633ce0d",
+      "caret": {
+        "left": 601.1640625,
+        "right": 601.1640625,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "quoted-block-05-redo-caret-2x.png",
+        "sha256": "1732e33d30a45fda182f6a5312ee0b2174a1fc7c8a19853ee3971fc2c4fc4268",
+        "clip": {
+          "x": 481.1640625,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "quoted-block-06-float-click.png",
+      "sha256": "f7acedc966f3d8dd2fe2798dfe524f0e24d077f6e709c92979e414637247d76b",
+      "caret": {
+        "left": 595.5703125,
+        "right": 595.5703125,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "quoted-block-06-float-click-caret-2x.png",
+        "sha256": "0ddf0b728f2fef907299d7005528c96516dcc5c9bc7bfc7ded43b9afa83daa19",
+        "clip": {
+          "x": 475.5703125,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "nested-quoted-block-01-rendered.png",
+      "sha256": "33d06f93b6a7cab1fa40cf54d389d353feb0823b8adff6b57ac0ab368ae123cd",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "nested-quoted-block-01-rendered-caret-2x.png",
+        "sha256": "f088b817e7c29f54c21f28d2e02c3d4ea13f30c6ab1a30db225f24ea0a799981",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "nested-quoted-block-02-clicked.png",
+      "sha256": "79811cd2ab451461de6b36b7c92a58c06f8bbc2c839ebe313f7f66eda6b69816",
+      "caret": {
+        "left": 604.6640625,
+        "right": 604.6640625,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "nested-quoted-block-02-clicked-caret-2x.png",
+        "sha256": "290b05ed6c9e399cd5a3857675e59c4dd4f990cfc745169d33261d8b57e5e697",
+        "clip": {
+          "x": 484.6640625,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "nested-quoted-block-03-edited.png",
+      "sha256": "9469c024439a42146fcd024fbe001a57e44003d68ae1b09c31c5ec76cc792765",
+      "caret": {
+        "left": 607.4609375,
+        "right": 607.4609375,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "nested-quoted-block-03-edited-caret-2x.png",
+        "sha256": "bfacd05140b5260d9f392b1a36d0e5dc494cd3bf87900b1fca0fa5e6c37eea9d",
+        "clip": {
+          "x": 487.4609375,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "nested-quoted-block-04-undo.png",
+      "sha256": "79811cd2ab451461de6b36b7c92a58c06f8bbc2c839ebe313f7f66eda6b69816",
+      "caret": {
+        "left": 604.6640625,
+        "right": 604.6640625,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "nested-quoted-block-04-undo-caret-2x.png",
+        "sha256": "290b05ed6c9e399cd5a3857675e59c4dd4f990cfc745169d33261d8b57e5e697",
+        "clip": {
+          "x": 484.6640625,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "nested-quoted-block-05-redo.png",
+      "sha256": "9469c024439a42146fcd024fbe001a57e44003d68ae1b09c31c5ec76cc792765",
+      "caret": {
+        "left": 607.4609375,
+        "right": 607.4609375,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "nested-quoted-block-05-redo-caret-2x.png",
+        "sha256": "bfacd05140b5260d9f392b1a36d0e5dc494cd3bf87900b1fca0fa5e6c37eea9d",
+        "clip": {
+          "x": 487.4609375,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "nested-quoted-block-06-float-click.png",
+      "sha256": "3231067d205b0aff46abb7a9812ef814da5379742a346e58b1ab0e50e064c13c",
+      "caret": {
+        "left": 601.8671875,
+        "right": 601.8671875,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "nested-quoted-block-06-float-click-caret-2x.png",
+        "sha256": "6c82f27e6eb513b475a0e0411f35e350f349cd2f3707567ac0d80931885d213f",
+        "clip": {
+          "x": 481.8671875,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "multiline-quoted-block-01-rendered.png",
+      "sha256": "e2787f323b0c4cc1a67943d7dcbdee55ef0e52ff3460b71725795aa349e24e90",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "multiline-quoted-block-01-rendered-caret-2x.png",
+        "sha256": "f088b817e7c29f54c21f28d2e02c3d4ea13f30c6ab1a30db225f24ea0a799981",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "multiline-quoted-block-02-clicked.png",
+      "sha256": "9d25e16520ea6422c70036d83c3f0b797a74e53bd24fe58ebb3050bc9c6796a0",
+      "caret": {
+        "left": 591.1328125,
+        "right": 591.1328125,
+        "top": 149.75,
+        "bottom": 164.25
+      },
+      "zoom": {
+        "file": "multiline-quoted-block-02-clicked-caret-2x.png",
+        "sha256": "b956dd15a57689c6315388eefabd4609bdaa2ad606a52db32442b80acef9b527",
+        "clip": {
+          "x": 471.1328125,
+          "y": 124.75,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "multiline-quoted-block-03-edited.png",
+      "sha256": "73b4c2d487cd716cf08664314b7b3b4d594e89ca7edd8317c5d2c4d1b7e52327",
+      "caret": {
+        "left": 593.9296875,
+        "right": 593.9296875,
+        "top": 149.75,
+        "bottom": 164.25
+      },
+      "zoom": {
+        "file": "multiline-quoted-block-03-edited-caret-2x.png",
+        "sha256": "66f119f796f467249891ccd1246d6d144dc3fa643d1821fab9aeef382e1f0a77",
+        "clip": {
+          "x": 473.9296875,
+          "y": 124.75,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "multiline-quoted-block-04-undo.png",
+      "sha256": "9d25e16520ea6422c70036d83c3f0b797a74e53bd24fe58ebb3050bc9c6796a0",
+      "caret": {
+        "left": 591.1328125,
+        "right": 591.1328125,
+        "top": 149.75,
+        "bottom": 164.25
+      },
+      "zoom": {
+        "file": "multiline-quoted-block-04-undo-caret-2x.png",
+        "sha256": "b956dd15a57689c6315388eefabd4609bdaa2ad606a52db32442b80acef9b527",
+        "clip": {
+          "x": 471.1328125,
+          "y": 124.75,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "multiline-quoted-block-05-redo.png",
+      "sha256": "73b4c2d487cd716cf08664314b7b3b4d594e89ca7edd8317c5d2c4d1b7e52327",
+      "caret": {
+        "left": 593.9296875,
+        "right": 593.9296875,
+        "top": 149.75,
+        "bottom": 164.25
+      },
+      "zoom": {
+        "file": "multiline-quoted-block-05-redo-caret-2x.png",
+        "sha256": "66f119f796f467249891ccd1246d6d144dc3fa643d1821fab9aeef382e1f0a77",
+        "clip": {
+          "x": 473.9296875,
+          "y": 124.75,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "multiline-quoted-block-06-float-click.png",
+      "sha256": "b9ff78c401fac6aa5bc6032f111f04985f3105faefd5472857f2d28142495281",
+      "caret": {
+        "left": 588.3359375,
+        "right": 588.3359375,
+        "top": 149.75,
+        "bottom": 164.25
+      },
+      "zoom": {
+        "file": "multiline-quoted-block-06-float-click-caret-2x.png",
+        "sha256": "653ace3c4a031e793effaf956b6647e595e84ec732733bc7d5c1b48843ea2022",
+        "clip": {
+          "x": 468.3359375,
+          "y": 124.75,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "quoted-whitespace-block-01-rendered.png",
+      "sha256": "0bce1ebdd4e87a1b51d49ad8e180e5524ad8112a300546d413e20d554fe9b50c",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "quoted-whitespace-block-01-rendered-caret-2x.png",
+        "sha256": "f088b817e7c29f54c21f28d2e02c3d4ea13f30c6ab1a30db225f24ea0a799981",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "quoted-whitespace-block-02-clicked.png",
+      "sha256": "42527e7bffc2994969f2da7613fac251dd8d92d9506a1054e38bd60c4f7433b8",
+      "caret": {
+        "left": 596.8515625,
+        "right": 596.8515625,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "quoted-whitespace-block-02-clicked-caret-2x.png",
+        "sha256": "95b806242a8753fb2c9add37b47c4fd12cc32816e3c7b6b90989ca1ab869ddf2",
+        "clip": {
+          "x": 476.8515625,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "quoted-whitespace-block-03-edited.png",
+      "sha256": "18a59171364a17b914031d191a5bd69c57e1e5026d8044e9d14a3a017bd04125",
+      "caret": {
+        "left": 599.6484375,
+        "right": 599.6484375,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "quoted-whitespace-block-03-edited-caret-2x.png",
+        "sha256": "f515723d66d5b61c6357a1b6fb9f5be579609c77eebdacf22d12b53c03fd8b0c",
+        "clip": {
+          "x": 479.6484375,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "quoted-whitespace-block-04-undo.png",
+      "sha256": "42527e7bffc2994969f2da7613fac251dd8d92d9506a1054e38bd60c4f7433b8",
+      "caret": {
+        "left": 596.8515625,
+        "right": 596.8515625,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "quoted-whitespace-block-04-undo-caret-2x.png",
+        "sha256": "95b806242a8753fb2c9add37b47c4fd12cc32816e3c7b6b90989ca1ab869ddf2",
+        "clip": {
+          "x": 476.8515625,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "quoted-whitespace-block-05-redo.png",
+      "sha256": "18a59171364a17b914031d191a5bd69c57e1e5026d8044e9d14a3a017bd04125",
+      "caret": {
+        "left": 599.6484375,
+        "right": 599.6484375,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "quoted-whitespace-block-05-redo-caret-2x.png",
+        "sha256": "f515723d66d5b61c6357a1b6fb9f5be579609c77eebdacf22d12b53c03fd8b0c",
+        "clip": {
+          "x": 479.6484375,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "quoted-whitespace-block-06-float-click.png",
+      "sha256": "683dd1c59e6c6ebb4672a478e8954313d537822e6d0dc286edb3c561153354f0",
+      "caret": {
+        "left": 594.046875,
+        "right": 594.046875,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "quoted-whitespace-block-06-float-click-caret-2x.png",
+        "sha256": "18e243575e2b0fb97f6a1b31b8a61f481d9f6aaf160b91b2693a58b3ad2c36ba",
+        "clip": {
+          "x": 474.046875,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "single-dollar-quoted-block-01-rendered.png",
+      "sha256": "f38cdc7ae9ded77b9a70ce0143dafb8e20df90a5ceea7b52473b5bfa9d408691",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "single-dollar-quoted-block-01-rendered-caret-2x.png",
+        "sha256": "c9f1e7d49832e4548d57685c18b0dadcd5f3fae9e1aaad9434aff0b425777eb2",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "single-dollar-quoted-block-02-clicked.png",
+      "sha256": "fb9319588c8ac6def06f80014cd69b89adb35f446bbaa2b2c59644f536489d1d",
+      "caret": {
+        "left": 598.3671875,
+        "right": 598.3671875,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "single-dollar-quoted-block-02-clicked-caret-2x.png",
+        "sha256": "38e1e0bc9859fcb3b5d4bd0a0d104390bfd87b4f7a8f5457fac46d9017a9b461",
+        "clip": {
+          "x": 478.3671875,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "single-dollar-quoted-block-03-edited.png",
+      "sha256": "f4bfd06f4cc422ab89e60bd2442564436580af30314fbfdb2fbaafdc1f8b7241",
+      "caret": {
+        "left": 601.1640625,
+        "right": 601.1640625,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "single-dollar-quoted-block-03-edited-caret-2x.png",
+        "sha256": "28bf809351318499495e59894e671d6dc8ab662a19fe85064ca41ec607455a98",
+        "clip": {
+          "x": 481.1640625,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "single-dollar-quoted-block-04-undo.png",
+      "sha256": "fb9319588c8ac6def06f80014cd69b89adb35f446bbaa2b2c59644f536489d1d",
+      "caret": {
+        "left": 598.3671875,
+        "right": 598.3671875,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "single-dollar-quoted-block-04-undo-caret-2x.png",
+        "sha256": "38e1e0bc9859fcb3b5d4bd0a0d104390bfd87b4f7a8f5457fac46d9017a9b461",
+        "clip": {
+          "x": 478.3671875,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "single-dollar-quoted-block-05-redo.png",
+      "sha256": "f4bfd06f4cc422ab89e60bd2442564436580af30314fbfdb2fbaafdc1f8b7241",
+      "caret": {
+        "left": 601.1640625,
+        "right": 601.1640625,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "single-dollar-quoted-block-05-redo-caret-2x.png",
+        "sha256": "28bf809351318499495e59894e671d6dc8ab662a19fe85064ca41ec607455a98",
+        "clip": {
+          "x": 481.1640625,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "single-dollar-quoted-block-06-float-click.png",
+      "sha256": "75ed06eeb84cd9f5c3061f09cedc9575fc23152b37f6caa1012d96f1e38c27ee",
+      "caret": {
+        "left": 595.5703125,
+        "right": 595.5703125,
+        "top": 127.0703125,
+        "bottom": 141.5703125
+      },
+      "zoom": {
+        "file": "single-dollar-quoted-block-06-float-click-caret-2x.png",
+        "sha256": "8c5f7f2a9371e484902630878e914144dd957b443efb5e5a40392133bf031ca4",
+        "clip": {
+          "x": 475.5703125,
+          "y": 102.0703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "ordinary-block-01-rendered.png",
+      "sha256": "57d7fa906340b47743512c4e2b6e6a1f8794291ae3554cbc35e3d4a683d97861",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "ordinary-block-01-rendered-caret-2x.png",
+        "sha256": "f088b817e7c29f54c21f28d2e02c3d4ea13f30c6ab1a30db225f24ea0a799981",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "ordinary-block-02-clicked.png",
+      "sha256": "6846eda2931bc598c7ac72bd310a0b7e2bcc2c86ac9cd2798e33ded0c99b0aa0",
+      "caret": {
+        "left": 589.9765625,
+        "right": 589.9765625,
+        "top": 130.0859375,
+        "bottom": 146.0859375
+      },
+      "zoom": {
+        "file": "ordinary-block-02-clicked-caret-2x.png",
+        "sha256": "99d722f1989344b5c369aadc01e510b9c491c01008d118a9acc5116e9fdd12c4",
+        "clip": {
+          "x": 469.9765625,
+          "y": 105.0859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "ordinary-block-03-edited.png",
+      "sha256": "ee9748c912af83802156ea59622f3cef58cf463e1d85f4791ec6772a38634ddb",
+      "caret": {
+        "left": 593.078125,
+        "right": 593.078125,
+        "top": 130.0859375,
+        "bottom": 146.0859375
+      },
+      "zoom": {
+        "file": "ordinary-block-03-edited-caret-2x.png",
+        "sha256": "a1b676968b90138896e0273bac63be6c95b7fb932cbf165a4c55bb65a3457026",
+        "clip": {
+          "x": 473.078125,
+          "y": 105.0859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "ordinary-block-04-undo.png",
+      "sha256": "6846eda2931bc598c7ac72bd310a0b7e2bcc2c86ac9cd2798e33ded0c99b0aa0",
+      "caret": {
+        "left": 589.9765625,
+        "right": 589.9765625,
+        "top": 130.0859375,
+        "bottom": 146.0859375
+      },
+      "zoom": {
+        "file": "ordinary-block-04-undo-caret-2x.png",
+        "sha256": "99d722f1989344b5c369aadc01e510b9c491c01008d118a9acc5116e9fdd12c4",
+        "clip": {
+          "x": 469.9765625,
+          "y": 105.0859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "ordinary-block-05-redo.png",
+      "sha256": "ee9748c912af83802156ea59622f3cef58cf463e1d85f4791ec6772a38634ddb",
+      "caret": {
+        "left": 593.078125,
+        "right": 593.078125,
+        "top": 130.0859375,
+        "bottom": 146.0859375
+      },
+      "zoom": {
+        "file": "ordinary-block-05-redo-caret-2x.png",
+        "sha256": "a1b676968b90138896e0273bac63be6c95b7fb932cbf165a4c55bb65a3457026",
+        "clip": {
+          "x": 473.078125,
+          "y": 105.0859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "ordinary-block-06-float-click.png",
+      "sha256": "26850dd473ba60e7a038061f2b47ae90f0483e47b589bc035a4a89b5543a7190",
+      "caret": {
+        "left": 586.8671875,
+        "right": 586.8671875,
+        "top": 130.0859375,
+        "bottom": 146.0859375
+      },
+      "zoom": {
+        "file": "ordinary-block-06-float-click-caret-2x.png",
+        "sha256": "09259e9a11d60b0a653aad831c2d312fa82f3e62fc9f55dcbebb72c4da848ecd",
+        "clip": {
+          "x": 466.8671875,
+          "y": 105.0859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "ordinary-inline-01-rendered.png",
+      "sha256": "f82e71bd4e059dcb5b84721be89963aaa55e9eb9e22887fe64f866fc9203fa50",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "ordinary-inline-01-rendered-caret-2x.png",
+        "sha256": "bc70d9a1e8eff17be41df3c9f0acc3191bf343f38736e663e18a94e498f41775",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "ordinary-inline-02-clicked.png",
+      "sha256": "d49b41317efafe7af67592d451c10b2575d2b28a24097f33c8758a87dcb153ca",
+      "caret": {
+        "left": 240.890625,
+        "right": 240.890625,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "ordinary-inline-02-clicked-caret-2x.png",
+        "sha256": "2d4869ddf58a29e184225fb8c9489a86aec44a78473a5ce8257582d8c502b488",
+        "clip": {
+          "x": 120.890625,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "ordinary-inline-03-edited.png",
+      "sha256": "6877f3b47556b3c4b78d4875d4a205ad74d1a3372d048fdd1ee10952ab3da7e3",
+      "caret": {
+        "left": 247.109375,
+        "right": 247.109375,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "ordinary-inline-03-edited-caret-2x.png",
+        "sha256": "e1a1b3d35971cadc95820efa43a00d0ad1f3a974feff98541cc3329e21190bf9",
+        "clip": {
+          "x": 127.109375,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "ordinary-inline-04-undo.png",
+      "sha256": "d49b41317efafe7af67592d451c10b2575d2b28a24097f33c8758a87dcb153ca",
+      "caret": {
+        "left": 240.890625,
+        "right": 240.890625,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "ordinary-inline-04-undo-caret-2x.png",
+        "sha256": "2d4869ddf58a29e184225fb8c9489a86aec44a78473a5ce8257582d8c502b488",
+        "clip": {
+          "x": 120.890625,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "ordinary-inline-05-redo.png",
+      "sha256": "6877f3b47556b3c4b78d4875d4a205ad74d1a3372d048fdd1ee10952ab3da7e3",
+      "caret": {
+        "left": 247.109375,
+        "right": 247.109375,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "ordinary-inline-05-redo-caret-2x.png",
+        "sha256": "e1a1b3d35971cadc95820efa43a00d0ad1f3a974feff98541cc3329e21190bf9",
+        "clip": {
+          "x": 127.109375,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "ordinary-inline-06-float-click.png",
+      "sha256": "a75d7c5bb5a0bd9b04da20a49e9317afeaab6f36d7e6e3c8970d9f012a9bc30e",
+      "caret": {
+        "left": 240.890625,
+        "right": 240.890625,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "ordinary-inline-06-float-click-caret-2x.png",
+        "sha256": "49d63dd7bb00ad6702d41c6db0eb7f8e6408930cd113cfc7e3dd83c02f3ebc34",
+        "clip": {
+          "x": 120.890625,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "keyboard-01-page-down.png",
+      "sha256": "ff51daaa5b457650f9cab7ebd5ccdfec545b4d87d1a0ec49fa91fd0ebb4ae19d",
+      "caret": {
+        "x": 170.5,
+        "y": 54.5078125,
+        "width": 0,
+        "height": 16,
+        "top": 54.5078125,
+        "right": 170.5,
+        "bottom": 70.5078125,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "keyboard-01-page-down-caret-2x.png",
+        "sha256": "c46552013afa1869402551218f6df91818ba15a5640bfbcaaf1aae1a6496c96c",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5078125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "keyboard-02-page-up.png",
+      "sha256": "aa5bea2958a6cc60a668d0076da2b5ac299269410bb0ef9cb5cb368e8be42547",
+      "caret": {
+        "x": 391.9609375,
+        "y": 54.5,
+        "width": 0,
+        "height": 16,
+        "top": 54.5,
+        "right": 391.9609375,
+        "bottom": 70.5,
+        "left": 391.9609375
+      },
+      "zoom": {
+        "file": "keyboard-02-page-up-caret-2x.png",
+        "sha256": "e5c71a529e3791bff1240520e17b5d182f959c89e93a139d797ce8762ceb169d",
+        "clip": {
+          "x": 271.9609375,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "keyboard-03-copy-paste-redo.png",
+      "sha256": "bfd421490135340ebeca731261c0c2cca6c59923301429e804930a5b5d5e2e0f",
+      "caret": {
+        "x": 170.5,
+        "y": 642.109375,
+        "width": 0,
+        "height": 16,
+        "top": 642.109375,
+        "right": 170.5,
+        "bottom": 658.109375,
+        "left": 170.5
+      },
+      "zoom": {
+        "file": "keyboard-03-copy-paste-redo-caret-2x.png",
+        "sha256": "648f21b4a813a300da959162e6807a98331ee9b1e846c1b294c4cd7a28ad6594",
+        "clip": {
+          "x": 50.5,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "mouse-01-double-click.png",
+      "sha256": "d5908c753b87689e44fc221c13c2eef5074fb30b982c1ff25ae2ad4d0ffaa10e",
+      "caret": {
+        "left": 204.7578125,
+        "right": 204.7578125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "mouse-01-double-click-caret-2x.png",
+        "sha256": "180027d93d0e30eae1b7fee93b76c7db7b3a6ef46a61d6d906baf23d89422fa0",
+        "clip": {
+          "x": 84.7578125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "mouse-02-replaced.png",
+      "sha256": "57cbcd650966e270e6ebd21a0db72e6b3f296b7123a0cd9d7a2f4e1b52c1bb8d",
+      "caret": {
+        "left": 217.6796875,
+        "right": 217.6796875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "mouse-02-replaced-caret-2x.png",
+        "sha256": "02aecb3ea3f23ee805e8794020f3c65d94c19ef8ed645918fb6cff65bff8f686",
+        "clip": {
+          "x": 97.6796875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-mouse-01-selected.png",
+      "sha256": "f8ddfb71ee4f8d1f23acb11db47c74f7f0ea891cb017ec51604ca4df429ea8f2",
+      "caret": {
+        "left": 291.640625,
+        "right": 291.640625,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-mouse-01-selected-caret-2x.png",
+        "sha256": "b161aa62cb5224a1fcd21b2eb247c350efa9a93ad0c459c3a6ff47c08253081a",
+        "clip": {
+          "x": 171.640625,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-mouse-02-paste-redo.png",
+      "sha256": "41963b9613f1a11f602d26ae7bd0e6394bd08437814d49bd2a5e89762b018291",
+      "caret": {
+        "left": 291.640625,
+        "right": 291.640625,
+        "top": 181.2890625,
+        "bottom": 197.2890625
+      },
+      "zoom": {
+        "file": "shift-mouse-02-paste-redo-caret-2x.png",
+        "sha256": "52a5c0f7682ecf63025ea8414c6ee71fdab3dc6495586881c240ed794f0616e9",
+        "clip": {
+          "x": 171.640625,
+          "y": 156.2890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "drag-01-selected.png",
+      "sha256": "f8ddfb71ee4f8d1f23acb11db47c74f7f0ea891cb017ec51604ca4df429ea8f2",
+      "caret": {
+        "left": 291.640625,
+        "right": 291.640625,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "drag-01-selected-caret-2x.png",
+        "sha256": "b161aa62cb5224a1fcd21b2eb247c350efa9a93ad0c459c3a6ff47c08253081a",
+        "clip": {
+          "x": 171.640625,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "drag-02-key-shortened.png",
+      "sha256": "2221c0b32f5bac7b1a1b1dde365f0a88b63b9fca6a90210a6ac7e1e409672982",
+      "caret": {
+        "left": 277.4609375,
+        "right": 277.4609375,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "drag-02-key-shortened-caret-2x.png",
+        "sha256": "34a7e55c8e53da6f4e3b0a7e5ee48f9f9e2c61a8cd7014e2b01782c900017a00",
+        "clip": {
+          "x": 157.4609375,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "drag-03-paste-redo.png",
+      "sha256": "3b47c9f9504687d6e1b4da38ff250319f9e799237bc5915fca99618986a1e980",
+      "caret": {
+        "x": 277.4609375,
+        "y": 181.2890625,
+        "width": 0,
+        "height": 16,
+        "top": 181.2890625,
+        "right": 277.4609375,
+        "bottom": 197.2890625,
+        "left": 277.4609375
+      },
+      "zoom": {
+        "file": "drag-03-paste-redo-caret-2x.png",
+        "sha256": "c2266ef09970eb544c7c49e321b85b95befc3113a5082848bc97a0b124dc2c41",
+        "clip": {
+          "x": 157.4609375,
+          "y": 156.2890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ]
+}

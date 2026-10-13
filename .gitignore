@@ -55,3 +55,6 @@
 # Portable quality tools: dependencies and private audit output
 node_modules/
 /.mp-verify/
+
+# Local packaged products and upgrade delivery copies
+/dist/

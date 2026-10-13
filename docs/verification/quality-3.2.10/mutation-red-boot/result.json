@@ -1,0 +1,267 @@
+{
+  "schema": 1,
+  "suite": "selection-workflows",
+  "startedAt": "2026-10-11T21:41:07.708Z",
+  "cases": [
+    {
+      "id": "early-cell-focus-survives-boot-fallback",
+      "status": "fail",
+      "trace": [
+        {
+          "name": "early-cell-click",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 26,
+            "head": 26
+          },
+          "cellText": "ab",
+          "focus": true,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "mp-cell-overlay-text"
+          },
+          "overlayVisible": true,
+          "anchor": 1,
+          "head": 1,
+          "focusNode": {
+            "type": 3,
+            "text": "ab",
+            "withinOverlay": true
+          },
+          "keys": [],
+          "pageMs": 852.5
+        },
+        {
+          "name": "cell-early-focus-01",
+          "text": "Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n",
+          "sourceSelection": {
+            "anchor": 26,
+            "head": 26
+          },
+          "cellText": "ab",
+          "focus": false,
+          "documentFocus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "overlayVisible": false,
+          "anchor": 0,
+          "head": 0,
+          "focusNode": {
+            "type": 1,
+            "text": "",
+            "withinOverlay": false
+          },
+          "keys": [],
+          "screenshot": {
+            "file": "cell-early-focus-01.png",
+            "sha256": "bd770d8ba2c5b067de8794903e117337fc105f01f820624c7db330061d831179",
+            "caret": null,
+            "zoom": {
+              "file": "cell-early-focus-01-caret-2x.png",
+              "sha256": "0d1c6c42ec68b3449d5e50ced1dec7f073c769233f8cacf9a731ac42b11472b7",
+              "clip": {
+                "x": 866.5,
+                "y": 118.5859375,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "error": "boot retry must preserve the user-selected cell editor",
+      "ms": 1931
+    },
+    {
+      "id": "boot-open-document-direct-typing-needs-no-click",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "boot-direct-01",
+          "text": "READY Direct typing\n",
+          "selection": {
+            "anchor": 6,
+            "head": 6
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 221.3359375,
+            "right": 221.3359375,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "boot-direct.md · 14 字 — MarkPilot",
+          "banner": "",
+          "keys": [],
+          "screenshot": {
+            "file": "boot-direct-01.png",
+            "sha256": "4b1b02ca4766ec5dd735828f94d19a137f040ba4c473acef243740e3d7a8e74b",
+            "caret": {
+              "left": 221.3359375,
+              "right": 221.3359375,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "boot-direct-01-caret-2x.png",
+              "sha256": "b1b1910ceffe723133deabcbe8a51ca40f7e9e05fd068c23d6d4c535cd3953b0",
+              "clip": {
+                "x": 101.3359375,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "ms": 1076
+    }
+  ],
+  "errors": [],
+  "artifact": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-boot\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-boot\\unpacked\\MarkPilot.exe",
+    "runtimeExecutableSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-boot\\unpacked\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.10",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-boot\\unpacked\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-boot\\unpacked\\resources\\app.asar",
+    "asarSha256": "c1f4e0b00a6ded93472508c451a7e5f2d969cb9968c557a0c01a9fc4d734e202",
+    "bootMs": 945,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "53cc5cd04934b7f46e81244355cf57a0b7e166bbda13a055e847d363a6255e84",
+        "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3",
+        "sourceSha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "clipboard": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T21:41:17.538Z",
+  "passed": false,
+  "frames": [
+    {
+      "file": "cell-early-focus-01.png",
+      "sha256": "bd770d8ba2c5b067de8794903e117337fc105f01f820624c7db330061d831179",
+      "caret": null,
+      "zoom": {
+        "file": "cell-early-focus-01-caret-2x.png",
+        "sha256": "0d1c6c42ec68b3449d5e50ced1dec7f073c769233f8cacf9a731ac42b11472b7",
+        "clip": {
+          "x": 866.5,
+          "y": 118.5859375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "boot-direct-01.png",
+      "sha256": "4b1b02ca4766ec5dd735828f94d19a137f040ba4c473acef243740e3d7a8e74b",
+      "caret": {
+        "left": 221.3359375,
+        "right": 221.3359375,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "boot-direct-01-caret-2x.png",
+        "sha256": "b1b1910ceffe723133deabcbe8a51ca40f7e9e05fd068c23d6d4c535cd3953b0",
+        "clip": {
+          "x": 101.3359375,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ]
+}

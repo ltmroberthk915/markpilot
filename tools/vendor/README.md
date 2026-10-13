@@ -1,0 +1,9 @@
+# Maintained KaTeX source mapping
+
+`node tools/vendor/build-katex.cjs` reproduces `dsh-markpilot/renderer/vendor/katex/` offline from the exact KaTeX 0.19.0 package in the engine lockfile. The controlled `node build-from-source.cjs` runs this step before bundling the engine. All 176 upstream source and asset inputs have a pinned inventory, checked against the package tarball and its lockfile SHA512. The generator applies 24 unique anchored hooks, fails on source drift, and records input/output hashes and unchanged security guard hashes in provenance. CSS and fonts come from the same package. The upstream MIT license is preserved.
+
+Mapping uses UTF-16 offsets in the caller's literal TeX. Normal tokens keep their lexer locations; substituted macro arguments retain their own locations; generated macro-body tokens map to the invocation. Unicode scripts, primes, and ligatures retain origins. Nonmonotonic macro output does not invent a contiguous parent range. DOM and string renderers emit the same `data-typora-source-start/end` attributes. Combining glyphs with distinct ranges is forbidden.
+
+The hooks preserve upstream expansion counters, shared subparser budgets, and own-property settings processing. Product rendering explicitly sets `trust: false`, `maxExpand: 1000`, and `maxSize: 20`. Tests in `tools/quality/tests/katex-vendor.test.cjs` exercise literal mappings and bounded regression inputs; build-status and provenance are build receipts, not GUI acceptance claims. GUI glyph hit testing, native selection/history, and exports are verified by the product workflow suites.
+
+Generated patch sources and inventories live in `.mp-verify/vendor-katex-source-map/` and are reproducible; they are not runtime dependencies. The checked renderer assets and both generator scripts must be kept together in a source delivery.

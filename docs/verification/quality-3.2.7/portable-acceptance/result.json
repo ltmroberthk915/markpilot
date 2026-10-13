@@ -1,0 +1,725 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T15:54:50.282Z",
+  "seed": 325,
+  "cases": [
+    {
+      "id": "startup-exact-bytes-and-focus",
+      "status": "pass",
+      "ms": 3,
+      "detail": {
+        "selection": {
+          "anchor": 0,
+          "head": 0
+        },
+        "focus": true
+      }
+    },
+    {
+      "id": "real-unicode-input-autosave",
+      "status": "pass",
+      "ms": 684,
+      "detail": {
+        "characters": 43,
+        "diskSha256": "45feb1a8f50f1bc7c75a7f1f849f9a7751f9c45a630f93e061d030ed33d14d3b"
+      }
+    },
+    {
+      "id": "format-bold-typing-and-toggle",
+      "status": "pass",
+      "ms": 234,
+      "detail": {
+        "text": "词体",
+        "selection": {
+          "anchor": 0,
+          "head": 0
+        }
+      }
+    },
+    {
+      "id": "format-italic-typing-and-toggle",
+      "status": "pass",
+      "ms": 230,
+      "detail": {
+        "text": "词体",
+        "selection": {
+          "anchor": 0,
+          "head": 0
+        }
+      }
+    },
+    {
+      "id": "format-underline-typing-and-toggle",
+      "status": "pass",
+      "ms": 216,
+      "detail": {
+        "text": "词体",
+        "selection": {
+          "anchor": 0,
+          "head": 0
+        }
+      }
+    },
+    {
+      "id": "format-strike-typing-and-toggle",
+      "status": "pass",
+      "ms": 257,
+      "detail": {
+        "text": "词体",
+        "selection": {
+          "anchor": 0,
+          "head": 0
+        }
+      }
+    },
+    {
+      "id": "format-code-typing-and-toggle",
+      "status": "pass",
+      "ms": 220,
+      "detail": {
+        "text": "词体",
+        "selection": {
+          "anchor": 0,
+          "head": 0
+        }
+      }
+    },
+    {
+      "id": "format-selection-undo-redo",
+      "status": "pass",
+      "ms": 191
+    },
+    {
+      "id": "plain-input-model-fixed-seed",
+      "status": "pass",
+      "ms": 777,
+      "detail": {
+        "seed": 325,
+        "operations": [
+          "甲",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a",
+          "backspace",
+          "乙",
+          "🙂",
+          "a"
+        ],
+        "characters": 35
+      }
+    },
+    {
+      "id": "markdown-projection-and-source-fidelity",
+      "status": "pass",
+      "ms": 732,
+      "detail": {
+        "underline": [
+          {
+            "text": "下划线",
+            "style": "underline"
+          }
+        ],
+        "math": 1
+      }
+    },
+    {
+      "id": "mermaid-render-and-content-update",
+      "status": "pass",
+      "ms": 877,
+      "detail": {
+        "svg": true,
+        "updated": true
+      }
+    },
+    {
+      "id": "mermaid-invalid-source-safe-fallback",
+      "status": "pass",
+      "ms": 397,
+      "detail": {
+        "message": "mermaid 渲染失败：Parse error on line 3:\n... TD A[unterminated\n---------------------^\nExpecting 'SQE', 'DOUBLECIRCLEEND', 'PE', '-)', 'STADIUMEND', 'SUBROUTINEEND', 'PIPE', 'CYLINDEREND', 'DIAMOND_STOP', 'TAGEND', 'TRAPEND', 'INVTRAPEND', 'UNICODE_TEXT', 'TEXT', 'TAGSTART', got '1'"
+      }
+    },
+    {
+      "id": "task-list-widget-after-offset-shift",
+      "status": "pass",
+      "ms": 208,
+      "detail": {
+        "text": "前缀\n前文\n- [x] task\n后文\n"
+      }
+    },
+    {
+      "id": "mouse-drag-selection-and-shift-key-extension",
+      "status": "pass",
+      "ms": 475,
+      "detail": {
+        "before": {
+          "anchor": 1,
+          "head": 6
+        },
+        "after": {
+          "anchor": 1,
+          "head": 7
+        }
+      }
+    },
+    {
+      "id": "shift-mouse-click-and-real-double-click",
+      "status": "pass",
+      "ms": 646,
+      "detail": {
+        "shifted": {
+          "anchor": 2,
+          "head": 8
+        },
+        "doubleClicked": {
+          "anchor": 6,
+          "head": 10
+        }
+      }
+    },
+    {
+      "id": "save-as-real-menu-and-disk",
+      "status": "pass",
+      "ms": 980,
+      "detail": {
+        "file": "mp-quality-save-as.md",
+        "bytes": 22
+      }
+    },
+    {
+      "id": "secondary-window-eol-and-session-isolation",
+      "status": "pass",
+      "ms": 2195,
+      "detail": {
+        "primary": "mp-quality-save-as.md",
+        "secondary": "mp-quality-b.md"
+      }
+    },
+    {
+      "id": "large-document-real-input-latency",
+      "status": "pass",
+      "ms": 1941,
+      "detail": [
+        {
+          "lines": 1000,
+          "characters": 33890,
+          "p50Ms": 16,
+          "p95Ms": 19,
+          "samples": 30,
+          "metric": "CDP input through next renderer animation frame; excludes whole-document serialization",
+          "rawMs": [
+            11.92029999999977,
+            12.959700000003068,
+            13.788799999998446,
+            14.893499999998312,
+            15.245699999999488,
+            15.775400000000445,
+            15.872999999999593,
+            15.936200000000099,
+            16.028800000000047,
+            16.10349999999744,
+            16.175600000002305,
+            16.20270000000164,
+            16.23370000000068,
+            16.277200000000448,
+            16.40230000000156,
+            16.625599999999395,
+            16.6304999999993,
+            16.83510000000024,
+            16.988299999997253,
+            17.04859999999826,
+            17.083200000000943,
+            17.153299999998126,
+            17.294799999999668,
+            17.50460000000021,
+            17.53059999999823,
+            17.593700000001263,
+            18.19840000000113,
+            18.813700000002427,
+            18.872299999999086,
+            20.823599999999715
+          ]
+        },
+        {
+          "lines": 10000,
+          "characters": 348890,
+          "p50Ms": 17,
+          "p95Ms": 18,
+          "samples": 30,
+          "metric": "CDP input through next renderer animation frame; excludes whole-document serialization",
+          "rawMs": [
+            14.426199999998062,
+            15.000600000003033,
+            15.513600000002043,
+            15.704000000001543,
+            15.937700000002224,
+            16.081900000001042,
+            16.386099999999715,
+            16.47660000000178,
+            16.492999999998574,
+            16.494699999999284,
+            16.603400000003603,
+            16.630600000000413,
+            16.662200000002485,
+            16.74749999999767,
+            16.89020000000164,
+            16.891700000000128,
+            16.900499999999738,
+            16.90820000000167,
+            16.92399999999907,
+            17.01299999999901,
+            17.068199999997887,
+            17.072299999999814,
+            17.14219999999841,
+            17.799800000000687,
+            17.85769999999684,
+            17.881600000000617,
+            18.01089999999749,
+            18.125,
+            18.242299999998068,
+            24.251400000001013
+          ]
+        }
+      ]
+    },
+    {
+      "id": "no-renderer-exceptions",
+      "status": "pass",
+      "ms": 0,
+      "detail": {
+        "errors": []
+      }
+    }
+  ],
+  "frames": [
+    {
+      "file": "01-boot.png",
+      "sha256": "c5417be8cfdc46aa3d2b40e79db40611130cc5b03da4b757abf3b998379eb337",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 57,
+        "bottom": 91
+      },
+      "zoom": {
+        "file": "01-boot-caret-2x.png",
+        "sha256": "f66f4a1d647b6410555b7e7a51b98f4d8fa7c377ca7646739e94eaac7cbf2181",
+        "clip": {
+          "x": 40.5,
+          "y": 32,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "02-markdown.png",
+      "sha256": "c476785ed96335bfcc1b48d5044ff6f585f88edff5a20d79abe03873b97af94d",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "02-markdown-caret-2x.png",
+        "sha256": "bea968e5fc55fcf0ac3dee5066f3ce2de28e2aab6f7da14d8a6bc2b6d2ebb9db",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "03-mermaid.png",
+      "sha256": "e788b75b096665086f8e77a4055ffd7804649302f013758d11ffc9322f7b9a09",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "03-mermaid-caret-2x.png",
+        "sha256": "b90ee631f1ee4307e6c08da4a51b3ce4bb92512f646fb8219b58d81a799e22d8",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "04-mermaid-updated.png",
+      "sha256": "49828bd56a79c6d3db973b745076e075f9a323e76d59034a86be62991c8fc3b9",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "04-mermaid-updated-caret-2x.png",
+        "sha256": "b90ee631f1ee4307e6c08da4a51b3ce4bb92512f646fb8219b58d81a799e22d8",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "08-mermaid-error.png",
+      "sha256": "235783643053fe4312628e73d72b27bbcf7b40bacd06df56dfb913b4c381b1d3",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "08-mermaid-error-caret-2x.png",
+        "sha256": "b90ee631f1ee4307e6c08da4a51b3ce4bb92512f646fb8219b58d81a799e22d8",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "05-selection.png",
+      "sha256": "011a9aa16a16787eaaeca1ca9029349333f19d0d84a3b0de4e8f4bfadffa2a69",
+      "caret": {
+        "left": 208.2421875,
+        "right": 208.2421875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "05-selection-caret-2x.png",
+        "sha256": "b84cb112618c94c4f1733155780990c1d0abc5315c9ce36f510dfd42546b37b2",
+        "clip": {
+          "x": 88.2421875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "10-shift-click-selection.png",
+      "sha256": "23ee4e1a4b9268d8b425c984cbd49eafa4c96e8068db491b55b73ae3e286d64d",
+      "caret": {
+        "left": 212.7421875,
+        "right": 212.7421875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "10-shift-click-selection-caret-2x.png",
+        "sha256": "9fe42b833bd5856d8464487d993238d07f81f9053fea48ba35ac65942beee889",
+        "clip": {
+          "x": 92.7421875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "09-double-click-selection.png",
+      "sha256": "b9f3d5377abfbbff65bad65371e86b68127bb9c74edbeb1a406caf6b32eb248e",
+      "caret": {
+        "left": 224.6328125,
+        "right": 224.6328125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "09-double-click-selection-caret-2x.png",
+        "sha256": "a60f0a573f0548d19defa60132ebca007cc832fbc88126433e522422bdfab6a3",
+        "clip": {
+          "x": 104.6328125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "06-second-window.png",
+      "sha256": "8db30192182e60250b79b12a01c3181824e52dc6b3caf25a60df20954bd122b9",
+      "caret": {
+        "left": 267.1171875,
+        "right": 267.1171875,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "06-second-window-caret-2x.png",
+        "sha256": "422e3018a3311e32a49794c17cf8a404fc468eafb25e4faeea11fdf490e0bc9f",
+        "clip": {
+          "x": 147.1171875,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "07-final.png",
+      "sha256": "ec001ea7ae769b63b7b615030447849277b8fd2e6d026fbc065575f601797eab",
+      "caret": {
+        "left": 372.546875,
+        "right": 372.546875,
+        "top": 642.3515625,
+        "bottom": 658.3515625
+      },
+      "zoom": {
+        "file": "07-final-caret-2x.png",
+        "sha256": "710c840b1b6fbf70ffc69ae33343ccab916ee33f5915d5eb0c539e4d1658ad8f",
+        "clip": {
+          "x": 252.546875,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ],
+  "warnings": [],
+  "performance": [
+    {
+      "lines": 1000,
+      "characters": 33890,
+      "p50Ms": 16,
+      "p95Ms": 19,
+      "samples": 30,
+      "metric": "CDP input through next renderer animation frame; excludes whole-document serialization",
+      "rawMs": [
+        11.92029999999977,
+        12.959700000003068,
+        13.788799999998446,
+        14.893499999998312,
+        15.245699999999488,
+        15.775400000000445,
+        15.872999999999593,
+        15.936200000000099,
+        16.028800000000047,
+        16.10349999999744,
+        16.175600000002305,
+        16.20270000000164,
+        16.23370000000068,
+        16.277200000000448,
+        16.40230000000156,
+        16.625599999999395,
+        16.6304999999993,
+        16.83510000000024,
+        16.988299999997253,
+        17.04859999999826,
+        17.083200000000943,
+        17.153299999998126,
+        17.294799999999668,
+        17.50460000000021,
+        17.53059999999823,
+        17.593700000001263,
+        18.19840000000113,
+        18.813700000002427,
+        18.872299999999086,
+        20.823599999999715
+      ]
+    },
+    {
+      "lines": 10000,
+      "characters": 348890,
+      "p50Ms": 17,
+      "p95Ms": 18,
+      "samples": 30,
+      "metric": "CDP input through next renderer animation frame; excludes whole-document serialization",
+      "rawMs": [
+        14.426199999998062,
+        15.000600000003033,
+        15.513600000002043,
+        15.704000000001543,
+        15.937700000002224,
+        16.081900000001042,
+        16.386099999999715,
+        16.47660000000178,
+        16.492999999998574,
+        16.494699999999284,
+        16.603400000003603,
+        16.630600000000413,
+        16.662200000002485,
+        16.74749999999767,
+        16.89020000000164,
+        16.891700000000128,
+        16.900499999999738,
+        16.90820000000167,
+        16.92399999999907,
+        17.01299999999901,
+        17.068199999997887,
+        17.072299999999814,
+        17.14219999999841,
+        17.799800000000687,
+        17.85769999999684,
+        17.881600000000617,
+        18.01089999999749,
+        18.125,
+        18.242299999998068,
+        24.251400000001013
+      ]
+    }
+  ],
+  "metadata": {
+    "executable": "markpilot-3.2.7-portable.exe",
+    "exeSha256": "ae824eb37cc0082a2c7876284fa4e03d99474f3dad42197e89e33324a940ccf7",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.7",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "bootMs": 5219,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "d64901ab8921ab227387679d9988302af9ed6576816c13bf26ad73d87cd123f7",
+        "sourceSha256": "d64901ab8921ab227387679d9988302af9ed6576816c13bf26ad73d87cd123f7"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "a82bfbb9c56c8c355976dec9ad5df6b1f8581d8524b9eab54f818261db7a97fd",
+        "sourceSha256": "a82bfbb9c56c8c355976dec9ad5df6b1f8581d8524b9eab54f818261db7a97fd"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "ee74a82702b50d9f261701df6e24f108cf27176ca79541fc0cc95af33f74bc5d",
+        "sourceSha256": "ee74a82702b50d9f261701df6e24f108cf27176ca79541fc0cc95af33f74bc5d"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T15:55:13.644Z",
+  "passed": true
+}

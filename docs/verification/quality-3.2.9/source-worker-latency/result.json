@@ -1,0 +1,181 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T20:04:38.761Z",
+  "metric": "CDP key input through the next renderer frame, including transport and frame pacing; semantic correctness is asserted separately from latency",
+  "cases": [
+    {
+      "id": "pending-quote-enter-20-repetitions",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 1,
+          "resets": 1,
+          "deltas": 0,
+          "completed": 0,
+          "discarded": 0,
+          "nativeFallback": 0,
+          "commandFallback": 0,
+          "error": null,
+          "revision": 1,
+          "status": "pending",
+          "length": 555008,
+          "treeLength": 555008,
+          "available": false
+        },
+        {
+          "requests": 41,
+          "resets": 1,
+          "deltas": 40,
+          "completed": 1,
+          "discarded": 14,
+          "nativeFallback": 40,
+          "commandFallback": 20,
+          "error": null,
+          "revision": 41,
+          "status": "ready",
+          "length": 555088,
+          "treeLength": 555088,
+          "available": true
+        }
+      ],
+      "detail": {
+        "characters": 555008,
+        "samples": 20,
+        "firstMs": 308,
+        "steadyP50Ms": 142,
+        "steadyP95Ms": 253,
+        "rawMs": [
+          308.07490000000007,
+          253.2273,
+          247.71519999999964,
+          209.67859999999973,
+          174.8182999999999,
+          194.3847999999998,
+          193.91739999999982,
+          190.94240000000036,
+          122.02440000000024,
+          148.0026000000007,
+          134.8726000000006,
+          138.16209999999955,
+          139.46000000000004,
+          142.90979999999945,
+          121.29210000000057,
+          140.6293999999998,
+          142.3181999999997,
+          141.65080000000034,
+          122.14789999999994,
+          142.4269000000004
+        ],
+        "status": {
+          "requests": 41,
+          "resets": 1,
+          "deltas": 40,
+          "completed": 1,
+          "discarded": 14,
+          "nativeFallback": 40,
+          "commandFallback": 20,
+          "error": null,
+          "revision": 41,
+          "status": "ready",
+          "length": 555088,
+          "treeLength": 555088,
+          "available": true
+        }
+      },
+      "ms": 3949
+    }
+  ],
+  "errors": [],
+  "metadata": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-final-source-3.2.9\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-final-source-3.2.9\\unpacked\\MarkPilot.exe",
+    "runtimeExecutableSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-final-source-3.2.9\\unpacked\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.9",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-final-source-3.2.9\\unpacked\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-final-source-3.2.9\\unpacked\\resources\\app.asar",
+    "asarSha256": "dae852488c3b63e86d807c043f9b46f150ba869b4fe2d5bc5c782a3150e3d0bc",
+    "bootMs": 1637,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "07f56591e566c4ceebfc2c49db57cf89eaebcf3b6f7188f00f7240617760059d",
+        "sourceSha256": "07f56591e566c4ceebfc2c49db57cf89eaebcf3b6f7188f00f7240617760059d"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "b4b11d263b9bbbe69a2651ecd4be37e0279b443a3061a47b0f0318952df66a7d",
+        "sourceSha256": "b4b11d263b9bbbe69a2651ecd4be37e0279b443a3061a47b0f0318952df66a7d"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T20:04:49.173Z",
+  "passed": true,
+  "frames": []
+}

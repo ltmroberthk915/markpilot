@@ -1,0 +1,367 @@
+{
+  "schema": 1,
+  "pngBytes": 1299711,
+  "uniquePngFiles": 22,
+  "frames": [
+    {
+      "group": "source-quoted-math-subrange-workflows",
+      "suite": "quoted-math-subrange-workflows",
+      "caseId": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+      "stage": "03-reverse-selected",
+      "kind": "full",
+      "sha256": "ba8895bb619d335d4b9bc99c4f015981fa1e9e5676ec3ba1a21901befd84a6a0",
+      "file": "frames/ba8895bb619d335d4b9bc99c4f015981fa1e9e5676ec3ba1a21901befd84a6a0.png",
+      "bytes": 61335
+    },
+    {
+      "group": "source-quoted-math-subrange-workflows",
+      "suite": "quoted-math-subrange-workflows",
+      "caseId": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+      "stage": "03-reverse-selected",
+      "kind": "2x",
+      "sha256": "9469cf3fd4fa31e35fcf19eaddead0fc62fd17f60cfaebb16288642da3bebd33",
+      "file": "frames/9469cf3fd4fa31e35fcf19eaddead0fc62fd17f60cfaebb16288642da3bebd33.png",
+      "bytes": 11455
+    },
+    {
+      "group": "source-cell-composition-workflows",
+      "suite": "cell-composition-workflows",
+      "caseId": "cell-unicode-positive-history-continue",
+      "stage": "02-ordinary-unicode",
+      "kind": "full",
+      "sha256": "dbe694cbe518da929058317f485bf68a94d3838cf6a7acb551eb116aa2edc7be",
+      "file": "frames/dbe694cbe518da929058317f485bf68a94d3838cf6a7acb551eb116aa2edc7be.png",
+      "bytes": 58445
+    },
+    {
+      "group": "source-cell-composition-workflows",
+      "suite": "cell-composition-workflows",
+      "caseId": "cell-unicode-positive-history-continue",
+      "stage": "02-ordinary-unicode",
+      "kind": "2x",
+      "sha256": "a2f28d9889a61e8d5433b089b3f8c2ef50fe0fa146ed12e2b8fef9166337fade",
+      "file": "frames/a2f28d9889a61e8d5433b089b3f8c2ef50fe0fa146ed12e2b8fef9166337fade.png",
+      "bytes": 7854
+    },
+    {
+      "group": "source-native-menu-workflows",
+      "suite": "native-menu-workflows",
+      "caseId": "native-menu-body-undo-history-continue",
+      "stage": "06-menu-after",
+      "kind": "full",
+      "sha256": "d176fd435c4eb37975348d5d5f08c8b23df902f0955cd90d24255add65ee6dd8",
+      "file": "frames/d176fd435c4eb37975348d5d5f08c8b23df902f0955cd90d24255add65ee6dd8.png",
+      "bytes": 49063
+    },
+    {
+      "group": "source-native-menu-workflows",
+      "suite": "native-menu-workflows",
+      "caseId": "native-menu-body-undo-history-continue",
+      "stage": "06-menu-after",
+      "kind": "2x",
+      "sha256": "036091ac1e474798cc96c9883c77476ae64e537a2e5e6e39dd4fd6f97a6abc14",
+      "file": "frames/036091ac1e474798cc96c9883c77476ae64e537a2e5e6e39dd4fd6f97a6abc14.png",
+      "bytes": 21249
+    },
+    {
+      "group": "source-native-menu-workflows",
+      "suite": "native-menu-workflows",
+      "caseId": "native-menu-cell-undo-history-continue",
+      "stage": "06-menu-after",
+      "kind": "full",
+      "sha256": "af6ab25d8bf06207688f2b63c276b011db1434623f86abebc7a28007e352c508",
+      "file": "frames/af6ab25d8bf06207688f2b63c276b011db1434623f86abebc7a28007e352c508.png",
+      "bytes": 57400
+    },
+    {
+      "group": "source-native-menu-workflows",
+      "suite": "native-menu-workflows",
+      "caseId": "native-menu-cell-undo-history-continue",
+      "stage": "06-menu-after",
+      "kind": "2x",
+      "sha256": "3818462a6039bd8d5f22cb7153867dbb740a996311b5937c8be743037e129c88",
+      "file": "frames/3818462a6039bd8d5f22cb7153867dbb740a996311b5937c8be743037e129c88.png",
+      "bytes": 5263
+    },
+    {
+      "group": "source-native-menu-workflows",
+      "suite": "native-menu-workflows",
+      "caseId": "native-menu-search-undo-history-continue",
+      "stage": "06-menu-after",
+      "kind": "full",
+      "sha256": "23b198958be26e4489606ee71ac090c222b17c25497081d284ed42587bd2ca71",
+      "file": "frames/23b198958be26e4489606ee71ac090c222b17c25497081d284ed42587bd2ca71.png",
+      "bytes": 63104
+    },
+    {
+      "group": "source-native-menu-workflows",
+      "suite": "native-menu-workflows",
+      "caseId": "native-menu-search-undo-history-continue",
+      "stage": "06-menu-after",
+      "kind": "2x",
+      "sha256": "ac7dfb399ac189f257cd30c890c768b3b8dba9783b09c3694647c639df0ffa22",
+      "file": "frames/ac7dfb399ac189f257cd30c890c768b3b8dba9783b09c3694647c639df0ffa22.png",
+      "bytes": 27113
+    },
+    {
+      "group": "source-cross-page-drag-workflows",
+      "suite": "cross-page-drag-workflows",
+      "caseId": "formula-held-wheel-loop",
+      "stage": "formula-03-released",
+      "kind": "full",
+      "sha256": "9fa6c36be0de1cbeedd50cb1ac4331a99099dae29efde553997c709044234166",
+      "file": "frames/9fa6c36be0de1cbeedd50cb1ac4331a99099dae29efde553997c709044234166.png",
+      "bytes": 224663
+    },
+    {
+      "group": "source-cross-page-drag-workflows",
+      "suite": "cross-page-drag-workflows",
+      "caseId": "formula-held-wheel-loop",
+      "stage": "formula-03-released",
+      "kind": "2x",
+      "sha256": "380c07f5975dd82fb79aecf0014f4262147048d17eef71c945ecc9a21cee4504",
+      "file": "frames/380c07f5975dd82fb79aecf0014f4262147048d17eef71c945ecc9a21cee4504.png",
+      "bytes": 37837
+    },
+    {
+      "group": "source-math-gesture-workflows",
+      "suite": "math-gesture-workflows",
+      "caseId": "math-gesture-local-loop-source-and-selection",
+      "stage": "local-loop-03-released",
+      "kind": "full",
+      "sha256": "acdcd0dc925a58cb9022f17174d9d9a4cf2673f1a3f16ca9f41b98a529db6770",
+      "file": "frames/acdcd0dc925a58cb9022f17174d9d9a4cf2673f1a3f16ca9f41b98a529db6770.png",
+      "bytes": 184067
+    },
+    {
+      "group": "source-math-gesture-workflows",
+      "suite": "math-gesture-workflows",
+      "caseId": "math-gesture-local-loop-source-and-selection",
+      "stage": "local-loop-03-released",
+      "kind": "2x",
+      "sha256": "bab5ed40dea5d939f6052cf0d7748f3e555e7fef2321478d826ce8fb031a0564",
+      "file": "frames/bab5ed40dea5d939f6052cf0d7748f3e555e7fef2321478d826ce8fb031a0564.png",
+      "bytes": 12349
+    },
+    {
+      "group": "source-native-pending-image-workflows",
+      "suite": "native-pending-image-workflows",
+      "caseId": "native-menu-undo-pending-bitmap-empty-history",
+      "stage": "04-late-response",
+      "kind": "full",
+      "sha256": "db77ddbcf809cc90902658cb9f32b0c58ebfadb08e8edd0ec58e837da47105d8",
+      "file": "frames/db77ddbcf809cc90902658cb9f32b0c58ebfadb08e8edd0ec58e837da47105d8.png",
+      "bytes": 66286
+    },
+    {
+      "group": "source-native-pending-image-workflows",
+      "suite": "native-pending-image-workflows",
+      "caseId": "native-menu-undo-pending-bitmap-empty-history",
+      "stage": "04-late-response",
+      "kind": "2x",
+      "sha256": "8865562c3ccaea9a864f23460de9c07403f2473137af00f45f216e9785bdbe0a",
+      "file": "frames/8865562c3ccaea9a864f23460de9c07403f2473137af00f45f216e9785bdbe0a.png",
+      "bytes": 21443
+    },
+    {
+      "group": "source-search-pending-image-workflows",
+      "suite": "search-pending-image-workflows",
+      "caseId": "native-search-undo-retains-document-pending-bitmap",
+      "stage": "04-late-response",
+      "kind": "full",
+      "sha256": "88706fb3c10fb6ec545ec0bb599cea5988e5a60d893ce7edfbfa7e2750c4657b",
+      "file": "frames/88706fb3c10fb6ec545ec0bb599cea5988e5a60d893ce7edfbfa7e2750c4657b.png",
+      "bytes": 67785
+    },
+    {
+      "group": "source-search-pending-image-workflows",
+      "suite": "search-pending-image-workflows",
+      "caseId": "native-search-undo-retains-document-pending-bitmap",
+      "stage": "04-late-response",
+      "kind": "2x",
+      "sha256": "aab3ca45969ff0b747c3eea631bb66ecc0bd243fb01a0fbedd98eb6d77ee45d2",
+      "file": "frames/aab3ca45969ff0b747c3eea631bb66ecc0bd243fb01a0fbedd98eb6d77ee45d2.png",
+      "bytes": 27157
+    },
+    {
+      "group": "baseline-native-menu",
+      "suite": "native-menu-workflows",
+      "caseId": "native-menu-cell-undo-history-continue",
+      "stage": "06-menu-after",
+      "kind": "full",
+      "sha256": "dbe694cbe518da929058317f485bf68a94d3838cf6a7acb551eb116aa2edc7be",
+      "file": "frames/dbe694cbe518da929058317f485bf68a94d3838cf6a7acb551eb116aa2edc7be.png",
+      "bytes": 58445
+    },
+    {
+      "group": "baseline-native-menu",
+      "suite": "native-menu-workflows",
+      "caseId": "native-menu-cell-undo-history-continue",
+      "stage": "06-menu-after",
+      "kind": "2x",
+      "sha256": "a2f28d9889a61e8d5433b089b3f8c2ef50fe0fa146ed12e2b8fef9166337fade",
+      "file": "frames/a2f28d9889a61e8d5433b089b3f8c2ef50fe0fa146ed12e2b8fef9166337fade.png",
+      "bytes": 7854
+    },
+    {
+      "group": "mutation-red-native-menu",
+      "suite": "native-menu-workflows",
+      "caseId": "native-menu-cell-undo-history-continue",
+      "stage": "06-menu-after",
+      "kind": "full",
+      "sha256": "dbe694cbe518da929058317f485bf68a94d3838cf6a7acb551eb116aa2edc7be",
+      "file": "frames/dbe694cbe518da929058317f485bf68a94d3838cf6a7acb551eb116aa2edc7be.png",
+      "bytes": 58445
+    },
+    {
+      "group": "mutation-red-native-menu",
+      "suite": "native-menu-workflows",
+      "caseId": "native-menu-cell-undo-history-continue",
+      "stage": "06-menu-after",
+      "kind": "2x",
+      "sha256": "a2f28d9889a61e8d5433b089b3f8c2ef50fe0fa146ed12e2b8fef9166337fade",
+      "file": "frames/a2f28d9889a61e8d5433b089b3f8c2ef50fe0fa146ed12e2b8fef9166337fade.png",
+      "bytes": 7854
+    },
+    {
+      "group": "mutation-restored-native-menu",
+      "suite": "native-menu-workflows",
+      "caseId": "native-menu-cell-undo-history-continue",
+      "stage": "06-menu-after",
+      "kind": "full",
+      "sha256": "af6ab25d8bf06207688f2b63c276b011db1434623f86abebc7a28007e352c508",
+      "file": "frames/af6ab25d8bf06207688f2b63c276b011db1434623f86abebc7a28007e352c508.png",
+      "bytes": 57400
+    },
+    {
+      "group": "mutation-restored-native-menu",
+      "suite": "native-menu-workflows",
+      "caseId": "native-menu-cell-undo-history-continue",
+      "stage": "06-menu-after",
+      "kind": "2x",
+      "sha256": "3818462a6039bd8d5f22cb7153867dbb740a996311b5937c8be743037e129c88",
+      "file": "frames/3818462a6039bd8d5f22cb7153867dbb740a996311b5937c8be743037e129c88.png",
+      "bytes": 5263
+    },
+    {
+      "group": "baseline-math-gesture",
+      "suite": "cross-page-drag-workflows",
+      "caseId": "formula-held-wheel-loop",
+      "stage": "formula-03-released",
+      "kind": "full",
+      "sha256": "b30426aa2040b00a51d775bddbc9a54e4b701dcf9efcdd0720c9b96fe297f6e2",
+      "file": "frames/b30426aa2040b00a51d775bddbc9a54e4b701dcf9efcdd0720c9b96fe297f6e2.png",
+      "bytes": 220595
+    },
+    {
+      "group": "baseline-math-gesture",
+      "suite": "cross-page-drag-workflows",
+      "caseId": "formula-held-wheel-loop",
+      "stage": "formula-03-released",
+      "kind": "2x",
+      "sha256": "08afb5afe64c9a248984458cfb184d4dfbf5f98481d93260942a582d6ffb475b",
+      "file": "frames/08afb5afe64c9a248984458cfb184d4dfbf5f98481d93260942a582d6ffb475b.png",
+      "bytes": 9152
+    },
+    {
+      "group": "mutation-red-math-gesture",
+      "suite": "cross-page-drag-workflows",
+      "caseId": "formula-held-wheel-loop",
+      "stage": "formula-03-released",
+      "kind": "full",
+      "sha256": "b30426aa2040b00a51d775bddbc9a54e4b701dcf9efcdd0720c9b96fe297f6e2",
+      "file": "frames/b30426aa2040b00a51d775bddbc9a54e4b701dcf9efcdd0720c9b96fe297f6e2.png",
+      "bytes": 220595
+    },
+    {
+      "group": "mutation-red-math-gesture",
+      "suite": "cross-page-drag-workflows",
+      "caseId": "formula-held-wheel-loop",
+      "stage": "formula-03-released",
+      "kind": "2x",
+      "sha256": "08afb5afe64c9a248984458cfb184d4dfbf5f98481d93260942a582d6ffb475b",
+      "file": "frames/08afb5afe64c9a248984458cfb184d4dfbf5f98481d93260942a582d6ffb475b.png",
+      "bytes": 9152
+    },
+    {
+      "group": "mutation-restored-math-gesture",
+      "suite": "cross-page-drag-workflows",
+      "caseId": "formula-held-wheel-loop",
+      "stage": "formula-03-released",
+      "kind": "full",
+      "sha256": "9fa6c36be0de1cbeedd50cb1ac4331a99099dae29efde553997c709044234166",
+      "file": "frames/9fa6c36be0de1cbeedd50cb1ac4331a99099dae29efde553997c709044234166.png",
+      "bytes": 224663
+    },
+    {
+      "group": "mutation-restored-math-gesture",
+      "suite": "cross-page-drag-workflows",
+      "caseId": "formula-held-wheel-loop",
+      "stage": "formula-03-released",
+      "kind": "2x",
+      "sha256": "380c07f5975dd82fb79aecf0014f4262147048d17eef71c945ecc9a21cee4504",
+      "file": "frames/380c07f5975dd82fb79aecf0014f4262147048d17eef71c945ecc9a21cee4504.png",
+      "bytes": 37837
+    },
+    {
+      "group": "baseline-menu-pending",
+      "suite": "native-pending-image-workflows",
+      "caseId": "native-menu-undo-pending-bitmap-empty-history",
+      "stage": "04-late-response",
+      "kind": "full",
+      "sha256": "2dec06b42a574b72c464a54551bf57fd420079764d367671b64058a9864281c9",
+      "file": "frames/2dec06b42a574b72c464a54551bf57fd420079764d367671b64058a9864281c9.png",
+      "bytes": 63701
+    },
+    {
+      "group": "baseline-menu-pending",
+      "suite": "native-pending-image-workflows",
+      "caseId": "native-menu-undo-pending-bitmap-empty-history",
+      "stage": "04-late-response",
+      "kind": "2x",
+      "sha256": "cacb46625b9449b7745ea20b10c91d882eed3d653441bedf788132ab584c35b2",
+      "file": "frames/cacb46625b9449b7745ea20b10c91d882eed3d653441bedf788132ab584c35b2.png",
+      "bytes": 2395
+    },
+    {
+      "group": "mutation-red-menu-pending",
+      "suite": "native-pending-image-workflows",
+      "caseId": "native-menu-undo-pending-bitmap-empty-history",
+      "stage": "04-late-response",
+      "kind": "full",
+      "sha256": "2dec06b42a574b72c464a54551bf57fd420079764d367671b64058a9864281c9",
+      "file": "frames/2dec06b42a574b72c464a54551bf57fd420079764d367671b64058a9864281c9.png",
+      "bytes": 63701
+    },
+    {
+      "group": "mutation-red-menu-pending",
+      "suite": "native-pending-image-workflows",
+      "caseId": "native-menu-undo-pending-bitmap-empty-history",
+      "stage": "04-late-response",
+      "kind": "2x",
+      "sha256": "cacb46625b9449b7745ea20b10c91d882eed3d653441bedf788132ab584c35b2",
+      "file": "frames/cacb46625b9449b7745ea20b10c91d882eed3d653441bedf788132ab584c35b2.png",
+      "bytes": 2395
+    },
+    {
+      "group": "mutation-restored-menu-pending",
+      "suite": "native-pending-image-workflows",
+      "caseId": "native-menu-undo-pending-bitmap-empty-history",
+      "stage": "04-late-response",
+      "kind": "full",
+      "sha256": "db77ddbcf809cc90902658cb9f32b0c58ebfadb08e8edd0ec58e837da47105d8",
+      "file": "frames/db77ddbcf809cc90902658cb9f32b0c58ebfadb08e8edd0ec58e837da47105d8.png",
+      "bytes": 66286
+    },
+    {
+      "group": "mutation-restored-menu-pending",
+      "suite": "native-pending-image-workflows",
+      "caseId": "native-menu-undo-pending-bitmap-empty-history",
+      "stage": "04-late-response",
+      "kind": "2x",
+      "sha256": "8865562c3ccaea9a864f23460de9c07403f2473137af00f45f216e9785bdbe0a",
+      "file": "frames/8865562c3ccaea9a864f23460de9c07403f2473137af00f45f216e9785bdbe0a.png",
+      "bytes": 21443
+    }
+  ]
+}

@@ -1,0 +1,152 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {args,launch,acquireSlot,sleep}=require('./lifecycle.cjs');
+const {outputDir,snapshot,frame,recorder,waitUntil,newWindow}=require('./harness.cjs');
+const clipboard=require('./clipboard.cjs');
+async function watchCellActivation(page,name){
+ await page.evaluate(name=>{window[name]=[];const read=(kind,event)=>{const el=document.querySelector('.mp-cell-overlay-text'),s=getSelection();let textOffset=null;if(el&&s?.focusNode&&el.contains(s.focusNode)){const r=document.createRange();r.selectNodeContents(el);r.setEnd(s.focusNode,s.focusOffset);textOffset=r.toString().length;}window[name].push({kind,key:event?.key,type:event?.inputType,trusted:event?.isTrusted,at:performance.now(),focus:document.hasFocus()&&document.activeElement===el,text:el?.textContent,head:s?.focusOffset,anchor:s?.anchorOffset,nodeType:s?.focusNode?.nodeType,textOffset});};document.addEventListener('keyup',e=>{if(e.key==='Tab'||e.key==='Home')read('keyup',e);},{capture:true});document.addEventListener('beforeinput',e=>read('beforeinput',e),{capture:true});document.addEventListener('selectionchange',()=>read('selectionchange'),{capture:true});},name);
+}
+async function main(){
+ const o=args(process.argv.slice(2)),dir=outputDir(o.out,'selection-workflows'),release=acquireSlot(),result={schema:1,suite:'selection-workflows',startedAt:new Date().toISOString(),cases:[],errors:[]},record=recorder(dir,result),filter=process.env.MP_QUALITY_CASES;
+ const test=(id,body)=>!filter||new RegExp(filter).test(id)?record(id,body):Promise.resolve();let run,clip;
+ try{
+  const owner=path.join(dir,'owner.md');fs.writeFileSync(owner,'Selection workflows\n');run=await launch(o,owner,dir);result.artifact=run.metadata;clip=await clipboard.hold();
+  const fresh=async(name,text)=>{const file=path.join(dir,name+'.md');fs.writeFileSync(file,text);const p=await newWindow(run,run.page,file);p.on('pageerror',e=>result.errors.push(e.message));await p.bringToFront();await p.evaluate(()=>{window.mpEngine.focus();window.__qualitySelectionKeys=[];document.addEventListener('keydown',e=>window.__qualitySelectionKeys.push({key:e.key,code:e.code,shift:e.shiftKey,ctrl:e.ctrlKey,trusted:e.isTrusted}),{capture:true});});assert((await snapshot(p)).focus);return{p,file};};
+  const capture=async(p,trace,name,options)=>{const s=await snapshot(p),entry={name,...s,keys:await p.evaluate(()=>(window.__qualitySelectionKeys||[]).slice(-6))};trace.push(entry);entry.screenshot=await frame(p,dir,name,options);return s;};
+  const glyph=async(p,scope,char,side)=>{await waitUntil(()=>p.locator(scope+' .katex-html [data-typora-source-start]').count(),'visible formula glyph');const g=await p.evaluate(({scope,char,side})=>{const el=[...document.querySelectorAll(scope+' .katex-html [data-typora-source-start]')].find(e=>e.textContent===char&&e.getBoundingClientRect().width>0);if(!el)return null;const r=el.getBoundingClientRect();return{x:r.left+r.width*side,y:r.top+r.height/2};},{scope,char,side});assert(g,'visible target glyph');return g;};
+  const click=async(p,g)=>{await p.mouse.click(g.x,g.y,{delay:65});await sleep(150);};
+  for(const kind of ['forward','reverse','float','float-reverse'])await test('shift-'+kind+'-glyph-keeps-selection-copy-delete-undo-redo',async trace=>{
+   const text='alpha $x+y$ omega\n',{p,file}=await fresh('shift-'+kind,text);
+   await p.keyboard.press('Control+Home');await click(p,await glyph(p,'.cm-content .mp-cm6-math','y',.8));assert.equal((await snapshot(p)).selection.head,10,'ordinary click positive control');await capture(p,trace,'shift-'+kind+'-00-ordinary-click');
+   let anchor,head,g;
+   if(kind.startsWith('float')){
+    const reverse=kind==='float-reverse';await click(p,await glyph(p,'.mp-inline-float',reverse?'y':'x',reverse?.8:.2));anchor=reverse?10:7;head=reverse?7:10;assert.equal((await snapshot(p)).selection.head,anchor,'ordinary floating glyph click positive control');g=await glyph(p,'.mp-inline-float',reverse?'x':'y',reverse?.2:.8);
+   }else{
+    await p.keyboard.press('Control+Home');if(kind==='reverse')await p.keyboard.press('End');anchor=kind==='reverse'?17:0;head=kind==='reverse'?7:10;assert.equal((await snapshot(p)).selection.head,anchor);g=await glyph(p,'.cm-content .mp-cm6-math',kind==='reverse'?'x':'y',kind==='reverse'?.2:.8);
+   }
+   await capture(p,trace,'shift-'+kind+'-01-before');assert((await snapshot(p)).focus);await p.keyboard.down('Shift');try{await click(p,g);}finally{await p.keyboard.up('Shift');}
+   const selected=await capture(p,trace,'shift-'+kind+'-02-selected');assert(selected.focus,'selected formula editor focus');assert.equal(selected.text,text);assert.deepEqual(selected.selection,{anchor,head},'Shift glyph click preserves original anchor and exact source endpoint');
+   const from=Math.min(anchor,head),to=Math.max(anchor,head),expected=text.slice(from,to),written=await p.evaluate(()=>window.mpHost.writeClipboard({text:'QUALITY_SELECTION_ARM'}));const armed=clipboard.verifyText('QUALITY_SELECTION_ARM');trace.push({name:'clipboard-arm',written,...armed});assert(written.ok&&armed.matches);
+   await p.keyboard.press('Control+c');const copied=clipboard.verifyText(expected);trace.push({name:'copied-exact-source',...copied});assert(copied.matches);
+   await p.keyboard.press('Delete');const deleted=text.slice(0,from)+text.slice(to);assert.equal((await snapshot(p)).text,deleted);await capture(p,trace,'shift-'+kind+'-03-delete');
+   await p.keyboard.press('Control+z');assert.equal((await snapshot(p)).text,text);await p.keyboard.press('Control+y');assert.equal((await snapshot(p)).text,deleted);await waitUntil(()=>fs.readFileSync(file,'utf8')===deleted,'selected deletion saved');return{anchor,head,copy:true,undoRedo:true};
+  });
+  const table='Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n';
+  for(const action of ['copy','cut'])for(const eol of ['lf','crlf'])await test('selection-'+action+'-after-line-copy-pastes-at-caret'+(eol==='lf'?'':'-crlf-file'),async trace=>{
+   const text='abc\nTARGET\n',{p}=await fresh('clipboard-'+action+'-'+eol,eol==='lf'?text:text.replaceAll('\n','\r\n'));await p.keyboard.press('Control+Home');assert((await snapshot(p)).focus);assert.equal((await snapshot(p)).text,text,'file EOL is represented by the editor consistently');
+   const armed=await p.evaluate(()=>window.mpHost.writeClipboard({text:'QUALITY_LINE_COPY_ARM'}));assert(armed.ok&&clipboard.verifyText('QUALITY_LINE_COPY_ARM').matches);await p.keyboard.press('Control+c');assert(clipboard.verifyText('abc').matches,'linewise native copy positive control');
+   await p.keyboard.press('Home');await p.keyboard.press('Shift+End');assert.deepEqual((await snapshot(p)).selection,{anchor:0,head:3});await capture(p,trace,'clipboard-'+action+'-01-selected');await p.keyboard.press(action==='copy'?'Control+c':'Control+x');assert(clipboard.verifyText('abc').matches,'selected source clipboard');
+   await p.keyboard.press('Control+End');await p.keyboard.press('ArrowUp');await p.keyboard.press('Home');for(let i=0;i<3;i++)await p.keyboard.press('ArrowRight');const before=await snapshot(p);assert(before.focus);const target=before.text.indexOf('TARGET')+3;assert.equal(before.selection.head,target);await p.keyboard.press('Control+v');await sleep(120);const pasted=await capture(p,trace,'clipboard-'+action+'-02-pasted');const prior=action==='copy'?text:'\nTARGET\n';assert.equal(pasted.text,prior.replace('TARGET','TARabcGET'),'selected clipboard content is inserted at the caret instead of stale linewise mode');await p.keyboard.press('Control+z');assert.equal((await snapshot(p)).text,prior);await p.keyboard.press('Control+y');assert.equal((await snapshot(p)).text,pasted.text);
+  });
+  const cellState=p=>p.evaluate(()=>{const el=document.querySelector('.mp-cell-overlay-text'),s=getSelection(),ae=document.activeElement,source=window.mpEngine._view().state.selection.main;return{text:window.mpEngine.getValue(),sourceSelection:{anchor:source.anchor,head:source.head},cellText:el?.textContent,focus:document.hasFocus()&&ae===el,documentFocus:document.hasFocus(),activeElement:{tag:ae?.tagName,class:ae?.className},overlayVisible:!!el&&el.getBoundingClientRect().height>0,anchor:s?.anchorOffset,head:s?.focusOffset,focusNode:{type:s?.focusNode?.nodeType,text:s?.focusNode?.textContent,withinOverlay:!!el&&el.contains(s?.focusNode)},keys:window.__qualitySelectionKeys.slice(-6)};});
+  const captureCell=async(p,trace,name)=>{const s=await cellState(p),entry={name,...s};trace.push(entry);entry.screenshot=await frame(p,dir,name,{caret:'dom',allowMissingCaret:true});return s;};
+  const openCell=async(p,trace,settle=true,expected='ab')=>{if(settle)await sleep(900);await p.locator('.mp-row td[data-mp-row]').first().click({delay:65});await waitUntil(async()=> (await cellState(p)).focus,'actual cell overlay focus');trace.push({name:'cell-click',...await cellState(p)});assert.equal((await cellState(p)).cellText,expected);await p.keyboard.press('Home');await p.keyboard.press('ArrowRight');const s=await cellState(p);trace.push({name:'cell-keyboard-start',...s});assert.equal(s.head,expected.startsWith('🙂')?2:Math.min(1,expected.length));assert(s.focus,'cell keyboard start focus');};
+  await test('early-cell-focus-survives-boot-fallback',async trace=>{
+   const {p}=await fresh('cell-early-focus',table);await p.locator('.mp-row td[data-mp-row]').first().click({delay:65});await waitUntil(async()=> (await cellState(p)).focus,'early actual cell focus');trace.push({name:'early-cell-click',...await cellState(p),pageMs:await p.evaluate(()=>performance.now())});await sleep(800);const settled=await captureCell(p,trace,'cell-early-focus-01');assert(settled.focus,'boot retry must preserve the user-selected cell editor');assert(settled.overlayVisible);assert.equal(settled.text,table);
+  });
+  await test('cell-typed-pipe-keeps-character-on-following-input',async trace=>{
+   const {p,file}=await fresh('cell-pipe',table);await openCell(p,trace);assert((await cellState(p)).focus);await p.keyboard.press('Shift+Backslash');await captureCell(p,trace,'cell-pipe-01');assert.equal((await cellState(p)).text,table.replace('|ab|KEEP|','|a\\|b|KEEP|'));
+   assert((await cellState(p)).focus);await p.keyboard.insertText('X');const actual=await captureCell(p,trace,'cell-pipe-02');assert.equal(actual.cellText,'a|Xb');assert.equal(actual.text,table.replace('|ab|KEEP|','|a\\|Xb|KEEP|'),'following character retains the escaped literal pipe and all surrounding text');await waitUntil(()=>fs.readFileSync(file,'utf8')===actual.text,'pipe input saved');
+  });
+  await test('active-cell-undo-redo-keeps-source-and-overlay-in-sync',async trace=>{
+   const {p}=await fresh('cell-history',table);await openCell(p,trace);await p.keyboard.insertText('X');const edited=table.replace('|ab|KEEP|','|aXb|KEEP|');assert.equal((await cellState(p)).text,edited);await captureCell(p,trace,'cell-history-00-edited');
+   assert((await cellState(p)).focus);await p.keyboard.press('Control+z');const undone=await captureCell(p,trace,'cell-history-01');assert.equal(undone.text,table);assert.equal(undone.cellText,'ab');assert(undone.focus,'Undo preserves active cell editor focus');assert.equal(undone.head,1,'Undo restores the actual pre-input cell caret');
+   await p.keyboard.press('Control+y');const redone=await captureCell(p,trace,'cell-history-02');assert.equal(redone.text,edited,'cell CtrlY invokes the same document redo history');assert.equal(redone.cellText,'aXb');assert(redone.focus);assert.equal(redone.head,2,'Redo restores the actual post-input cell caret');
+  });
+  await test('cell-history-continue-edit-after-undo-and-shift-redo',async trace=>{
+   const {p}=await fresh('cell-history-continue',table);await openCell(p,trace);await p.keyboard.press('Control+z');assert((await cellState(p)).focus,'empty history retains cell focus');await p.keyboard.insertText('X');await p.keyboard.press('Control+z');assert.equal((await cellState(p)).head,1);await p.keyboard.insertText('Y');
+   const changed=table.replace('|ab|KEEP|','|aYb|KEEP|');assert.equal((await cellState(p)).text,changed);await p.keyboard.press('Control+z');assert.equal((await cellState(p)).text,table);await p.keyboard.press('Control+Shift+Z');const redone=await captureCell(p,trace,'cell-continue-01-redone');assert.equal(redone.text,changed);assert.equal(redone.cellText,'aYb');assert.equal(redone.head,2);assert(redone.focus);await p.keyboard.insertText('Q');assert.equal((await cellState(p)).text,table.replace('|ab|KEEP|','|aYQb|KEEP|'));
+  });
+  await test('cell-history-across-tab-keeps-restored-source-and-dom-in-same-cell',async trace=>{
+   const {p}=await fresh('cell-history-across-tab',table);await openCell(p,trace);await p.keyboard.insertText('X');await sleep(700);
+   await watchCellActivation(p,'__qualityCellActivation');
+   await p.keyboard.press('Tab');await waitUntil(async()=> (await cellState(p)).focus&&(await cellState(p)).cellText==='KEEP','Tab enters actual next cell');await p.keyboard.press('Home');await p.keyboard.insertText('Y');const both=await captureCell(p,trace,'cell-cross-history-00-both-edited');trace.push({name:'actual-cell-activation-events',events:await p.evaluate(()=>window.__qualityCellActivation)});assert.equal(both.text,table.replace('|ab|KEEP|','|aXb|YKEEP|'));
+   await p.keyboard.press('Control+z');assert.equal((await cellState(p)).text,table.replace('|ab|KEEP|','|aXb|KEEP|'));await p.keyboard.press('Control+z');const undone=await captureCell(p,trace,'cell-cross-history-01-restored');assert.equal(undone.text,table);assert.equal(undone.sourceSelection.head,table.indexOf('ab')+1,'history returns to first cell source caret');if(undone.focus){assert.equal(undone.cellText,'ab','overlay must match the cell restored by source history');assert.equal(undone.head,1);}else{assert((await snapshot(p)).focus,'history exits an obsolete cell overlay to the restored source caret');assert(!undone.overlayVisible);}
+   await p.keyboard.insertText('Z');const edited=await cellState(p);assert.equal(edited.text,table.replace('|ab|KEEP|','|aZb|KEEP|'),'editing after cross-cell undo modifies the restored first cell');
+  });
+  await test('cell-tab-home-keeps-caret-before-next-input',async trace=>{
+   for(let round=0;round<4;round++){
+    const {p}=await fresh('cell-tab-home-'+round,table);await openCell(p,trace);
+    await watchCellActivation(p,'__qualityCellHome');
+    await p.keyboard.press('Tab');await waitUntil(async()=>{const s=await cellState(p);return s.focus&&s.cellText==='KEEP';},'actual next cell');
+    await p.keyboard.press('Home');await sleep(80);await p.keyboard.insertText('Y');
+    const after=await captureCell(p,trace,'cell-tab-home-'+round+'-01-typed');
+    const events=await p.evaluate(()=>window.__qualityCellHome);trace.push({name:'cell-tab-home-events',round,events});
+    assert(events.some(e=>e.kind==='keyup'&&e.key==='Home'&&e.trusted&&e.focus&&e.textOffset===0),'real Home reaches the next cell start');
+    assert.equal(after.cellText,'YKEEP','a late cell activation must not overwrite the user Home caret');
+    assert.equal(after.text,table.replace('|ab|KEEP|','|ab|YKEEP|'),'next input follows the user caret without changing neighbors');
+    const home=events.find(e=>e.kind==='keyup'&&e.key==='Home'),input=events.find(e=>e.kind==='beforeinput'&&e.at>=home.at);
+    assert.equal(input?.textOffset,0,'actual beforeinput retains the Home text offset');
+    assert(events.filter(e=>e.kind==='selectionchange'&&e.at>=home.at&&e.at<=input.at).every(e=>e.textOffset===0),'activation never repositions the user caret after Home');
+    assert(after.focus,'typed cell keeps actual focus');
+   }
+   return{independentRounds:4,homeThenInputPauseMs:80};
+  });
+  await test('cell-mouse-click-immediate-input-keeps-ratio-caret',async trace=>{
+   const {p}=await fresh('cell-click-immediate',table);await sleep(900);
+   const cell=p.locator('.mp-row td[data-mp-row]').first(),box=await cell.boundingBox();assert(box,'real click target');
+   await watchCellActivation(p,'__qualityCellClick');
+   await p.mouse.click(box.x+box.width*.5,box.y+box.height*.5,{delay:65});
+   await p.keyboard.insertText('X');const after=await captureCell(p,trace,'cell-click-immediate-01');
+   trace.push({name:'real-cell-click-events',box,events:await p.evaluate(()=>window.__qualityCellClick)});
+   assert(after.focus,'handled native cell click retains overlay focus');assert.equal(after.cellText,'aXb');assert.equal(after.text,table.replace('|ab|KEEP|','|aXb|KEEP|'),'immediate input follows the proportional cell click caret');
+   return{realClickDelayMs:65,immediateInput:true};
+  });
+  await test('cell-last-row-tab-shift-tab-and-select-cell-preserve-source',async trace=>{
+   const rows=Array.from({length:80},(_,i)=>'|r'+i+'|K'+i+'|'),last=rows.at(-1),initial='PRE\n\n|H|K|\n|---|---|\n'+rows.join('\n')+'\n\nPOST\n';
+   const {p,file}=await fresh('cell-last-row-tab',initial);await p.keyboard.press('Control+End');
+   const from=initial.lastIndexOf(last),cell=p.locator('.mp-row td[data-mp-row="'+from+'"][data-mp-col="1"]');
+   await cell.click({delay:65});await waitUntil(async()=>{const s=await cellState(p);return s.focus&&s.cellText==='K79';},'actual scrolled last cell');
+   await p.keyboard.press('Tab');await waitUntil(async()=>{const s=await cellState(p);return s.focus&&s.cellText==='  ';},'new row attached and focused');
+   await p.keyboard.press('Home');await p.keyboard.insertText('N');const appended=await captureCell(p,trace,'cell-last-row-01-appended');
+   const added=initial.replace(last,last+'\n|N  |  |');assert.equal(appended.text,added,'Tab appends exactly one row and immediate input reaches its first cell');assert(appended.focus);
+   await p.keyboard.press('Shift+Tab');await waitUntil(async()=>{const s=await cellState(p);return s.focus&&s.cellText==='K79';},'reverse Tab returns to preceding last cell');
+   await p.keyboard.press('Control+e');assert.equal(await p.evaluate(()=>getSelection().toString()),'K79','CtrlE selects the current cell after reverse navigation');
+   await p.keyboard.insertText('R');const selected=await captureCell(p,trace,'cell-last-row-02-selected-replaced');
+   const expected=added.replace(last,'|r79|R|');assert.equal(selected.text,expected,'selected-cell replacement preserves all 79 preceding rows and new row');assert(selected.focus);
+   await waitUntil(()=>fs.readFileSync(file,'utf8')===expected,'exact long-table source saved');return{originalRows:80,newRows:1,reverseNavigation:true,selectCell:true};
+  });
+  for(const empty of [false,true])await test('cell-'+(empty?'empty':'end')+'-boundary-undo-redo-retains-owner',async trace=>{
+   const initial=empty?table.replace('|ab|KEEP|','||KEEP|'):table,{p}=await fresh('cell-boundary-'+empty,initial);await openCell(p,trace,true,empty?'':'ab');await p.keyboard.press('End');await p.keyboard.insertText('X');await p.keyboard.press('Control+z');const undone=await captureCell(p,trace,'cell-boundary-'+empty+'-01-undo');assert.equal(undone.text,initial);assert.equal(undone.cellText,empty?'':'ab');assert(undone.focus&&undone.overlayVisible,'cell-end and empty-cell boundaries belong to their cell');await p.keyboard.press('Control+y');const redone=await captureCell(p,trace,'cell-boundary-'+empty+'-02-redo');assert.equal(redone.cellText,empty?'X':'abX');assert(redone.focus);await p.keyboard.insertText('Y');assert.equal((await cellState(p)).text,table.replace('|ab|KEEP|',empty?'|XY|KEEP|':'|abXY|KEEP|'));
+  });
+  for(const reverse of [false,true])await test('cell-selected-pipe-'+(reverse?'reverse-replace':'forward-delete')+'-undo-redo',async trace=>{
+   const initial=table.replace('|ab|KEEP|','|a\\|b|KEEP|'),{p}=await fresh('cell-selected-pipe-'+reverse,initial);await openCell(p,trace,true,'a|b');if(reverse){await p.keyboard.press('ArrowRight');await p.keyboard.press('Shift+ArrowLeft');}else await p.keyboard.press('Shift+ArrowRight');
+   const selected=await captureCell(p,trace,'cell-selected-'+reverse+'-01');assert.deepEqual({anchor:selected.anchor,head:selected.head},reverse?{anchor:2,head:1}:{anchor:1,head:2});assert.equal(await p.evaluate(()=>getSelection().toString()),'|');if(reverse)await p.keyboard.insertText('Q|R');else await p.keyboard.press('Delete');
+   const expected=reverse?'aQ|Rb':'ab',source=reverse?'|aQ\\|Rb|KEEP|':'|ab|KEEP|';const changed=await captureCell(p,trace,'cell-selected-'+reverse+'-02');assert.equal(changed.cellText,expected);assert.equal(changed.text,table.replace('|ab|KEEP|',source));assert(changed.focus);await p.keyboard.press('Control+z');const undone=await captureCell(p,trace,'cell-selected-'+reverse+'-03-undo');assert.equal(undone.text,initial);assert.equal(undone.cellText,'a|b');assert(undone.focus);assert.deepEqual({anchor:undone.anchor,head:undone.head},reverse?{anchor:2,head:1}:{anchor:1,head:2});await p.keyboard.press('Control+y');assert.equal((await cellState(p)).text,changed.text);assert((await cellState(p)).focus);
+  });
+  await test('cell-existing-pipes-emoji-and-visible-backslash-preserve-neighbor',async trace=>{
+   const initial=table.replace('|ab|KEEP|','|🙂\\|甲\\\\|z|KEEP|'),{p}=await fresh('cell-existing-pipes',initial);await openCell(p,trace,true,'🙂|甲\\|z');await p.keyboard.press('ArrowRight');assert.equal((await cellState(p)).head,3);await p.keyboard.insertText('X');await p.keyboard.press('Shift+Backslash');await p.keyboard.insertText('Y');const actual=await captureCell(p,trace,'cell-existing-01');assert.equal(actual.cellText,'🙂|X|Y甲\\|z');assert.equal(actual.text,table.replace('|ab|KEEP|','|🙂\\|X\\|Y甲\\\\|z|KEEP|'));assert(actual.focus);assert.equal(await p.locator('.mp-row td[data-mp-row]').count(),2,'escaped pipes never create neighboring columns');
+  });
+  await test('cell-plain-paste-pipes-has-one-source-encoding-and-history',async trace=>{
+   const {p}=await fresh('cell-paste-pipes',table);await openCell(p,trace);const plain='P|Q\\|R';const ack=await p.evaluate(text=>window.mpHost.writeClipboard({text}),plain);assert(ack.ok&&clipboard.verifyText(plain).matches);await p.keyboard.press('Control+v');const pasted=await captureCell(p,trace,'cell-paste-01');assert.equal(pasted.cellText,'aP|Q\\|Rb');assert.equal(pasted.text,table.replace('|ab|KEEP|','|aP\\|Q\\\\|Rb|KEEP|'));assert(pasted.focus);await p.keyboard.press('Control+z');const undone=await cellState(p);assert.equal(undone.text,table);assert.equal(undone.cellText,'ab');assert.equal(undone.head,1);assert(undone.focus);await p.keyboard.press('Control+y');assert.equal((await cellState(p)).text,pasted.text);await p.keyboard.insertText('X');assert.equal((await cellState(p)).cellText,'aP|Q\\|RXb');
+  });
+  for(const action of ['copy','cut'])await test('cell-selected-pipe-'+action+'-paste-in-next-cell-preserves-literal',async trace=>{
+   const initial=table.replace('|ab|KEEP|','|a\\|b|KEEP|'),{p}=await fresh('cell-pipe-clipboard-'+action,initial);await openCell(p,trace,true,'a|b');await p.keyboard.press('Shift+ArrowRight');assert.equal(await p.evaluate(()=>getSelection().toString()),'|');const ack=await p.evaluate(()=>window.mpHost.writeClipboard({text:'QUALITY_CELL_COPY_ARM'}));assert(ack.ok&&clipboard.verifyText('QUALITY_CELL_COPY_ARM').matches);assert((await cellState(p)).focus);await p.keyboard.press(action==='copy'?'Control+c':'Control+x');assert(clipboard.verifyText('|').matches,'cell selection copies its literal visible pipe');const before=action==='copy'?initial:table;assert.equal((await cellState(p)).text,before);await p.keyboard.press('Tab');await waitUntil(async()=> (await cellState(p)).focus&&(await cellState(p)).cellText==='KEEP','next cell clipboard target');await p.keyboard.press('End');await p.keyboard.press('Control+v');const pasted=await captureCell(p,trace,'cell-clipboard-'+action+'-01');assert.equal(pasted.cellText,'KEEP|');assert.equal(pasted.text,before.replace('|KEEP|','|KEEP\\||'));assert(pasted.focus);await p.keyboard.press('Control+z');assert.equal((await cellState(p)).text,before);assert((await cellState(p)).focus);await p.keyboard.press('Control+y');assert.equal((await cellState(p)).text,pasted.text);
+  });
+  await test('boot-open-document-direct-typing-needs-no-click',async trace=>{
+   const initial='Direct typing\n',file=path.join(dir,'boot-direct.md');fs.writeFileSync(file,initial);const p=await newWindow(run,run.page,file);await p.bringToFront();await waitUntil(async()=> (await snapshot(p)).focus,'boot editor focus without explicit focus or click');assert.equal((await snapshot(p)).selection.head,0);await p.keyboard.insertText('READY ');const actual=await capture(p,trace,'boot-direct-01');assert.equal(actual.text,'READY '+initial);assert(actual.focus);await p.keyboard.press('Control+z');assert.equal((await snapshot(p)).text,initial);
+  });
+  const nav='ABCDEFGHIJKLMNOPQRSTUVWXYZ\n$$\nx+y\n$$\nabcdefghijklmnopqrstuvwxyz\n';
+  for(const interrupted of [false,true])await test('math-vertical-'+(interrupted?'horizontal-reposition-resets-goal':'reversal-keeps-goal'),async trace=>{
+   const {p}=await fresh('nav-'+interrupted,nav);await p.keyboard.press('Control+Home');for(let i=0;i<20;i++)await p.keyboard.press('ArrowRight');assert.equal((await snapshot(p)).selection.head,20);
+   await p.keyboard.press('ArrowDown');const entered=await capture(p,trace,'nav-'+interrupted+'-01-enter');assert(entered.focus);assert.equal(entered.selection.head,nav.indexOf('x+y'));if(interrupted){await p.keyboard.press('ArrowRight');const repositioned=await capture(p,trace,'nav-'+interrupted+'-01b-horizontal');assert(repositioned.focus);assert.equal(repositioned.selection.head,nav.indexOf('x+y')+1);}
+   await p.keyboard.press('ArrowUp');const exited=await capture(p,trace,'nav-'+interrupted+'-02-exit');assert.equal(exited.text,nav);assert.equal(exited.selection.head,interrupted?1:20,'new horizontal position starts a new vertical goal while uninterrupted reversal preserves it');
+  });
+  await test('math-multiline-native-up-down-and-reversal-preserve-goal',async trace=>{
+   const initial=nav.replace('x+y','x+y\nz+w'),{p}=await fresh('nav-native-multiline',initial);await p.keyboard.press('Control+Home');for(let i=0;i<20;i++)await p.keyboard.press('ArrowRight');await p.keyboard.press('ArrowDown');assert.equal((await snapshot(p)).selection.head,initial.indexOf('x+y'));await p.keyboard.press('ArrowDown');const internal=await capture(p,trace,'nav-native-01-inside');assert.equal(internal.selection.head,initial.indexOf('z+w'));assert(internal.focus);await p.keyboard.press('ArrowUp');assert.equal((await snapshot(p)).selection.head,initial.indexOf('x+y'));await p.keyboard.press('ArrowUp');const exited=await capture(p,trace,'nav-native-02-exit');assert.equal(exited.selection.head,20);assert.equal(exited.text,initial);const diag=await p.evaluate(()=>window.mpEngine.__mermaid().纵向意图);trace.push({name:'real-native-and-custom-vertical-paths',diag});assert(diag.native>=2&&diag.custom>=2);assert.equal(diag.keys,diag.cleared,'short vertical input intent retires after each key stack');
+  });
+  await test('math-floating-pointer-reposition-starts-new-vertical-goal',async trace=>{
+   const {p}=await fresh('nav-float-pointer',nav);await p.keyboard.press('Control+Home');for(let i=0;i<20;i++)await p.keyboard.press('ArrowRight');await p.keyboard.press('ArrowDown');await click(p,await glyph(p,'.mp-inline-float','y',.8));assert.equal((await snapshot(p)).selection.head,nav.indexOf('x+y')+3);await p.keyboard.press('ArrowUp');const exited=await capture(p,trace,'nav-float-01-exit');assert.equal(exited.selection.head,3);assert.equal(exited.text,nav);
+  });
+  await test('math-edit-undo-reposition-starts-new-vertical-goal',async trace=>{
+   const {p}=await fresh('nav-edit-history',nav);await p.keyboard.press('Control+Home');for(let i=0;i<20;i++)await p.keyboard.press('ArrowRight');await p.keyboard.press('ArrowDown');await p.keyboard.press('ArrowRight');await p.keyboard.insertText('Q');assert.equal((await snapshot(p)).text,nav.replace('x+y','xQ+y'));await p.keyboard.press('Control+z');assert.equal((await snapshot(p)).text,nav);assert.equal((await snapshot(p)).selection.head,nav.indexOf('x+y')+1);await p.keyboard.press('ArrowUp');const exited=await capture(p,trace,'nav-history-01-exit');assert.equal(exited.selection.head,1);assert.equal(exited.text,nav);
+  });
+  await test('math-copy-without-reposition-preserves-vertical-goal',async trace=>{
+   const {p}=await fresh('nav-copy',nav);await p.keyboard.press('Control+Home');for(let i=0;i<20;i++)await p.keyboard.press('ArrowRight');await p.keyboard.press('ArrowDown');assert((await snapshot(p)).focus);await p.keyboard.press('Control+c');assert(clipboard.verifyText('x+y').matches,'actual block content line copy');await p.keyboard.press('ArrowUp');const exited=await capture(p,trace,'nav-copy-01-exit');assert.equal(exited.selection.head,20);assert.equal(exited.text,nav);
+  });
+ }finally{
+  try{if(clip)result.clipboard=await clip.restore();}finally{try{if(run)result.cleanup=await run.cleanup();}finally{release();}}result.finishedAt=new Date().toISOString();result.passed=result.cases.length>0&&result.cases.every(c=>c.status==='pass')&&!result.cleanup?.residual?.length&&result.errors.length===0;fs.writeFileSync(path.join(dir,'result.json'),JSON.stringify(result,null,2));
+ }
+ if(!result.passed)process.exitCode=1;
+}
+main().catch(e=>{console.error(e.stack);process.exitCode=1;});

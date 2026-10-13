@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "version": "3.2.13",
+  "at": "2026-10-12T02:39:45.928Z",
+  "publisherSha256": "0f51ba6aa963d28f913bdb854bc510873a475296c1ca143a7129d8c96effd803",
+  "sourceSuites": 24,
+  "sourceCases": 345,
+  "negativeControlKinds": 1,
+  "deliveryBoundaryCases": {
+    "portable": 6,
+    "isolated": 9,
+    "installed": 6
+  },
+  "frameBytes": 789092,
+  "uniquePngFiles": 16,
+  "openedReviewFrames": 41,
+  "installed": true,
+  "pushed": false,
+  "released": false,
+  "sourceRuntimeReusedFromPrevious": {
+    "version": "3.2.12",
+    "exeSha256": "d300992b1003765f2f64417269c124f0c7b14af65ce415ad2488d166e6f63e13",
+    "deliberate": true
+  },
+  "scope": "Actual synthetic source/main MenuItem/host/renderer/disk/cleanup and public frames only. Exact cell source endpoints route to the existing owner; ordinary source is the positive control. Partial escapes/separators retain the previous source contract. Physical OS menu/accelerators, actual IME candidates and untested outside-view/scroll-return lifecycles remain outside the guarantee. Performance is the actual current-suite detail, with structural Enter recorded separately.",
+  "knownUnfixed": "Active-cell external reload focus route was confirmed separately by the root and is excluded from this single-root fix; no repair or success is claimed here.",
+  "excluded": "Earlier private/prototype baselines, wrong argv/coordinate oracles, entry-unconfirmed runs, personal documents/profiles/registry/shortcuts/original clipboard and large intermediate outputs."
+}

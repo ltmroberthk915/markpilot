@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "version": "3.2.10",
+  "at": "2026-10-11T22:10:52.163Z",
+  "frameBytes": 3695412,
+  "sourceCases": 287,
+  "negativeControlKinds": 12,
+  "deliveryBoundaryCases": {
+    "portable": 12,
+    "isolated": 40,
+    "installed": 40
+  },
+  "installed": true,
+  "pushed": false,
+  "released": false,
+  "invalidRunsExcluded": [
+    "selection-source-3.2.10-b boot capture: diagnostic keys uninitialized; actual boot input passed after tool repair"
+  ],
+  "fixtureScope": "Only synthetic fixtures are published; no personal document/profile contents."
+}

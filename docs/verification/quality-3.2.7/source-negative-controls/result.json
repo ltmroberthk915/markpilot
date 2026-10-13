@@ -1,0 +1,155 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T15:43:44.921Z",
+  "baselineEngine": "ee74a82702b50d9f261701df6e24f108cf27176ca79541fc0cc95af33f74bc5d",
+  "mutations": [
+    {
+      "kind": "quoted-enter",
+      "family": "code",
+      "mutantEngine": "aedf03d080c5357ab7994607962ef4b4dddc9220fe1aaa231e194c7dc7402c8d",
+      "restoredEngine": "ee74a82702b50d9f261701df6e24f108cf27176ca79541fc0cc95af33f74bc5d",
+      "negativeIds": [
+        "code-enter-quoted",
+        "code-enter-nested-quote"
+      ],
+      "negative": [
+        "code-enter-quoted",
+        "code-enter-nested-quote",
+        "code-enter-indent",
+        "code-enter-body-home",
+        "code-enter-selection",
+        "code-enter-multiple-cursors"
+      ],
+      "positiveTotal": 29,
+      "idempotentOnOff": true,
+      "restoredSourceHashes": true
+    },
+    {
+      "kind": "code-line-number",
+      "family": "code",
+      "mutantEngine": "148a818377830d19c0d1881b3997a727434f63228231c0c8f4e00021bf700e66",
+      "restoredEngine": "ee74a82702b50d9f261701df6e24f108cf27176ca79541fc0cc95af33f74bc5d",
+      "negativeIds": [
+        "code-math-is-literal-quoted"
+      ],
+      "negative": [
+        "code-math-is-literal-quoted",
+        "code-line-numbers-map-and-remove"
+      ],
+      "positiveTotal": 29,
+      "idempotentOnOff": true,
+      "restoredSourceHashes": true
+    },
+    {
+      "kind": "context",
+      "family": "code",
+      "mutantEngine": "8b213d2a2a037f3378ef86398967a1e3fc24fd99c4f4fa2bb5b586200937fcf1",
+      "restoredEngine": "ee74a82702b50d9f261701df6e24f108cf27176ca79541fc0cc95af33f74bc5d",
+      "negativeIds": [
+        "code-enter-backticks",
+        "code-math-is-literal-plain",
+        "code-checkmark-is-literal"
+      ],
+      "negative": [
+        "code-enter-backticks",
+        "code-enter-tildes",
+        "code-enter-quoted",
+        "code-enter-nested-quote",
+        "code-enter-longer-close",
+        "code-enter-shorter-inner",
+        "code-enter-different-inner",
+        "code-enter-unclosed",
+        "code-tab-plain",
+        "code-tab-quoted",
+        "code-no-table-quoted-table",
+        "code-no-table-different-fence",
+        "code-checkmark-is-literal",
+        "code-pipe-tab-does-not-enter-table",
+        "code-math-is-literal-plain",
+        "code-math-is-literal-quoted",
+        "code-quoted-completion-and-auto-break-disabled",
+        "code-closing-info-keeps-literal",
+        "code-closing-tail-edit-and-undo",
+        "code-quoted-shift-tab-preserves-container",
+        "code-enter-indent",
+        "code-enter-body-home",
+        "code-enter-selection",
+        "code-enter-multiple-cursors",
+        "code-line-numbers-map-and-remove",
+        "code-bare-blank-line-ends-quote-like-parser"
+      ],
+      "positiveTotal": 29,
+      "idempotentOnOff": true,
+      "restoredSourceHashes": true
+    },
+    {
+      "kind": "completion-order",
+      "family": "completion",
+      "mutantEngine": "50baba702a6b3ee94023eceb05afb8bb0842e7a9244ebab411f69fa367a7cb86",
+      "restoredEngine": "ee74a82702b50d9f261701df6e24f108cf27176ca79541fc0cc95af33f74bc5d",
+      "negativeIds": [
+        "completion-list-Enter",
+        "completion-list-Tab"
+      ],
+      "negative": [
+        "completion-list-Enter",
+        "completion-list-Tab",
+        "completion-nested-list-Enter",
+        "completion-nested-list-Tab",
+        "completion-ordered-Enter",
+        "completion-ordered-Tab"
+      ],
+      "positiveTotal": 12,
+      "idempotentOnOff": true,
+      "restoredSourceHashes": true
+    },
+    {
+      "kind": "underline",
+      "family": "format",
+      "mutantEngine": "ccbb1c87c90c004375bb0b543d3c5216a4d5415a81726a29ec4bc90fd5301232",
+      "restoredEngine": "ee74a82702b50d9f261701df6e24f108cf27176ca79541fc0cc95af33f74bc5d",
+      "negativeIds": [
+        "underline-empty-toggle",
+        "underline-real-drag-shift-toggle"
+      ],
+      "negative": [
+        "underline-empty-toggle",
+        "underline-remove-forward",
+        "underline-remove-reverse",
+        "underline-real-drag-shift-toggle"
+      ],
+      "positiveTotal": 5,
+      "idempotentOnOff": true,
+      "restoredSourceHashes": true
+    },
+    {
+      "kind": "export",
+      "family": "export",
+      "mutantEngine": "35803d2c49a271ff208649a05aa0f8cee4bf1466dec84f1abbb69c5a1b969d23",
+      "restoredEngine": "ee74a82702b50d9f261701df6e24f108cf27176ca79541fc0cc95af33f74bc5d",
+      "negativeIds": [
+        "export-ordered",
+        "export-tilde",
+        "export-wide-dash"
+      ],
+      "negative": [
+        "export-ordered",
+        "export-ordered-start",
+        "export-mixed-lists",
+        "export-tilde",
+        "export-fence-literal-inner",
+        "export-fence-unclosed",
+        "export-quoted-fence",
+        "export-quoted-extra-marker",
+        "export-pipe-without-delimiter",
+        "export-wide-dash",
+        "export-en-dash-align"
+      ],
+      "positiveTotal": 11,
+      "idempotentOnOff": true,
+      "restoredSourceHashes": true
+    }
+  ],
+  "passed": true,
+  "finishedAt": "2026-10-11T15:47:31.590Z"
+}

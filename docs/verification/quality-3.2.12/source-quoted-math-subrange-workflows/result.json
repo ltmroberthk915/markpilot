@@ -1,0 +1,4318 @@
+{
+  "schema": 1,
+  "suite": "quoted-math-subrange-workflows",
+  "version": "3.2.12",
+  "passed": true,
+  "recordedCaseCount": 1,
+  "publishedCaseCount": 1,
+  "artifact": {
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.12",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "exeSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+    "runtimeExecutableSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+    "asarSha256": "f794e8c23ea631afe1b66552c8674d9bd8c0a48eaf4b957b581832b57b624143",
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "be105040e75e3707d9b5d978eaffa6d17151004e0f46fac4cc87bab829ec3f33"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "5d58d02e672705f4bb5c1475aa8be667b04a2cb9cb4111d285b9efead54a1521"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "4517f08c0f305d08c361c2079157e587b5a9e8097dc161ab748c26960a8c40f5"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "570aae504d0e7ccf46e77c180c861cf6d030d2421d070885340d7a41d10a79ba"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": [],
+    "complete": true
+  },
+  "clipboardOutcome": {
+    "restored": true
+  },
+  "transport": "renderer-CDP; real clipboard STA readback; physical OS input/menu accelerators unverified",
+  "fixtureSha256": null,
+  "cases": [
+    {
+      "id": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+      "status": "pass",
+      "stage": "complete",
+      "productReached": true,
+      "trace": [
+        {
+          "name": "01-rendered",
+          "text": "PRE\n\n> $$\n> x+\n> y\n> $$\n\nPOST\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "disk": {
+            "text": "PRE\n\n> $$\n> x+\n> y\n> $$\n\nPOST\n",
+            "bytes": 30,
+            "sha256": "2fbd3404663287eae545c66fb118d2aaa3307a65ec246d6e42757f100bdc7ef5"
+          },
+          "pointerEvents": [],
+          "keyboardEvents": [],
+          "inputEvents": [],
+          "transferEvents": []
+        },
+        {
+          "name": "rendered-y-target"
+        },
+        {
+          "name": "02-clicked-y",
+          "text": "PRE\n\n> $$\n> x+\n> y\n> $$\n\nPOST\n",
+          "selection": {
+            "anchor": 18,
+            "head": 18
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "disk": {
+            "text": "PRE\n\n> $$\n> x+\n> y\n> $$\n\nPOST\n",
+            "bytes": 30,
+            "sha256": "2fbd3404663287eae545c66fb118d2aaa3307a65ec246d6e42757f100bdc7ef5"
+          },
+          "pointerEvents": [
+            {
+              "type": "pointerdown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.0999999046326
+            },
+            {
+              "type": "mousedown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.2999999523163
+            },
+            {
+              "type": "pointerup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.5999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.6999999284744
+            }
+          ],
+          "keyboardEvents": [],
+          "inputEvents": [],
+          "transferEvents": []
+        },
+        {
+          "name": "floating-x-target"
+        },
+        {
+          "name": "03-reverse-selected",
+          "text": "PRE\n\n> $$\n> x+\n> y\n> $$\n\nPOST\n",
+          "selection": {
+            "anchor": 18,
+            "head": 12
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "disk": {
+            "text": "PRE\n\n> $$\n> x+\n> y\n> $$\n\nPOST\n",
+            "bytes": 30,
+            "sha256": "2fbd3404663287eae545c66fb118d2aaa3307a65ec246d6e42757f100bdc7ef5"
+          },
+          "pointerEvents": [
+            {
+              "type": "pointerdown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.0999999046326
+            },
+            {
+              "type": "mousedown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.2999999523163
+            },
+            {
+              "type": "pointerup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.5999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.6999999284744
+            },
+            {
+              "type": "pointerdown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "mousedown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "pointerup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.0999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.1999999284744
+            },
+            {
+              "type": "click",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.2999999523163
+            }
+          ],
+          "keyboardEvents": [
+            {
+              "type": "keydown",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1948.5999999046326
+            },
+            {
+              "type": "keyup",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2035.8999999761581
+            }
+          ],
+          "inputEvents": [],
+          "transferEvents": []
+        },
+        {
+          "name": "copy-sentinel-STA",
+          "ack": {
+            "ok": true
+          }
+        },
+        {
+          "name": "04-copy",
+          "text": "PRE\n\n> $$\n> x+\n> y\n> $$\n\nPOST\n",
+          "selection": {
+            "anchor": 18,
+            "head": 12
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "disk": {
+            "text": "PRE\n\n> $$\n> x+\n> y\n> $$\n\nPOST\n",
+            "bytes": 30,
+            "sha256": "2fbd3404663287eae545c66fb118d2aaa3307a65ec246d6e42757f100bdc7ef5"
+          },
+          "pointerEvents": [
+            {
+              "type": "pointerdown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.0999999046326
+            },
+            {
+              "type": "mousedown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.2999999523163
+            },
+            {
+              "type": "pointerup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.5999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.6999999284744
+            },
+            {
+              "type": "pointerdown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "mousedown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "pointerup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.0999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.1999999284744
+            },
+            {
+              "type": "click",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.2999999523163
+            }
+          ],
+          "keyboardEvents": [
+            {
+              "type": "keydown",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1948.5999999046326
+            },
+            {
+              "type": "keyup",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2035.8999999761581
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2855.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2858
+            },
+            {
+              "type": "keyup",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2860.7999999523163
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2862.0999999046326
+            }
+          ],
+          "inputEvents": [],
+          "transferEvents": [
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 2858.5
+            }
+          ]
+        },
+        {
+          "name": "copy-payload-independent-STA"
+        },
+        {
+          "name": "cut-sentinel-STA",
+          "ack": {
+            "ok": true
+          }
+        },
+        {
+          "name": "05-cut",
+          "text": "PRE\n\n> $$\n> \n> $$\n\nPOST\n",
+          "selection": {
+            "anchor": 12,
+            "head": 12
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "disk": {
+            "text": "PRE\n\n> $$\n> x+\n> y\n> $$\n\nPOST\n",
+            "bytes": 30,
+            "sha256": "2fbd3404663287eae545c66fb118d2aaa3307a65ec246d6e42757f100bdc7ef5"
+          },
+          "pointerEvents": [
+            {
+              "type": "pointerdown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.0999999046326
+            },
+            {
+              "type": "mousedown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.2999999523163
+            },
+            {
+              "type": "pointerup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.5999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.6999999284744
+            },
+            {
+              "type": "pointerdown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "mousedown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "pointerup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.0999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.1999999284744
+            },
+            {
+              "type": "click",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.2999999523163
+            }
+          ],
+          "keyboardEvents": [
+            {
+              "type": "keydown",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1948.5999999046326
+            },
+            {
+              "type": "keyup",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2035.8999999761581
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2855.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2858
+            },
+            {
+              "type": "keyup",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2860.7999999523163
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2862.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 4183.299999952316
+            },
+            {
+              "type": "keydown",
+              "key": "x",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 4184.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "x",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 4193
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 4194.599999904633
+            }
+          ],
+          "inputEvents": [],
+          "transferEvents": [
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 2858.5
+            },
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 4184.899999976158
+            }
+          ]
+        },
+        {
+          "name": "cut-payload-independent-STA"
+        },
+        {
+          "name": "06-cut-undo",
+          "text": "PRE\n\n> $$\n> x+\n> y\n> $$\n\nPOST\n",
+          "selection": {
+            "anchor": 18,
+            "head": 12
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "disk": {
+            "text": "PRE\n\n> $$\n> \n> $$\n\nPOST\n",
+            "bytes": 24,
+            "sha256": "364bfc6c7041f9c29df8b45820ff48a835785c07ce586c32df1eb1856eb09dbf"
+          },
+          "pointerEvents": [
+            {
+              "type": "pointerdown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.0999999046326
+            },
+            {
+              "type": "mousedown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.2999999523163
+            },
+            {
+              "type": "pointerup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.5999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.6999999284744
+            },
+            {
+              "type": "pointerdown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "mousedown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "pointerup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.0999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.1999999284744
+            },
+            {
+              "type": "click",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.2999999523163
+            }
+          ],
+          "keyboardEvents": [
+            {
+              "type": "keydown",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1948.5999999046326
+            },
+            {
+              "type": "keyup",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2035.8999999761581
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2855.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2858
+            },
+            {
+              "type": "keyup",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2860.7999999523163
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2862.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 4183.299999952316
+            },
+            {
+              "type": "keydown",
+              "key": "x",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 4184.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "x",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 4193
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 4194.599999904633
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5044.199999928474
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5045.299999952316
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5050.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5053
+            }
+          ],
+          "inputEvents": [],
+          "transferEvents": [
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 2858.5
+            },
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 4184.899999976158
+            }
+          ]
+        },
+        {
+          "name": "07-cut-redo",
+          "text": "PRE\n\n> $$\n> \n> $$\n\nPOST\n",
+          "selection": {
+            "anchor": 12,
+            "head": 12
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "disk": {
+            "text": "PRE\n\n> $$\n> \n> $$\n\nPOST\n",
+            "bytes": 24,
+            "sha256": "364bfc6c7041f9c29df8b45820ff48a835785c07ce586c32df1eb1856eb09dbf"
+          },
+          "pointerEvents": [
+            {
+              "type": "pointerdown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.0999999046326
+            },
+            {
+              "type": "mousedown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.2999999523163
+            },
+            {
+              "type": "pointerup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.5999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.6999999284744
+            },
+            {
+              "type": "pointerdown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "mousedown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "pointerup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.0999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.1999999284744
+            },
+            {
+              "type": "click",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.2999999523163
+            }
+          ],
+          "keyboardEvents": [
+            {
+              "type": "keydown",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1948.5999999046326
+            },
+            {
+              "type": "keyup",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2035.8999999761581
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2855.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2858
+            },
+            {
+              "type": "keyup",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2860.7999999523163
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2862.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 4183.299999952316
+            },
+            {
+              "type": "keydown",
+              "key": "x",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 4184.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "x",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 4193
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 4194.599999904633
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5044.199999928474
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5045.299999952316
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5050.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5053
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5490.699999928474
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5493.399999976158
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5499.099999904633
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5501.5
+            }
+          ],
+          "inputEvents": [],
+          "transferEvents": [
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 2858.5
+            },
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 4184.899999976158
+            }
+          ]
+        },
+        {
+          "name": "before-paste-independent-STA"
+        },
+        {
+          "name": "08-original-position-paste",
+          "text": "PRE\n\n> $$\n> x+\n> y\n> $$\n\nPOST\n",
+          "selection": {
+            "anchor": 18,
+            "head": 18
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "disk": {
+            "text": "PRE\n\n> $$\n> \n> $$\n\nPOST\n",
+            "bytes": 24,
+            "sha256": "364bfc6c7041f9c29df8b45820ff48a835785c07ce586c32df1eb1856eb09dbf"
+          },
+          "pointerEvents": [
+            {
+              "type": "pointerdown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.0999999046326
+            },
+            {
+              "type": "mousedown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.2999999523163
+            },
+            {
+              "type": "pointerup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.5999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.6999999284744
+            },
+            {
+              "type": "pointerdown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "mousedown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "pointerup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.0999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.1999999284744
+            },
+            {
+              "type": "click",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.2999999523163
+            }
+          ],
+          "keyboardEvents": [
+            {
+              "type": "keydown",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1948.5999999046326
+            },
+            {
+              "type": "keyup",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2035.8999999761581
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2855.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2858
+            },
+            {
+              "type": "keyup",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2860.7999999523163
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2862.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 4183.299999952316
+            },
+            {
+              "type": "keydown",
+              "key": "x",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 4184.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "x",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 4193
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 4194.599999904633
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5044.199999928474
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5045.299999952316
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5050.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5053
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5490.699999928474
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5493.399999976158
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5499.099999904633
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5501.5
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6370.899999976158
+            },
+            {
+              "type": "keydown",
+              "key": "v",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6372.099999904633
+            },
+            {
+              "type": "keyup",
+              "key": "v",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6379.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6380.799999952316
+            }
+          ],
+          "inputEvents": [],
+          "transferEvents": [
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 2858.5
+            },
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 4184.899999976158
+            },
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": true,
+              "at": 6373.899999976158
+            }
+          ]
+        },
+        {
+          "name": "09-paste-undo",
+          "text": "PRE\n\n> $$\n> \n> $$\n\nPOST\n",
+          "selection": {
+            "anchor": 12,
+            "head": 12
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "disk": {
+            "text": "PRE\n\n> $$\n> \n> $$\n\nPOST\n",
+            "bytes": 24,
+            "sha256": "364bfc6c7041f9c29df8b45820ff48a835785c07ce586c32df1eb1856eb09dbf"
+          },
+          "pointerEvents": [
+            {
+              "type": "pointerdown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.0999999046326
+            },
+            {
+              "type": "mousedown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.2999999523163
+            },
+            {
+              "type": "pointerup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.5999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.6999999284744
+            },
+            {
+              "type": "pointerdown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "mousedown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "pointerup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.0999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.1999999284744
+            },
+            {
+              "type": "click",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.2999999523163
+            }
+          ],
+          "keyboardEvents": [
+            {
+              "type": "keydown",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1948.5999999046326
+            },
+            {
+              "type": "keyup",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2035.8999999761581
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2855.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2858
+            },
+            {
+              "type": "keyup",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2860.7999999523163
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2862.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 4183.299999952316
+            },
+            {
+              "type": "keydown",
+              "key": "x",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 4184.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "x",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 4193
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 4194.599999904633
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5044.199999928474
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5045.299999952316
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5050.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5053
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5490.699999928474
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5493.399999976158
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5499.099999904633
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5501.5
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6370.899999976158
+            },
+            {
+              "type": "keydown",
+              "key": "v",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6372.099999904633
+            },
+            {
+              "type": "keyup",
+              "key": "v",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6379.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6380.799999952316
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6850.099999904633
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6851.299999952316
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6856.199999928474
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6857.299999952316
+            }
+          ],
+          "inputEvents": [],
+          "transferEvents": [
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 2858.5
+            },
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 4184.899999976158
+            },
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": true,
+              "at": 6373.899999976158
+            }
+          ]
+        },
+        {
+          "name": "10-paste-redo",
+          "text": "PRE\n\n> $$\n> x+\n> y\n> $$\n\nPOST\n",
+          "selection": {
+            "anchor": 18,
+            "head": 18
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "disk": {
+            "text": "PRE\n\n> $$\n> \n> $$\n\nPOST\n",
+            "bytes": 24,
+            "sha256": "364bfc6c7041f9c29df8b45820ff48a835785c07ce586c32df1eb1856eb09dbf"
+          },
+          "pointerEvents": [
+            {
+              "type": "pointerdown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.0999999046326
+            },
+            {
+              "type": "mousedown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.2999999523163
+            },
+            {
+              "type": "pointerup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.5999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.6999999284744
+            },
+            {
+              "type": "pointerdown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "mousedown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "pointerup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.0999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.1999999284744
+            },
+            {
+              "type": "click",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.2999999523163
+            }
+          ],
+          "keyboardEvents": [
+            {
+              "type": "keydown",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1948.5999999046326
+            },
+            {
+              "type": "keyup",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2035.8999999761581
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2855.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2858
+            },
+            {
+              "type": "keyup",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2860.7999999523163
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2862.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 4183.299999952316
+            },
+            {
+              "type": "keydown",
+              "key": "x",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 4184.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "x",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 4193
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 4194.599999904633
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5044.199999928474
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5045.299999952316
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5050.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5053
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5490.699999928474
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5493.399999976158
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5499.099999904633
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5501.5
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6370.899999976158
+            },
+            {
+              "type": "keydown",
+              "key": "v",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6372.099999904633
+            },
+            {
+              "type": "keyup",
+              "key": "v",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6379.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6380.799999952316
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6850.099999904633
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6851.299999952316
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6856.199999928474
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6857.299999952316
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 7332.899999976158
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 7334.099999904633
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 7339
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 7340
+            }
+          ],
+          "inputEvents": [],
+          "transferEvents": [
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 2858.5
+            },
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 4184.899999976158
+            },
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": true,
+              "at": 6373.899999976158
+            }
+          ]
+        },
+        {
+          "name": "11-continued-R",
+          "text": "PRE\n\n> $$\n> x+\n> yR\n> $$\n\nPOST\n",
+          "selection": {
+            "anchor": 19,
+            "head": 19
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "disk": {
+            "text": "PRE\n\n> $$\n> \n> $$\n\nPOST\n",
+            "bytes": 24,
+            "sha256": "364bfc6c7041f9c29df8b45820ff48a835785c07ce586c32df1eb1856eb09dbf"
+          },
+          "pointerEvents": [
+            {
+              "type": "pointerdown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.0999999046326
+            },
+            {
+              "type": "mousedown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.2999999523163
+            },
+            {
+              "type": "pointerup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.5999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.6999999284744
+            },
+            {
+              "type": "pointerdown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "mousedown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "pointerup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.0999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.1999999284744
+            },
+            {
+              "type": "click",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.2999999523163
+            }
+          ],
+          "keyboardEvents": [
+            {
+              "type": "keydown",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1948.5999999046326
+            },
+            {
+              "type": "keyup",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2035.8999999761581
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2855.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2858
+            },
+            {
+              "type": "keyup",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2860.7999999523163
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2862.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 4183.299999952316
+            },
+            {
+              "type": "keydown",
+              "key": "x",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 4184.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "x",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 4193
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 4194.599999904633
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5044.199999928474
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5045.299999952316
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5050.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5053
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5490.699999928474
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5493.399999976158
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5499.099999904633
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5501.5
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6370.899999976158
+            },
+            {
+              "type": "keydown",
+              "key": "v",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6372.099999904633
+            },
+            {
+              "type": "keyup",
+              "key": "v",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6379.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6380.799999952316
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6850.099999904633
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6851.299999952316
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6856.199999928474
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6857.299999952316
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 7332.899999976158
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 7334.099999904633
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 7339
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 7340
+            }
+          ],
+          "inputEvents": [
+            {
+              "type": "beforeinput",
+              "inputType": "insertText",
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 7789.699999928474
+            },
+            {
+              "type": "input",
+              "inputType": "insertText",
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 7790.599999904633
+            }
+          ],
+          "transferEvents": [
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 2858.5
+            },
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 4184.899999976158
+            },
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": true,
+              "at": 6373.899999976158
+            }
+          ]
+        },
+        {
+          "name": "12-saved",
+          "text": "PRE\n\n> $$\n> x+\n> yR\n> $$\n\nPOST\n",
+          "selection": {
+            "anchor": 19,
+            "head": 19
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "disk": {
+            "text": "PRE\n\n> $$\n> x+\n> yR\n> $$\n\nPOST\n",
+            "bytes": 31,
+            "sha256": "c9e5572c229cf737443273456ff16fea359aa10efc0709d9a0106d8bc7dd1c21"
+          },
+          "pointerEvents": [
+            {
+              "type": "pointerdown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.0999999046326
+            },
+            {
+              "type": "mousedown",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1470.2999999523163
+            },
+            {
+              "type": "pointerup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555.8859252929688,
+              "y": 113.734375,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.5999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 555,
+              "y": 113,
+              "selection": {
+                "anchor": 5,
+                "head": 5
+              },
+              "at": 1558.6999999284744
+            },
+            {
+              "type": "pointerdown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "mousedown",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1957.6999999284744
+            },
+            {
+              "type": "pointerup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525.8390502929688,
+              "y": 221.046875,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.0999999046326
+            },
+            {
+              "type": "mouseup",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.1999999284744
+            },
+            {
+              "type": "click",
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "x": 525,
+              "y": 221,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2033.2999999523163
+            }
+          ],
+          "keyboardEvents": [
+            {
+              "type": "keydown",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": true,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 1948.5999999046326
+            },
+            {
+              "type": "keyup",
+              "key": "Shift",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2035.8999999761581
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2855.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2858
+            },
+            {
+              "type": "keyup",
+              "key": "c",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2860.7999999523163
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 2862.0999999046326
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 4183.299999952316
+            },
+            {
+              "type": "keydown",
+              "key": "x",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 4184.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "x",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 4193
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 4194.599999904633
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5044.199999928474
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5045.299999952316
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5050.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5053
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5490.699999928474
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 12
+              },
+              "at": 5493.399999976158
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5499.099999904633
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 5501.5
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6370.899999976158
+            },
+            {
+              "type": "keydown",
+              "key": "v",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6372.099999904633
+            },
+            {
+              "type": "keyup",
+              "key": "v",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6379.699999928474
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6380.799999952316
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6850.099999904633
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 6851.299999952316
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6856.199999928474
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 6857.299999952316
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 7332.899999976158
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 12,
+                "head": 12
+              },
+              "at": 7334.099999904633
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 7339
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 7340
+            }
+          ],
+          "inputEvents": [
+            {
+              "type": "beforeinput",
+              "inputType": "insertText",
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 7789.699999928474
+            },
+            {
+              "type": "input",
+              "inputType": "insertText",
+              "trusted": true,
+              "inEditor": true,
+              "selection": {
+                "anchor": 18,
+                "head": 18
+              },
+              "at": 7790.599999904633
+            }
+          ],
+          "transferEvents": [
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 2858.5
+            },
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": false,
+              "at": 4184.899999976158
+            },
+            {
+              "trusted": true,
+              "inEditor": true,
+              "plainMatches": true,
+              "at": 6373.899999976158
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scope": "Synthetic fixtures only. No user document/profile/registry/shortcut/original clipboard data. OS physical accelerator and actual IME claims are excluded."
+}

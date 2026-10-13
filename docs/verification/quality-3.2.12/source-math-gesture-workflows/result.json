@@ -1,0 +1,1520 @@
+{
+  "schema": 1,
+  "suite": "math-gesture-workflows",
+  "version": "3.2.12",
+  "passed": true,
+  "recordedCaseCount": 4,
+  "publishedCaseCount": 4,
+  "artifact": {
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.12",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "exeSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+    "runtimeExecutableSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+    "asarSha256": "f794e8c23ea631afe1b66552c8674d9bd8c0a48eaf4b957b581832b57b624143",
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "be105040e75e3707d9b5d978eaffa6d17151004e0f46fac4cc87bab829ec3f33"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "5d58d02e672705f4bb5c1475aa8be667b04a2cb9cb4111d285b9efead54a1521"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "4517f08c0f305d08c361c2079157e587b5a9e8097dc161ab748c26960a8c40f5"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "570aae504d0e7ccf46e77c180c861cf6d030d2421d070885340d7a41d10a79ba"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": [],
+    "complete": true
+  },
+  "clipboardOutcome": {
+    "touched": false
+  },
+  "transport": "Renderer CDP actual input; OS physical input unverified",
+  "seed": 32923,
+  "fixtureSha256": "221349ae8c45f37dcc3c8b3d7ac77ea19ce08e1adcd33f83c06f7c5b190a9358",
+  "cases": [
+    {
+      "id": "math-gesture-click-source-and-selection",
+      "status": "pass",
+      "productReached": true,
+      "trace": [
+        {
+          "name": "click-01-before",
+          "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "viewportHeight": 691,
+          "rangeCount": 1,
+          "disk": {
+            "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n"
+          },
+          "pointerEvents": [],
+          "wheelEvents": [],
+          "scrollEvents": []
+        },
+        {
+          "name": "fixed-path"
+        },
+        {
+          "name": "click-02-pre-up",
+          "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "viewportHeight": 691,
+          "rangeCount": 1,
+          "disk": {
+            "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n"
+          },
+          "pointerEvents": [
+            {
+              "type": "mousedown",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 567,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1149.3999999761581
+            }
+          ],
+          "wheelEvents": [],
+          "scrollEvents": []
+        },
+        {
+          "name": "click-03-released",
+          "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n",
+          "selection": {
+            "anchor": 11,
+            "head": 11
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "viewportHeight": 691,
+          "rangeCount": 1,
+          "disk": {
+            "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n"
+          },
+          "pointerEvents": [
+            {
+              "type": "mousedown",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 567,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1149.3999999761581
+            },
+            {
+              "type": "mouseup",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 0,
+              "x": 567,
+              "y": 113,
+              "selection": {
+                "anchor": 7,
+                "head": 7
+              },
+              "at": 1589.3999999761581
+            }
+          ],
+          "wheelEvents": [],
+          "scrollEvents": []
+        }
+      ]
+    },
+    {
+      "id": "math-gesture-jitter-source-and-selection",
+      "status": "pass",
+      "productReached": true,
+      "trace": [
+        {
+          "name": "jitter-01-before",
+          "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "viewportHeight": 691,
+          "rangeCount": 1,
+          "disk": {
+            "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n"
+          },
+          "pointerEvents": [],
+          "wheelEvents": [],
+          "scrollEvents": []
+        },
+        {
+          "name": "fixed-path"
+        },
+        {
+          "name": "jitter-02-pre-up",
+          "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "viewportHeight": 691,
+          "rangeCount": 1,
+          "disk": {
+            "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n"
+          },
+          "pointerEvents": [
+            {
+              "type": "mousedown",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 567,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1247
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 569,
+              "y": 114,
+              "selection": {
+                "anchor": 7,
+                "head": 7
+              },
+              "at": 1272.8000000715256
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 567,
+              "y": 113,
+              "selection": {
+                "anchor": 7,
+                "head": 7
+              },
+              "at": 1369.2000000476837
+            }
+          ],
+          "wheelEvents": [],
+          "scrollEvents": []
+        },
+        {
+          "name": "jitter-03-released",
+          "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n",
+          "selection": {
+            "anchor": 11,
+            "head": 11
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "viewportHeight": 691,
+          "rangeCount": 1,
+          "disk": {
+            "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n"
+          },
+          "pointerEvents": [
+            {
+              "type": "mousedown",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 567,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1247
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 569,
+              "y": 114,
+              "selection": {
+                "anchor": 7,
+                "head": 7
+              },
+              "at": 1272.8000000715256
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 567,
+              "y": 113,
+              "selection": {
+                "anchor": 7,
+                "head": 7
+              },
+              "at": 1369.2000000476837
+            },
+            {
+              "type": "mouseup",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 0,
+              "x": 567,
+              "y": 113,
+              "selection": {
+                "anchor": 7,
+                "head": 7
+              },
+              "at": 1777.3000000715256
+            }
+          ],
+          "wheelEvents": [],
+          "scrollEvents": []
+        }
+      ]
+    },
+    {
+      "id": "math-gesture-local-loop-source-and-selection",
+      "status": "pass",
+      "productReached": true,
+      "trace": [
+        {
+          "name": "local-loop-01-before",
+          "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "viewportHeight": 691,
+          "rangeCount": 1,
+          "disk": {
+            "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n"
+          },
+          "pointerEvents": [],
+          "wheelEvents": [],
+          "scrollEvents": []
+        },
+        {
+          "name": "fixed-path"
+        },
+        {
+          "name": "local-loop-02-pre-up",
+          "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "viewportHeight": 691,
+          "rangeCount": 1,
+          "disk": {
+            "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n"
+          },
+          "pointerEvents": [
+            {
+              "type": "mousedown",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 567,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1188.1000000238419
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 568,
+              "y": 123,
+              "selection": {
+                "anchor": 7,
+                "head": 7
+              },
+              "at": 1216.3999999761581
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 569,
+              "y": 133,
+              "selection": {
+                "anchor": 7,
+                "head": 7
+              },
+              "at": 1281.7999999523163
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 570,
+              "y": 143,
+              "selection": {
+                "anchor": 7,
+                "head": 10
+              },
+              "at": 1345.2999999523163
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 572,
+              "y": 153,
+              "selection": {
+                "anchor": 7,
+                "head": 10
+              },
+              "at": 1407.7000000476837
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 573,
+              "y": 163,
+              "selection": {
+                "anchor": 7,
+                "head": 14
+              },
+              "at": 1471.1000000238419
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 574,
+              "y": 173,
+              "selection": {
+                "anchor": 7,
+                "head": 14
+              },
+              "at": 1536.2000000476837
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 575,
+              "y": 183,
+              "selection": {
+                "anchor": 7,
+                "head": 14
+              },
+              "at": 1600.1000000238419
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 577,
+              "y": 193,
+              "selection": {
+                "anchor": 7,
+                "head": 17
+              },
+              "at": 1650.3999999761581
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 578,
+              "y": 203,
+              "selection": {
+                "anchor": 7,
+                "head": 55
+              },
+              "at": 1700.8999999761581
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 579,
+              "y": 213,
+              "selection": {
+                "anchor": 7,
+                "head": 92
+              },
+              "at": 1759
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 580,
+              "y": 223,
+              "selection": {
+                "anchor": 7,
+                "head": 92
+              },
+              "at": 1822.6000000238419
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 582,
+              "y": 233,
+              "selection": {
+                "anchor": 7,
+                "head": 92
+              },
+              "at": 1887.7000000476837
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 583,
+              "y": 243,
+              "selection": {
+                "anchor": 7,
+                "head": 93
+              },
+              "at": 1955.2000000476837
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 584,
+              "y": 253,
+              "selection": {
+                "anchor": 7,
+                "head": 93
+              },
+              "at": 2017.7000000476837
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 585,
+              "y": 263,
+              "selection": {
+                "anchor": 7,
+                "head": 130
+              },
+              "at": 2075.5
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 587,
+              "y": 273,
+              "selection": {
+                "anchor": 7,
+                "head": 130
+              },
+              "at": 2137.399999976158
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 585,
+              "y": 263,
+              "selection": {
+                "anchor": 7,
+                "head": 130
+              },
+              "at": 2198.899999976158
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 584,
+              "y": 253,
+              "selection": {
+                "anchor": 7,
+                "head": 130
+              },
+              "at": 2265.7000000476837
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 583,
+              "y": 243,
+              "selection": {
+                "anchor": 7,
+                "head": 130
+              },
+              "at": 2325.600000023842
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 582,
+              "y": 233,
+              "selection": {
+                "anchor": 7,
+                "head": 93
+              },
+              "at": 2392.2999999523163
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 580,
+              "y": 223,
+              "selection": {
+                "anchor": 7,
+                "head": 93
+              },
+              "at": 2451.399999976158
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 579,
+              "y": 213,
+              "selection": {
+                "anchor": 7,
+                "head": 92
+              },
+              "at": 2516.899999976158
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 578,
+              "y": 203,
+              "selection": {
+                "anchor": 7,
+                "head": 92
+              },
+              "at": 2578.100000023842
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 577,
+              "y": 193,
+              "selection": {
+                "anchor": 7,
+                "head": 92
+              },
+              "at": 2642.5
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 575,
+              "y": 183,
+              "selection": {
+                "anchor": 7,
+                "head": 55
+              },
+              "at": 2705.2000000476837
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 574,
+              "y": 173,
+              "selection": {
+                "anchor": 7,
+                "head": 55
+              },
+              "at": 2756
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 573,
+              "y": 163,
+              "selection": {
+                "anchor": 7,
+                "head": 54
+              },
+              "at": 2805.899999976158
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 572,
+              "y": 153,
+              "selection": {
+                "anchor": 7,
+                "head": 54
+              },
+              "at": 2868.5
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 570,
+              "y": 143,
+              "selection": {
+                "anchor": 7,
+                "head": 54
+              },
+              "at": 2932.100000023842
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 569,
+              "y": 133,
+              "selection": {
+                "anchor": 7,
+                "head": 17
+              },
+              "at": 2995.7999999523163
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 568,
+              "y": 123,
+              "selection": {
+                "anchor": 7,
+                "head": 17
+              },
+              "at": 3058
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 567,
+              "y": 113,
+              "selection": {
+                "anchor": 7,
+                "head": 16
+              },
+              "at": 3120.2000000476837
+            }
+          ],
+          "wheelEvents": [],
+          "scrollEvents": []
+        },
+        {
+          "name": "local-loop-03-released",
+          "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "viewportHeight": 691,
+          "rangeCount": 1,
+          "disk": {
+            "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n"
+          },
+          "pointerEvents": [
+            {
+              "type": "mousedown",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 567,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1188.1000000238419
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 568,
+              "y": 123,
+              "selection": {
+                "anchor": 7,
+                "head": 7
+              },
+              "at": 1216.3999999761581
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 569,
+              "y": 133,
+              "selection": {
+                "anchor": 7,
+                "head": 7
+              },
+              "at": 1281.7999999523163
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 570,
+              "y": 143,
+              "selection": {
+                "anchor": 7,
+                "head": 10
+              },
+              "at": 1345.2999999523163
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 572,
+              "y": 153,
+              "selection": {
+                "anchor": 7,
+                "head": 10
+              },
+              "at": 1407.7000000476837
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 573,
+              "y": 163,
+              "selection": {
+                "anchor": 7,
+                "head": 14
+              },
+              "at": 1471.1000000238419
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 574,
+              "y": 173,
+              "selection": {
+                "anchor": 7,
+                "head": 14
+              },
+              "at": 1536.2000000476837
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 575,
+              "y": 183,
+              "selection": {
+                "anchor": 7,
+                "head": 14
+              },
+              "at": 1600.1000000238419
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 577,
+              "y": 193,
+              "selection": {
+                "anchor": 7,
+                "head": 17
+              },
+              "at": 1650.3999999761581
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 578,
+              "y": 203,
+              "selection": {
+                "anchor": 7,
+                "head": 55
+              },
+              "at": 1700.8999999761581
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 579,
+              "y": 213,
+              "selection": {
+                "anchor": 7,
+                "head": 92
+              },
+              "at": 1759
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 580,
+              "y": 223,
+              "selection": {
+                "anchor": 7,
+                "head": 92
+              },
+              "at": 1822.6000000238419
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 582,
+              "y": 233,
+              "selection": {
+                "anchor": 7,
+                "head": 92
+              },
+              "at": 1887.7000000476837
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 583,
+              "y": 243,
+              "selection": {
+                "anchor": 7,
+                "head": 93
+              },
+              "at": 1955.2000000476837
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 584,
+              "y": 253,
+              "selection": {
+                "anchor": 7,
+                "head": 93
+              },
+              "at": 2017.7000000476837
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 585,
+              "y": 263,
+              "selection": {
+                "anchor": 7,
+                "head": 130
+              },
+              "at": 2075.5
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 587,
+              "y": 273,
+              "selection": {
+                "anchor": 7,
+                "head": 130
+              },
+              "at": 2137.399999976158
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 585,
+              "y": 263,
+              "selection": {
+                "anchor": 7,
+                "head": 130
+              },
+              "at": 2198.899999976158
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 584,
+              "y": 253,
+              "selection": {
+                "anchor": 7,
+                "head": 130
+              },
+              "at": 2265.7000000476837
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 583,
+              "y": 243,
+              "selection": {
+                "anchor": 7,
+                "head": 130
+              },
+              "at": 2325.600000023842
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 582,
+              "y": 233,
+              "selection": {
+                "anchor": 7,
+                "head": 93
+              },
+              "at": 2392.2999999523163
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 580,
+              "y": 223,
+              "selection": {
+                "anchor": 7,
+                "head": 93
+              },
+              "at": 2451.399999976158
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 579,
+              "y": 213,
+              "selection": {
+                "anchor": 7,
+                "head": 92
+              },
+              "at": 2516.899999976158
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 578,
+              "y": 203,
+              "selection": {
+                "anchor": 7,
+                "head": 92
+              },
+              "at": 2578.100000023842
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 577,
+              "y": 193,
+              "selection": {
+                "anchor": 7,
+                "head": 92
+              },
+              "at": 2642.5
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 575,
+              "y": 183,
+              "selection": {
+                "anchor": 7,
+                "head": 55
+              },
+              "at": 2705.2000000476837
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 574,
+              "y": 173,
+              "selection": {
+                "anchor": 7,
+                "head": 55
+              },
+              "at": 2756
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 573,
+              "y": 163,
+              "selection": {
+                "anchor": 7,
+                "head": 54
+              },
+              "at": 2805.899999976158
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 572,
+              "y": 153,
+              "selection": {
+                "anchor": 7,
+                "head": 54
+              },
+              "at": 2868.5
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 570,
+              "y": 143,
+              "selection": {
+                "anchor": 7,
+                "head": 54
+              },
+              "at": 2932.100000023842
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 569,
+              "y": 133,
+              "selection": {
+                "anchor": 7,
+                "head": 17
+              },
+              "at": 2995.7999999523163
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 568,
+              "y": 123,
+              "selection": {
+                "anchor": 7,
+                "head": 17
+              },
+              "at": 3058
+            },
+            {
+              "type": "mousemove",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 567,
+              "y": 113,
+              "selection": {
+                "anchor": 7,
+                "head": 16
+              },
+              "at": 3120.2000000476837
+            },
+            {
+              "type": "mouseup",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 0,
+              "x": 567,
+              "y": 113,
+              "selection": {
+                "anchor": 7,
+                "head": 7
+              },
+              "at": 3606.7999999523163
+            }
+          ],
+          "wheelEvents": [],
+          "scrollEvents": []
+        }
+      ]
+    },
+    {
+      "id": "math-gesture-wheel-only-source-and-selection",
+      "status": "pass",
+      "productReached": true,
+      "trace": [
+        {
+          "name": "wheel-only-01-before",
+          "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "scrollTop": 0,
+          "viewportHeight": 691,
+          "rangeCount": 1,
+          "disk": {
+            "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n"
+          },
+          "pointerEvents": [],
+          "wheelEvents": [],
+          "scrollEvents": []
+        },
+        {
+          "name": "fixed-path"
+        },
+        {
+          "name": "wheel-only-02-pre-up",
+          "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "scrollTop": 600,
+          "viewportHeight": 691,
+          "rangeCount": 1,
+          "disk": {
+            "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n"
+          },
+          "pointerEvents": [
+            {
+              "type": "mousedown",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 567,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1189.9000000953674
+            }
+          ],
+          "wheelEvents": [
+            {
+              "trusted": true,
+              "buttons": 0,
+              "deltaY": 300,
+              "at": 1233.4000000953674
+            },
+            {
+              "trusted": true,
+              "buttons": 0,
+              "deltaY": 300,
+              "at": 1375
+            }
+          ],
+          "scrollEvents": [
+            {
+              "trusted": true,
+              "top": 300,
+              "at": 1269.4000000953674
+            },
+            {
+              "trusted": true,
+              "top": 600,
+              "at": 1407.3000000715256
+            }
+          ]
+        },
+        {
+          "name": "wheel-only-03-released",
+          "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "scrollTop": 600,
+          "viewportHeight": 691,
+          "rangeCount": 1,
+          "disk": {
+            "text": "START\n\n$$\na+b\n$$\n\nP00 ordinary fixed seed 32923 words.\n\nP01 ordinary fixed seed 32923 words.\n\nP02 ordinary fixed seed 32923 words.\n\nP03 ordinary fixed seed 32923 words.\n\nP04 ordinary fixed seed 32923 words.\n\nP05 ordinary fixed seed 32923 words.\n\nP06 ordinary fixed seed 32923 words.\n\nP07 ordinary fixed seed 32923 words.\n\nP08 ordinary fixed seed 32923 words.\n\nP09 ordinary fixed seed 32923 words.\n\nP10 ordinary fixed seed 32923 words.\n\nP11 ordinary fixed seed 32923 words.\n\nP12 ordinary fixed seed 32923 words.\n\nP13 ordinary fixed seed 32923 words.\n\nP14 ordinary fixed seed 32923 words.\n\nP15 ordinary fixed seed 32923 words.\n\nP16 ordinary fixed seed 32923 words.\n\nP17 ordinary fixed seed 32923 words.\n\nP18 ordinary fixed seed 32923 words.\n\nP19 ordinary fixed seed 32923 words.\n\nP20 ordinary fixed seed 32923 words.\n\nP21 ordinary fixed seed 32923 words.\n\nP22 ordinary fixed seed 32923 words.\n\nP23 ordinary fixed seed 32923 words.\n\n"
+          },
+          "pointerEvents": [
+            {
+              "type": "mousedown",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 1,
+              "x": 567,
+              "y": 113,
+              "selection": {
+                "anchor": 0,
+                "head": 0
+              },
+              "at": 1189.9000000953674
+            },
+            {
+              "type": "mouseup",
+              "trusted": true,
+              "inEditor": true,
+              "button": 0,
+              "buttons": 0,
+              "x": 567,
+              "y": 113,
+              "selection": {
+                "anchor": 7,
+                "head": 7
+              },
+              "at": 1894.6000000238419
+            }
+          ],
+          "wheelEvents": [
+            {
+              "trusted": true,
+              "buttons": 0,
+              "deltaY": 300,
+              "at": 1233.4000000953674
+            },
+            {
+              "trusted": true,
+              "buttons": 0,
+              "deltaY": 300,
+              "at": 1375
+            }
+          ],
+          "scrollEvents": [
+            {
+              "trusted": true,
+              "top": 300,
+              "at": 1269.4000000953674
+            },
+            {
+              "trusted": true,
+              "top": 600,
+              "at": 1407.3000000715256
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scope": "Synthetic fixtures only. No user document/profile/registry/shortcut/original clipboard data. OS physical accelerator and actual IME claims are excluded."
+}

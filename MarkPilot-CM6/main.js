@@ -9,6 +9,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
+const { fileURLToPath, pathToFileURL } = require('node:url');
 // 「导出为文件夹」的落盘实现：图片逐张复制进 assets/、HTML 分块流式写入（实现在 export-folder.js，纯 Node 可单测）
 const exporter = require('./export-folder');
 // 「导出为 PDF」的打印层：从磁盘上的本地 HTML 打印（隐藏窗口 + printToPDF + 分片写盘），实现在 export-pdf.js
@@ -433,7 +434,7 @@ function buildMenu() {
     {
       label: '文件',
       submenu: [
-        { label: '新建', accelerator: 'CmdOrCtrl+N', click: (_item, W) => send('menu', 'new', activeWindow(W)) },
+        { id: 'menu-new-document', label: '新建', accelerator: 'CmdOrCtrl+N', click: (_item, W) => send('menu', 'new', activeWindow(W)) },
         { label: '打开…', accelerator: 'CmdOrCtrl+O', click: (_item, W) => pickOpen(activeWindow(W)) },
         { label: '最近打开', submenu: recents },
         { type: 'separator' },
@@ -530,19 +531,28 @@ async function pickOpen(W = activeWindow()) {
   if (r.canceled || !r.filePaths[0]) return { ok: false, canceled: true };
   return openPath(r.filePaths[0], { win: W, session: sessionOf(W.webContents) });
 }
+let testSaveAsIndex = 0;
 async function pickSaveAs(S, W) {
-  S.saveAsGrant = null;
+  const request = documents.beginSaveAs(S);
   try {
     if (MP_TEST_HOOKS && process.env.MP_TEST_SAVE_AS_CANCEL === '1') return { ok: false, canceled: true };
     let file = process.env.MP_TEST_SAVE_AS;
-    const documentId = S.documentId;
+    const documentId = request.documentId;
+    // Only the owned quality launch may exercise deterministic dialog latency.
+    if (MP_TEST_HOOKS && process.env.MP_TEST_SAVE_AS_PLAN) {
+      const plans = JSON.parse(process.env.MP_TEST_SAVE_AS_PLAN), index = testSaveAsIndex++;
+      const plan = Array.isArray(plans) ? plans[index] : null;
+      if (plan?.filePath && typeof plan.filePath === 'string') file = plan.filePath;
+      const ms = Math.min(5000,Math.max(0,Number(plan?.delayMs)||0));
+      if (ms) { dbg('test:save-as-delay',{index,phase:'before-grant',ms}); await new Promise(resolve=>setTimeout(resolve,ms)); }
+    }
     if (!file) {
       const r = await dialog.showSaveDialog(W, { title: '另存为', defaultPath: S.filePath || path.join(app.getPath('documents'), '未命名.md'), filters: [{ name: 'Markdown', extensions: ['md'] }] });
       if (r.canceled || !r.filePath) return { ok: false, canceled: true };
       file = r.filePath;
     }
-    if (W.isDestroyed() || S.documentId !== documentId) return { ok: false, error: '选择路径期间文档已切换', code: 'MP_DOC_MISMATCH' };
-    return await documents.grantSaveAs(S, file);
+    if (W.isDestroyed() || S.documentId !== documentId || S.saveAsRequest !== request.serial) return { ok: false, error: '选择路径期间文档或另存为操作已改变', code: 'MP_DOC_MISMATCH' };
+    return await documents.grantSaveAs(S, file, request);
   } catch (e) { return { ok: false, error: e.message, code: e.code }; }
 }
 async function confirmReplace(S, W) {
@@ -617,17 +627,33 @@ async function reloadDoc(opts, S, W) {
   const p = S.filePath;
   if (!p) return { ok: false, error: '当前文档没有路径，无法重新加载' };
   if (pdfActive?.owner === W.webContents.id) return { ok: false, error: 'PDF 正在导出，请先完成或取消', code: 'MP_EXPORT_BUSY' };
-  if (reloads.has(S)) return reloads.get(S);
-  const job = (async () => {
-    if (!(await confirmReplace(S, W))) return { ok: false, canceled: true };
+  const requestId = typeof opts.requestId === 'string' ? opts.requestId : null;
+  const expected = { documentId: S.documentId, revision: S.revision, filePath: p, loadRequest: S.loadRequest };
+  if (opts.documentId && (opts.documentId !== expected.documentId || opts.revision !== expected.revision || opts.filePath !== p)) return { ok: false, code: 'MP_DOC_MISMATCH', error: '文档版本已改变，重载已取消' };
+  const pending = reloads.get(S);
+  if (pending) return pending.requestId === requestId && pending.path === p ? pending.job : { ok: false, code: 'MP_RELOAD_BUSY', error: '正在读取当前文档' };
+  const job = Promise.resolve().then(async () => {
     try {
-      const doc = await documents.load(S, p);
-      syncPathUi(S, W); sendTo(W, 'doc', doc);
-      return { ok: true, ...doc };
+      if (!(await confirmReplace(S, W))) return { ok: false, canceled: true, requestId };
+      // Bounded test-only transport/IO delays make revision and response races
+      // reproducible while retaining the actual handler and store adoption.
+      const pauseForTest = async phase => {
+        const key = phase === 'before-read' ? 'MP_TEST_RELOAD_READ_DELAY_MS' : 'MP_TEST_RELOAD_RESPONSE_DELAY_MS';
+        const ms = process.env.MP_TEST_HOOKS === '1' ? Math.min(5000, Math.max(0, Number(process.env[key]) || 0)) : 0;
+        if (!ms) return;
+        dbg('test:reload-delay', { phase, requestId, filePath: p, documentId: S.documentId, ms });
+        await new Promise(resolve => setTimeout(resolve, ms));
+      };
+      await pauseForTest('before-read');
+      const doc = await documents.load(S, p, expected);
+      const payload = { ...doc, loadKind: 'reload', requestId };
+      await pauseForTest('after-adopt');
+      syncPathUi(S, W); sendTo(W, 'doc', payload);
+      return { ok: true, ...payload };
     } catch (e) { return { ok: false, error: e.message, code: e.code }; }
-    finally { reloads.delete(S); }
-  })();
-  reloads.set(S, job); return job;
+    finally { if (reloads.get(S)?.job === job) reloads.delete(S); }
+  });
+  reloads.set(S, { job, requestId, path: p }); return job;
 }
 
 /* ── 【文件多开·第 3 步·3b】会话工厂与新窗口打开 ──────────────────────────
@@ -835,7 +861,7 @@ handle('doc:current', e => { const S = sessionOf(e.sender); return S.filePath ? 
 handle('doc:ready', e => {
   const S = sessionOf(e.sender);
   if (S.filePath && !S.dirty) sendTo(windowOf(e), 'doc', documents.metadata(S));
-  return !!S.filePath;
+  return documents.metadata(S);
 });
 handle('view:reload', e => reloadEditorView(windowOf(e)));
 handle('file:cancelCloseSave', e => {
@@ -1085,10 +1111,17 @@ function imgSafeName(name, fallback = 'image.png') {
 const imgSha1 = (buf) => crypto.createHash('sha1').update(buf).digest('hex');
 /** 原子写：临时文件 + rename（assets 里的图不该出现半截文件）。 */
 async function imgAtomicWrite(target, buf) {
-  const tmp = `${target}.mp-tmp-${process.pid}`;
-  await fsp.writeFile(tmp, buf);
-  try { await fsp.rename(tmp, target); }
-  catch { try { await fsp.rm(target, { force: true }); } catch { /* 目标本来就不在 */ } await fsp.rename(tmp, target); }
+  const tmp = `${target}.mp-tmp-${process.pid}-${crypto.randomUUID()}`;
+  try { await fsp.writeFile(tmp, buf, { flag: 'wx' }); await fsp.rename(tmp, target); }
+  finally { await fsp.rm(tmp, { force: true }).catch(() => {}); }
+}
+/** Stage all bytes first; exclusive copy never replaces an existing asset. */
+async function imgExclusiveWrite(target, buf) {
+  const tmp = `${target}.mp-tmp-${process.pid}-${crypto.randomUUID()}`;
+  try {
+    await fsp.writeFile(tmp, buf, { flag: 'wx' });
+    await fsp.copyFile(tmp, target, fs.constants.COPYFILE_EXCL);
+  } finally { await fsp.rm(tmp, { force: true }).catch(() => {}); }
 }
 /** 先 stat 再读：超过上限**根本不读进内存**（这是"大文件别塞内存"的落点）。 */
 async function imgReadCapped(p) {
@@ -1098,7 +1131,7 @@ async function imgReadCapped(p) {
     return { ok: false, error: `图片过大：${p} 有 ${(st.size / 1048576).toFixed(1)} MB，超过单张 ${IMG_MAX_BYTES / 1048576} MB 上限`, code: 'E_TOO_LARGE', bytes: st.size };
   }
   const buf = await fsp.readFile(p);
-  return { ok: true, buf, bytes: buf.length };
+  return { ok: true, buf, bytes: buf.length, mime: imgMimeOf(p) };
 }
 /** 落盘到 <文档目录>/assets/ 并回相对路径（重名去重规则由引擎定、这里执行）：
  *  同名 + 字节相同 ⇒ 复用已有文件；同名 + 字节不同 ⇒ a-1.png、a-2.png… */
@@ -1131,8 +1164,13 @@ async function imgSaveToAssets({ docPath, srcPath, base64, mime, fileName } = {}
       const target = path.join(assetsDir, candidate);
       let existing = null;
       try { existing = await fsp.readFile(target); } catch (e) { if (e.code !== 'ENOENT') throw e; }
-      if (existing === null) { await imgAtomicWrite(target, buf); dbg('img:saveToAssets', { from, target, bytes: buf.length, renamed }); return { ok: true, relPath: `assets/${candidate}`, absPath: target, renamed, reused: false, bytes: buf.length, mime: mime || imgMimeOf(candidate) }; }
-      if (imgSha1(existing) === sha) { dbg('img:saveToAssets:reuse', { from, target }); return { ok: true, relPath: `assets/${candidate}`, absPath: target, renamed, reused: true, bytes: buf.length, mime: mime || imgMimeOf(candidate) }; }
+      if (existing === null) {
+        try { await imgExclusiveWrite(target, buf); }
+        catch (e) { if (e.code === 'EEXIST') { i--; continue; } throw e; }
+        dbg('img:saveToAssets', { from, target, bytes: buf.length, renamed });
+        return { ok: true, relPath: `assets/${encodeURIComponent(candidate).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase())}`, absPath: target, renamed, reused: false, bytes: buf.length, mime: mime || imgMimeOf(candidate) };
+      }
+      if (imgSha1(existing) === sha && existing.equals(buf)) { dbg('img:saveToAssets:reuse', { from, target }); return { ok: true, relPath: `assets/${encodeURIComponent(candidate).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase())}`, absPath: target, renamed, reused: true, bytes: buf.length, mime: mime || imgMimeOf(candidate) }; }
       if (i > 99) return { ok: false, error: `同名文件太多（试到 ${candidate}），请换个文件名` };
       candidate = `${stem}-${i + 1}${ext}`;
       renamed = true;
@@ -1209,7 +1247,17 @@ handle('image:pick', async (_e, opts = {}) => {
   dbg('image:pick', r.filePaths);
   return { ok: true, files: r.filePaths };
 });
-handle('image:saveToAssets', (_e, opts = {}) => imgSaveToAssets(opts));
+// Name allocation and write receipts are serial across all editor windows.
+let imageAssetsQueue = Promise.resolve();
+handle('image:saveToAssets', (_e, opts = {}) => {
+  const result = imageAssetsQueue.then(async () => {
+    const delay = process.env.MP_TEST_HOOKS === '1' ? Math.min(5000, Math.max(0, Number(process.env.MP_TEST_IMAGE_DELAY_MS) || 0)) : 0;
+    if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+    return imgSaveToAssets(opts);
+  });
+  imageAssetsQueue = result.catch(() => {});
+  return result;
+});
 handle('image:base64ToFile', async (_e, { base64, mime, fileName } = {}) => {
   if (typeof base64 !== 'string' || !base64) return { ok: false, error: 'base64 为空' };
   const buf = Buffer.from(base64, 'base64');
@@ -1249,6 +1297,14 @@ handle('edit:paste', e => {
     w.webContents.paste();
     return { ok: true };
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+handle('edit:history', (e, cmd) => {
+  if (cmd !== 'undo' && cmd !== 'redo') return { ok: false, error: 'invalid-command' };
+  try {
+    const w = windowOf(e);
+    w.webContents[cmd]();
+    return { ok: true };
+  } catch (err) { return { ok: false, error: String((err && err.message) || err) }; }
 });
 /* 【通用设置通道·2026-10-10】渲染侧只允许改这几个键（白名单）：
    设置面板要加的开关会越来越多，但**不能**给渲染侧一个万能写入口 —— 
@@ -1307,37 +1363,99 @@ handle('clipboard:hasImage', () => {
     return { ok: true, hasImage: !img.isEmpty(), width: size.width, height: size.height, textLen: clipboard.readText().length };
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
-handle('clipboard:writeImage', (_e, payload = {}) => {
+async function imgSourceBytes(src, docPath) {
+  const value = String(src || '');
+  if (!value) return { ok: false, error: '图片地址为空' };
+  if (/^data:/i.test(value)) {
+    const comma = value.indexOf(','), meta = value.slice(5, comma);
+    if (comma < 0 || !/^image\//i.test(meta)) return { ok: false, error: '不是图片数据' };
+    const data = value.slice(comma + 1);
+    const buf = /;base64(?:;|$)/i.test(meta) ? Buffer.from(data, 'base64') : Buffer.from(decodeURIComponent(data));
+    if (!buf.length || buf.length > IMG_MAX_BYTES) return { ok: false, error: '图片为空或超过单张大小上限' };
+    return { ok: true, buf, bytes: buf.length, mime: meta.split(';')[0] };
+  }
+  if (/^https?:/i.test(value)) {
+    const downloaded = await imgDownload({ url: value });
+    if (!downloaded.ok) return downloaded;
+    return imgReadCapped(downloaded.absPath);
+  }
+  let file;
+  if (/^file:/i.test(value)) file = fileURLToPath(value);
+  else if (path.isAbsolute(value)) file = value;
+  else {
+    if (!docPath) return { ok: false, error: '请先保存文档，或使用完整图片地址' };
+    const base = pathToFileURL(path.dirname(path.resolve(docPath)) + path.sep);
+    file = fileURLToPath(new URL(value.replace(/\\/g, '/'), base));
+  }
+  return imgReadCapped(file);
+}
+// nativeImage decodes PNG/JPEG. Chromium supplies the raster for other editor
+// formats such as WebP; the source file remains unchanged when saving it.
+async function imgForClipboard(sender, source) {
+  let image = nativeImage.createFromBuffer(source.buf);
+  if (!image.isEmpty()) return image;
+  const decode = async (dataURL, maxBytes) => {
+    const img = new Image(); img.src = dataURL; await img.decode();
+    if (!img.naturalWidth || !img.naturalHeight || img.naturalWidth * img.naturalHeight > 64000000) throw new Error('图片为空或像素过大');
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    const png = canvas.toDataURL('image/png');
+    if (png.length > maxBytes * 4 / 3 + 128) throw new Error('图片无法复制或超过大小上限');
+    return png;
+  };
+  const dataURL = `data:${source.mime || 'image/png'};base64,${source.buf.toString('base64')}`;
+  let timer;
   try {
-    const src = String(payload.src || '');
-    let img = null;
-    if (/^data:/i.test(src)) img = nativeImage.createFromDataURL(src);
-    else if (src && fs.existsSync(src)) img = nativeImage.createFromPath(src);
+    const png = await Promise.race([
+      sender.executeJavaScript(`(${decode.toString()})(${JSON.stringify(dataURL)},${IMG_MAX_BYTES})`),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('图片解码超时')), 10000); }),
+    ]);
+    if (typeof png !== 'string' || !png.startsWith('data:image/png;base64,') || png.length > IMG_MAX_BYTES * 4 / 3 + 128) throw new Error('图片无法复制或超过大小上限');
+    image = nativeImage.createFromBuffer(Buffer.from(png.slice(png.indexOf(',') + 1), 'base64'));
+    return image;
+  } finally { clearTimeout(timer); }
+}
+handle('clipboard:writeImage', async (e, payload = {}) => {
+  try {
+    const docPath = sessionOf(e.sender).filePath;
+    const source = await imgSourceBytes(payload.src, docPath);
+    if (!source.ok) return source;
+    if (e.sender.isDestroyed()) return { ok: false, canceled: true };
+    const img = await imgForClipboard(e.sender, source);
+    if (e.sender.isDestroyed()) return { ok: false, canceled: true };
     if (!img || img.isEmpty()) return { ok: false, error: "bad-image" };
     clipboard.writeImage(img);
     const size = img.getSize();
     return { ok: true, width: size.width, height: size.height };
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
-handle('image:saveAs', async (_e, payload = {}) => {
+handle('image:saveAs', async (e, payload = {}) => {
   try {
-    const src = String(payload.src || '');
-    const suggest = String(payload.fileName || 'image.png');
-    let bytes = null;
-    if (/^data:/i.test(src)) { const i = src.indexOf(','); bytes = Buffer.from(src.slice(i + 1), 'base64'); }
-    else if (src && fs.existsSync(src)) bytes = fs.readFileSync(src);
-    if (!bytes || !bytes.length) return { ok: false, error: "bad-image" };
-    const r = await dialog.showSaveDialog(win, { title: "图片另存为", defaultPath: path.join(app.getPath("pictures"), suggest) });
+    const owner = BrowserWindow.fromWebContents(e.sender), docPath = sessionOf(e.sender).filePath;
+    const suggest = imgSafeName(payload.fileName || 'image.png');
+    const source = await imgSourceBytes(payload.src, docPath);
+    if (!source.ok) return source;
+    let r;
+    if (MP_TEST_HOOKS && process.env.MP_TEST_IMAGE_SAVE_AS) r = { canceled: false, filePath: path.resolve(process.env.MP_TEST_IMAGE_SAVE_AS) };
+    else if (process.env.MP_TEST_NO_DIALOG === '1') r = { canceled: true };
+    else r = await dialog.showSaveDialog(owner, { title: "图片另存为", defaultPath: path.join(app.getPath("pictures"), suggest) });
     if (r.canceled || !r.filePath) return { ok: false, canceled: true };
-    await fsp.writeFile(r.filePath, bytes);
-    return { ok: true, path: r.filePath, bytes: bytes.length };
+    await fsp.writeFile(r.filePath, source.buf);
+    return { ok: true, path: r.filePath, bytes: source.bytes };
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
-handle('clipboard:write', (_e, p) => {
+let clipboardWriteSerial = 0;
+handle('clipboard:write', async (_e, p) => {
   try {
     const text = String((p && p.text) || '');
     const html = (p && p.html) ? String(p.html) : '';
     if (!text && !html) return { ok: false, error: "empty" };
+    const delay = Number(process.env.MP_TEST_CLIPBOARD_DELAY_MS);
+    if (process.env.MP_TEST_HOOKS === '1' && Number.isFinite(delay) && delay > 0 && delay <= 5000) {
+      dbg('clipboardWrite:start', { seq: ++clipboardWriteSerial, ms: delay });
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
     if (html) clipboard.write({ text, html }); else clipboard.writeText(text);
     return { ok: true, bytes: text.length, hasHtml: !!html };
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
@@ -1382,13 +1500,15 @@ handle('theme:pickCss', async () => {
 });
 handle('doc:dirty', (e, payload) => {
   const S = sessionOf(e.sender), W = windowOf(e);
-  if (typeof payload === 'boolean' && MP_TEST_HOOKS) S.dirty = payload;
-  else documents.markDirty(S, payload || {});
-  updateTitle(S, W); return true;
+  let accepted;
+  if (typeof payload === 'boolean' && MP_TEST_HOOKS) { S.dirty = payload; accepted = true; }
+  else accepted = documents.markDirty(S, payload || {});
+  updateTitle(S, W); return { ok: accepted, documentId: S.documentId, revision: S.revision, dirty: S.dirty };
 });
 handle('doc:path', (e, filePath, metadata = {}) => {
   const S = sessionOf(e.sender), W = windowOf(e);
   if (filePath === null) {
+    if (metadata.documentId !== S.documentId) return { ok: false, code: 'MP_DOC_MISMATCH' };
     if (pdfActive?.owner === e.sender.id) return { ok: false, error: 'PDF 正在导出，请完成或取消后再新建文档' };
     documents.reset(S); W.__pendingClose = null;
   } else if (filePath !== S.filePath || (metadata.documentId && metadata.documentId !== S.documentId)) return { ok: false, code: 'MP_DOC_MISMATCH' };
@@ -1416,7 +1536,7 @@ const exportWriters = new Map();
 /** 当前 PDF 导出会话（staging 目录 + 取消位 + 等渲染侧交 HTML 的承诺）；null = 没有 PDF 导出在进行 */
 let pdfActive = null;
 let pdfSeq = 0;
-handle('doc:info', (e) => { const S = sessionOf(e && e.sender); try { dbg('doc:info:read', { wcId: e && e.sender ? e.sender.id : null, isPrimary: S === state, path: (S.filePath || '').split('\\').pop() || null, mapSize: sessions.size }); } catch { } return { filePath: S.filePath, name: S.filePath ? path.basename(S.filePath) : null }; });   // 【文件多开·第 2 步·批 A】按发起窗口的会话
+handle('doc:info', (e) => { const S = sessionOf(e && e.sender); try { dbg('doc:info:read', { wcId: e && e.sender ? e.sender.id : null, isPrimary: S === state, path: (S.filePath || '').split('\\').pop() || null, mapSize: sessions.size }); } catch { } return { filePath: S.filePath, documentId: S.documentId, name: S.filePath ? path.basename(S.filePath) : null }; });
 handle('export:pickFolder', async (e, opts = {}) => {
   const S = sessionOf(e.sender), W = windowOf(e);
   if (pdfActive?.owner === e.sender.id) {

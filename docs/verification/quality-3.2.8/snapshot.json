@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "version": "3.2.8",
+  "at": "2026-10-11T18:59:12.829Z",
+  "frameBytes": 1218804,
+  "sourceImageCases": 42,
+  "negativeControlKinds": 13,
+  "deliveryBoundaryCases": {
+    "portable": 27,
+    "isolated": 27,
+    "installed": 30
+  },
+  "installed": true,
+  "pushed": false,
+  "released": false,
+  "installedVisualInspection": {
+    "observer": "primary agent",
+    "openedFrames": 6,
+    "scope": "Saved screenshot full/2x; document-end full/2x; 25 and 100 percent full frames",
+    "observed": "Real image rendered at caret, document-end small image within the viewport, visibly distinct 25/100 sizes"
+  }
+}

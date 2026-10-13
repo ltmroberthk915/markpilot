@@ -1,0 +1,173 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T15:33:03.081Z",
+  "metric": "CDP key input through the next renderer frame, including transport and frame pacing; semantic correctness is asserted separately from latency",
+  "cases": [
+    {
+      "id": "pending-quote-enter-20-repetitions",
+      "status": "pass",
+      "trace": [
+        {
+          "requests": 1,
+          "resets": 1,
+          "deltas": 0,
+          "completed": 0,
+          "discarded": 0,
+          "nativeFallback": 0,
+          "commandFallback": 0,
+          "error": null,
+          "revision": 1,
+          "status": "pending",
+          "length": 555008,
+          "treeLength": 555008,
+          "available": false
+        },
+        {
+          "requests": 41,
+          "resets": 1,
+          "deltas": 40,
+          "completed": 1,
+          "discarded": 12,
+          "nativeFallback": 40,
+          "commandFallback": 20,
+          "error": null,
+          "revision": 41,
+          "status": "ready",
+          "length": 555088,
+          "treeLength": 555088,
+          "available": true
+        }
+      ],
+      "detail": {
+        "characters": 555008,
+        "samples": 20,
+        "firstMs": 140,
+        "steadyP50Ms": 129,
+        "steadyP95Ms": 162,
+        "rawMs": [
+          140.3979999999999,
+          146.15009999999984,
+          146.94309999999996,
+          162.44990000000007,
+          146.64279999999985,
+          128.77010000000018,
+          128.82870000000003,
+          130.3765000000003,
+          112.33140000000003,
+          115.48399999999992,
+          130.76060000000007,
+          113.23879999999963,
+          132.29820000000018,
+          129.38790000000017,
+          131.05299999999988,
+          113.19999999999982,
+          114.22789999999986,
+          113.62360000000035,
+          114.9373999999998,
+          130.51279999999997
+        ],
+        "status": {
+          "requests": 41,
+          "resets": 1,
+          "deltas": 40,
+          "completed": 1,
+          "discarded": 12,
+          "nativeFallback": 40,
+          "commandFallback": 20,
+          "error": null,
+          "revision": 41,
+          "status": "ready",
+          "length": 555088,
+          "treeLength": 555088,
+          "available": true
+        }
+      },
+      "ms": 2911
+    }
+  ],
+  "errors": [],
+  "metadata": {
+    "executable": "MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.7",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "bootMs": 861,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "d64901ab8921ab227387679d9988302af9ed6576816c13bf26ad73d87cd123f7",
+        "sourceSha256": "d64901ab8921ab227387679d9988302af9ed6576816c13bf26ad73d87cd123f7"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "a82bfbb9c56c8c355976dec9ad5df6b1f8581d8524b9eab54f818261db7a97fd",
+        "sourceSha256": "a82bfbb9c56c8c355976dec9ad5df6b1f8581d8524b9eab54f818261db7a97fd"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "ee74a82702b50d9f261701df6e24f108cf27176ca79541fc0cc95af33f74bc5d",
+        "sourceSha256": "ee74a82702b50d9f261701df6e24f108cf27176ca79541fc0cc95af33f74bc5d"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T15:33:11.053Z",
+  "passed": true
+}

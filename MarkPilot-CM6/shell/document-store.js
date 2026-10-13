@@ -7,7 +7,7 @@ const {decodeDocument,encodeDocument}=require('./text-codec');
 const failure=(code,message)=>Object.assign(new Error(message),{code});
 const digest=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 function createSession(){
-  return {documentId:crypto.randomUUID(),revision:0,lastSavedRevision:0,filePath:null,savedText:'',diskMtime:0,baseline:null,bom:false,eol:'\n',encoding:'utf8',dirty:false,saveAsGrant:null,lastSave:null,loadRequest:0,pendingSaves:new Set()};
+  return {documentId:crypto.randomUUID(),revision:0,lastSavedRevision:0,filePath:null,savedText:'',diskMtime:0,baseline:null,bom:false,eol:'\n',encoding:'utf8',dirty:false,saveAsRequest:0,saveAsGrant:null,lastSave:null,loadRequest:0,pendingSaves:new Set()};
 }
 class DocumentStore{
   constructor({beforeReplace=async()=>{}}={}){this.jobs=new Map();this.commitTail=Promise.resolve();this.beforeReplace=beforeReplace;}
@@ -36,12 +36,14 @@ class DocumentStore{
       return {bytes,baseline:{sha256:digest(bytes),mtimeMs:last.mtimeMs,size:bytes.length,nlink:last.nlink}};
     }catch(e){if(allowMissing&&e.code==='ENOENT')return null;throw e;}finally{await handle?.close();}
   }
-  async load(S,file){
+  async load(S,file,expected=null){
     if(typeof file!=='string'||!file)throw failure('MP_BAD_PATH','没有指定文件路径');
+    const current=()=>!expected||(S.documentId===expected.documentId&&S.revision===expected.revision&&this.key(S.filePath||'')===this.key(expected.filePath||''));
+    if(!current()||(expected&&expected.loadRequest!==S.loadRequest))throw failure('MP_DOC_MISMATCH','重载期间文档或编辑版本已改变');
     const request=++S.loadRequest,canonical=await this.canonical(file);
     return this.queue(this.key(canonical),async()=>{
       const snap=await this.snapshot(canonical),decoded=decodeDocument(snap.bytes,file);
-      if(request!==S.loadRequest)throw failure('MP_DOC_MISMATCH','文档已切换，本次打开已取消');
+      if(request!==S.loadRequest||!current())throw failure('MP_DOC_MISMATCH','文档已切换或继续编辑，本次读取已取消');
       const pending=S.pendingSaves,{text,...format}=decoded;
       Object.assign(S,createSession(),format,{pendingSaves:pending,loadRequest:request,filePath:path.resolve(file),savedText:text,baseline:snap.baseline,diskMtime:snap.baseline.mtimeMs});
       return this.metadata(S);
@@ -53,10 +55,16 @@ class DocumentStore{
     S.dirty=!!dirty||revision!==S.lastSavedRevision;
     return true;
   }
-  async grantSaveAs(S,file){
-    const documentId=S.documentId,canonical=await this.canonical(file),snap=await this.snapshot(canonical,{allowMissing:true});
-    if(documentId!==S.documentId)throw failure('MP_DOC_MISMATCH','选择路径期间文档已切换');
-    const grant={token:crypto.randomUUID(),documentId,filePath:path.resolve(file),canonical,baseline:snap?.baseline||null};
+  beginSaveAs(S){
+    S.saveAsGrant=null;
+    return {documentId:S.documentId,serial:++S.saveAsRequest};
+  }
+  async grantSaveAs(S,file,request=this.beginSaveAs(S)){
+    const current=()=>request.documentId===S.documentId&&request.serial===S.saveAsRequest;
+    if(!current())throw failure('MP_SAVE_TARGET','另存为操作已被新的选择替代');
+    const documentId=request.documentId,canonical=await this.canonical(file),snap=await this.snapshot(canonical,{allowMissing:true});
+    if(!current())throw failure('MP_SAVE_TARGET','另存为操作已被新的选择替代');
+    const grant={token:crypto.randomUUID(),documentId,request:request.serial,filePath:path.resolve(file),canonical,baseline:snap?.baseline||null};
     S.saveAsGrant=grant;return {ok:true,filePath:grant.filePath,documentId,saveAsToken:grant.token};
   }
   async validate(file,baseline){
@@ -70,12 +78,14 @@ class DocumentStore{
       const {filePath,text,documentId,revision,saveAsToken}=request;
       if(documentId!==S.documentId||typeof text!=='string'||!Number.isSafeInteger(revision)||revision<0)throw failure('MP_DOC_MISMATCH','文档或编辑版本已改变，保存已取消');
       const grant=saveAsToken&&S.saveAsGrant;
+      const grantCurrent=()=>!grant||(S.documentId===grant.documentId&&S.saveAsRequest===grant.request);
       if(saveAsToken&&(!grant||grant.token!==saveAsToken||grant.documentId!==documentId||grant.filePath!==path.resolve(filePath)))throw failure('MP_SAVE_TARGET','另存为许可已失效，请重新选择路径');
       if(!grant&&(!S.filePath||path.resolve(filePath)!==S.filePath))throw failure('MP_SAVE_TARGET','保存目标不属于当前文档，请使用另存为');
       if(grant)S.saveAsGrant=null; // One use, including a failed attempt.
       const target=await this.canonical(filePath);
       if(grant&&this.key(target)!==this.key(grant.canonical))throw failure('MP_FILE_CONFLICT','另存为目标位置已改变，请重新选择路径');
       return this.queue(this.key(target),async()=>{
+        if(!grantCurrent())throw failure('MP_SAVE_TARGET','另存为操作已被新的选择替代');
         if(S.documentId!==documentId||(!grant&&S.filePath!==path.resolve(filePath))||revision<S.lastSavedRevision)throw failure('MP_DOC_MISMATCH','文档已切换或已有更新的保存');
         const baseline=grant?grant.baseline:S.baseline,format={bom:S.bom,eol:S.eol,encoding:S.encoding},out=encodeDocument(text,format);
         await this.validate(target,baseline);
@@ -87,8 +97,9 @@ class DocumentStore{
           return await this.commit(async()=>{
             // The short shared commit also protects alternate names of the same file.
             await this.validate(target,baseline);
+            if(!grantCurrent())throw failure('MP_SAVE_TARGET','另存为操作已被新的选择替代');
             await fs.rename(tmp,target);const st=await fs.stat(target),id=crypto.randomUUID();
-            const current=S.documentId===documentId;
+            const current=S.documentId===documentId&&grantCurrent();
             if(current){
               S.filePath=path.resolve(filePath);S.savedText=text;S.baseline={sha256:digest(out),mtimeMs:st.mtimeMs,size:out.length,nlink:st.nlink};S.diskMtime=st.mtimeMs;
               S.lastSavedRevision=revision;S.dirty=S.revision!==revision;

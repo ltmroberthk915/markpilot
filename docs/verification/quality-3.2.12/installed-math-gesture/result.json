@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "suite": "math-gesture-workflows",
+  "version": "3.2.12",
+  "passed": true,
+  "recordedCaseCount": 4,
+  "publishedCaseCount": 4,
+  "artifact": {
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.12",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "exeSha256": "d300992b1003765f2f64417269c124f0c7b14af65ce415ad2488d166e6f63e13",
+    "runtimeExecutableSha256": "d300992b1003765f2f64417269c124f0c7b14af65ce415ad2488d166e6f63e13",
+    "asarSha256": "f794e8c23ea631afe1b66552c8674d9bd8c0a48eaf4b957b581832b57b624143",
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "be105040e75e3707d9b5d978eaffa6d17151004e0f46fac4cc87bab829ec3f33"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "5d58d02e672705f4bb5c1475aa8be667b04a2cb9cb4111d285b9efead54a1521"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "4517f08c0f305d08c361c2079157e587b5a9e8097dc161ab748c26960a8c40f5"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "570aae504d0e7ccf46e77c180c861cf6d030d2421d070885340d7a41d10a79ba"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": [],
+    "complete": true
+  },
+  "clipboardOutcome": {
+    "touched": false
+  },
+  "transport": "Renderer CDP actual input; OS physical input unverified",
+  "seed": 32923,
+  "fixtureSha256": "221349ae8c45f37dcc3c8b3d7ac77ea19ce08e1adcd33f83c06f7c5b190a9358",
+  "cases": [
+    {
+      "id": "math-gesture-click-source-and-selection",
+      "status": "pass",
+      "productReached": true
+    },
+    {
+      "id": "math-gesture-jitter-source-and-selection",
+      "status": "pass",
+      "productReached": true
+    },
+    {
+      "id": "math-gesture-local-loop-source-and-selection",
+      "status": "pass",
+      "productReached": true
+    },
+    {
+      "id": "math-gesture-wheel-only-source-and-selection",
+      "status": "pass",
+      "productReached": true
+    }
+  ],
+  "scope": "Synthetic fixtures only. No user document/profile/registry/shortcut/original clipboard data. OS physical accelerator and actual IME claims are excluded."
+}

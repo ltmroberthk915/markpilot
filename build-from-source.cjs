@@ -55,6 +55,10 @@ console.log('· esbuild = ' + ESBUILD_BIN);
    ② cwd 必须是 dsh-markpilot：字体是**相对路径** import 的 ✓，从仓库根跑会解析错 ✗；
    ③ --minify：与内部构建同口径 ✓（不开的话产物 hash 对不上，无法做等价性核对 ✗）。 */
 const ENGINE_DIR = path.join(ROOT, 'dsh-markpilot');
+// Rebuild the maintained source-map renderer and all matching font/CSS assets
+// from the exact locked upstream package before resolving engine imports.
+execFileSync(process.execPath, [path.join(ROOT, 'tools/vendor/build-katex.cjs')],
+  { cwd: ROOT, stdio: 'inherit', windowsHide: true });
 execFileSync(process.execPath, [
   ESBUILD_BIN, path.relative(ENGINE_DIR, SRC), '--bundle', '--format=iife',
   '--outfile=' + OUT, '--loader:.woff=file', '--loader:.woff2=file', '--loader:.ttf=file',
@@ -62,6 +66,16 @@ execFileSync(process.execPath, [
 ], { cwd: ENGINE_DIR, stdio: ['ignore', 'ignore', 'pipe'] });
 console.log('· 引擎产物 ' + sha16(OUT) + '  ' + fs.statSync(OUT).size + ' B');
 console.log('· 已同步到 ' + path.relative(ROOT, OUT));
+
+// Dedicated Worker is a separate offline asset, not an inline blob. Build it
+// with the same locked dependencies as the renderer's parser and wire codec.
+const WORKER_SRC = path.join(ENGINE_DIR, 'src-cm6', 'markdown-worker.js');
+const WORKER_OUT = path.join(SHELL, 'renderer', 'cm6', 'markdown-worker.js');
+execFileSync(process.execPath, [
+  ESBUILD_BIN, path.relative(ENGINE_DIR, WORKER_SRC), '--bundle', '--format=iife',
+  '--outfile=' + WORKER_OUT, '--minify', '--log-level=error',
+], { cwd: ENGINE_DIR, stdio: ['ignore', 'ignore', 'pipe'] });
+console.log('· 后台解析包 ' + sha16(WORKER_OUT) + '  ' + fs.statSync(WORKER_OUT).size + ' B');
 
 /* ②-b 打印层用的 Knuth–Plass 排版包（PDF 精细断行；两条产品线共用同一份真源 ✓） */
 const KP_SRC = path.join(ROOT, 'Typora-Editor-App', 'app', 'renderer', 'js', 'knuth-plass.mjs');

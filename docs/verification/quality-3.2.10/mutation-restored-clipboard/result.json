@@ -1,0 +1,556 @@
+{
+  "schema": 1,
+  "suite": "selection-workflows",
+  "startedAt": "2026-10-11T21:41:44.154Z",
+  "cases": [
+    {
+      "id": "selection-copy-after-line-copy-pastes-at-caret",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "clipboard-copy-01-selected",
+          "text": "abc\nTARGET\n",
+          "selection": {
+            "anchor": 0,
+            "head": 3
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 191.75,
+            "right": 191.75,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "clipboard-copy-lf.md · 11 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "c",
+              "code": "KeyC",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "shift": true,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "shift": true,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "clipboard-copy-01-selected.png",
+            "sha256": "0fc173c1118ccfe871ee8c8bda56143b3155faa7bf9f56b7e2ce5664ef2041e2",
+            "caret": {
+              "left": 191.75,
+              "right": 191.75,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "clipboard-copy-01-selected-caret-2x.png",
+              "sha256": "22745b97eac2f1009f6aaff2d42f7826e0f4f277d0d83c578fc14e10c127cc4a",
+              "clip": {
+                "x": 71.75,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-copy-02-pasted",
+          "text": "abc\nTARabcGET\n",
+          "selection": {
+            "anchor": 10,
+            "head": 10
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 219.625,
+            "right": 219.625,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "● clipboard-copy-lf.md · 14 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "v",
+              "code": "KeyV",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "clipboard-copy-02-pasted.png",
+            "sha256": "b4689b6b31d8fd51fda1db4edad63eed6755dd263969cd199ae659d33c8028a3",
+            "caret": {
+              "left": 219.625,
+              "right": 219.625,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "zoom": {
+              "file": "clipboard-copy-02-pasted-caret-2x.png",
+              "sha256": "c0ee88157d3f35fd863e174f21762e65c1f41e873038e6af22469ea11882ab61",
+              "clip": {
+                "x": 99.625,
+                "y": 54.6953125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "ms": 3232
+    },
+    {
+      "id": "selection-cut-after-line-copy-pastes-at-caret",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "clipboard-cut-01-selected",
+          "text": "abc\nTARGET\n",
+          "selection": {
+            "anchor": 0,
+            "head": 3
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 191.75,
+            "right": 191.75,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "clipboard-cut-lf.md · 11 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "c",
+              "code": "KeyC",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "shift": true,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "shift": true,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "clipboard-cut-01-selected.png",
+            "sha256": "0fc173c1118ccfe871ee8c8bda56143b3155faa7bf9f56b7e2ce5664ef2041e2",
+            "caret": {
+              "left": 191.75,
+              "right": 191.75,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "clipboard-cut-01-selected-caret-2x.png",
+              "sha256": "22745b97eac2f1009f6aaff2d42f7826e0f4f277d0d83c578fc14e10c127cc4a",
+              "clip": {
+                "x": 71.75,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-cut-02-pasted",
+          "text": "\nTARabcGET\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 219.625,
+            "right": 219.625,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "● clipboard-cut-lf.md · 11 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "ArrowRight",
+              "code": "ArrowRight",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "v",
+              "code": "KeyV",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "clipboard-cut-02-pasted.png",
+            "sha256": "ec2cfcab4f818834d460430999a94dd0d4ac87acc718e624e49d456e3ac06a11",
+            "caret": {
+              "left": 219.625,
+              "right": 219.625,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "zoom": {
+              "file": "clipboard-cut-02-pasted-caret-2x.png",
+              "sha256": "8e757fcda83057fea9f81b3922cd7b5cca3942a2d2e495b62b919062353cc728",
+              "clip": {
+                "x": 99.625,
+                "y": 54.6953125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "ms": 2925
+    }
+  ],
+  "errors": [],
+  "artifact": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-clipboard\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-clipboard\\unpacked\\MarkPilot.exe",
+    "runtimeExecutableSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-clipboard\\unpacked\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.10",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-clipboard\\unpacked\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-clipboard\\unpacked\\resources\\app.asar",
+    "asarSha256": "da087df330d99409909ccad8ef58a64de5903319b6272c14703857e463d5cf99",
+    "bootMs": 994,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3",
+        "sourceSha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "clipboard": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T21:41:57.249Z",
+  "passed": true,
+  "frames": [
+    {
+      "file": "clipboard-copy-01-selected.png",
+      "sha256": "0fc173c1118ccfe871ee8c8bda56143b3155faa7bf9f56b7e2ce5664ef2041e2",
+      "caret": {
+        "left": 191.75,
+        "right": 191.75,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "clipboard-copy-01-selected-caret-2x.png",
+        "sha256": "22745b97eac2f1009f6aaff2d42f7826e0f4f277d0d83c578fc14e10c127cc4a",
+        "clip": {
+          "x": 71.75,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "clipboard-copy-02-pasted.png",
+      "sha256": "b4689b6b31d8fd51fda1db4edad63eed6755dd263969cd199ae659d33c8028a3",
+      "caret": {
+        "left": 219.625,
+        "right": 219.625,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "clipboard-copy-02-pasted-caret-2x.png",
+        "sha256": "c0ee88157d3f35fd863e174f21762e65c1f41e873038e6af22469ea11882ab61",
+        "clip": {
+          "x": 99.625,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "clipboard-cut-01-selected.png",
+      "sha256": "0fc173c1118ccfe871ee8c8bda56143b3155faa7bf9f56b7e2ce5664ef2041e2",
+      "caret": {
+        "left": 191.75,
+        "right": 191.75,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "clipboard-cut-01-selected-caret-2x.png",
+        "sha256": "22745b97eac2f1009f6aaff2d42f7826e0f4f277d0d83c578fc14e10c127cc4a",
+        "clip": {
+          "x": 71.75,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "clipboard-cut-02-pasted.png",
+      "sha256": "ec2cfcab4f818834d460430999a94dd0d4ac87acc718e624e49d456e3ac06a11",
+      "caret": {
+        "left": 219.625,
+        "right": 219.625,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "clipboard-cut-02-pasted-caret-2x.png",
+        "sha256": "8e757fcda83057fea9f81b3922cd7b5cca3942a2d2e495b62b919062353cc728",
+        "clip": {
+          "x": 99.625,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ]
+}

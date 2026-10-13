@@ -108,15 +108,23 @@ async function launch(o, doc, runDir, extraEnv = {}) {
     await page.waitForFunction(() => window.mpEngine._view().state.doc.length > 0, null, { timeout: 15000 });
     const info = await page.evaluate(() => window.mpHost.info());
     const artifactFiles=[];
-    for(const name of ['main.js','preload.js','renderer/host.js','shell/document-store.js','shell/text-codec.js','renderer/cm6/app.js']) {
+    for(const name of require('./artifact-files.cjs')) {
       const bytes=await page.evaluate(async name=>{
         const u=new URL('../'+name,location.href);
         const p=decodeURIComponent(u.pathname).replace(/^\/(?=[A-Za-z]:\/)/,'');
         const r=await window.mpHost.readFileBase64(p);return r?.ok ? r.base64 : null;
       },name);
-      artifactFiles.push({file:name,sha256:bytes ? crypto.createHash('sha256').update(Buffer.from(bytes,'base64')).digest('hex') : null,sourceSha256:sha256(path.join(ROOT,'MarkPilot-CM6',name))});
+      const source=path.join(ROOT,'MarkPilot-CM6',name);
+      artifactFiles.push({file:name,sha256:bytes ? crypto.createHash('sha256').update(Buffer.from(bytes,'base64')).digest('hex') : null,sourceSha256:fs.existsSync(source)?sha256(source):null});
     }
-    return { browser, page, child, profile, cleanup, metadata: { executable: path.basename(exe), exeSha256: hash, app: info, sourceMode: !!o.app, bootMs: Math.round(performance.now() - started), node: process.version, platform: process.platform, cpu: os.cpus()[0]?.model, ramGiB: Math.round(os.totalmem()/1073741824), engineBundleSha256: o.app ? sha256(path.join(o.app, 'renderer/cm6/app.js')) : null,artifactFiles } };
+    // A portable wrapper extracts a different running executable. Resolve the
+    // archive from the actual editor page, rather than guessing beside wrapper.
+    const artifactRoot=path.resolve(require('node:url').fileURLToPath(new URL('../',page.url())));
+    const asarPath=o.app?null:artifactRoot,resourcesPath=o.app?path.join(path.dirname(exe),'resources'):path.dirname(asarPath);
+    const asarSha256=asarPath&&fs.existsSync(asarPath)?sha256(asarPath):null;
+    const runtimeExecutablePath=o.app?exe:path.join(path.dirname(resourcesPath),'MarkPilot.exe');
+    const runtimeExecutableSha256=fs.existsSync(runtimeExecutablePath)?sha256(runtimeExecutablePath):null;
+    return { browser, page, child, profile, cleanup, metadata: { executable: path.basename(exe), executablePath:exe, exeSha256: hash, runtimeExecutablePath,runtimeExecutableSha256, artifactRoot,app: info, sourceMode: !!o.app, resourcesPath, asarPath, asarSha256, bootMs: Math.round(performance.now() - started), node: process.version, platform: process.platform, cpu: os.cpus()[0]?.model, ramGiB: Math.round(os.totalmem()/1073741824), engineBundleSha256: o.app ? sha256(path.join(o.app, 'renderer/cm6/app.js')) : null,artifactFiles } };
   } catch (e) { await cleanup(); throw new Error(e.message + '\n' + launchLog.slice(-1200)); }
 }
 module.exports = { ROOT, sleep, sha256, acquireSlot, args, launch };

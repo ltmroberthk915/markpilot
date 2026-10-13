@@ -31,7 +31,7 @@ import { EditorState } from "@codemirror/state";
 const ANCHOR_RATIO = 0.30;   // 取主视图视口 30% 高度处的像素锚（Marijn 官方口径）
 
 export function installSplit(deps) {
-  const { getView } = deps;
+  const { getView, focusSelection } = deps;
   let pane = null, slave = null, driver = null, expectedScroll = -1, expectedMasterScroll = -1, hlLine = null, slaveDoc = null, correctTimer = null;
 
   const isOpen = () => !!slave;
@@ -72,7 +72,7 @@ export function installSplit(deps) {
     document.addEventListener('visibilitychange', onVisibility);
     // 打开即对齐（两拍：新视图首帧高度图未就绪；timeout 在后台也会跑，不依赖 rAF）
     alignSlaveToMaster();
-    setTimeout(() => { if (slave) alignSlaveToMaster(); }, 0);
+    scheduleCorrect(() => { if (slave) alignSlaveToMaster(); });
     // 点击从视图（源码）→ 主视图落位并聚焦
     slave.dom.addEventListener('mousedown', (e) => {
       let pos = null;
@@ -80,8 +80,8 @@ export function installSplit(deps) {
       if (pos == null) return;
       e.preventDefault();
       driver = 'slave';
-      a.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
-      a.focus();
+      if (deps.selectSource) deps.selectSource(pos);
+      else { a.dispatch({ selection: { anchor: pos }, scrollIntoView: true }); if (!focusSelection?.(a)) a.focus(); }
       alignSlaveToMaster(pos);
       highlightSlave(pos);
       driver = null;
@@ -227,11 +227,16 @@ export function installSplit(deps) {
   /** 补一拍（setTimeout 0，**不是 rAF**）：程序化赋 scrollTop 之后 CM6 还要跑一次测量，
    *  高度图里的估计值会被实测值替换，目标行的实际落点随之微移（实测主/从两向可达 ~80px）。
    *  同方向再对齐一次即收敛；隐藏标签页里 timer 仍会跑（只是被节流），不依赖 rAF 存活。 */
-  const CORRECT_PASSES = [0, 45, 150];   // ms：0＝同拍；45/150＝CM6 测量（下一帧）之后
+  const correctionKey = {};
   function scheduleCorrect(fn) {
-    if (correctTimer) clearTimeout(correctTimer);
-    const timers = CORRECT_PASSES.map((ms) => setTimeout(() => { try { fn(); } catch { /* 分屏可能已关闭 */ } }, ms));
-    correctTimer = { clear: () => timers.forEach((t) => clearTimeout(t)) };
+    correctTimer?.clear();
+    const master=getView(),source=slave,doc=master?.state.doc,serial=deps.intentSerial?.();
+    if(!master||!source)return;
+    const ticket={active:true,clear(){this.active=false;}};correctTimer=ticket;
+    master.requestMeasure({key:correctionKey,
+      read:()=>ticket.active&&slave===source&&master.state.doc===doc&&deps.intentSerial?.()===serial,
+      write(ok){ticket.active=false;if(correctTimer===ticket)correctTimer=null;if(ok)try{fn();}catch{/* pane retired */}}
+    });
   }
   function alignSlaveToMaster(posHint, yHint) {
     const a = getView(); if (!a || !slave) return;
@@ -253,7 +258,7 @@ export function installSplit(deps) {
     let pos = null;
     try { pos = a.posAtCoords({ x: e.clientX, y: e.clientY }); } catch { pos = null; }
     if (pos == null) return;
-    setTimeout(() => { try { highlightSlave(pos); alignSlaveToMaster(pos, e.clientY); } catch { } }, 0);
+    scheduleCorrect(() => { highlightSlave(pos); alignSlaveToMaster(pos, e.clientY); });
   }
   /** 对侧当前块高亮：给从视图里**对应那一行**的 DOM 行加 data-mp-hl（零扫描、零装饰、不改文档）。
    *  【实现修正】旧写法按 `.cm-line` 数组下标取行——CM6 只渲染视口内的行，下标 ≠ 行号（实测定点错行）。

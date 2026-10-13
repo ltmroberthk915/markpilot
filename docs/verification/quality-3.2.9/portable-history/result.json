@@ -1,0 +1,421 @@
+{
+  "suite": "document-workflows",
+  "schema": 1,
+  "startedAt": "2026-10-11T20:18:34.715Z",
+  "cases": [
+    {
+      "id": "same-text-other-file-starts-empty-history",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "same-text-01-before-edit",
+          "text": "A base\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 160.5,
+            "y": 79.6953125,
+            "width": 0,
+            "height": 16,
+            "top": 79.6953125,
+            "right": 160.5,
+            "bottom": 95.6953125,
+            "left": 160.5
+          },
+          "scrollTop": 0,
+          "title": "history-A.md · 7 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "7cf893ec-3782-4e6b-9cfd-9525d1f89eeb",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.9-history\\history-A.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "same-text-01-before-edit.png",
+            "sha256": "f1b7900edcacc79957de4b7e76caf81169fd63b41a05ddb48433169b469b72ad",
+            "caret": {
+              "x": 160.5,
+              "y": 79.6953125,
+              "width": 0,
+              "height": 16,
+              "top": 79.6953125,
+              "right": 160.5,
+              "bottom": 95.6953125,
+              "left": 160.5
+            },
+            "zoom": {
+              "file": "same-text-01-before-edit-caret-2x.png",
+              "sha256": "42d82e0338d76ba214ae3585cb3da87a3c76d950b43d544e4aabe868475d5517",
+              "clip": {
+                "x": 40.5,
+                "y": 54.6953125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "same-text-02-A-edited",
+          "text": "A base\nFROM_A",
+          "selection": {
+            "anchor": 13,
+            "head": 13
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 220.5,
+            "right": 220.5,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "history-A.md · 13 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "7cf893ec-3782-4e6b-9cfd-9525d1f89eeb",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.9-history\\history-A.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "same-text-02-A-edited.png",
+            "sha256": "d83afca2e759a93fec96d90276e037679e74cd50466b0b979ead3d767a24eaec",
+            "caret": {
+              "left": 220.5,
+              "right": 220.5,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "zoom": {
+              "file": "same-text-02-A-edited-caret-2x.png",
+              "sha256": "6f6c0219182699c40aadf7480755d8e0688938ab60ffd65c3435293e3d961d0b",
+              "clip": {
+                "x": 100.5,
+                "y": 54.6953125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "same-text-03-B-before-undo",
+          "text": "A base\nFROM_A",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 160.5,
+            "right": 160.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "history-B.md · 13 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "5b7dc353-af96-41aa-b33e-82f6a63b455f",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.9-history\\history-B.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "same-text-03-B-before-undo.png",
+            "sha256": "0f39df31d6cd0edaf6ca286b063cba507d71d6b5f14c4cf1d7997da986c4a90d",
+            "caret": {
+              "left": 160.5,
+              "right": 160.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "same-text-03-B-before-undo-caret-2x.png",
+              "sha256": "61379eec73d592d741aa9ee92c3816d32022e6a927e739de1f3eafa76014f162",
+              "clip": {
+                "x": 40.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "same-text-04-B-after-undo",
+          "text": "A base\nFROM_A",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 160.5,
+            "right": 160.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "history-B.md · 13 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "5b7dc353-af96-41aa-b33e-82f6a63b455f",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.9-history\\history-B.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "same-text-04-B-after-undo.png",
+            "sha256": "0f39df31d6cd0edaf6ca286b063cba507d71d6b5f14c4cf1d7997da986c4a90d",
+            "caret": {
+              "left": 160.5,
+              "right": 160.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "same-text-04-B-after-undo-caret-2x.png",
+              "sha256": "61379eec73d592d741aa9ee92c3816d32022e6a927e739de1f3eafa76014f162",
+              "clip": {
+                "x": 40.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "disk-after-undo",
+          "A": "A base\nFROM_A",
+          "B": "A base\nFROM_A"
+        }
+      ],
+      "detail": {
+        "historyIsolated": true,
+        "documentIdentityChanged": true
+      },
+      "ms": 2454
+    }
+  ],
+  "input": "CDP real key events and insertText; file opening uses real host IPC",
+  "artifact": {
+    "executable": "markpilot-3.2.9-portable.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\candidate-3.2.9\\production\\markpilot-3.2.9-portable.exe",
+    "exeSha256": "00bcb227f2019359e44bea14f56afb1ff556fcfe06550c11aa95f6b332fada02",
+    "runtimeExecutablePath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\MarkPilot.exe",
+    "runtimeExecutableSha256": "39197065a983d7a8ff3235b8c6b690ea6d08bf5542fc959203386444da06259a",
+    "artifactRoot": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.9",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources",
+    "asarPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+    "asarSha256": "dae852488c3b63e86d807c043f9b46f150ba869b4fe2d5bc5c782a3150e3d0bc",
+    "bootMs": 5456,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "07f56591e566c4ceebfc2c49db57cf89eaebcf3b6f7188f00f7240617760059d",
+        "sourceSha256": "07f56591e566c4ceebfc2c49db57cf89eaebcf3b6f7188f00f7240617760059d"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "b4b11d263b9bbbe69a2651ecd4be37e0279b443a3061a47b0f0318952df66a7d",
+        "sourceSha256": "b4b11d263b9bbbe69a2651ecd4be37e0279b443a3061a47b0f0318952df66a7d"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T20:18:47.251Z",
+  "passed": true,
+  "frames": [
+    {
+      "file": "same-text-01-before-edit.png",
+      "sha256": "f1b7900edcacc79957de4b7e76caf81169fd63b41a05ddb48433169b469b72ad",
+      "caret": {
+        "x": 160.5,
+        "y": 79.6953125,
+        "width": 0,
+        "height": 16,
+        "top": 79.6953125,
+        "right": 160.5,
+        "bottom": 95.6953125,
+        "left": 160.5
+      },
+      "zoom": {
+        "file": "same-text-01-before-edit-caret-2x.png",
+        "sha256": "42d82e0338d76ba214ae3585cb3da87a3c76d950b43d544e4aabe868475d5517",
+        "clip": {
+          "x": 40.5,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "same-text-02-A-edited.png",
+      "sha256": "d83afca2e759a93fec96d90276e037679e74cd50466b0b979ead3d767a24eaec",
+      "caret": {
+        "left": 220.5,
+        "right": 220.5,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "same-text-02-A-edited-caret-2x.png",
+        "sha256": "6f6c0219182699c40aadf7480755d8e0688938ab60ffd65c3435293e3d961d0b",
+        "clip": {
+          "x": 100.5,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "same-text-03-B-before-undo.png",
+      "sha256": "0f39df31d6cd0edaf6ca286b063cba507d71d6b5f14c4cf1d7997da986c4a90d",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "same-text-03-B-before-undo-caret-2x.png",
+        "sha256": "61379eec73d592d741aa9ee92c3816d32022e6a927e739de1f3eafa76014f162",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "same-text-04-B-after-undo.png",
+      "sha256": "0f39df31d6cd0edaf6ca286b063cba507d71d6b5f14c4cf1d7997da986c4a90d",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "same-text-04-B-after-undo-caret-2x.png",
+        "sha256": "61379eec73d592d741aa9ee92c3816d32022e6a927e739de1f3eafa76014f162",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ]
+}

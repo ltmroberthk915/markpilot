@@ -1,0 +1,71 @@
+{
+  "schema": 2,
+  "tag": "isolated",
+  "exe": "<repo>\\.mp-verify\\codex-audit\\candidate installation 3.2.10\\installed\\MarkPilot.exe",
+  "sha256": "a045aa49b9111dda6b18d692f8a6a3026b387fb200706a71f50314e082c8ede8",
+  "asarSha256": "da087df330d99409909ccad8ef58a64de5903319b6272c14703857e463d5cf99",
+  "results": [
+    {
+      "suite": "selection-workflows",
+      "scope": "suite",
+      "caseFilter": "^(early-cell-focus-survives-boot-fallback|active-cell-undo-redo-keeps-source-and-overlay-in-sync|cell-tab-home-keeps-caret-before-next-input|cell-mouse-click-immediate-input-keeps-ratio-caret|cell-plain-paste-pipes-has-one-source-encoding-and-history|boot-open-document-direct-typing-needs-no-click|cell-history-across-tab-keeps-restored-source-and-dom-in-same-cell|cell-last-row-tab-shift-tab-and-select-cell-preserve-source)$",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.10-selection-workflows",
+      "total": 8,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "critical",
+      "scope": "suite",
+      "caseFilter": null,
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.10-critical",
+      "total": 26,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "images",
+      "scope": "saved-screenshot-immediate",
+      "caseFilter": null,
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.10-images",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "document-workflows",
+      "scope": "history",
+      "caseFilter": "^(same-text-other-file-starts-empty-history|open-from-active-cell-immediately-types-in-new-document|open-keeps-focused-persistent-settings-control)$",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.10-history",
+      "total": 3,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "math-workflows",
+      "scope": "math",
+      "caseFilter": "^multiline-quoted-block-glyph-click-edit-undo-redo$",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.10-math",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "rich-workflows",
+      "scope": "rich",
+      "caseFilter": "^mixed-html-preserve-all-content-in-order$",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-isolated-3.2.10-rich",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    }
+  ],
+  "passed": true,
+  "at": "2026-10-11T22:03:53.589Z"
+}

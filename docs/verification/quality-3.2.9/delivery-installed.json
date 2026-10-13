@@ -1,0 +1,83 @@
+{
+  "schema": 2,
+  "tag": "installed",
+  "exe": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\MarkPilot.exe",
+  "sha256": "39197065a983d7a8ff3235b8c6b690ea6d08bf5542fc959203386444da06259a",
+  "asarSha256": "dae852488c3b63e86d807c043f9b46f150ba869b4fe2d5bc5c782a3150e3d0bc",
+  "results": [
+    {
+      "suite": "critical",
+      "scope": "suite",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.9-critical",
+      "total": 26,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "images",
+      "scope": "saved-screenshot-immediate",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.9-images",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "document-workflows",
+      "scope": "history",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.9-history",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "math-workflows",
+      "scope": "math",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.9-math",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "rich-workflows",
+      "scope": "rich",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.9-rich",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "images",
+      "scope": "viewport",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.9-viewport",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "images",
+      "scope": "size",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.9-size",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "images",
+      "scope": "copy-save",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-installed-3.2.9-copy-save",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    }
+  ],
+  "passed": true,
+  "at": "2026-10-11T20:21:38.972Z"
+}

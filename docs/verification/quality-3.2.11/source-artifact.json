@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "executable": "<repo>\\.mp-verify\\codex-audit\\cm6-common-final-source-3.2.11\\unpacked\\MarkPilot.exe",
+  "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+  "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+  "version": "3.2.11",
+  "files": [
+    {
+      "file": "main.js",
+      "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+    },
+    {
+      "file": "preload.js",
+      "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+    },
+    {
+      "file": "renderer/host.js",
+      "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+    },
+    {
+      "file": "shell/document-store.js",
+      "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+    },
+    {
+      "file": "shell/text-codec.js",
+      "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+    },
+    {
+      "file": "renderer/cm6/app.js",
+      "sha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+    },
+    {
+      "file": "renderer/cm6/markdown-worker.js",
+      "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+    }
+  ]
+}

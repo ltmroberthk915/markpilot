@@ -1,0 +1,216 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T18:41:02.274Z",
+  "cases": [
+    {
+      "id": "long-document-paste-is-visible-without-extra-input",
+      "status": "fail",
+      "trace": [
+        {
+          "phase": "decoded",
+          "top": 636.0703125,
+          "bottom": 796.0703125,
+          "visibleBottom": 667,
+          "scrollTop": 10156.5,
+          "caret": {
+            "left": 560.5,
+            "right": 560.5,
+            "top": 636.0703125,
+            "bottom": 803.765625
+          }
+        },
+        {
+          "failureState": {
+            "text": {
+              "characters": 6523,
+              "sha256": "cf4537ea7674dabcb420ae66813a54eeeeaa26ba2848f8cbfd25362919d720e3",
+              "preview": "# Section 0\n\n<img src=\"data:image/png;base64,[bitmap bytes omitted]\" width=\"756\" />\n\nordinary paragraph before screenshot\nordinary paragraph before screenshot\nordinary paragraph before screenshot\nordinary paragraph before screenshot\nordinary paragraph befo\n…\n4,[bitmap bytes omitted]\" width=\"756\" />\n\nordinary paragraph before screenshot\nordinary paragraph before screenshot\nordinary paragraph before screenshot\nordinary paragraph before screenshot\nordinary paragraph before screenshot\n\n![](assets/pasted-image.png)"
+            },
+            "selection": {
+              "anchor": 10269355,
+              "head": 10269355
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 560.5,
+              "right": 560.5,
+              "top": 636.0703125,
+              "bottom": 803.765625
+            },
+            "scrollTop": 10156.5,
+            "title": "新建 Markdown 文档.md · 10269355 字 — MarkPilot",
+            "banner": ""
+          },
+          "images": [
+            {
+              "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABVkAAANZCAYAAAAVtD5wAAAAAXNSR0IArs4c6QAAIABJREFUeF7s3XfcZEWdL/4ChjjkDAPikBkyOGQQkWTEAAouiktQuFzxGnDF1dX9wTVhWGVZUJ",
+              "complete": true,
+              "naturalWidth": 1369,
+              "naturalHeight": 857,
+              "width": 756,
+              "failed": false
+            },
+            {
+              "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABVkAAANZCAYAAAAVtD5wAAAAAXNSR0IArs4c6QAAIABJREFUeF7s3XfcZEWdL/4ChjjkDAPikBkyOGQQkWTEAAouiktQuFzxGnDF1dX9wTVhWGVZUJ",
+              "complete": true,
+              "naturalWidth": 1369,
+              "naturalHeight": 857,
+              "width": 756,
+              "failed": false
+            },
+            {
+              "src": "file:///<repo>/.mp-verify/codex-audit/cm6-image-mutations-3.2.8/negative-predecode/%E4%B8%AD%E6%96%87%20%E6%88%AA%E5%",
+              "complete": true,
+              "naturalWidth": 400,
+              "naturalHeight": 160,
+              "width": 400,
+              "failed": false
+            }
+          ],
+          "toast": "已存入 assets 并插入图片"
+        }
+      ],
+      "error": "Timed out waiting for entire screenshot visible without any post-paste input",
+      "ms": 8617
+    }
+  ],
+  "frames": [
+    {
+      "file": "long-document-before-paste.png",
+      "sha256": "d362b73c7549221627a63c0c58459beacce1974f3e9151d377c1da2dcabbe81b",
+      "caret": {
+        "left": 916.5,
+        "right": 916.5,
+        "top": 10135.25,
+        "bottom": 10616.203125
+      },
+      "zoom": {
+        "file": "long-document-before-paste-caret-2x.png",
+        "sha256": "444e4021c6c7808cdd1d77fc5e3dcbcb6849f203502952157d3dda6b06f86b45",
+        "clip": {
+          "x": 787,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "failed-long-document-paste-is-visible-without-extra-input.png",
+      "sha256": "cad573a22c2e4fd9f832b9cd8d6ebdfa8e17505b1af21643c5b1013e43657459",
+      "caret": {
+        "left": 560.5,
+        "right": 560.5,
+        "top": 636.0703125,
+        "bottom": 803.765625
+      },
+      "zoom": {
+        "file": "failed-long-document-paste-is-visible-without-extra-input-caret-2x.png",
+        "sha256": "74a0667d7f276f27125cae3bd3eeab5ed0f8793e94abbfe394bf1f42b70c1a44",
+        "clip": {
+          "x": 440.5,
+          "y": 601,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    }
+  ],
+  "observations": [],
+  "metadata": {
+    "executable": "MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.8",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "bootMs": 833,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "178bb51a146b37ac15d6c913ddcaf50c9b80386751e8f51cdf0ba1c9e578bef8",
+        "sourceSha256": "178bb51a146b37ac15d6c913ddcaf50c9b80386751e8f51cdf0ba1c9e578bef8"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "81301eef4e4f09a3d499c50d2fe21f21604fc996c41173024ba7469ee191182d",
+        "sourceSha256": "81301eef4e4f09a3d499c50d2fe21f21604fc996c41173024ba7469ee191182d"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "bd8471f647b4d3c876027a803e78af43001ea5d62991399d5cdebf4f0402b3a1",
+        "sourceSha256": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ],
+    "imageHostDelayMs": 0
+  },
+  "clipboardCleanup": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "completedAt": "2026-10-11T18:41:17.984Z",
+  "passed": false
+}

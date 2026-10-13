@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "passed": true,
+  "checkoutUnchanged": true,
+  "selectedKinds": [
+    "split-source-cell-owner"
+  ],
+  "baselineEngine": "5c5ad94957ce94902176664182afbb1d578c42bf2347119bbbb58739c64abcb8",
+  "mutations": [
+    {
+      "kind": "split-source-cell-owner",
+      "suite": "split-source-workflows",
+      "ids": [
+        "active-cell-source-pane-click-immediate-edit-history-continue"
+      ],
+      "controls": [
+        "active-cell-source-pane-plain-click-immediate-edit-history-continue"
+      ],
+      "negativeErrors": [
+        {
+          "id": "active-cell-source-pane-click-immediate-edit-history-continue",
+          "error": "immediate R full source / neighbors\n+ actual - expected\n\n+ 'Before\\n\\n|H|K|\\n|---|---|\\n|a\\\\|b|KEEP|\\nR\\nAfter\\n'\n- 'Before\\n\\n|H|K|\\n|---|---|\\n|a\\\\|Rb|KEEP|\\n\\nAfter\\n'\n"
+        }
+      ],
+      "redAsar": "04becfae783478edc78f0add55a10fe277d135830e6a66bcc4c6d6999a35b6d4",
+      "greenAsar": "08a6de1a9b6be8a6b8033ec5c8dbf5b6fd3f8277a674ed4c35bcc6b58dad4e51",
+      "sourceRestored": true,
+      "idempotentOnOff": true,
+      "positive": true
+    }
+  ],
+  "scope": "Only the split-source exact-cell callback routing is removed. The table arm must reproduce the original immediate-R full-source error; plain source remains green. Restored same ASAR passes both. The preceding three roots are regression coverage, not new repeated mutations."
+}

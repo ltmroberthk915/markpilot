@@ -131,6 +131,7 @@ const { snapshot, reset, frame, outputDir } = require('./harness.cjs');
       try { await click(points[1]); } finally { await page.keyboard.up('Shift'); }
       s=await snapshot(page);assert.equal(s.selection.anchor,2);assert.equal(s.selection.head,8);assert.equal(s.text,text);
       const shifted=s.selection;
+      result.frames.push(await frame(page,dir,'10-shift-click-selection'));
       await click(points[1],{clickCount:2});
       s=await snapshot(page);assert.equal(text.slice(Math.min(s.selection.anchor,s.selection.head),Math.max(s.selection.anchor,s.selection.head)),'beta');
       assert(s.focus);assert.equal(s.text,text);

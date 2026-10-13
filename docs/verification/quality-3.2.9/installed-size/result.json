@@ -1,0 +1,510 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T20:21:09.205Z",
+  "cases": [
+    {
+      "id": "size-presets-are-distinct-stable-and-reversible",
+      "status": "pass",
+      "trace": [
+        {
+          "percent": 25,
+          "stored": 189,
+          "display": 189,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"189\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 205.703125,
+              "width": 0,
+              "height": 16,
+              "top": 205.703125,
+              "right": 188.5,
+              "bottom": 221.703125,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "percent": 50,
+          "stored": 378,
+          "display": 378,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"378\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 324.015625,
+              "width": 0,
+              "height": 16,
+              "top": 324.015625,
+              "right": 188.5,
+              "bottom": 340.015625,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "percent": 75,
+          "stored": 567,
+          "display": 567,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"567\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 442.328125,
+              "width": 0,
+              "height": 16,
+              "top": 442.328125,
+              "right": 188.5,
+              "bottom": 458.328125,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "percent": 100,
+          "stored": 756,
+          "display": 756,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"756\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 560.6484375,
+              "width": 0,
+              "height": 16,
+              "top": 560.6484375,
+              "right": 188.5,
+              "bottom": 576.6484375,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "percent": 50,
+          "stored": 378,
+          "display": 378,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"378\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 324.015625,
+              "width": 0,
+              "height": 16,
+              "top": 324.015625,
+              "right": 188.5,
+              "bottom": 340.015625,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "percent": 25,
+          "stored": 189,
+          "display": 189,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"189\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 205.703125,
+              "width": 0,
+              "height": 16,
+              "top": 205.703125,
+              "right": 188.5,
+              "bottom": 221.703125,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": ""
+          }
+        },
+        {
+          "percent": 100,
+          "stored": 756,
+          "display": 756,
+          "state": {
+            "text": "<img src=\"assets/fixture-a.png\" width=\"756\">\n\n正文",
+            "selection": {
+              "anchor": 48,
+              "head": 48
+            },
+            "focus": false,
+            "activeElement": {
+              "tag": "BODY",
+              "class": ""
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 560.6484375,
+              "width": 0,
+              "height": 16,
+              "top": 560.6484375,
+              "right": 188.5,
+              "bottom": 576.6484375,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 48 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 6503
+    }
+  ],
+  "frames": [
+    {
+      "file": "size-25-1.png",
+      "sha256": "5edfc11e7d666a7d549ac532a619f1c934eb39fab5d2e730d646a4a6361a51e5",
+      "caret": {
+        "x": 188.5,
+        "y": 205.703125,
+        "width": 0,
+        "height": 16,
+        "top": 205.703125,
+        "right": 188.5,
+        "bottom": 221.703125,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-25-1-caret-2x.png",
+        "sha256": "0b90f7b9b8997e6a9f3474789ce89d032c99ada0ab5da920736a9e07696c6868",
+        "clip": {
+          "x": 68.5,
+          "y": 180.703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-50-2.png",
+      "sha256": "c6fc9d0c0b8a62c12da042ffe3708030b95f3a977cae53a775588f05276009ac",
+      "caret": {
+        "x": 188.5,
+        "y": 324.015625,
+        "width": 0,
+        "height": 16,
+        "top": 324.015625,
+        "right": 188.5,
+        "bottom": 340.015625,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-50-2-caret-2x.png",
+        "sha256": "57ae8c43ab77d42fb0f33416d9e7bd1c64da49feb61475389e927f2729562688",
+        "clip": {
+          "x": 68.5,
+          "y": 299.015625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-75-3.png",
+      "sha256": "b6958354af682ddbae2409621b78fda2d2e007c154e9672ce17b5d4a8734081f",
+      "caret": {
+        "x": 188.5,
+        "y": 442.328125,
+        "width": 0,
+        "height": 16,
+        "top": 442.328125,
+        "right": 188.5,
+        "bottom": 458.328125,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-75-3-caret-2x.png",
+        "sha256": "7ae68854cb19773f4f445d3d6521ad7a264a1867791e3e013383e1ace343666d",
+        "clip": {
+          "x": 68.5,
+          "y": 417.328125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-100-4.png",
+      "sha256": "796e08cda4d80f7bb8d23d07e85b43d3c6f1ddb61ffe68f434ebeead4e985954",
+      "caret": {
+        "x": 188.5,
+        "y": 560.6484375,
+        "width": 0,
+        "height": 16,
+        "top": 560.6484375,
+        "right": 188.5,
+        "bottom": 576.6484375,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-100-4-caret-2x.png",
+        "sha256": "0b90f7b9b8997e6a9f3474789ce89d032c99ada0ab5da920736a9e07696c6868",
+        "clip": {
+          "x": 68.5,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-50-5.png",
+      "sha256": "c6fc9d0c0b8a62c12da042ffe3708030b95f3a977cae53a775588f05276009ac",
+      "caret": {
+        "x": 188.5,
+        "y": 324.015625,
+        "width": 0,
+        "height": 16,
+        "top": 324.015625,
+        "right": 188.5,
+        "bottom": 340.015625,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-50-5-caret-2x.png",
+        "sha256": "57ae8c43ab77d42fb0f33416d9e7bd1c64da49feb61475389e927f2729562688",
+        "clip": {
+          "x": 68.5,
+          "y": 299.015625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-25-6.png",
+      "sha256": "c4c01586a78a39ec3dff2cb68ff1545b495fe1d69505da22ecfd2535aef327b0",
+      "caret": {
+        "x": 188.5,
+        "y": 205.703125,
+        "width": 0,
+        "height": 16,
+        "top": 205.703125,
+        "right": 188.5,
+        "bottom": 221.703125,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-25-6-caret-2x.png",
+        "sha256": "0b90f7b9b8997e6a9f3474789ce89d032c99ada0ab5da920736a9e07696c6868",
+        "clip": {
+          "x": 68.5,
+          "y": 180.703125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "size-100-7.png",
+      "sha256": "796e08cda4d80f7bb8d23d07e85b43d3c6f1ddb61ffe68f434ebeead4e985954",
+      "caret": {
+        "x": 188.5,
+        "y": 560.6484375,
+        "width": 0,
+        "height": 16,
+        "top": 560.6484375,
+        "right": 188.5,
+        "bottom": 576.6484375,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "size-100-7-caret-2x.png",
+        "sha256": "0b90f7b9b8997e6a9f3474789ce89d032c99ada0ab5da920736a9e07696c6868",
+        "clip": {
+          "x": 68.5,
+          "y": 535.6484375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ],
+  "observations": [],
+  "metadata": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\MarkPilot.exe",
+    "exeSha256": "39197065a983d7a8ff3235b8c6b690ea6d08bf5542fc959203386444da06259a",
+    "runtimeExecutablePath": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\MarkPilot.exe",
+    "runtimeExecutableSha256": "39197065a983d7a8ff3235b8c6b690ea6d08bf5542fc959203386444da06259a",
+    "artifactRoot": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.9",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\resources",
+    "asarPath": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\resources\\app.asar",
+    "asarSha256": "dae852488c3b63e86d807c043f9b46f150ba869b4fe2d5bc5c782a3150e3d0bc",
+    "bootMs": 931,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "07f56591e566c4ceebfc2c49db57cf89eaebcf3b6f7188f00f7240617760059d",
+        "sourceSha256": "07f56591e566c4ceebfc2c49db57cf89eaebcf3b6f7188f00f7240617760059d"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "b4b11d263b9bbbe69a2651ecd4be37e0279b443a3061a47b0f0318952df66a7d",
+        "sourceSha256": "b4b11d263b9bbbe69a2651ecd4be37e0279b443a3061a47b0f0318952df66a7d"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ],
+    "imageHostDelayMs": 5000
+  },
+  "clipboardCleanup": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "completedAt": "2026-10-11T20:21:22.612Z",
+  "passed": true
+}

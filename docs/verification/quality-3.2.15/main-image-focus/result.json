@@ -1,0 +1,282 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-12T19:43:25.639Z",
+  "cases": [
+    {
+      "id": "delete-image-html",
+      "status": "pass",
+      "trace": [
+        {
+          "afterDelete": {
+            "text": "\n\n正文",
+            "selection": {
+              "anchor": 4,
+              "head": 4
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 188.5,
+              "y": 104.890625,
+              "width": 0,
+              "height": 16,
+              "top": 104.890625,
+              "right": 188.5,
+              "bottom": 120.890625,
+              "left": 188.5
+            },
+            "scrollTop": 0,
+            "title": "● 新建 Markdown 文档.md · 4 字 — MarkPilot",
+            "banner": ""
+          },
+          "commandTrace": [
+            {
+              "phase": "captured",
+              "anchor": 58,
+              "head": 58,
+              "owner": "cm"
+            },
+            {
+              "phase": "executed",
+              "anchor": 4,
+              "head": 4,
+              "owner": "cm"
+            },
+            {
+              "phase": "resumed",
+              "anchor": 4,
+              "head": 4,
+              "owner": "cm"
+            }
+          ]
+        },
+        {
+          "text": "<img src=\"assets/fixture-a.png\" height=\"80\" alt=\"a>b\">\n\n正文",
+          "selection": {
+            "anchor": 58,
+            "head": 58
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 188.5,
+            "y": 167.390625,
+            "width": 0,
+            "height": 16,
+            "top": 167.390625,
+            "right": 188.5,
+            "bottom": 183.390625,
+            "left": 188.5
+          },
+          "scrollTop": 0,
+          "title": "● 新建 Markdown 文档.md · 58 字 — MarkPilot",
+          "banner": ""
+        },
+        {
+          "continuation": {
+            "text": "\n\n正文K",
+            "selection": {
+              "anchor": 5,
+              "head": 5
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 198.21875,
+              "right": 198.21875,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "scrollTop": 0,
+            "title": "新建 Markdown 文档.md · 5 字 — MarkPilot",
+            "banner": ""
+          },
+          "diskSha256": "6b01d487f0d657672bca667e6dc4dac685fc211d36a446c2c74d55321adb3702"
+        }
+      ],
+      "ms": 1703
+    }
+  ],
+  "frames": [
+    {
+      "file": "deleted-html.png",
+      "sha256": "97908a9ae7d43487d3aa1242c61e6037bac84ddabf482d38f88a7d6dc7539e19",
+      "caret": {
+        "x": 188.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 188.5,
+        "bottom": 120.890625,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "deleted-html-caret-2x.png",
+        "sha256": "0f3a309a2d166414dfa0398fcc93cee7c9aa9e8d23f82486096d73c13640bfc0",
+        "clip": {
+          "x": 68.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "delete-html.png",
+      "sha256": "18d8d15925c89d5dc48364d106adfd3d616d1c0a9ce5a92094ddf03f49217979",
+      "caret": {
+        "x": 188.5,
+        "y": 167.390625,
+        "width": 0,
+        "height": 16,
+        "top": 167.390625,
+        "right": 188.5,
+        "bottom": 183.390625,
+        "left": 188.5
+      },
+      "zoom": {
+        "file": "delete-html-caret-2x.png",
+        "sha256": "0f3a309a2d166414dfa0398fcc93cee7c9aa9e8d23f82486096d73c13640bfc0",
+        "clip": {
+          "x": 68.5,
+          "y": 142.390625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "delete-continue-html.png",
+      "sha256": "00f7fc6f39d91660646732c5878ce40a17eccda8d779a10fca29f11a8e79ae40",
+      "caret": {
+        "left": 198.21875,
+        "right": 198.21875,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "delete-continue-html-caret-2x.png",
+        "sha256": "126ac7eab10a2b7746205a4af52f0b5bb2e4d2dca0a20753d5de670f765a6dce",
+        "clip": {
+          "x": 78.21875,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ],
+  "observations": [],
+  "metadata": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\MarkPilot.exe",
+    "exeSha256": "10014beb28ebbe4d193bd218a62c42113f227a1e6acc79779ec8235045923eff",
+    "runtimeExecutablePath": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\MarkPilot.exe",
+    "runtimeExecutableSha256": "10014beb28ebbe4d193bd218a62c42113f227a1e6acc79779ec8235045923eff",
+    "artifactRoot": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.15",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\resources",
+    "asarPath": "<user>\\AppData\\Local\\Programs\\MarkPilot CM6\\resources\\app.asar",
+    "asarSha256": "f979c2bac7a3293e8fabb3e278a5b325ee206bfba7d17b79b5b88d4ef693025b",
+    "bootMs": 1050,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "a1de99204740639a3e6f96337dbc7f32d5246e2406e6df9a967ce0ae84203ce6",
+        "sourceSha256": "a1de99204740639a3e6f96337dbc7f32d5246e2406e6df9a967ce0ae84203ce6"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "8684dcb4f4410d7e75af75ea99f22b78851fd431504549f037d4f89d4f815ee9",
+        "sourceSha256": "8684dcb4f4410d7e75af75ea99f22b78851fd431504549f037d4f89d4f815ee9"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "a13377236f0878abd3957bea11c115380cfecc82acdfa71c7a760fe4063814fd",
+        "sourceSha256": "a13377236f0878abd3957bea11c115380cfecc82acdfa71c7a760fe4063814fd"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "74393c650d4e65df2c0ec13b0894108ab7c2f2f3764004dce8bd7188682a3111",
+        "sourceSha256": "74393c650d4e65df2c0ec13b0894108ab7c2f2f3764004dce8bd7188682a3111"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "ceb6e4b8883879d53d6f3d0f436bbe2b8bf548afef7e77c0c83e7df431fd64af",
+        "sourceSha256": "ceb6e4b8883879d53d6f3d0f436bbe2b8bf548afef7e77c0c83e7df431fd64af"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ],
+    "imageHostDelayMs": 5000
+  },
+  "clipboardCleanup": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "completedAt": "2026-10-12T19:43:34.577Z",
+  "passed": true
+}

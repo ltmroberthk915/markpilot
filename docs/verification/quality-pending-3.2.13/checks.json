@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "unit": {
+    "summary": {
+      "tests": 89,
+      "pass": 89,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "logSha256": "ad9d722d3ac02919e65f26b72ea0fc639b1026d9301a44badc4fecc56c146dbe"
+  },
+  "preflight": {
+    "schema": 1,
+    "total": 124,
+    "syntaxFailures": [],
+    "eagerImportFailures": [],
+    "legacyDependencyPaths": [],
+    "ok": true,
+    "inputSha256": "73b01749ae54e60223c5a92d12465afc68a6d7c3d172d8218c8c8948fda6b466"
+  },
+  "buildCheckSha256": "ddc03603a2cf705ad26e2917d617a71f961cd3bc43d22959753b38f20306bb51"
+}

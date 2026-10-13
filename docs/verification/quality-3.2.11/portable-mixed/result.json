@@ -1,0 +1,3947 @@
+{
+  "schema": 1,
+  "suite": "next-mixed-selection-chain",
+  "kind": "private-actual-ui-draft",
+  "seed": 32917,
+  "startedAt": "2026-10-11T23:12:44.379Z",
+  "cases": [
+    {
+      "id": "mouse-reverse-drag-mixed-copy-replace-history",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "known-formula-and-render-positive",
+          "known": [
+            {
+              "id": "ordinary-inline-one",
+              "token": "$x+y$",
+              "tex": "x+y",
+              "from": 26,
+              "to": 31
+            },
+            {
+              "id": "ordinary-inline-two",
+              "token": "$a+b$",
+              "tex": "a+b",
+              "from": 38,
+              "to": 43
+            },
+            {
+              "id": "quoted-inline",
+              "token": "$q+r$",
+              "tex": "q+r",
+              "from": 60,
+              "to": 65
+            }
+          ],
+          "rendered": [
+            {
+              "glyphText": "x+y",
+              "sourceMappedGlyphs": 3,
+              "height": 20,
+              "width": 39.296875
+            },
+            {
+              "glyphText": "a+b",
+              "sourceMappedGlyphs": 3,
+              "height": 20,
+              "width": 36.9375
+            },
+            {
+              "glyphText": "q+r",
+              "sourceMappedGlyphs": 3,
+              "height": 18,
+              "width": 33.2890625
+            }
+          ]
+        },
+        {
+          "name": "mouse-01-plain-copy-positive",
+          "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nPASTE_TARGET",
+          "selection": {
+            "anchor": 0,
+            "head": 16
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 314.09375,
+            "right": 314.09375,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "mouse.md · 102 字 — MarkPilot",
+          "banner": "",
+          "disk": {
+            "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nPASTE_TARGET",
+            "byteLength": 102,
+            "sha256": "061b67a8f2df4adc23ea6c9af457cecbed46fdb0d4f59bcdeaeeef7281666cfb"
+          },
+          "evidence": {
+            "keys": [
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 690.3999999761581
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 692.8000000715256
+              },
+              {
+                "key": "Shift",
+                "code": "ShiftLeft",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 889.3000000715256
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 891.1000000238419
+              }
+            ],
+            "pointers": [],
+            "transfers": [],
+            "inputs": [],
+            "scrolls": [],
+            "expected": ""
+          },
+          "screenshot": {
+            "file": "mouse-01-plain-copy-positive.png",
+            "sha256": "4409df9304b504d560e55d14eccdf5024905c786cdb7a40f4eb9a43706a16f8a",
+            "caret": {
+              "left": 314.09375,
+              "right": 314.09375,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "mouse-01-plain-copy-positive-caret-2x.png",
+              "sha256": "bd19a2f7270a65981cfa52553def9a2d7775c8cb02887e04cdbb9177f763f1b5",
+              "clip": {
+                "x": 194.09375,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-arm-mouse-positive",
+          "ack": {
+            "ok": true,
+            "bytes": 38,
+            "hasHtml": false
+          },
+          "check": {
+            "matches": true,
+            "length": 38
+          }
+        },
+        {
+          "name": "mouse-02-plain-copy-after",
+          "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nPASTE_TARGET",
+          "selection": {
+            "anchor": 0,
+            "head": 16
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 314.09375,
+            "right": 314.09375,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "mouse.md · 102 字 — MarkPilot",
+          "banner": "",
+          "disk": {
+            "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nPASTE_TARGET",
+            "byteLength": 102,
+            "sha256": "061b67a8f2df4adc23ea6c9af457cecbed46fdb0d4f59bcdeaeeef7281666cfb"
+          },
+          "evidence": {
+            "keys": [
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 690.3999999761581
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 692.8000000715256
+              },
+              {
+                "key": "Shift",
+                "code": "ShiftLeft",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 889.3000000715256
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 891.1000000238419
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1862.3000000715256
+              },
+              {
+                "key": "c",
+                "code": "KeyC",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1863.7000000476837
+              }
+            ],
+            "pointers": [],
+            "transfers": [
+              {
+                "kind": "copy",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [],
+                "plainIsExpected": false,
+                "plainLength": 0,
+                "at": 1864.1000000238419
+              }
+            ],
+            "inputs": [],
+            "scrolls": [],
+            "expected": ""
+          },
+          "screenshot": {
+            "file": "mouse-02-plain-copy-after.png",
+            "sha256": "4409df9304b504d560e55d14eccdf5024905c786cdb7a40f4eb9a43706a16f8a",
+            "caret": {
+              "left": 314.09375,
+              "right": 314.09375,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "mouse-02-plain-copy-after-caret-2x.png",
+              "sha256": "bd19a2f7270a65981cfa52553def9a2d7775c8cb02887e04cdbb9177f763f1b5",
+              "clip": {
+                "x": 194.09375,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "plain-copy-independent-STA",
+          "length": 16,
+          "matches": true
+        },
+        {
+          "name": "frozen-real-drag-coordinates",
+          "points": [
+            {
+              "x": 328.521875,
+              "y": 136.8359375,
+              "top": 129.5859375,
+              "bottom": 144.0859375,
+              "viewport": {
+                "width": 1167,
+                "height": 691
+              }
+            },
+            {
+              "x": 170.6,
+              "y": 112.890625,
+              "top": 104.890625,
+              "bottom": 120.890625,
+              "viewport": {
+                "width": 1167,
+                "height": 691
+              }
+            }
+          ],
+          "steps": 16,
+          "stepMs": 20
+        },
+        {
+          "name": "mouse-05-crossing-selected",
+          "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nPASTE_TARGET",
+          "selection": {
+            "anchor": 71,
+            "head": 18
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 104.890625,
+            "bottom": 120.890625
+          },
+          "scrollTop": 0,
+          "title": "mouse.md · 102 字 — MarkPilot",
+          "banner": "",
+          "disk": {
+            "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nPASTE_TARGET",
+            "byteLength": 102,
+            "sha256": "061b67a8f2df4adc23ea6c9af457cecbed46fdb0d4f59bcdeaeeef7281666cfb"
+          },
+          "evidence": {
+            "keys": [
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 690.3999999761581
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 692.8000000715256
+              },
+              {
+                "key": "Shift",
+                "code": "ShiftLeft",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 889.3000000715256
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 891.1000000238419
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1862.3000000715256
+              },
+              {
+                "key": "c",
+                "code": "KeyC",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1863.7000000476837
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 2658.100000023842
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 2659.899999976158
+              }
+            ],
+            "pointers": [
+              {
+                "type": "mousedown",
+                "trusted": true,
+                "x": 328,
+                "y": 136,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2841.5
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 318,
+                "y": 135,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2857.100000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 308,
+                "y": 133,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2910.8000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 298,
+                "y": 132,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2963.5
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 289,
+                "y": 130,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3016.600000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 279,
+                "y": 129,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3070.899999976158
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 269,
+                "y": 127,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3124
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 259,
+                "y": 126,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3176.2000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 249,
+                "y": 124,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3230.3000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 239,
+                "y": 123,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3284
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 229,
+                "y": 121,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3337.600000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 219,
+                "y": 120,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3391.7000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 210,
+                "y": 118,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3426.8000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 200,
+                "y": 117,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3479
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 190,
+                "y": 115,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3532.399999976158
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 180,
+                "y": 114,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3584.7000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 170,
+                "y": 112,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3638.2000000476837
+              },
+              {
+                "type": "mouseup",
+                "trusted": true,
+                "x": 170,
+                "y": 112,
+                "button": 0,
+                "buttons": 0,
+                "targetInEditor": true,
+                "at": 3679.399999976158
+              }
+            ],
+            "transfers": [
+              {
+                "kind": "copy",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [],
+                "plainIsExpected": false,
+                "plainLength": 0,
+                "at": 1864.1000000238419
+              }
+            ],
+            "inputs": [],
+            "scrolls": [],
+            "expected": ""
+          },
+          "screenshot": {
+            "file": "mouse-05-crossing-selected.png",
+            "sha256": "37fed1eac3a2b633b7a5214eae50a4a1bdfcf62cbea91f12ff28f683f060ac9a",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "zoom": {
+              "file": "mouse-05-crossing-selected-caret-2x.png",
+              "sha256": "2ab8bfe8877f03926fa096edf36d6530d75b213f8fb3c80cad40a2dd124dd773",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-arm-mouse-crossing",
+          "ack": {
+            "ok": true,
+            "bytes": 38,
+            "hasHtml": false
+          },
+          "check": {
+            "length": 38,
+            "matches": true
+          }
+        },
+        {
+          "name": "mouse-06-copy",
+          "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nPASTE_TARGET",
+          "selection": {
+            "anchor": 71,
+            "head": 18
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 104.890625,
+            "bottom": 120.890625
+          },
+          "scrollTop": 0,
+          "title": "mouse.md · 102 字 — MarkPilot",
+          "banner": "",
+          "disk": {
+            "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nPASTE_TARGET",
+            "byteLength": 102,
+            "sha256": "061b67a8f2df4adc23ea6c9af457cecbed46fdb0d4f59bcdeaeeef7281666cfb"
+          },
+          "evidence": {
+            "keys": [
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 690.3999999761581
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 692.8000000715256
+              },
+              {
+                "key": "Shift",
+                "code": "ShiftLeft",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 889.3000000715256
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 891.1000000238419
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1862.3000000715256
+              },
+              {
+                "key": "c",
+                "code": "KeyC",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1863.7000000476837
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 2658.100000023842
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 2659.899999976158
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 4511.399999976158
+              },
+              {
+                "key": "c",
+                "code": "KeyC",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 4512.899999976158
+              }
+            ],
+            "pointers": [
+              {
+                "type": "mousedown",
+                "trusted": true,
+                "x": 328,
+                "y": 136,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2841.5
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 318,
+                "y": 135,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2857.100000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 308,
+                "y": 133,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2910.8000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 298,
+                "y": 132,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2963.5
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 289,
+                "y": 130,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3016.600000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 279,
+                "y": 129,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3070.899999976158
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 269,
+                "y": 127,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3124
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 259,
+                "y": 126,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3176.2000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 249,
+                "y": 124,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3230.3000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 239,
+                "y": 123,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3284
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 229,
+                "y": 121,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3337.600000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 219,
+                "y": 120,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3391.7000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 210,
+                "y": 118,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3426.8000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 200,
+                "y": 117,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3479
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 190,
+                "y": 115,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3532.399999976158
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 180,
+                "y": 114,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3584.7000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 170,
+                "y": 112,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3638.2000000476837
+              },
+              {
+                "type": "mouseup",
+                "trusted": true,
+                "x": 170,
+                "y": 112,
+                "button": 0,
+                "buttons": 0,
+                "targetInEditor": true,
+                "at": 3679.399999976158
+              }
+            ],
+            "transfers": [
+              {
+                "kind": "copy",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [],
+                "plainIsExpected": false,
+                "plainLength": 0,
+                "at": 1864.1000000238419
+              },
+              {
+                "kind": "copy",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [],
+                "plainIsExpected": false,
+                "plainLength": 0,
+                "at": 4513
+              }
+            ],
+            "inputs": [],
+            "scrolls": [],
+            "expected": ""
+          },
+          "screenshot": {
+            "file": "mouse-06-copy.png",
+            "sha256": "37fed1eac3a2b633b7a5214eae50a4a1bdfcf62cbea91f12ff28f683f060ac9a",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 104.890625,
+              "bottom": 120.890625
+            },
+            "zoom": {
+              "file": "mouse-06-copy-caret-2x.png",
+              "sha256": "2ab8bfe8877f03926fa096edf36d6530d75b213f8fb3c80cad40a2dd124dd773",
+              "clip": {
+                "x": 50.5,
+                "y": 79.890625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "crossing-source-independent-STA",
+          "matches": true,
+          "length": 53
+        },
+        {
+          "name": "mouse-10-target-selected",
+          "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nPASTE_TARGET",
+          "selection": {
+            "anchor": 90,
+            "head": 102
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 278.9296875,
+            "right": 278.9296875,
+            "top": 203.15625,
+            "bottom": 219.15625
+          },
+          "scrollTop": 0,
+          "title": "mouse.md · 102 字 — MarkPilot",
+          "banner": "",
+          "disk": {
+            "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nPASTE_TARGET",
+            "byteLength": 102,
+            "sha256": "061b67a8f2df4adc23ea6c9af457cecbed46fdb0d4f59bcdeaeeef7281666cfb"
+          },
+          "evidence": {
+            "keys": [
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 690.3999999761581
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 692.8000000715256
+              },
+              {
+                "key": "Shift",
+                "code": "ShiftLeft",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 889.3000000715256
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 891.1000000238419
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1862.3000000715256
+              },
+              {
+                "key": "c",
+                "code": "KeyC",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1863.7000000476837
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 2658.100000023842
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 2659.899999976158
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 4511.399999976158
+              },
+              {
+                "key": "c",
+                "code": "KeyC",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 4512.899999976158
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 5335.700000047684
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 5337.200000047684
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": false,
+                "shift": false,
+                "trusted": true,
+                "at": 5500.899999976158
+              },
+              {
+                "key": "Shift",
+                "code": "ShiftLeft",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 5669.800000071526
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 5671.100000023842
+              }
+            ],
+            "pointers": [
+              {
+                "type": "mousedown",
+                "trusted": true,
+                "x": 328,
+                "y": 136,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2841.5
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 318,
+                "y": 135,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2857.100000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 308,
+                "y": 133,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2910.8000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 298,
+                "y": 132,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2963.5
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 289,
+                "y": 130,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3016.600000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 279,
+                "y": 129,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3070.899999976158
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 269,
+                "y": 127,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3124
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 259,
+                "y": 126,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3176.2000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 249,
+                "y": 124,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3230.3000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 239,
+                "y": 123,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3284
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 229,
+                "y": 121,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3337.600000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 219,
+                "y": 120,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3391.7000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 210,
+                "y": 118,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3426.8000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 200,
+                "y": 117,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3479
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 190,
+                "y": 115,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3532.399999976158
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 180,
+                "y": 114,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3584.7000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 170,
+                "y": 112,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3638.2000000476837
+              },
+              {
+                "type": "mouseup",
+                "trusted": true,
+                "x": 170,
+                "y": 112,
+                "button": 0,
+                "buttons": 0,
+                "targetInEditor": true,
+                "at": 3679.399999976158
+              }
+            ],
+            "transfers": [
+              {
+                "kind": "copy",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [],
+                "plainIsExpected": false,
+                "plainLength": 0,
+                "at": 1864.1000000238419
+              },
+              {
+                "kind": "copy",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [],
+                "plainIsExpected": false,
+                "plainLength": 0,
+                "at": 4513
+              }
+            ],
+            "inputs": [],
+            "scrolls": [],
+            "expected": ""
+          },
+          "screenshot": {
+            "file": "mouse-10-target-selected.png",
+            "sha256": "42a30f94cc92e5d8f7342f6facb63e5294e1bd1e9a958a6461125163f6e3ce3f",
+            "caret": {
+              "left": 278.9296875,
+              "right": 278.9296875,
+              "top": 203.15625,
+              "bottom": 219.15625
+            },
+            "zoom": {
+              "file": "mouse-10-target-selected-caret-2x.png",
+              "sha256": "316e65bd6631921cc9a3f06d7312918df2e2c5214635b44f815ab61d1cf71764",
+              "clip": {
+                "x": 158.9296875,
+                "y": 178.15625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-before-paste",
+          "matches": true,
+          "length": 53
+        },
+        {
+          "name": "mouse-11-pasted",
+          "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END",
+          "selection": {
+            "anchor": 143,
+            "head": 143
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 328.421875,
+            "right": 328.421875,
+            "top": 227.8515625,
+            "bottom": 242.3515625
+          },
+          "scrollTop": 0,
+          "title": "● mouse.md · 143 字 — MarkPilot",
+          "banner": "",
+          "disk": {
+            "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nPASTE_TARGET",
+            "byteLength": 102,
+            "sha256": "061b67a8f2df4adc23ea6c9af457cecbed46fdb0d4f59bcdeaeeef7281666cfb"
+          },
+          "evidence": {
+            "keys": [
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 690.3999999761581
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 692.8000000715256
+              },
+              {
+                "key": "Shift",
+                "code": "ShiftLeft",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 889.3000000715256
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 891.1000000238419
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1862.3000000715256
+              },
+              {
+                "key": "c",
+                "code": "KeyC",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1863.7000000476837
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 2658.100000023842
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 2659.899999976158
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 4511.399999976158
+              },
+              {
+                "key": "c",
+                "code": "KeyC",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 4512.899999976158
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 5335.700000047684
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 5337.200000047684
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": false,
+                "shift": false,
+                "trusted": true,
+                "at": 5500.899999976158
+              },
+              {
+                "key": "Shift",
+                "code": "ShiftLeft",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 5669.800000071526
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 5671.100000023842
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 6486.300000071526
+              },
+              {
+                "key": "v",
+                "code": "KeyV",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 6487.600000023842
+              }
+            ],
+            "pointers": [
+              {
+                "type": "mousedown",
+                "trusted": true,
+                "x": 328,
+                "y": 136,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2841.5
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 318,
+                "y": 135,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2857.100000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 308,
+                "y": 133,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2910.8000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 298,
+                "y": 132,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2963.5
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 289,
+                "y": 130,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3016.600000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 279,
+                "y": 129,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3070.899999976158
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 269,
+                "y": 127,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3124
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 259,
+                "y": 126,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3176.2000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 249,
+                "y": 124,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3230.3000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 239,
+                "y": 123,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3284
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 229,
+                "y": 121,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3337.600000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 219,
+                "y": 120,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3391.7000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 210,
+                "y": 118,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3426.8000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 200,
+                "y": 117,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3479
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 190,
+                "y": 115,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3532.399999976158
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 180,
+                "y": 114,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3584.7000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 170,
+                "y": 112,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3638.2000000476837
+              },
+              {
+                "type": "mouseup",
+                "trusted": true,
+                "x": 170,
+                "y": 112,
+                "button": 0,
+                "buttons": 0,
+                "targetInEditor": true,
+                "at": 3679.399999976158
+              }
+            ],
+            "transfers": [
+              {
+                "kind": "copy",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [],
+                "plainIsExpected": false,
+                "plainLength": 0,
+                "at": 1864.1000000238419
+              },
+              {
+                "kind": "copy",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [],
+                "plainIsExpected": false,
+                "plainLength": 0,
+                "at": 4513
+              },
+              {
+                "kind": "paste",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [
+                  "text/plain"
+                ],
+                "plainIsExpected": true,
+                "plainLength": 53,
+                "at": 6490.300000071526
+              }
+            ],
+            "inputs": [],
+            "scrolls": [],
+            "expected": "M_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END"
+          },
+          "screenshot": {
+            "file": "mouse-11-pasted.png",
+            "sha256": "f4453004b5b6fcad4536c37660140044a65fe555b408c754fd9f67d2b0e0af0e",
+            "caret": {
+              "left": 328.421875,
+              "right": 328.421875,
+              "top": 227.8515625,
+              "bottom": 242.3515625
+            },
+            "zoom": {
+              "file": "mouse-11-pasted-caret-2x.png",
+              "sha256": "4fb49711f4f0b9d43d8816db341395d84484c38f771f1ca2dcb09888cc3768ee",
+              "clip": {
+                "x": 208.421875,
+                "y": 202.8515625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-after-paste",
+          "matches": true,
+          "length": 53
+        },
+        {
+          "name": "mouse-12-paste-undo",
+          "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nPASTE_TARGET",
+          "selection": {
+            "anchor": 90,
+            "head": 102
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 278.9296875,
+            "right": 278.9296875,
+            "top": 203.15625,
+            "bottom": 219.15625
+          },
+          "scrollTop": 0,
+          "title": "● mouse.md · 102 字 — MarkPilot",
+          "banner": "",
+          "disk": {
+            "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END",
+            "byteLength": 143,
+            "sha256": "558231b5e41237c2667921fe55a009646a9996328eaa9e8dc5846b38a780f23a"
+          },
+          "evidence": {
+            "keys": [
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 690.3999999761581
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 692.8000000715256
+              },
+              {
+                "key": "Shift",
+                "code": "ShiftLeft",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 889.3000000715256
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 891.1000000238419
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1862.3000000715256
+              },
+              {
+                "key": "c",
+                "code": "KeyC",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1863.7000000476837
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 2658.100000023842
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 2659.899999976158
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 4511.399999976158
+              },
+              {
+                "key": "c",
+                "code": "KeyC",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 4512.899999976158
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 5335.700000047684
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 5337.200000047684
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": false,
+                "shift": false,
+                "trusted": true,
+                "at": 5500.899999976158
+              },
+              {
+                "key": "Shift",
+                "code": "ShiftLeft",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 5669.800000071526
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 5671.100000023842
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 6486.300000071526
+              },
+              {
+                "key": "v",
+                "code": "KeyV",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 6487.600000023842
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 7305
+              },
+              {
+                "key": "z",
+                "code": "KeyZ",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 7306.200000047684
+              }
+            ],
+            "pointers": [
+              {
+                "type": "mousedown",
+                "trusted": true,
+                "x": 328,
+                "y": 136,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2841.5
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 318,
+                "y": 135,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2857.100000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 308,
+                "y": 133,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2910.8000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 298,
+                "y": 132,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2963.5
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 289,
+                "y": 130,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3016.600000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 279,
+                "y": 129,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3070.899999976158
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 269,
+                "y": 127,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3124
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 259,
+                "y": 126,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3176.2000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 249,
+                "y": 124,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3230.3000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 239,
+                "y": 123,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3284
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 229,
+                "y": 121,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3337.600000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 219,
+                "y": 120,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3391.7000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 210,
+                "y": 118,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3426.8000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 200,
+                "y": 117,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3479
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 190,
+                "y": 115,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3532.399999976158
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 180,
+                "y": 114,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3584.7000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 170,
+                "y": 112,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3638.2000000476837
+              },
+              {
+                "type": "mouseup",
+                "trusted": true,
+                "x": 170,
+                "y": 112,
+                "button": 0,
+                "buttons": 0,
+                "targetInEditor": true,
+                "at": 3679.399999976158
+              }
+            ],
+            "transfers": [
+              {
+                "kind": "copy",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [],
+                "plainIsExpected": false,
+                "plainLength": 0,
+                "at": 1864.1000000238419
+              },
+              {
+                "kind": "copy",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [],
+                "plainIsExpected": false,
+                "plainLength": 0,
+                "at": 4513
+              },
+              {
+                "kind": "paste",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [
+                  "text/plain"
+                ],
+                "plainIsExpected": true,
+                "plainLength": 53,
+                "at": 6490.300000071526
+              }
+            ],
+            "inputs": [],
+            "scrolls": [],
+            "expected": "M_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END"
+          },
+          "screenshot": {
+            "file": "mouse-12-paste-undo.png",
+            "sha256": "42a30f94cc92e5d8f7342f6facb63e5294e1bd1e9a958a6461125163f6e3ce3f",
+            "caret": {
+              "left": 278.9296875,
+              "right": 278.9296875,
+              "top": 203.15625,
+              "bottom": 219.15625
+            },
+            "zoom": {
+              "file": "mouse-12-paste-undo-caret-2x.png",
+              "sha256": "316e65bd6631921cc9a3f06d7312918df2e2c5214635b44f815ab61d1cf71764",
+              "clip": {
+                "x": 158.9296875,
+                "y": 178.15625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "mouse-13-paste-redo",
+          "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END",
+          "selection": {
+            "anchor": 90,
+            "head": 143
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 328.421875,
+            "right": 328.421875,
+            "top": 227.8515625,
+            "bottom": 242.3515625
+          },
+          "scrollTop": 0,
+          "title": "● mouse.md · 143 字 — MarkPilot",
+          "banner": "",
+          "disk": {
+            "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END",
+            "byteLength": 143,
+            "sha256": "558231b5e41237c2667921fe55a009646a9996328eaa9e8dc5846b38a780f23a"
+          },
+          "evidence": {
+            "keys": [
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 690.3999999761581
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 692.8000000715256
+              },
+              {
+                "key": "Shift",
+                "code": "ShiftLeft",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 889.3000000715256
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 891.1000000238419
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1862.3000000715256
+              },
+              {
+                "key": "c",
+                "code": "KeyC",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1863.7000000476837
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 2658.100000023842
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 2659.899999976158
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 4511.399999976158
+              },
+              {
+                "key": "c",
+                "code": "KeyC",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 4512.899999976158
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 5335.700000047684
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 5337.200000047684
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": false,
+                "shift": false,
+                "trusted": true,
+                "at": 5500.899999976158
+              },
+              {
+                "key": "Shift",
+                "code": "ShiftLeft",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 5669.800000071526
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 5671.100000023842
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 6486.300000071526
+              },
+              {
+                "key": "v",
+                "code": "KeyV",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 6487.600000023842
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 7305
+              },
+              {
+                "key": "z",
+                "code": "KeyZ",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 7306.200000047684
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 7746.899999976158
+              },
+              {
+                "key": "y",
+                "code": "KeyY",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 7748.100000023842
+              }
+            ],
+            "pointers": [
+              {
+                "type": "mousedown",
+                "trusted": true,
+                "x": 328,
+                "y": 136,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2841.5
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 318,
+                "y": 135,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2857.100000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 308,
+                "y": 133,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2910.8000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 298,
+                "y": 132,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2963.5
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 289,
+                "y": 130,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3016.600000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 279,
+                "y": 129,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3070.899999976158
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 269,
+                "y": 127,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3124
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 259,
+                "y": 126,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3176.2000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 249,
+                "y": 124,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3230.3000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 239,
+                "y": 123,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3284
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 229,
+                "y": 121,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3337.600000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 219,
+                "y": 120,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3391.7000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 210,
+                "y": 118,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3426.8000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 200,
+                "y": 117,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3479
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 190,
+                "y": 115,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3532.399999976158
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 180,
+                "y": 114,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3584.7000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 170,
+                "y": 112,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3638.2000000476837
+              },
+              {
+                "type": "mouseup",
+                "trusted": true,
+                "x": 170,
+                "y": 112,
+                "button": 0,
+                "buttons": 0,
+                "targetInEditor": true,
+                "at": 3679.399999976158
+              }
+            ],
+            "transfers": [
+              {
+                "kind": "copy",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [],
+                "plainIsExpected": false,
+                "plainLength": 0,
+                "at": 1864.1000000238419
+              },
+              {
+                "kind": "copy",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [],
+                "plainIsExpected": false,
+                "plainLength": 0,
+                "at": 4513
+              },
+              {
+                "kind": "paste",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [
+                  "text/plain"
+                ],
+                "plainIsExpected": true,
+                "plainLength": 53,
+                "at": 6490.300000071526
+              }
+            ],
+            "inputs": [],
+            "scrolls": [],
+            "expected": "M_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END"
+          },
+          "screenshot": {
+            "file": "mouse-13-paste-redo.png",
+            "sha256": "156922a9abb2bf91210894f68d1faf5073ed9acf970289688acff4d621d2e9bb",
+            "caret": {
+              "left": 328.421875,
+              "right": 328.421875,
+              "top": 227.8515625,
+              "bottom": 242.3515625
+            },
+            "zoom": {
+              "file": "mouse-13-paste-redo-caret-2x.png",
+              "sha256": "536d10f490cea393a008ab26b7e7182438f6081015a8fe947affd2a974225380",
+              "clip": {
+                "x": 208.421875,
+                "y": 202.8515625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "mouse-14-continue-start",
+          "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END",
+          "selection": {
+            "anchor": 143,
+            "head": 143
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 328.421875,
+            "right": 328.421875,
+            "top": 227.8515625,
+            "bottom": 242.3515625
+          },
+          "scrollTop": 0,
+          "title": "mouse.md · 143 字 — MarkPilot",
+          "banner": "",
+          "disk": {
+            "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END",
+            "byteLength": 143,
+            "sha256": "558231b5e41237c2667921fe55a009646a9996328eaa9e8dc5846b38a780f23a"
+          },
+          "evidence": {
+            "keys": [
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 690.3999999761581
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 692.8000000715256
+              },
+              {
+                "key": "Shift",
+                "code": "ShiftLeft",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 889.3000000715256
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 891.1000000238419
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1862.3000000715256
+              },
+              {
+                "key": "c",
+                "code": "KeyC",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1863.7000000476837
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 2658.100000023842
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 2659.899999976158
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 4511.399999976158
+              },
+              {
+                "key": "c",
+                "code": "KeyC",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 4512.899999976158
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 5335.700000047684
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 5337.200000047684
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": false,
+                "shift": false,
+                "trusted": true,
+                "at": 5500.899999976158
+              },
+              {
+                "key": "Shift",
+                "code": "ShiftLeft",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 5669.800000071526
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 5671.100000023842
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 6486.300000071526
+              },
+              {
+                "key": "v",
+                "code": "KeyV",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 6487.600000023842
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 7305
+              },
+              {
+                "key": "z",
+                "code": "KeyZ",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 7306.200000047684
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 7746.899999976158
+              },
+              {
+                "key": "y",
+                "code": "KeyY",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 7748.100000023842
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 8176.5
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 8183
+              }
+            ],
+            "pointers": [
+              {
+                "type": "mousedown",
+                "trusted": true,
+                "x": 328,
+                "y": 136,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2841.5
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 318,
+                "y": 135,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2857.100000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 308,
+                "y": 133,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2910.8000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 298,
+                "y": 132,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2963.5
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 289,
+                "y": 130,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3016.600000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 279,
+                "y": 129,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3070.899999976158
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 269,
+                "y": 127,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3124
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 259,
+                "y": 126,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3176.2000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 249,
+                "y": 124,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3230.3000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 239,
+                "y": 123,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3284
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 229,
+                "y": 121,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3337.600000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 219,
+                "y": 120,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3391.7000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 210,
+                "y": 118,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3426.8000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 200,
+                "y": 117,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3479
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 190,
+                "y": 115,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3532.399999976158
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 180,
+                "y": 114,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3584.7000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 170,
+                "y": 112,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3638.2000000476837
+              },
+              {
+                "type": "mouseup",
+                "trusted": true,
+                "x": 170,
+                "y": 112,
+                "button": 0,
+                "buttons": 0,
+                "targetInEditor": true,
+                "at": 3679.399999976158
+              }
+            ],
+            "transfers": [
+              {
+                "kind": "copy",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [],
+                "plainIsExpected": false,
+                "plainLength": 0,
+                "at": 1864.1000000238419
+              },
+              {
+                "kind": "copy",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [],
+                "plainIsExpected": false,
+                "plainLength": 0,
+                "at": 4513
+              },
+              {
+                "kind": "paste",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [
+                  "text/plain"
+                ],
+                "plainIsExpected": true,
+                "plainLength": 53,
+                "at": 6490.300000071526
+              }
+            ],
+            "inputs": [],
+            "scrolls": [],
+            "expected": "M_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END"
+          },
+          "screenshot": {
+            "file": "mouse-14-continue-start.png",
+            "sha256": "f4453004b5b6fcad4536c37660140044a65fe555b408c754fd9f67d2b0e0af0e",
+            "caret": {
+              "left": 328.421875,
+              "right": 328.421875,
+              "top": 227.8515625,
+              "bottom": 242.3515625
+            },
+            "zoom": {
+              "file": "mouse-14-continue-start-caret-2x.png",
+              "sha256": "4fb49711f4f0b9d43d8816db341395d84484c38f771f1ca2dcb09888cc3768ee",
+              "clip": {
+                "x": 208.421875,
+                "y": 202.8515625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "mouse-15-continued",
+          "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\nCONTINUE_M_32917",
+          "selection": {
+            "anchor": 160,
+            "head": 160
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 312.7421875,
+            "y": 251.03125,
+            "width": 0,
+            "height": 16,
+            "top": 251.03125,
+            "right": 312.7421875,
+            "bottom": 267.03125,
+            "left": 312.7421875
+          },
+          "scrollTop": 0,
+          "title": "● mouse.md · 160 字 — MarkPilot",
+          "banner": "",
+          "disk": {
+            "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END",
+            "byteLength": 143,
+            "sha256": "558231b5e41237c2667921fe55a009646a9996328eaa9e8dc5846b38a780f23a"
+          },
+          "evidence": {
+            "keys": [
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 690.3999999761581
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 692.8000000715256
+              },
+              {
+                "key": "Shift",
+                "code": "ShiftLeft",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 889.3000000715256
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 891.1000000238419
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1862.3000000715256
+              },
+              {
+                "key": "c",
+                "code": "KeyC",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 1863.7000000476837
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 2658.100000023842
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 2659.899999976158
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 4511.399999976158
+              },
+              {
+                "key": "c",
+                "code": "KeyC",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 4512.899999976158
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 5335.700000047684
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 5337.200000047684
+              },
+              {
+                "key": "Home",
+                "code": "Home",
+                "ctrl": false,
+                "shift": false,
+                "trusted": true,
+                "at": 5500.899999976158
+              },
+              {
+                "key": "Shift",
+                "code": "ShiftLeft",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 5669.800000071526
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": false,
+                "shift": true,
+                "trusted": true,
+                "at": 5671.100000023842
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 6486.300000071526
+              },
+              {
+                "key": "v",
+                "code": "KeyV",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 6487.600000023842
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 7305
+              },
+              {
+                "key": "z",
+                "code": "KeyZ",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 7306.200000047684
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 7746.899999976158
+              },
+              {
+                "key": "y",
+                "code": "KeyY",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 7748.100000023842
+              },
+              {
+                "key": "Control",
+                "code": "ControlLeft",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 8176.5
+              },
+              {
+                "key": "End",
+                "code": "End",
+                "ctrl": true,
+                "shift": false,
+                "trusted": true,
+                "at": 8183
+              }
+            ],
+            "pointers": [
+              {
+                "type": "mousedown",
+                "trusted": true,
+                "x": 328,
+                "y": 136,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2841.5
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 318,
+                "y": 135,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2857.100000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 308,
+                "y": 133,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2910.8000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 298,
+                "y": 132,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 2963.5
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 289,
+                "y": 130,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3016.600000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 279,
+                "y": 129,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3070.899999976158
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 269,
+                "y": 127,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3124
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 259,
+                "y": 126,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3176.2000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 249,
+                "y": 124,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3230.3000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 239,
+                "y": 123,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3284
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 229,
+                "y": 121,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3337.600000023842
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 219,
+                "y": 120,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3391.7000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 210,
+                "y": 118,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3426.8000000715256
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 200,
+                "y": 117,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3479
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 190,
+                "y": 115,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3532.399999976158
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 180,
+                "y": 114,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3584.7000000476837
+              },
+              {
+                "type": "mousemove",
+                "trusted": true,
+                "x": 170,
+                "y": 112,
+                "button": 0,
+                "buttons": 1,
+                "targetInEditor": true,
+                "at": 3638.2000000476837
+              },
+              {
+                "type": "mouseup",
+                "trusted": true,
+                "x": 170,
+                "y": 112,
+                "button": 0,
+                "buttons": 0,
+                "targetInEditor": true,
+                "at": 3679.399999976158
+              }
+            ],
+            "transfers": [
+              {
+                "kind": "copy",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [],
+                "plainIsExpected": false,
+                "plainLength": 0,
+                "at": 1864.1000000238419
+              },
+              {
+                "kind": "copy",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [],
+                "plainIsExpected": false,
+                "plainLength": 0,
+                "at": 4513
+              },
+              {
+                "kind": "paste",
+                "trusted": true,
+                "targetInEditor": true,
+                "types": [
+                  "text/plain"
+                ],
+                "plainIsExpected": true,
+                "plainLength": 53,
+                "at": 6490.300000071526
+              }
+            ],
+            "inputs": [
+              {
+                "type": "beforeinput",
+                "inputType": "insertText",
+                "trusted": true,
+                "targetInEditor": true,
+                "at": 8587
+              },
+              {
+                "type": "input",
+                "inputType": "insertText",
+                "trusted": true,
+                "targetInEditor": true,
+                "at": 8589.700000047684
+              },
+              {
+                "type": "input",
+                "inputType": "insertText",
+                "trusted": true,
+                "targetInEditor": true,
+                "at": 8595
+              }
+            ],
+            "scrolls": [],
+            "expected": "M_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END"
+          },
+          "screenshot": {
+            "file": "mouse-15-continued.png",
+            "sha256": "127bf19c4942b12c0c9a477a1082f3dde0a42beabe4bf4aa2eb3e4e8c79a8fdf",
+            "caret": {
+              "x": 312.7421875,
+              "y": 251.03125,
+              "width": 0,
+              "height": 16,
+              "top": 251.03125,
+              "right": 312.7421875,
+              "bottom": 267.03125,
+              "left": 312.7421875
+            },
+            "zoom": {
+              "file": "mouse-15-continued-caret-2x.png",
+              "sha256": "8d8bc3a84bed7208d951593f7ce554acb913cd9ea47ddd18b4806759fc9f553f",
+              "clip": {
+                "x": 192.7421875,
+                "y": 226.03125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "final-independent-disk-readback",
+          "text": "OUTER_HEAD_32917\n\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\n\nOUTER_TAIL_32917\nM_BEGIN $x+y$ M_MID $a+b$ M_END\n> Q_BEGIN $q+r$ Q_END\nCONTINUE_M_32917",
+          "byteLength": 160,
+          "sha256": "fc3db06877a17bf8d0c3ff653d40c7f562cfb1728832773eeb0f8a4c419f6851"
+        }
+      ],
+      "stage": "complete",
+      "productReached": true,
+      "oracle": {
+        "direction": "reverse",
+        "required": [
+          "ordinary-inline-one",
+          "ordinary-inline-two",
+          "quoted-inline"
+        ],
+        "covered": [
+          "ordinary-inline-one",
+          "ordinary-inline-two",
+          "quoted-inline"
+        ],
+        "intended": {
+          "anchor": 71,
+          "head": 18
+        },
+        "actual": {
+          "anchor": 71,
+          "head": 18
+        },
+        "payloadLength": 53,
+        "payloadSha256": "2ced29cdfb5623f62269cdb875de87a88eecaabb0763eb4778e53f886fe89a61"
+      },
+      "detail": {
+        "seed": 32917,
+        "direction": "reverse",
+        "action": "copy",
+        "crossedFormulas": [
+          "ordinary-inline-one",
+          "ordinary-inline-two",
+          "quoted-inline"
+        ],
+        "payloadLength": 53,
+        "finalSha256": "fc3db06877a17bf8d0c3ff653d40c7f562cfb1728832773eeb0f8a4c419f6851",
+        "transport": "renderer-CDP; accelerators unverified",
+        "clipboardSourceExact": true,
+        "nativeHistory": true,
+        "diskExact": true
+      },
+      "ms": 9142
+    }
+  ],
+  "errors": [],
+  "cleanupErrors": [],
+  "timing": {
+    "settleMs": 150,
+    "historyMs": 650,
+    "dragSteps": 16,
+    "dragStepMs": 20
+  },
+  "transport": "renderer-CDP; actual clipboard; Electron accelerators and physical OS input unverified",
+  "sourceMainSha256": "9785673e49995f2c35333e06539054cc4e75b27b4af2b1e6d45f573ce260ecfe",
+  "artifact": {
+    "executable": "markpilot-3.2.11-portable.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\candidate-3.2.11\\production\\markpilot-3.2.11-portable.exe",
+    "exeSha256": "2f2ac4870997b397dcfb103bfd2f47a9f109c3a702d3e9fceb625bfa735aa5cb",
+    "runtimeExecutablePath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\MarkPilot.exe",
+    "runtimeExecutableSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+    "artifactRoot": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.11",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources",
+    "asarPath": "<user>\\AppData\\Local\\Temp\\MarkPilotPortable\\resources\\app.asar",
+    "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+    "bootMs": 4550,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+        "sourceSha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "clipboard": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T23:13:03.617Z",
+  "entryUnconfirmed": [],
+  "productFailures": [],
+  "passed": true,
+  "verdict": "renderer-chain-pass",
+  "frames": [
+    {
+      "file": "mouse-01-plain-copy-positive.png",
+      "sha256": "4409df9304b504d560e55d14eccdf5024905c786cdb7a40f4eb9a43706a16f8a",
+      "caret": {
+        "left": 314.09375,
+        "right": 314.09375,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "mouse-01-plain-copy-positive-caret-2x.png",
+        "sha256": "bd19a2f7270a65981cfa52553def9a2d7775c8cb02887e04cdbb9177f763f1b5",
+        "clip": {
+          "x": 194.09375,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "mouse-02-plain-copy-after.png",
+      "sha256": "4409df9304b504d560e55d14eccdf5024905c786cdb7a40f4eb9a43706a16f8a",
+      "caret": {
+        "left": 314.09375,
+        "right": 314.09375,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "mouse-02-plain-copy-after-caret-2x.png",
+        "sha256": "bd19a2f7270a65981cfa52553def9a2d7775c8cb02887e04cdbb9177f763f1b5",
+        "clip": {
+          "x": 194.09375,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "mouse-05-crossing-selected.png",
+      "sha256": "37fed1eac3a2b633b7a5214eae50a4a1bdfcf62cbea91f12ff28f683f060ac9a",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "mouse-05-crossing-selected-caret-2x.png",
+        "sha256": "2ab8bfe8877f03926fa096edf36d6530d75b213f8fb3c80cad40a2dd124dd773",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "mouse-06-copy.png",
+      "sha256": "37fed1eac3a2b633b7a5214eae50a4a1bdfcf62cbea91f12ff28f683f060ac9a",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 104.890625,
+        "bottom": 120.890625
+      },
+      "zoom": {
+        "file": "mouse-06-copy-caret-2x.png",
+        "sha256": "2ab8bfe8877f03926fa096edf36d6530d75b213f8fb3c80cad40a2dd124dd773",
+        "clip": {
+          "x": 50.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "mouse-10-target-selected.png",
+      "sha256": "42a30f94cc92e5d8f7342f6facb63e5294e1bd1e9a958a6461125163f6e3ce3f",
+      "caret": {
+        "left": 278.9296875,
+        "right": 278.9296875,
+        "top": 203.15625,
+        "bottom": 219.15625
+      },
+      "zoom": {
+        "file": "mouse-10-target-selected-caret-2x.png",
+        "sha256": "316e65bd6631921cc9a3f06d7312918df2e2c5214635b44f815ab61d1cf71764",
+        "clip": {
+          "x": 158.9296875,
+          "y": 178.15625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "mouse-11-pasted.png",
+      "sha256": "f4453004b5b6fcad4536c37660140044a65fe555b408c754fd9f67d2b0e0af0e",
+      "caret": {
+        "left": 328.421875,
+        "right": 328.421875,
+        "top": 227.8515625,
+        "bottom": 242.3515625
+      },
+      "zoom": {
+        "file": "mouse-11-pasted-caret-2x.png",
+        "sha256": "4fb49711f4f0b9d43d8816db341395d84484c38f771f1ca2dcb09888cc3768ee",
+        "clip": {
+          "x": 208.421875,
+          "y": 202.8515625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "mouse-12-paste-undo.png",
+      "sha256": "42a30f94cc92e5d8f7342f6facb63e5294e1bd1e9a958a6461125163f6e3ce3f",
+      "caret": {
+        "left": 278.9296875,
+        "right": 278.9296875,
+        "top": 203.15625,
+        "bottom": 219.15625
+      },
+      "zoom": {
+        "file": "mouse-12-paste-undo-caret-2x.png",
+        "sha256": "316e65bd6631921cc9a3f06d7312918df2e2c5214635b44f815ab61d1cf71764",
+        "clip": {
+          "x": 158.9296875,
+          "y": 178.15625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "mouse-13-paste-redo.png",
+      "sha256": "156922a9abb2bf91210894f68d1faf5073ed9acf970289688acff4d621d2e9bb",
+      "caret": {
+        "left": 328.421875,
+        "right": 328.421875,
+        "top": 227.8515625,
+        "bottom": 242.3515625
+      },
+      "zoom": {
+        "file": "mouse-13-paste-redo-caret-2x.png",
+        "sha256": "536d10f490cea393a008ab26b7e7182438f6081015a8fe947affd2a974225380",
+        "clip": {
+          "x": 208.421875,
+          "y": 202.8515625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "mouse-14-continue-start.png",
+      "sha256": "f4453004b5b6fcad4536c37660140044a65fe555b408c754fd9f67d2b0e0af0e",
+      "caret": {
+        "left": 328.421875,
+        "right": 328.421875,
+        "top": 227.8515625,
+        "bottom": 242.3515625
+      },
+      "zoom": {
+        "file": "mouse-14-continue-start-caret-2x.png",
+        "sha256": "4fb49711f4f0b9d43d8816db341395d84484c38f771f1ca2dcb09888cc3768ee",
+        "clip": {
+          "x": 208.421875,
+          "y": 202.8515625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "mouse-15-continued.png",
+      "sha256": "127bf19c4942b12c0c9a477a1082f3dde0a42beabe4bf4aa2eb3e4e8c79a8fdf",
+      "caret": {
+        "x": 312.7421875,
+        "y": 251.03125,
+        "width": 0,
+        "height": 16,
+        "top": 251.03125,
+        "right": 312.7421875,
+        "bottom": 267.03125,
+        "left": 312.7421875
+      },
+      "zoom": {
+        "file": "mouse-15-continued-caret-2x.png",
+        "sha256": "8d8bc3a84bed7208d951593f7ce554acb913cd9ea47ddd18b4806759fc9f553f",
+        "clip": {
+          "x": 192.7421875,
+          "y": 226.03125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ]
+}

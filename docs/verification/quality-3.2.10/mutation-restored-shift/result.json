@@ -1,0 +1,1345 @@
+{
+  "schema": 1,
+  "suite": "selection-workflows",
+  "startedAt": "2026-10-11T21:38:59.279Z",
+  "cases": [
+    {
+      "id": "shift-forward-glyph-keeps-selection-copy-delete-undo-redo",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "shift-forward-00-ordinary-click",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 10,
+            "head": 10
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 239.6328125,
+            "right": 239.6328125,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-forward.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-forward-00-ordinary-click.png",
+            "sha256": "040ec046512336a471ea44f9293f768c2b36f405b350a845880c32312d5039fb",
+            "caret": {
+              "left": 239.6328125,
+              "right": 239.6328125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-forward-00-ordinary-click-caret-2x.png",
+              "sha256": "1b147822111cfec87739a2a93dfc64b123c02e36f904de329ab1b9a802a0c7ed",
+              "clip": {
+                "x": 119.6328125,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "shift-forward-01-before",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-forward.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-forward-01-before.png",
+            "sha256": "a590eaccec0fa3c622774f10d20f9f8ca7135c4ae80ad3302f37314dfc673542",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-forward-01-before-caret-2x.png",
+              "sha256": "a5ecacc19a0009139f4779766385e94a0bca7035da0842b8dd978581310bdd28",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "shift-forward-02-selected",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 0,
+            "head": 10
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 239.6328125,
+            "right": 239.6328125,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-forward.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "shift": true,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-forward-02-selected.png",
+            "sha256": "beb4988e07ca98269f1ed6d574c2cdf8ff6fa856c20a27bda97751d035f1aacf",
+            "caret": {
+              "left": 239.6328125,
+              "right": 239.6328125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-forward-02-selected-caret-2x.png",
+              "sha256": "b87f263110767154dc01c4571a025ef5fe6d1c69b5a52ed799cc13666ae5a920",
+              "clip": {
+                "x": 119.6328125,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-arm",
+          "written": {
+            "ok": true,
+            "bytes": 21,
+            "hasHtml": false
+          },
+          "matches": true,
+          "length": 21
+        },
+        {
+          "name": "copied-exact-source",
+          "length": 10,
+          "matches": true
+        },
+        {
+          "name": "shift-forward-03-delete",
+          "text": "$ omega\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● shift-forward.md · 8 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "shift": true,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "c",
+              "code": "KeyC",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Delete",
+              "code": "Delete",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-forward-03-delete.png",
+            "sha256": "8ab7a2398568c1ae0ee50009b981420b3f8badb704bf1a1e01a269ce824b8882",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-forward-03-delete-caret-2x.png",
+              "sha256": "6f21bdb814a4be57d10da909aee6b9a106f500083757e20b9114f8f4e8c957af",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "anchor": 0,
+        "head": 10,
+        "copy": true,
+        "undoRedo": true
+      },
+      "ms": 3757
+    },
+    {
+      "id": "shift-reverse-glyph-keeps-selection-copy-delete-undo-redo",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "shift-reverse-00-ordinary-click",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 10,
+            "head": 10
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 239.6328125,
+            "right": 239.6328125,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-reverse.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-reverse-00-ordinary-click.png",
+            "sha256": "040ec046512336a471ea44f9293f768c2b36f405b350a845880c32312d5039fb",
+            "caret": {
+              "left": 239.6328125,
+              "right": 239.6328125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-reverse-00-ordinary-click-caret-2x.png",
+              "sha256": "1b147822111cfec87739a2a93dfc64b123c02e36f904de329ab1b9a802a0c7ed",
+              "clip": {
+                "x": 119.6328125,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "shift-reverse-01-before",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 17,
+            "head": 17
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 291.640625,
+            "right": 291.640625,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-reverse.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-reverse-01-before.png",
+            "sha256": "a35819d2e09a7c4a898591c921b9fe576bd3f9fe5e285680cb1cbca545298abd",
+            "caret": {
+              "left": 291.640625,
+              "right": 291.640625,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-reverse-01-before-caret-2x.png",
+              "sha256": "3e637b71ea33d543e3204e62508b588d26684419a13b1e9548ef8fce3a2a6c62",
+              "clip": {
+                "x": 171.640625,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "shift-reverse-02-selected",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 17,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 216.671875,
+            "right": 216.671875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-reverse.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "shift": true,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-reverse-02-selected.png",
+            "sha256": "2ba8db40770ae3774eee4d3c556b50009d0ae5d8e44a9b41be1ff36d045fb9b6",
+            "caret": {
+              "left": 216.671875,
+              "right": 216.671875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-reverse-02-selected-caret-2x.png",
+              "sha256": "f6b9dd062bdeb22beffd6901a7018a2bbb02aeeb70f8a74034051bb64810ee0c",
+              "clip": {
+                "x": 96.671875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-arm",
+          "written": {
+            "ok": true,
+            "bytes": 21,
+            "hasHtml": false
+          },
+          "matches": true,
+          "length": 21
+        },
+        {
+          "name": "copied-exact-source",
+          "matches": true,
+          "length": 10
+        },
+        {
+          "name": "shift-reverse-03-delete",
+          "text": "alpha $\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 216.671875,
+            "right": 216.671875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● shift-reverse.md · 8 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "End",
+              "code": "End",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "shift": true,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "c",
+              "code": "KeyC",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Delete",
+              "code": "Delete",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-reverse-03-delete.png",
+            "sha256": "f1a94af9b5fce47a6d220510d03c0443c25c0a4abcc052f6d5c781262935925e",
+            "caret": {
+              "left": 216.671875,
+              "right": 216.671875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-reverse-03-delete-caret-2x.png",
+              "sha256": "2f35f290000ad9cba7126120dbb7d1a1b67ec191eb700924921337cc24a0e525",
+              "clip": {
+                "x": 96.671875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "anchor": 17,
+        "head": 7,
+        "copy": true,
+        "undoRedo": true
+      },
+      "ms": 4043
+    },
+    {
+      "id": "shift-float-glyph-keeps-selection-copy-delete-undo-redo",
+      "status": "pass",
+      "trace": [
+        {
+          "name": "shift-float-00-ordinary-click",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 10,
+            "head": 10
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 239.6328125,
+            "right": 239.6328125,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-float.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-float-00-ordinary-click.png",
+            "sha256": "040ec046512336a471ea44f9293f768c2b36f405b350a845880c32312d5039fb",
+            "caret": {
+              "left": 239.6328125,
+              "right": 239.6328125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-float-00-ordinary-click-caret-2x.png",
+              "sha256": "1b147822111cfec87739a2a93dfc64b123c02e36f904de329ab1b9a802a0c7ed",
+              "clip": {
+                "x": 119.6328125,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "shift-float-01-before",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 216.671875,
+            "right": 216.671875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-float.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-float-01-before.png",
+            "sha256": "91cfdd5284b369918c2cb6c467ce28546b53da7442fa57035a2190cd9dc2c097",
+            "caret": {
+              "left": 216.671875,
+              "right": 216.671875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-float-01-before-caret-2x.png",
+              "sha256": "6f41be3d414b19753a66114d16e26cad1d198e267a511764174ab27ae7113cc1",
+              "clip": {
+                "x": 96.671875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "shift-float-02-selected",
+          "text": "alpha $x+y$ omega\n",
+          "selection": {
+            "anchor": 7,
+            "head": 10
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 239.6328125,
+            "right": 239.6328125,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "shift-float.md · 18 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "shift": true,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-float-02-selected.png",
+            "sha256": "cbbeb68e4673ff5b1bd5db62ed215417d8c9832432571db1560e9978075c92d2",
+            "caret": {
+              "left": 239.6328125,
+              "right": 239.6328125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-float-02-selected-caret-2x.png",
+              "sha256": "ba271ad834af5e8e4ebccaabf3ff4abb3b17a779adfb435acaa1a37aaa45bb9b",
+              "clip": {
+                "x": 119.6328125,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clipboard-arm",
+          "written": {
+            "ok": true,
+            "bytes": 21,
+            "hasHtml": false
+          },
+          "length": 21,
+          "matches": true
+        },
+        {
+          "name": "copied-exact-source",
+          "matches": true,
+          "length": 3
+        },
+        {
+          "name": "shift-float-03-delete",
+          "text": "alpha $$ omega\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 216.671875,
+            "right": 216.671875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● shift-float.md · 15 字 — MarkPilot",
+          "banner": "",
+          "keys": [
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Home",
+              "code": "Home",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Shift",
+              "code": "ShiftLeft",
+              "shift": true,
+              "ctrl": false,
+              "trusted": true
+            },
+            {
+              "key": "Control",
+              "code": "ControlLeft",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "c",
+              "code": "KeyC",
+              "shift": false,
+              "ctrl": true,
+              "trusted": true
+            },
+            {
+              "key": "Delete",
+              "code": "Delete",
+              "shift": false,
+              "ctrl": false,
+              "trusted": true
+            }
+          ],
+          "screenshot": {
+            "file": "shift-float-03-delete.png",
+            "sha256": "d2f5d83dedc8433e4b33e2141252ef8d687068f64a12dc792377e147b4ad3fe5",
+            "caret": {
+              "left": 216.671875,
+              "right": 216.671875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "shift-float-03-delete-caret-2x.png",
+              "sha256": "59f7df7e18829902b41c9aab853c051a52f91fd77d6478807d5316efe27771e1",
+              "clip": {
+                "x": 96.671875,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "detail": {
+        "anchor": 7,
+        "head": 10,
+        "copy": true,
+        "undoRedo": true
+      },
+      "ms": 4339
+    }
+  ],
+  "errors": [],
+  "artifact": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-shift\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-shift\\unpacked\\MarkPilot.exe",
+    "runtimeExecutableSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-shift\\unpacked\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.10",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-shift\\unpacked\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\restored-shift\\unpacked\\resources\\app.asar",
+    "asarSha256": "da087df330d99409909ccad8ef58a64de5903319b6272c14703857e463d5cf99",
+    "bootMs": 975,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3",
+        "sourceSha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "clipboard": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T21:39:19.001Z",
+  "passed": true,
+  "frames": [
+    {
+      "file": "shift-forward-00-ordinary-click.png",
+      "sha256": "040ec046512336a471ea44f9293f768c2b36f405b350a845880c32312d5039fb",
+      "caret": {
+        "left": 239.6328125,
+        "right": 239.6328125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-forward-00-ordinary-click-caret-2x.png",
+        "sha256": "1b147822111cfec87739a2a93dfc64b123c02e36f904de329ab1b9a802a0c7ed",
+        "clip": {
+          "x": 119.6328125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-forward-01-before.png",
+      "sha256": "a590eaccec0fa3c622774f10d20f9f8ca7135c4ae80ad3302f37314dfc673542",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-forward-01-before-caret-2x.png",
+        "sha256": "a5ecacc19a0009139f4779766385e94a0bca7035da0842b8dd978581310bdd28",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-forward-02-selected.png",
+      "sha256": "beb4988e07ca98269f1ed6d574c2cdf8ff6fa856c20a27bda97751d035f1aacf",
+      "caret": {
+        "left": 239.6328125,
+        "right": 239.6328125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-forward-02-selected-caret-2x.png",
+        "sha256": "b87f263110767154dc01c4571a025ef5fe6d1c69b5a52ed799cc13666ae5a920",
+        "clip": {
+          "x": 119.6328125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "shift-forward-03-delete.png",
+      "sha256": "8ab7a2398568c1ae0ee50009b981420b3f8badb704bf1a1e01a269ce824b8882",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-forward-03-delete-caret-2x.png",
+        "sha256": "6f21bdb814a4be57d10da909aee6b9a106f500083757e20b9114f8f4e8c957af",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-reverse-00-ordinary-click.png",
+      "sha256": "040ec046512336a471ea44f9293f768c2b36f405b350a845880c32312d5039fb",
+      "caret": {
+        "left": 239.6328125,
+        "right": 239.6328125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-reverse-00-ordinary-click-caret-2x.png",
+        "sha256": "1b147822111cfec87739a2a93dfc64b123c02e36f904de329ab1b9a802a0c7ed",
+        "clip": {
+          "x": 119.6328125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-reverse-01-before.png",
+      "sha256": "a35819d2e09a7c4a898591c921b9fe576bd3f9fe5e285680cb1cbca545298abd",
+      "caret": {
+        "left": 291.640625,
+        "right": 291.640625,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-reverse-01-before-caret-2x.png",
+        "sha256": "3e637b71ea33d543e3204e62508b588d26684419a13b1e9548ef8fce3a2a6c62",
+        "clip": {
+          "x": 171.640625,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-reverse-02-selected.png",
+      "sha256": "2ba8db40770ae3774eee4d3c556b50009d0ae5d8e44a9b41be1ff36d045fb9b6",
+      "caret": {
+        "left": 216.671875,
+        "right": 216.671875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-reverse-02-selected-caret-2x.png",
+        "sha256": "f6b9dd062bdeb22beffd6901a7018a2bbb02aeeb70f8a74034051bb64810ee0c",
+        "clip": {
+          "x": 96.671875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-reverse-03-delete.png",
+      "sha256": "f1a94af9b5fce47a6d220510d03c0443c25c0a4abcc052f6d5c781262935925e",
+      "caret": {
+        "left": 216.671875,
+        "right": 216.671875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-reverse-03-delete-caret-2x.png",
+        "sha256": "2f35f290000ad9cba7126120dbb7d1a1b67ec191eb700924921337cc24a0e525",
+        "clip": {
+          "x": 96.671875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-float-00-ordinary-click.png",
+      "sha256": "040ec046512336a471ea44f9293f768c2b36f405b350a845880c32312d5039fb",
+      "caret": {
+        "left": 239.6328125,
+        "right": 239.6328125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-float-00-ordinary-click-caret-2x.png",
+        "sha256": "1b147822111cfec87739a2a93dfc64b123c02e36f904de329ab1b9a802a0c7ed",
+        "clip": {
+          "x": 119.6328125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-float-01-before.png",
+      "sha256": "91cfdd5284b369918c2cb6c467ce28546b53da7442fa57035a2190cd9dc2c097",
+      "caret": {
+        "left": 216.671875,
+        "right": 216.671875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-float-01-before-caret-2x.png",
+        "sha256": "6f41be3d414b19753a66114d16e26cad1d198e267a511764174ab27ae7113cc1",
+        "clip": {
+          "x": 96.671875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-float-02-selected.png",
+      "sha256": "cbbeb68e4673ff5b1bd5db62ed215417d8c9832432571db1560e9978075c92d2",
+      "caret": {
+        "left": 239.6328125,
+        "right": 239.6328125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-float-02-selected-caret-2x.png",
+        "sha256": "ba271ad834af5e8e4ebccaabf3ff4abb3b17a779adfb435acaa1a37aaa45bb9b",
+        "clip": {
+          "x": 119.6328125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "shift-float-03-delete.png",
+      "sha256": "d2f5d83dedc8433e4b33e2141252ef8d687068f64a12dc792377e147b4ad3fe5",
+      "caret": {
+        "left": 216.671875,
+        "right": 216.671875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "shift-float-03-delete-caret-2x.png",
+        "sha256": "59f7df7e18829902b41c9aab853c051a52f91fd77d6478807d5316efe27771e1",
+        "clip": {
+          "x": 96.671875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ]
+}

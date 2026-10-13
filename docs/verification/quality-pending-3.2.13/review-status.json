@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "status": "unavailable",
+  "independentlyVisuallyApproved": false,
+  "claimedImageOpens": 0,
+  "attempts": [
+    {
+      "provider": "deepseek-official",
+      "status": "dispatch-accepted; review-unavailable"
+    },
+    {
+      "provider": "deepseek-account",
+      "status": "dispatch-accepted; review-unavailable"
+    }
+  ],
+  "scope": "Provider/status only. No DSH sessions, prompts, credentials or task receipt bodies exported. Without authoritative reduced model errors, dispatch receipts are not assigned a fabricated HTTP 402."
+}

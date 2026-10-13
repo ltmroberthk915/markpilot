@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "at": "2026-10-11T18:42:08.622Z",
+  "kind": "model",
+  "scope": "exact source insertion/helpers and actual resolver; real CM6 State/history; controlled Image/FileReader/clock/host; no browser/GUI/clipboard/file save",
+  "metadata": {
+    "productName": "MarkPilot",
+    "version": "3.2.8",
+    "node": "v24.14.1",
+    "dependencies": {
+      "state": "6.7.6",
+      "commands": "6.11.1"
+    },
+    "lockSha256": "eb6a334000aca013bb354da9bc8c126c58d61c55793e780a170fddced7d0e24f"
+  },
+  "sourceHashes": {
+    "main.js": "d08868c732a514b8296a6e2a91350697b01567d6c81e3a42817e2577d97a7144",
+    "extras.js": "a7be5f93a51ebaeed53f6af96f5436b07c9825a246ba0d9212bb8f54e0d1a05c",
+    "image-insertion.js": "dc3bb4ba45f7ab8d4408d9b4d0c3c5bf89ac86d13a4199965f9fabedf68acc2a",
+    "image-path.js": "737e65a478ec0e0223dc8a73b3dc0d222a03dd0cbe1362d1024f7d105ceeab05"
+  },
+  "coreHashes": {
+    "main.js": "178bb51a146b37ac15d6c913ddcaf50c9b80386751e8f51cdf0ba1c9e578bef8",
+    "preload.js": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+    "renderer/host.js": "81301eef4e4f09a3d499c50d2fe21f21604fc996c41173024ba7469ee191182d",
+    "shell/document-store.js": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+    "shell/text-codec.js": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+    "renderer/cm6/app.js": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+    "renderer/cm6/markdown-worker.js": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+  },
+  "bundleHash": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc",
+  "artifactMatches": true,
+  "artifactIdentity": {
+    "manifestSha256": "4fcc4146d90d0965e8d579aed3f7b78f40e72bab1d7e96d9bf0c8caeba177d11",
+    "version": "3.2.8",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "asarSha256": "6b64982fa461a6658d8289a651b57b0c2190685610289ef9e221b245df126940",
+    "checkedCoreFiles": [
+      "main.js",
+      "preload.js",
+      "renderer/host.js",
+      "shell/document-store.js",
+      "shell/text-codec.js",
+      "renderer/cm6/app.js",
+      "renderer/cm6/markdown-worker.js"
+    ],
+    "nativeBinaryHashesVerified": false
+  },
+  "passed": true,
+  "total": 13,
+  "results": [
+    {
+      "name": "successful assets decode uses actual resolver and commits exactly once",
+      "passed": true
+    },
+    {
+      "name": "assets decode rejection still commits unchanged real path",
+      "passed": true
+    },
+    {
+      "name": "assets 10-second timeout commits once and late success cannot commit again",
+      "passed": true
+    },
+    {
+      "name": "inline decode rejection preserves exact data URI",
+      "passed": true
+    },
+    {
+      "name": "inline timeout preserves exact data URI and clears timer",
+      "passed": true
+    },
+    {
+      "name": "doc id change while decoding rejects commit but keeps saved file record",
+      "passed": true
+    },
+    {
+      "name": "directory change while decoding rejects commit",
+      "passed": true
+    },
+    {
+      "name": "same-Text reset while decoding rejects commit",
+      "passed": true
+    },
+    {
+      "name": "view switch while decoding modifies neither old nor new view",
+      "passed": true
+    },
+    {
+      "name": "real undo while decoding cancels insertion ticket",
+      "passed": true
+    },
+    {
+      "name": "moved caret stays moved; commit does not add scroll request",
+      "passed": true
+    },
+    {
+      "name": "pure effect during decode preserves insertion",
+      "passed": true
+    },
+    {
+      "name": "two adjacent image requests remain serial, ordered, and independently undoable",
+      "passed": true
+    }
+  ]
+}

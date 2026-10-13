@@ -4,6 +4,8 @@
 // 移到下一单元格内容的起点；行尾 Enter＝按当前行列数生成 "| | |" 空行。无 DOM 结构魔法。
 
 import { EditorSelection, Prec } from "@codemirror/state";
+import { codeBlockAt } from './markdown-context.js';
+export { fenceAt, isFenceAt } from './markdown-context.js';
 import { keymap } from "@codemirror/view";
 
 /* 【引用区表格·2026-10-08】**表块前缀**（`> ` / `>> ` / `> >` / 前导缩进）的唯一判定点。
@@ -28,11 +30,6 @@ export const withTableLead = (q, body) => (q || "") + body;
  *
  *  入参口径：**已去引用前缀的内容行**（调用方先过 `tableLead()`）。
  *  前缀必须由调用方剥掉，因为 `> ```js ` 里的围栏只有剥掉前缀之后才看得见（这正是 E 的第二处根因）。 */
-export function fenceAt(content) {
-  const m = /^\s*(`{3,}|~{3,})/.exec(content || "");
-  return m ? { fence: m[1], char: m[1][0], len: m[1].length } : null;
-}
-export const isFenceAt = (content) => fenceAt(content) !== null;
 
 /* 【分隔行·2026-10-08】短横三种写法都认：ASCII `-`、en dash `–`(U+2013)、em dash `—`(U+2014)。
  *  来由：用户手写表格常用全角破折号写分隔行（`| —— | —— |`），旧判据只认 ASCII 短横
@@ -97,9 +94,11 @@ const isSeparatorText = (t) => isSeparatorBody(t);
  *  【引用区·2026-10-08】收块时必须**同引用前缀**：`> | a |` 与表外 `| b |` 不是同一张表；
  *  跨层级收块会让"分隔行在上一层、数据行在下一层"的伪块被认成表，Enter/Tab 就作用错地方。 */
 export function tableBlockOf(state, lineNumber) {
+  if (codeBlockAt(state, state.doc.line(lineNumber).from)) return null;
   const base = tableLead(state.doc.line(lineNumber).text);
   const rowOf = (n) => {
     const line = state.doc.line(n);
+    if (codeBlockAt(state, line.from)) return null;
     const ld = tableLead(line.text);
     return ld.q === base.q && line.text.slice(ld.off).includes("|") ? { text: line.text.slice(ld.off) } : null;
   };
@@ -113,6 +112,7 @@ export function tableBlockOf(state, lineNumber) {
 }
 
 function isTableContext(state) {
+  if (state.selection.ranges.length !== 1) return null;
   const head = state.selection.main.head;
   const line = state.doc.lineAt(head);
   const block = tableBlockOf(state, line.number);

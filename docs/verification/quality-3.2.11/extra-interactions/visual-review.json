@@ -1,0 +1,475 @@
+{
+  "schema": 1,
+  "reviewer": "session-4f4961f4-144b-43d3-a67f-b49fb33824f0",
+  "reportSha256": "d43d0fb5be2becdaaf217fcdcaab897d988a1368bd73fdc5eeec24d12d11d962",
+  "ledgerSha256": "e796226ac1a3d3bfadca58cdc74b4afa79918ed700eb00942751003d763cbaf8",
+  "manifestSha256": "b759b3d519d5d6c9f93c065000ef2915ae6c996ba92785fde2c55518ac22169a",
+  "openedUniqueFrames": 21,
+  "reports": [
+    {
+      "file": "<repo>\\.mp-verify\\codex-audit\\quoted-subrange-public-installed-3.2.11\\result.json",
+      "sha256": "5a588959ee8504733ffa7104de7572d805e42fbbf0979a00f8b39c1632e6721e",
+      "passed": true,
+      "verdict": "renderer-chain-pass",
+      "cases": [
+        {
+          "id": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "file": "<repo>\\.mp-verify\\codex-audit\\cell-unicode-public-installed-3.2.11\\result.json",
+      "sha256": "7aba0101d829b730a2023c3401cea4de11ff5ee4e3f8ab15e5b72ad9f204c553",
+      "passed": true,
+      "verdict": "chromium-chain-pass",
+      "cases": [
+        {
+          "id": "cell-unicode-positive-history-continue",
+          "status": "pass"
+        }
+      ]
+    },
+    {
+      "file": "<repo>\\.mp-verify\\codex-audit\\goal-6h5\\cell-composition-installed-3.2.11\\result.json",
+      "sha256": "9d572df57c650f06e70086729018ca34e75efca630c396a162d3947bce836a98",
+      "passed": false,
+      "verdict": "transport/commit-unconfirmed",
+      "cases": [
+        {
+          "id": "cell-unicode-positive-history-continue",
+          "status": "pass"
+        },
+        {
+          "id": "cell-cdp-composition-commit-history-continue",
+          "status": "transport/commit-unconfirmed"
+        }
+      ]
+    }
+  ],
+  "ledger": {
+    "at": "2026-10-11T23:28:24.132Z",
+    "images": [
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\quoted-subrange-public-installed-3.2.11\\03-reverse-selected.png",
+        "sha256": "ba8895bb619d335d4b9bc99c4f015981fa1e9e5676ec3ba1a21901befd84a6a0",
+        "references": [
+          {
+            "suite": "quoted-math-subrange-workflow",
+            "id": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+            "stage": "03-reverse-selected",
+            "kind": "full",
+            "caret": true,
+            "status": "pass"
+          },
+          {
+            "suite": "quoted-math-subrange-workflow",
+            "id": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+            "stage": "06-cut-undo",
+            "kind": "full",
+            "caret": true,
+            "status": "pass"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\quoted-subrange-public-installed-3.2.11\\03-reverse-selected-caret-2x.png",
+        "sha256": "9469cf3fd4fa31e35fcf19eaddead0fc62fd17f60cfaebb16288642da3bebd33",
+        "references": [
+          {
+            "suite": "quoted-math-subrange-workflow",
+            "id": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+            "stage": "03-reverse-selected",
+            "kind": "zoom",
+            "caret": true,
+            "status": "pass"
+          },
+          {
+            "suite": "quoted-math-subrange-workflow",
+            "id": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+            "stage": "06-cut-undo",
+            "kind": "zoom",
+            "caret": true,
+            "status": "pass"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\quoted-subrange-public-installed-3.2.11\\05-cut.png",
+        "sha256": "0626a7da9858dce568aa3f2761fae114d535913b63a9223977159b2188117c3a",
+        "references": [
+          {
+            "suite": "quoted-math-subrange-workflow",
+            "id": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+            "stage": "05-cut",
+            "kind": "full",
+            "caret": true,
+            "status": "pass"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\quoted-subrange-public-installed-3.2.11\\05-cut-caret-2x.png",
+        "sha256": "1a7cafcc2e295612fd396cfe1f9c13faf726c6ab9ca355f1523a89210d26b1fd",
+        "references": [
+          {
+            "suite": "quoted-math-subrange-workflow",
+            "id": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+            "stage": "05-cut",
+            "kind": "zoom",
+            "caret": true,
+            "status": "pass"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\quoted-subrange-public-installed-3.2.11\\08-original-position-paste.png",
+        "sha256": "cbf7eed447e29bf56fb90da98e448b55dd627f3e174f844b242303f7f1ef2a3d",
+        "references": [
+          {
+            "suite": "quoted-math-subrange-workflow",
+            "id": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+            "stage": "08-original-position-paste",
+            "kind": "full",
+            "caret": true,
+            "status": "pass"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\quoted-subrange-public-installed-3.2.11\\08-original-position-paste-caret-2x.png",
+        "sha256": "b956dd15a57689c6315388eefabd4609bdaa2ad606a52db32442b80acef9b527",
+        "references": [
+          {
+            "suite": "quoted-math-subrange-workflow",
+            "id": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+            "stage": "08-original-position-paste",
+            "kind": "zoom",
+            "caret": true,
+            "status": "pass"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\quoted-subrange-public-installed-3.2.11\\11-continued-R.png",
+        "sha256": "4ed908480d1c694aee7cdfc876719c3ec269edcaea4924827bd15a94520a2a89",
+        "references": [
+          {
+            "suite": "quoted-math-subrange-workflow",
+            "id": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+            "stage": "11-continued-R",
+            "kind": "full",
+            "caret": true,
+            "status": "pass"
+          },
+          {
+            "suite": "quoted-math-subrange-workflow",
+            "id": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+            "stage": "12-saved",
+            "kind": "full",
+            "caret": true,
+            "status": "pass"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\quoted-subrange-public-installed-3.2.11\\11-continued-R-caret-2x.png",
+        "sha256": "8eaee5578d6a044d30986f93a80cb00777bd2b18501021297876d72a22c86db5",
+        "references": [
+          {
+            "suite": "quoted-math-subrange-workflow",
+            "id": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+            "stage": "11-continued-R",
+            "kind": "zoom",
+            "caret": true,
+            "status": "pass"
+          },
+          {
+            "suite": "quoted-math-subrange-workflow",
+            "id": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+            "stage": "12-saved",
+            "kind": "zoom",
+            "caret": true,
+            "status": "pass"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\cell-unicode-public-installed-3.2.11\\ordinary-01-entry.png",
+        "sha256": "0c45ff6802002cbb226ff119f2c3530a9175c9c115ba20303b260099a1780922",
+        "references": [
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-unicode-positive-history-continue",
+            "stage": "01-entry",
+            "kind": "full",
+            "caret": true,
+            "status": "pass"
+          },
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-unicode-positive-history-continue",
+            "stage": "01-entry",
+            "kind": "full",
+            "caret": true,
+            "status": "pass"
+          },
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-cdp-composition-commit-history-continue",
+            "stage": "01-entry",
+            "kind": "full",
+            "caret": true,
+            "status": "transport/commit-unconfirmed"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\cell-unicode-public-installed-3.2.11\\ordinary-01-entry-caret-2x.png",
+        "sha256": "3818462a6039bd8d5f22cb7153867dbb740a996311b5937c8be743037e129c88",
+        "references": [
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-unicode-positive-history-continue",
+            "stage": "01-entry",
+            "kind": "zoom",
+            "caret": true,
+            "status": "pass"
+          },
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-unicode-positive-history-continue",
+            "stage": "05-undo",
+            "kind": "zoom",
+            "caret": true,
+            "status": "pass"
+          },
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-unicode-positive-history-continue",
+            "stage": "01-entry",
+            "kind": "zoom",
+            "caret": true,
+            "status": "pass"
+          },
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-cdp-composition-commit-history-continue",
+            "stage": "01-entry",
+            "kind": "zoom",
+            "caret": true,
+            "status": "transport/commit-unconfirmed"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\cell-unicode-public-installed-3.2.11\\ordinary-02-ordinary-unicode.png",
+        "sha256": "dbe694cbe518da929058317f485bf68a94d3838cf6a7acb551eb116aa2edc7be",
+        "references": [
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-unicode-positive-history-continue",
+            "stage": "02-ordinary-unicode",
+            "kind": "full",
+            "caret": true,
+            "status": "pass"
+          },
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-cdp-composition-commit-history-continue",
+            "stage": "04-commit-observed",
+            "kind": "full",
+            "caret": true,
+            "status": "transport/commit-unconfirmed"
+          },
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-cdp-composition-commit-history-continue",
+            "stage": "failure-commit-transport",
+            "kind": "full",
+            "caret": true,
+            "status": "transport/commit-unconfirmed"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\cell-unicode-public-installed-3.2.11\\ordinary-02-ordinary-unicode-caret-2x.png",
+        "sha256": "a2f28d9889a61e8d5433b089b3f8c2ef50fe0fa146ed12e2b8fef9166337fade",
+        "references": [
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-unicode-positive-history-continue",
+            "stage": "02-ordinary-unicode",
+            "kind": "zoom",
+            "caret": true,
+            "status": "pass"
+          },
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-cdp-composition-commit-history-continue",
+            "stage": "04-commit-observed",
+            "kind": "zoom",
+            "caret": true,
+            "status": "transport/commit-unconfirmed"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\cell-unicode-public-installed-3.2.11\\ordinary-05-undo.png",
+        "sha256": "af6ab25d8bf06207688f2b63c276b011db1434623f86abebc7a28007e352c508",
+        "references": [
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-unicode-positive-history-continue",
+            "stage": "05-undo",
+            "kind": "full",
+            "caret": true,
+            "status": "pass"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\cell-unicode-public-installed-3.2.11\\ordinary-07-continue-one.png",
+        "sha256": "24b442ade5b5138820fe9c711920505f1f02142e56820a23e95f524313a7b63d",
+        "references": [
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-unicode-positive-history-continue",
+            "stage": "07-continue-one",
+            "kind": "full",
+            "caret": true,
+            "status": "pass"
+          },
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-unicode-positive-history-continue",
+            "stage": "08-saved",
+            "kind": "full",
+            "caret": true,
+            "status": "pass"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\cell-unicode-public-installed-3.2.11\\ordinary-07-continue-one-caret-2x.png",
+        "sha256": "333c3002016df449832fc72ad607da22103db724998cb7719b455a9ad4f0b881",
+        "references": [
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-unicode-positive-history-continue",
+            "stage": "07-continue-one",
+            "kind": "zoom",
+            "caret": true,
+            "status": "pass"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\cell-unicode-public-installed-3.2.11\\ordinary-08-saved-caret-2x.png",
+        "sha256": "cb7a14a8e8cdb25eb722669209d5cee2e4620697b033ad5b77ac745cb936134e",
+        "references": [
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-unicode-positive-history-continue",
+            "stage": "08-saved",
+            "kind": "zoom",
+            "caret": true,
+            "status": "pass"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\goal-6h5\\cell-composition-installed-3.2.11\\composition-02-composition-zhong.png",
+        "sha256": "9a61a3c4452ca620dc004a44d48d5f73ed73172a311605d59e4a8b83d4537291",
+        "references": [
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-cdp-composition-commit-history-continue",
+            "stage": "02-composition-zhong",
+            "kind": "full",
+            "caret": true,
+            "status": "transport/commit-unconfirmed"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\goal-6h5\\cell-composition-installed-3.2.11\\composition-02-composition-zhong-caret-2x.png",
+        "sha256": "52c967276b24e230d883a28625d53790a919c2f424d84e0626886a9710e6400f",
+        "references": [
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-cdp-composition-commit-history-continue",
+            "stage": "02-composition-zhong",
+            "kind": "zoom",
+            "caret": true,
+            "status": "transport/commit-unconfirmed"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\goal-6h5\\cell-composition-installed-3.2.11\\composition-03-composition-chinese.png",
+        "sha256": "b212bb83183b0c5c2ea8a14f1617f68a166145c952aa673eb40cac1140b9245b",
+        "references": [
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-cdp-composition-commit-history-continue",
+            "stage": "03-composition-chinese",
+            "kind": "full",
+            "caret": true,
+            "status": "transport/commit-unconfirmed"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\goal-6h5\\cell-composition-installed-3.2.11\\composition-03-composition-chinese-caret-2x.png",
+        "sha256": "65cd889b7cee63e8be5c20e53f944ce5766d593559eb4843d0abae7cbb55b7f0",
+        "references": [
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-cdp-composition-commit-history-continue",
+            "stage": "03-composition-chinese",
+            "kind": "zoom",
+            "caret": true,
+            "status": "transport/commit-unconfirmed"
+          }
+        ],
+        "saw": 1
+      },
+      {
+        "file": "<repo>\\.mp-verify\\codex-audit\\goal-6h5\\cell-composition-installed-3.2.11\\composition-failure-commit-transport-caret-2x.png",
+        "sha256": "1ee0d0d1b1b0331c1d03c6bdf00d11096b539a48d520e1dca3797ad8d79289ea",
+        "references": [
+          {
+            "suite": "cell-composition-workflow",
+            "id": "cell-cdp-composition-commit-history-continue",
+            "stage": "failure-commit-transport",
+            "kind": "zoom",
+            "caret": true,
+            "status": "transport/commit-unconfirmed"
+          }
+        ],
+        "saw": 1
+      }
+    ]
+  },
+  "scope": "Two passing renderer chains; strict CDP composition commit unconfirmed, excluded from passing totals. OS IME and physical input unverified."
+}

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "tag": "portable",
+  "exe": "<repo>\\.mp-verify\\codex-audit\\candidate-3.2.8\\production\\markpilot-3.2.8-portable.exe",
+  "sha256": "ece24d04130bd1ae0c948d2507b82057b2f00f12bca5ed11b626ff33dfed98ed",
+  "results": [
+    {
+      "suite": "critical",
+      "scope": "suite",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.8-critical",
+      "total": 26,
+      "failed": [],
+      "fullImageSuite": false
+    },
+    {
+      "suite": "images",
+      "scope": "saved-screenshot-immediate",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-portable-3.2.8-images",
+      "total": 1,
+      "failed": [],
+      "fullImageSuite": false
+    }
+  ],
+  "passed": true,
+  "at": "2026-10-11T18:53:34.553Z"
+}

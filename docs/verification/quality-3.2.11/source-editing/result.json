@@ -1,0 +1,3401 @@
+{
+  "schema": 1,
+  "startedAt": "2026-10-11T22:53:32.807Z",
+  "family": "all",
+  "cases": [
+    {
+      "id": "code-enter-backticks",
+      "status": "pass",
+      "trace": [
+        {
+          "before": "```shell\n- install foo\n```\n",
+          "at": 22,
+          "after": {
+            "text": "```shell\n- install foo\n\n```\n",
+            "selection": {
+              "anchor": 23,
+              "head": 23
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 161.5,
+              "y": 88.875,
+              "width": 0,
+              "height": 14,
+              "top": 88.875,
+              "right": 161.5,
+              "bottom": 102.875,
+              "left": 161.5
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 28 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 470
+    },
+    {
+      "id": "code-enter-tildes",
+      "status": "pass",
+      "trace": [
+        {
+          "before": "~~~text\n1. literal\n~~~\n",
+          "at": 18,
+          "after": {
+            "text": "~~~text\n1. literal\n\n~~~\n",
+            "selection": {
+              "anchor": 19,
+              "head": 19
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 161.5,
+              "y": 88.875,
+              "width": 0,
+              "height": 14,
+              "top": 88.875,
+              "right": 161.5,
+              "bottom": 102.875,
+              "left": 161.5
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 24 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 159
+    },
+    {
+      "id": "code-enter-quoted",
+      "status": "pass",
+      "trace": [
+        {
+          "before": "> ```js\n> - literal\n> ```\n",
+          "at": 19,
+          "after": {
+            "text": "> ```js\n> - literal\n> \n> ```\n",
+            "selection": {
+              "anchor": 22,
+              "head": 22
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 176.578125,
+              "y": 90.46875,
+              "width": 0,
+              "height": 12.59375,
+              "top": 90.46875,
+              "right": 176.578125,
+              "bottom": 103.0625,
+              "left": 176.578125
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 29 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 402
+    },
+    {
+      "id": "code-enter-nested-quote",
+      "status": "pass",
+      "trace": [
+        {
+          "before": "> > ````js\n> > - literal\n> > ````\n",
+          "at": 24,
+          "after": {
+            "text": "> > ````js\n> > - literal\n> > \n> > ````\n",
+            "selection": {
+              "anchor": 29,
+              "head": 29
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 189.1796875,
+              "y": 90.46875,
+              "width": 0,
+              "height": 12.59375,
+              "top": 90.46875,
+              "right": 189.1796875,
+              "bottom": 103.0625,
+              "left": 189.1796875
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 39 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 574
+    },
+    {
+      "id": "code-enter-longer-close",
+      "status": "pass",
+      "trace": [
+        {
+          "before": "````\n- literal\n`````\n",
+          "at": 14,
+          "after": {
+            "text": "````\n- literal\n\n`````\n",
+            "selection": {
+              "anchor": 15,
+              "head": 15
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 161.5,
+              "y": 88.875,
+              "width": 0,
+              "height": 14,
+              "top": 88.875,
+              "right": 161.5,
+              "bottom": 102.875,
+              "left": 161.5
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 22 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 187
+    },
+    {
+      "id": "code-enter-shorter-inner",
+      "status": "pass",
+      "trace": [
+        {
+          "before": "````\n```\n- literal\n````\n",
+          "at": 18,
+          "after": {
+            "text": "````\n```\n- literal\n\n````\n",
+            "selection": {
+              "anchor": 19,
+              "head": 19
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 161.5,
+              "y": 107.3125,
+              "width": 0,
+              "height": 14,
+              "top": 107.3125,
+              "right": 161.5,
+              "bottom": 121.3125,
+              "left": 161.5
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 25 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 161
+    },
+    {
+      "id": "code-enter-different-inner",
+      "status": "pass",
+      "trace": [
+        {
+          "before": "```\n~~~\n- literal\n```\n",
+          "at": 17,
+          "after": {
+            "text": "```\n~~~\n- literal\n\n```\n",
+            "selection": {
+              "anchor": 18,
+              "head": 18
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 161.5,
+              "y": 107.3125,
+              "width": 0,
+              "height": 14,
+              "top": 107.3125,
+              "right": 161.5,
+              "bottom": 121.3125,
+              "left": 161.5
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 23 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 161
+    },
+    {
+      "id": "code-enter-unclosed",
+      "status": "pass",
+      "trace": [
+        {
+          "before": "```\n- literal\n",
+          "at": 13,
+          "after": {
+            "text": "```\n- literal\n\n",
+            "selection": {
+              "anchor": 14,
+              "head": 14
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "x": 161.5,
+              "y": 88.875,
+              "width": 0,
+              "height": 14,
+              "top": 88.875,
+              "right": 161.5,
+              "bottom": 102.875,
+              "left": 161.5
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 15 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 149
+    },
+    {
+      "id": "code-tab-plain",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "```js\n  const value = 1\n```\n",
+          "selection": {
+            "anchor": 8,
+            "head": 8
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 175.4453125,
+            "right": 175.4453125,
+            "top": 70.4375,
+            "bottom": 84.4375
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 28 字 — MarkPilot",
+          "banner": ""
+        },
+        {
+          "text": "```js\nconst value = 1\n```\n",
+          "selection": {
+            "anchor": 6,
+            "head": 6
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 161.5,
+            "right": 161.5,
+            "top": 70.4375,
+            "bottom": 84.4375
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 26 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 538
+    },
+    {
+      "id": "code-tab-quoted",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "> ~~~js\n>   const value = 1\n> ~~~\n",
+          "selection": {
+            "anchor": 12,
+            "head": 12
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 191.34375,
+            "right": 191.34375,
+            "top": 72.03125,
+            "bottom": 86.53125
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 34 字 — MarkPilot",
+          "banner": ""
+        },
+        {
+          "text": "> ~~~js\n> const value = 1\n> ~~~\n",
+          "selection": {
+            "anchor": 10,
+            "head": 10
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 176.578125,
+            "right": 176.578125,
+            "top": 72.03125,
+            "bottom": 86.53125
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 32 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 432
+    },
+    {
+      "id": "code-no-table-quoted-table",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "起点\n\n> ```\n> | a | b |\n> | --- | --- |\n> ```\n",
+          "tables": 0
+        }
+      ],
+      "ms": 763
+    },
+    {
+      "id": "code-no-table-different-fence",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "起点\n\n````\n~~~\n| a | b |\n| --- | --- |\n````\n",
+          "tables": 0
+        }
+      ],
+      "ms": 350
+    },
+    {
+      "id": "code-no-table-unclosed",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "起点\n\n~~~\n| a | b |\n| --- | --- |\n",
+          "tables": 0
+        }
+      ],
+      "ms": 349
+    },
+    {
+      "id": "code-checkmark-is-literal",
+      "status": "pass",
+      "trace": [],
+      "ms": 430
+    },
+    {
+      "id": "code-pipe-tab-does-not-enter-table",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "> ~~~\n> |   a | b |\n> | --- | --- |\n> ~~~\n",
+          "selection": {
+            "anchor": 12,
+            "head": 12
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 203.15625,
+            "right": 203.15625,
+            "top": 73.03125,
+            "bottom": 86.03125
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 42 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 445
+    },
+    {
+      "id": "pipe-without-delimiter-editor-control",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "起点\n| a | b |\n| 1 | 2 |\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 160.5,
+            "right": 160.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 42 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 144
+    },
+    {
+      "id": "code-math-is-literal-plain",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "起点\n~~~text\n*literal* $x$\n$$\ny\n$$\n~~~\n",
+            "selection": {
+              "anchor": 0,
+              "head": 0
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 160.5,
+              "right": 160.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "editing-fixture.md · 42 字 — MarkPilot",
+            "banner": ""
+          },
+          "math": 0,
+          "codeLines": [
+            {
+              "text": "~~~text",
+              "n": null
+            },
+            {
+              "text": "*literal* $x$",
+              "n": "1"
+            },
+            {
+              "text": "$$",
+              "n": "2"
+            },
+            {
+              "text": "y",
+              "n": "3"
+            },
+            {
+              "text": "$$",
+              "n": "4"
+            },
+            {
+              "text": "~~~",
+              "n": null
+            }
+          ]
+        }
+      ],
+      "ms": 651
+    },
+    {
+      "id": "code-math-is-literal-quoted",
+      "status": "pass",
+      "trace": [
+        {
+          "state": {
+            "text": "起点\n> ~~~text\n> *literal* $x$\n> $$\n> y\n> $$\n> ~~~\n",
+            "selection": {
+              "anchor": 0,
+              "head": 0
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 160.5,
+              "right": 160.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "editing-fixture.md · 42 字 — MarkPilot",
+            "banner": ""
+          },
+          "math": 0,
+          "codeLines": [
+            {
+              "text": "~~~text",
+              "n": null
+            },
+            {
+              "text": "*literal* $x$",
+              "n": "1"
+            },
+            {
+              "text": "$$",
+              "n": "2"
+            },
+            {
+              "text": "y",
+              "n": "3"
+            },
+            {
+              "text": "$$",
+              "n": "4"
+            },
+            {
+              "text": "~~~",
+              "n": null
+            }
+          ]
+        }
+      ],
+      "ms": 670
+    },
+    {
+      "id": "code-quoted-completion-and-auto-break-disabled",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "> ~~~js\n> a $$x$$",
+          "selection": {
+            "anchor": 17,
+            "head": 17
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 228.2578125,
+            "y": 72.03125,
+            "width": 0,
+            "height": 14.5,
+            "top": 72.03125,
+            "right": 228.2578125,
+            "bottom": 86.53125,
+            "left": 228.2578125
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 17 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 1015
+    },
+    {
+      "id": "code-closing-info-keeps-literal",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "```\nx\n``` js\n- literal\n\n",
+          "selection": {
+            "anchor": 23,
+            "head": 23
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 161.5,
+            "y": 125.75,
+            "width": 0,
+            "height": 14,
+            "top": 125.75,
+            "right": 161.5,
+            "bottom": 139.75,
+            "left": 161.5
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 24 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 164
+    },
+    {
+      "id": "code-closing-tail-edit-and-undo",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "~~~\nx\n~~~a\n- after\n\n",
+          "selection": {
+            "anchor": 19,
+            "head": 19
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 161.5,
+            "y": 125.75,
+            "width": 0,
+            "height": 14,
+            "top": 125.75,
+            "right": 161.5,
+            "bottom": 139.75,
+            "left": 161.5
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 20 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 206
+    },
+    {
+      "id": "code-quoted-shift-tab-preserves-container",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "> ~~~js\n> x\n> ~~~\n",
+          "selection": {
+            "anchor": 11,
+            "head": 11
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 183.9609375,
+            "y": 72.03125,
+            "width": 0,
+            "height": 14.5,
+            "top": 72.03125,
+            "right": 183.9609375,
+            "bottom": 86.53125,
+            "left": 183.9609375
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 18 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 461
+    },
+    {
+      "id": "code-enter-indent",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "> ```js\n>     ab\n>     \n> ```\n",
+          "selection": {
+            "anchor": 23,
+            "head": 23
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 206.109375,
+            "y": 91.5625,
+            "width": 0,
+            "height": 14.5,
+            "top": 91.5625,
+            "right": 206.109375,
+            "bottom": 106.0625,
+            "left": 206.109375
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 30 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 453
+    },
+    {
+      "id": "code-enter-body-home",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "> ```js\n> \n> ab\n> ```\n",
+          "selection": {
+            "anchor": 13,
+            "head": 13
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 176.578125,
+            "right": 176.578125,
+            "top": 91.5625,
+            "bottom": 106.0625
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 22 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 461
+    },
+    {
+      "id": "code-enter-selection",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "> ```js\n> ab\n> ef\n> ```\n",
+          "selection": {
+            "anchor": 15,
+            "head": 15
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 176.578125,
+            "right": 176.578125,
+            "top": 91.5625,
+            "bottom": 106.0625
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 24 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 477
+    },
+    {
+      "id": "code-enter-closing-default",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "> ```js\n> ab\n> ```\n\n",
+          "selection": {
+            "anchor": 19,
+            "head": 19
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 160.5,
+            "y": 113.09375,
+            "width": 0,
+            "height": 16,
+            "top": 113.09375,
+            "right": 160.5,
+            "bottom": 129.09375,
+            "left": 160.5
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 20 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 472
+    },
+    {
+      "id": "code-enter-multiple-cursors",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "> ```\n> ab\n> \n> cd\n> \n> ```\n",
+          "selection": {
+            "anchor": 13,
+            "head": 13
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 176.578125,
+            "y": 90.46875,
+            "width": 0,
+            "height": 12.59375,
+            "top": 90.46875,
+            "right": 176.578125,
+            "bottom": 103.0625,
+            "left": 176.578125
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 28 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 544
+    },
+    {
+      "id": "code-line-numbers-map-and-remove",
+      "status": "pass",
+      "trace": [
+        [
+          {
+            "text": "above",
+            "n": null
+          },
+          {
+            "text": "before",
+            "n": null
+          },
+          {
+            "text": "~~~",
+            "n": null
+          },
+          {
+            "text": "first",
+            "n": "1"
+          },
+          {
+            "text": "second",
+            "n": "2"
+          },
+          {
+            "text": "~~~",
+            "n": null
+          },
+          {
+            "text": "",
+            "n": null
+          }
+        ],
+        [
+          {
+            "text": "above",
+            "n": null
+          },
+          {
+            "text": "before",
+            "n": null
+          },
+          {
+            "text": "",
+            "n": null
+          },
+          {
+            "text": "first",
+            "n": null
+          },
+          {
+            "text": "second",
+            "n": null
+          },
+          {
+            "text": "~~~",
+            "n": null
+          },
+          {
+            "text": "",
+            "n": "1"
+          }
+        ]
+      ],
+      "ms": 568
+    },
+    {
+      "id": "code-bare-blank-line-ends-quote-like-parser",
+      "status": "pass",
+      "trace": [
+        [
+          {
+            "text": "```",
+            "code": true
+          },
+          {
+            "text": "a",
+            "code": true
+          },
+          {
+            "text": "",
+            "code": false
+          },
+          {
+            "text": "b",
+            "code": false
+          },
+          {
+            "text": "```",
+            "code": true
+          },
+          {
+            "text": "c",
+            "code": true
+          }
+        ]
+      ],
+      "ms": 149
+    },
+    {
+      "id": "list-enter-home",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "\n- 项目\n",
+          "selection": {
+            "anchor": 1,
+            "head": 1
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 160.5,
+            "right": 160.5,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 6 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 452
+    },
+    {
+      "id": "list-enter-tail",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "- 项目\n- \n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 169.1171875,
+            "right": 169.1171875,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 8 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 147
+    },
+    {
+      "id": "list-enter-ordered",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "9. item\n10. \n",
+          "selection": {
+            "anchor": 12,
+            "head": 12
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 182.2578125,
+            "right": 182.2578125,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 13 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 160
+    },
+    {
+      "id": "list-enter-task",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "- [x] task\n- [ ] \n",
+          "selection": {
+            "anchor": 17,
+            "head": 17
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 192.0703125,
+            "right": 192.0703125,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 18 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 156
+    },
+    {
+      "id": "list-enter-empty",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 160.5,
+            "y": 54.5,
+            "width": 0,
+            "height": 16,
+            "top": 54.5,
+            "right": 160.5,
+            "bottom": 70.5,
+            "left": 160.5
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 158
+    },
+    {
+      "id": "list-enter-empty-task",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 160.5,
+            "y": 54.5,
+            "width": 0,
+            "height": 16,
+            "top": 54.5,
+            "right": 160.5,
+            "bottom": 70.5,
+            "left": 160.5
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 188
+    },
+    {
+      "id": "list-enter-indented",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "  - word\n  - \n",
+          "selection": {
+            "anchor": 13,
+            "head": 13
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 175.875,
+            "right": 175.875,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 14 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 166
+    },
+    {
+      "id": "list-enter-replaces-selection",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "- ab\n- ef\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 169.1171875,
+            "right": 169.1171875,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 10 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 502
+    },
+    {
+      "id": "list-enter-multiple-cursors",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "- ab\n- \n- cd\n- ",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 169.1171875,
+            "right": 169.1171875,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 15 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 459
+    },
+    {
+      "id": "list-before-fence-plain-edit-maps-context",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "- abc\n- \n```\nx\n```\n",
+          "selection": {
+            "anchor": 8,
+            "head": 8
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 169.1171875,
+            "right": 169.1171875,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 19 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 173
+    },
+    {
+      "id": "task-widget-positive-control",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "起点\n- [ ] task\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 160.5,
+            "right": 160.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 19 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 152
+    },
+    {
+      "id": "completion-prose-Enter",
+      "status": "pass",
+      "trace": [
+        {
+          "selected": "\\frac",
+          "state": {
+            "text": "计算 $\\frac{}{}",
+            "selection": {
+              "anchor": 10,
+              "head": 10
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 236.703125,
+              "right": 236.703125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 13 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 201
+    },
+    {
+      "id": "completion-prose-Tab",
+      "status": "pass",
+      "trace": [
+        {
+          "selected": "\\frac",
+          "state": {
+            "text": "计算 $\\frac{}{}",
+            "selection": {
+              "anchor": 10,
+              "head": 10
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 236.703125,
+              "right": 236.703125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 13 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 211
+    },
+    {
+      "id": "completion-list-Enter",
+      "status": "pass",
+      "trace": [
+        {
+          "selected": "\\frac",
+          "state": {
+            "text": "- 计算 $\\frac{}{}",
+            "selection": {
+              "anchor": 12,
+              "head": 12
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 245.578125,
+              "right": 245.578125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 15 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 895
+    },
+    {
+      "id": "completion-list-Tab",
+      "status": "pass",
+      "trace": [
+        {
+          "selected": "\\frac",
+          "state": {
+            "text": "- 计算 $\\frac{}{}",
+            "selection": {
+              "anchor": 12,
+              "head": 12
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 245.578125,
+              "right": 245.578125,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 15 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 484
+    },
+    {
+      "id": "completion-nested-list-Enter",
+      "status": "pass",
+      "trace": [
+        {
+          "selected": "\\frac",
+          "state": {
+            "text": "  - 计算 $\\frac{}{}",
+            "selection": {
+              "anchor": 14,
+              "head": 14
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 252.3359375,
+              "right": 252.3359375,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 17 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 208
+    },
+    {
+      "id": "completion-nested-list-Tab",
+      "status": "pass",
+      "trace": [
+        {
+          "selected": "\\frac",
+          "state": {
+            "text": "  - 计算 $\\frac{}{}",
+            "selection": {
+              "anchor": 14,
+              "head": 14
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 252.3359375,
+              "right": 252.3359375,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 17 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 219
+    },
+    {
+      "id": "completion-ordered-Enter",
+      "status": "pass",
+      "trace": [
+        {
+          "selected": "\\frac",
+          "state": {
+            "text": "1. 计算 $\\frac{}{}",
+            "selection": {
+              "anchor": 13,
+              "head": 13
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 251.875,
+              "right": 251.875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 16 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 236
+    },
+    {
+      "id": "completion-ordered-Tab",
+      "status": "pass",
+      "trace": [
+        {
+          "selected": "\\frac",
+          "state": {
+            "text": "1. 计算 $\\frac{}{}",
+            "selection": {
+              "anchor": 13,
+              "head": 13
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 251.875,
+              "right": 251.875,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 16 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 195
+    },
+    {
+      "id": "completion-quote-Enter",
+      "status": "pass",
+      "trace": [
+        {
+          "selected": "\\frac",
+          "state": {
+            "text": "> 计算 $\\frac{}{}",
+            "selection": {
+              "anchor": 12,
+              "head": 12
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 245.1640625,
+              "right": 245.1640625,
+              "top": 54,
+              "bottom": 68.5
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 15 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 215
+    },
+    {
+      "id": "completion-quote-Tab",
+      "status": "pass",
+      "trace": [
+        {
+          "selected": "\\frac",
+          "state": {
+            "text": "> 计算 $\\frac{}{}",
+            "selection": {
+              "anchor": 12,
+              "head": 12
+            },
+            "focus": true,
+            "activeElement": {
+              "tag": "DIV",
+              "class": "cm-content cm-lineWrapping"
+            },
+            "caret": {
+              "left": 245.1640625,
+              "right": 245.1640625,
+              "top": 54,
+              "bottom": 68.5
+            },
+            "scrollTop": 0,
+            "title": "● editing-fixture.md · 15 字 — MarkPilot",
+            "banner": ""
+          }
+        }
+      ],
+      "ms": 261
+    },
+    {
+      "id": "completion-mouse-acceptance",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "- 计算 $\\frac{}{}",
+          "selection": {
+            "anchor": 12,
+            "head": 12
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 245.578125,
+            "right": 245.578125,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 15 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 692
+    },
+    {
+      "id": "completion-escape-resumes-list-enter",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "- 计算 $\\fra\n- ",
+          "selection": {
+            "anchor": 13,
+            "head": 13
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 169.1171875,
+            "right": 169.1171875,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 13 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 206
+    },
+    {
+      "id": "heading-hashtag",
+      "status": "pass",
+      "trace": [
+        [
+          {
+            "text": "起点",
+            "class": "cm-line cm-activeLine"
+          },
+          {
+            "text": "#话题",
+            "class": "cm-line"
+          },
+          {
+            "text": "",
+            "class": "cm-line"
+          }
+        ]
+      ],
+      "ms": 446
+    },
+    {
+      "id": "heading-tag-many",
+      "status": "pass",
+      "trace": [
+        [
+          {
+            "text": "起点",
+            "class": "cm-line cm-activeLine"
+          },
+          {
+            "text": "###topic",
+            "class": "cm-line"
+          },
+          {
+            "text": "",
+            "class": "cm-line"
+          }
+        ]
+      ],
+      "ms": 140
+    },
+    {
+      "id": "heading-space",
+      "status": "pass",
+      "trace": [
+        [
+          {
+            "text": "起点",
+            "class": "cm-line cm-activeLine"
+          },
+          {
+            "text": "标题",
+            "class": "cm-line mp-h1"
+          },
+          {
+            "text": "",
+            "class": "cm-line"
+          }
+        ]
+      ],
+      "ms": 140
+    },
+    {
+      "id": "heading-tab",
+      "status": "pass",
+      "trace": [
+        [
+          {
+            "text": "起点",
+            "class": "cm-line cm-activeLine"
+          },
+          {
+            "text": "标题",
+            "class": "cm-line mp-h2"
+          },
+          {
+            "text": "",
+            "class": "cm-line"
+          }
+        ]
+      ],
+      "ms": 147
+    },
+    {
+      "id": "heading-empty",
+      "status": "pass",
+      "trace": [
+        [
+          {
+            "text": "起点",
+            "class": "cm-line cm-activeLine"
+          },
+          {
+            "text": "",
+            "class": "cm-line mp-h3"
+          },
+          {
+            "text": "",
+            "class": "cm-line"
+          }
+        ]
+      ],
+      "ms": 142
+    },
+    {
+      "id": "heading-seven",
+      "status": "pass",
+      "trace": [
+        [
+          {
+            "text": "起点",
+            "class": "cm-line cm-activeLine"
+          },
+          {
+            "text": "####### 标题",
+            "class": "cm-line"
+          },
+          {
+            "text": "",
+            "class": "cm-line"
+          }
+        ]
+      ],
+      "ms": 154
+    },
+    {
+      "id": "heading-indented",
+      "status": "pass",
+      "trace": [
+        [
+          {
+            "text": "起点",
+            "class": "cm-line cm-activeLine"
+          },
+          {
+            "text": "  标题",
+            "class": "cm-line mp-h2"
+          },
+          {
+            "text": "",
+            "class": "cm-line"
+          }
+        ]
+      ],
+      "ms": 461
+    },
+    {
+      "id": "bold-single-star-existing-toggle",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 160.5,
+            "y": 54.5,
+            "width": 0,
+            "height": 16,
+            "top": 54.5,
+            "right": 160.5,
+            "bottom": 70.5,
+            "left": 160.5
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 147
+    },
+    {
+      "id": "underline-empty-toggle",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 160.5,
+            "y": 54.5,
+            "width": 0,
+            "height": 16,
+            "top": 54.5,
+            "right": 160.5,
+            "bottom": 70.5,
+            "left": 160.5
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 483
+    },
+    {
+      "id": "underline-remove-forward",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "词体",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 160.5,
+            "right": 160.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 2 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 173
+    },
+    {
+      "id": "underline-remove-reverse",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "词体",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 160.5,
+            "right": 160.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 2 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 173
+    },
+    {
+      "id": "underline-real-drag-shift-toggle",
+      "status": "pass",
+      "trace": [
+        {
+          "text": "abcdef\n",
+          "selection": {
+            "anchor": 1,
+            "head": 6
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 201.109375,
+            "right": 201.109375,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "editing-fixture.md · 9 字 — MarkPilot",
+          "banner": ""
+        },
+        {
+          "text": "a<u>bcdef</u>\n",
+          "selection": {
+            "anchor": 9,
+            "head": 4
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 193.6171875,
+            "right": 193.6171875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 14 字 — MarkPilot",
+          "banner": ""
+        },
+        {
+          "text": "abcdef\n",
+          "selection": {
+            "anchor": 1,
+            "head": 1
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 167.5546875,
+            "right": 167.5546875,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "● editing-fixture.md · 7 字 — MarkPilot",
+          "banner": ""
+        }
+      ],
+      "ms": 1002
+    },
+    {
+      "id": "export-ordered",
+      "status": "pass",
+      "trace": [
+        {
+          "ok": true,
+          "mode": "folder",
+          "dir": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export",
+          "file": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export\\MarkPilot 导出.html",
+          "bytes": 373096,
+          "chunks": 1,
+          "images": 0,
+          "copied": 0,
+          "failed": 0,
+          "skipped": 0,
+          "assetBytes": 0,
+          "ms": 41.5,
+          "mathCss": {
+            "cssBytes": 25578,
+            "faces": 20,
+            "embedded": 20,
+            "failed": 0,
+            "fontBytes": 259792,
+            "via": {
+              "host": 20,
+              "fetch": 0,
+              "liveSheet": 1,
+              "hostErr": "文件不存在：<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-editing/cm6/app.css（ENOENT）"
+            },
+            "outBytes": 369218
+          },
+          "math": true
+        },
+        {
+          "body": "\n\n甲\n乙\n\n\n\n\n\n",
+          "ol": [
+            {
+              "start": "1",
+              "items": [
+                "甲",
+                "乙"
+              ]
+            }
+          ],
+          "ul": 0,
+          "pre": [],
+          "tables": []
+        }
+      ],
+      "ms": 454
+    },
+    {
+      "id": "export-ordered-start",
+      "status": "pass",
+      "trace": [
+        {
+          "ok": true,
+          "mode": "folder",
+          "dir": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export",
+          "file": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export\\MarkPilot 导出.html",
+          "bytes": 373096,
+          "chunks": 1,
+          "images": 0,
+          "copied": 0,
+          "failed": 0,
+          "skipped": 0,
+          "assetBytes": 0,
+          "ms": 4.5,
+          "mathCss": {
+            "cssBytes": 25578,
+            "faces": 20,
+            "embedded": 20,
+            "failed": 0,
+            "fontBytes": 259792,
+            "via": {
+              "host": 20,
+              "fetch": 0,
+              "liveSheet": 1,
+              "hostErr": "文件不存在：<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-editing/cm6/app.css（ENOENT）"
+            },
+            "outBytes": 369218
+          },
+          "math": true
+        },
+        {
+          "body": "\n\n甲\n乙\n\n\n\n\n\n",
+          "ol": [
+            {
+              "start": "7",
+              "items": [
+                "甲",
+                "乙"
+              ]
+            }
+          ],
+          "ul": 0,
+          "pre": [],
+          "tables": []
+        }
+      ],
+      "ms": 372
+    },
+    {
+      "id": "export-mixed-lists",
+      "status": "pass",
+      "trace": [
+        {
+          "ok": true,
+          "mode": "folder",
+          "dir": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export",
+          "file": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export\\MarkPilot 导出.html",
+          "bytes": 373134,
+          "chunks": 1,
+          "images": 0,
+          "copied": 0,
+          "failed": 0,
+          "skipped": 0,
+          "assetBytes": 0,
+          "ms": 4.100000023841858,
+          "mathCss": {
+            "cssBytes": 25578,
+            "faces": 20,
+            "embedded": 20,
+            "failed": 0,
+            "fontBytes": 259792,
+            "via": {
+              "host": 20,
+              "fetch": 0,
+              "liveSheet": 1,
+              "hostErr": "文件不存在：<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-editing/cm6/app.css（ENOENT）"
+            },
+            "outBytes": 369218
+          },
+          "math": true
+        },
+        {
+          "body": "\n\n甲\n乙\n\n\n\n丙\n丁\n\n\n\n\n\n",
+          "ol": [
+            {
+              "start": "1",
+              "items": [
+                "甲",
+                "乙"
+              ]
+            }
+          ],
+          "ul": 1,
+          "pre": [],
+          "tables": []
+        }
+      ],
+      "ms": 408
+    },
+    {
+      "id": "export-tilde",
+      "status": "pass",
+      "trace": [
+        {
+          "ok": true,
+          "mode": "folder",
+          "dir": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export",
+          "file": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export\\MarkPilot 导出.html",
+          "bytes": 373083,
+          "chunks": 1,
+          "images": 0,
+          "copied": 0,
+          "failed": 0,
+          "skipped": 0,
+          "assetBytes": 0,
+          "ms": 4.800000071525574,
+          "mathCss": {
+            "cssBytes": 25578,
+            "faces": 20,
+            "embedded": 20,
+            "failed": 0,
+            "fontBytes": 259792,
+            "via": {
+              "host": 20,
+              "fetch": 0,
+              "liveSheet": 1,
+              "hostErr": "文件不存在：<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-editing/cm6/app.css（ENOENT）"
+            },
+            "outBytes": 369218
+          },
+          "math": true
+        },
+        {
+          "body": "\n\n*x* $y$\n\n\n\n\n\n",
+          "ol": [],
+          "ul": 0,
+          "pre": [
+            "\n*x* $y$\n"
+          ],
+          "tables": []
+        }
+      ],
+      "ms": 383
+    },
+    {
+      "id": "export-fence-literal-inner",
+      "status": "pass",
+      "trace": [
+        {
+          "ok": true,
+          "mode": "folder",
+          "dir": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export",
+          "file": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export\\MarkPilot 导出.html",
+          "bytes": 373087,
+          "chunks": 1,
+          "images": 0,
+          "copied": 0,
+          "failed": 0,
+          "skipped": 0,
+          "assetBytes": 0,
+          "ms": 5.100000023841858,
+          "mathCss": {
+            "cssBytes": 25578,
+            "faces": 20,
+            "embedded": 20,
+            "failed": 0,
+            "fontBytes": 259792,
+            "via": {
+              "host": 20,
+              "fetch": 0,
+              "liveSheet": 1,
+              "hostErr": "文件不存在：<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-editing/cm6/app.css（ENOENT）"
+            },
+            "outBytes": 369218
+          },
+          "math": true
+        },
+        {
+          "body": "\n\n```\n*x* $y$\n\n\n\n\n\n",
+          "ol": [],
+          "ul": 0,
+          "pre": [
+            "\n```\n*x* $y$\n"
+          ],
+          "tables": []
+        }
+      ],
+      "ms": 419
+    },
+    {
+      "id": "export-fence-unclosed",
+      "status": "pass",
+      "trace": [
+        {
+          "ok": true,
+          "mode": "folder",
+          "dir": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export",
+          "file": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export\\MarkPilot 导出.html",
+          "bytes": 373083,
+          "chunks": 1,
+          "images": 0,
+          "copied": 0,
+          "failed": 0,
+          "skipped": 0,
+          "assetBytes": 0,
+          "ms": 4.199999928474426,
+          "mathCss": {
+            "cssBytes": 25578,
+            "faces": 20,
+            "embedded": 20,
+            "failed": 0,
+            "fontBytes": 259792,
+            "via": {
+              "host": 20,
+              "fetch": 0,
+              "liveSheet": 1,
+              "hostErr": "文件不存在：<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-editing/cm6/app.css（ENOENT）"
+            },
+            "outBytes": 369218
+          },
+          "math": true
+        },
+        {
+          "body": "\n\n*x* $y$\n\n\n\n\n\n",
+          "ol": [],
+          "ul": 0,
+          "pre": [
+            "\n*x* $y$\n\n"
+          ],
+          "tables": []
+        }
+      ],
+      "ms": 420
+    },
+    {
+      "id": "export-quoted-fence",
+      "status": "pass",
+      "trace": [
+        {
+          "ok": true,
+          "mode": "folder",
+          "dir": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export",
+          "file": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export\\MarkPilot 导出.html",
+          "bytes": 373126,
+          "chunks": 1,
+          "images": 0,
+          "copied": 0,
+          "failed": 0,
+          "skipped": 0,
+          "assetBytes": 0,
+          "ms": 4.699999928474426,
+          "mathCss": {
+            "cssBytes": 25578,
+            "faces": 20,
+            "embedded": 20,
+            "failed": 0,
+            "fontBytes": 259792,
+            "via": {
+              "host": 20,
+              "fetch": 0,
+              "liveSheet": 1,
+              "hostErr": "文件不存在：<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-editing/cm6/app.css（ENOENT）"
+            },
+            "outBytes": 369218
+          },
+          "math": true
+        },
+        {
+          "body": "\n\n\n| a | b |\n| --- | --- |\n\n\n\n\n\n\n",
+          "ol": [],
+          "ul": 0,
+          "pre": [
+            "\n| a | b |\n| --- | --- |\n"
+          ],
+          "tables": []
+        }
+      ],
+      "ms": 428
+    },
+    {
+      "id": "export-quoted-extra-marker",
+      "status": "pass",
+      "trace": [
+        {
+          "ok": true,
+          "mode": "folder",
+          "dir": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export",
+          "file": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export\\MarkPilot 导出.html",
+          "bytes": 373115,
+          "chunks": 1,
+          "images": 0,
+          "copied": 0,
+          "failed": 0,
+          "skipped": 0,
+          "assetBytes": 0,
+          "ms": 4.399999976158142,
+          "mathCss": {
+            "cssBytes": 25578,
+            "faces": 20,
+            "embedded": 20,
+            "failed": 0,
+            "fontBytes": 259792,
+            "via": {
+              "host": 20,
+              "fetch": 0,
+              "liveSheet": 1,
+              "hostErr": "文件不存在：<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-editing/cm6/app.css（ENOENT）"
+            },
+            "outBytes": 369218
+          },
+          "math": true
+        },
+        {
+          "body": "\n\n\n> literal\n\n\n\n\n\n\n",
+          "ol": [],
+          "ul": 0,
+          "pre": [
+            "\n> literal\n"
+          ],
+          "tables": []
+        }
+      ],
+      "ms": 384
+    },
+    {
+      "id": "export-pipe-without-delimiter",
+      "status": "pass",
+      "trace": [
+        {
+          "ok": true,
+          "mode": "folder",
+          "dir": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export",
+          "file": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export\\MarkPilot 导出.html",
+          "bytes": 373083,
+          "chunks": 1,
+          "images": 0,
+          "copied": 0,
+          "failed": 0,
+          "skipped": 0,
+          "assetBytes": 0,
+          "ms": 4.5,
+          "mathCss": {
+            "cssBytes": 25578,
+            "faces": 20,
+            "embedded": 20,
+            "failed": 0,
+            "fontBytes": 259792,
+            "via": {
+              "host": 20,
+              "fetch": 0,
+              "liveSheet": 1,
+              "hostErr": "文件不存在：<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-editing/cm6/app.css（ENOENT）"
+            },
+            "outBytes": 369218
+          },
+          "math": true
+        },
+        {
+          "body": "\n| a | b |\n| 1 | 2 |\n\n\n\n\n",
+          "ol": [],
+          "ul": 0,
+          "pre": [],
+          "tables": []
+        }
+      ],
+      "ms": 420
+    },
+    {
+      "id": "export-wide-dash",
+      "status": "pass",
+      "trace": [
+        {
+          "ok": true,
+          "mode": "folder",
+          "dir": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export",
+          "file": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export\\MarkPilot 导出.html",
+          "bytes": 373155,
+          "chunks": 1,
+          "images": 0,
+          "copied": 0,
+          "failed": 0,
+          "skipped": 0,
+          "assetBytes": 0,
+          "ms": 5,
+          "mathCss": {
+            "cssBytes": 25578,
+            "faces": 20,
+            "embedded": 20,
+            "failed": 0,
+            "fontBytes": 259792,
+            "via": {
+              "host": 20,
+              "fetch": 0,
+              "liveSheet": 1,
+              "hostErr": "文件不存在：<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-editing/cm6/app.css（ENOENT）"
+            },
+            "outBytes": 369218
+          },
+          "math": true
+        },
+        {
+          "body": "\nab\n12\n\n\n\n\n\n",
+          "ol": [],
+          "ul": 0,
+          "pre": [],
+          "tables": [
+            [
+              [
+                "a",
+                "b"
+              ],
+              [
+                "1",
+                "2"
+              ]
+            ]
+          ]
+        }
+      ],
+      "ms": 433
+    },
+    {
+      "id": "export-en-dash-align",
+      "status": "pass",
+      "trace": [
+        {
+          "ok": true,
+          "mode": "folder",
+          "dir": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export",
+          "file": "<repo>\\.mp-verify\\codex-audit\\cm6-common-3.2.11-editing\\folder-export\\MarkPilot 导出.html",
+          "bytes": 373205,
+          "chunks": 1,
+          "images": 0,
+          "copied": 0,
+          "failed": 0,
+          "skipped": 0,
+          "assetBytes": 0,
+          "ms": 4.100000023841858,
+          "mathCss": {
+            "cssBytes": 25578,
+            "faces": 20,
+            "embedded": 20,
+            "failed": 0,
+            "fontBytes": 259792,
+            "via": {
+              "host": 20,
+              "fetch": 0,
+              "liveSheet": 1,
+              "hostErr": "文件不存在：<repo>/.mp-verify/codex-audit/cm6-common-3.2.11-editing/cm6/app.css（ENOENT）"
+            },
+            "outBytes": 369218
+          },
+          "math": true
+        },
+        {
+          "body": "\nab\n12\n\n\n\n\n\n",
+          "ol": [],
+          "ul": 0,
+          "pre": [],
+          "tables": [
+            [
+              [
+                "a",
+                "b"
+              ],
+              [
+                "1",
+                "2"
+              ]
+            ]
+          ]
+        }
+      ],
+      "ms": 421
+    }
+  ],
+  "frames": [
+    {
+      "file": "code-enter-backticks.png",
+      "sha256": "82326dbcc60b85629270a58aabf4a51a24f20f621b1cc7973221aeea2993a7b6",
+      "caret": {
+        "x": 161.5,
+        "y": 88.875,
+        "width": 0,
+        "height": 14,
+        "top": 88.875,
+        "right": 161.5,
+        "bottom": 102.875,
+        "left": 161.5
+      },
+      "zoom": {
+        "file": "code-enter-backticks-caret-2x.png",
+        "sha256": "02fd2d64bebfdfbff6c48e034b6dff7857e08646f6f6ddb42b5023b6568b9ea0",
+        "clip": {
+          "x": 41.5,
+          "y": 63.875,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-enter-quoted.png",
+      "sha256": "62bd4adf384fff405f7d43b998ccf37d11bd8fdcbeba9df7673cfaf15bea3a52",
+      "caret": {
+        "x": 176.578125,
+        "y": 90.46875,
+        "width": 0,
+        "height": 12.59375,
+        "top": 90.46875,
+        "right": 176.578125,
+        "bottom": 103.0625,
+        "left": 176.578125
+      },
+      "zoom": {
+        "file": "code-enter-quoted-caret-2x.png",
+        "sha256": "ae68e3f985b78e5bc0c5b5e8e8453d5518cb7feb7b736a4a46b5d22d37f1fd7b",
+        "clip": {
+          "x": 56.578125,
+          "y": 65.46875,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-enter-nested-quote.png",
+      "sha256": "e44fe1abe94b9d25ccd96e45ae557d9b7bddc0353c875b86b863273f7b3adaec",
+      "caret": {
+        "x": 189.1796875,
+        "y": 90.46875,
+        "width": 0,
+        "height": 12.59375,
+        "top": 90.46875,
+        "right": 189.1796875,
+        "bottom": 103.0625,
+        "left": 189.1796875
+      },
+      "zoom": {
+        "file": "code-enter-nested-quote-caret-2x.png",
+        "sha256": "e5a0f993b0610589d210e188ddb098e94c9f108f16794415c1a1ede895b96f02",
+        "clip": {
+          "x": 69.1796875,
+          "y": 65.46875,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-tab-plain.png",
+      "sha256": "0a23e9745befc4c4f298062477bc704eaae50d101edbe4724708fd25f33ebcab",
+      "caret": {
+        "left": 175.4453125,
+        "right": 175.4453125,
+        "top": 70.4375,
+        "bottom": 84.4375
+      },
+      "zoom": {
+        "file": "code-tab-plain-caret-2x.png",
+        "sha256": "4f0d69c8a864a25de8dd27cb9ab4d8b6b3c35555effebafc90fe916a4780fe49",
+        "clip": {
+          "x": 55.4453125,
+          "y": 45.4375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-tab-quoted.png",
+      "sha256": "e6135261f4dbf73385881a54c6cf9a7532a9933c40fc8527b9bee725ded18773",
+      "caret": {
+        "left": 191.34375,
+        "right": 191.34375,
+        "top": 72.03125,
+        "bottom": 86.53125
+      },
+      "zoom": {
+        "file": "code-tab-quoted-caret-2x.png",
+        "sha256": "a63c0538f3022829f8e3d955af6808f30aebbe90f532dc1b2e5efe7f56588e20",
+        "clip": {
+          "x": 71.34375,
+          "y": 47.03125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "quoted-literal-table.png",
+      "sha256": "65a5ed62cce82208271ac722af899ad0315778366d929988ebc07d9957af17a8",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "quoted-literal-table-caret-2x.png",
+        "sha256": "d64112cbe5d2207503f85be06cc0d7ac19e5bb38d9ceabe07b255dea3cc6c8b1",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "literal-task.png",
+      "sha256": "9b77419caef00b0e806236892d46c284457fcfad1d343ffafe2f7e125293b87a",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "literal-task-caret-2x.png",
+        "sha256": "b8d6d613832c9e1d647dc0d21a2d190faca1a8110ed3626945b334bc75a37172",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-pipe-tab.png",
+      "sha256": "5bfab8c62dd06dc22d9005d92d1325840c545577944e01e911ded2744a4f61fe",
+      "caret": {
+        "left": 203.15625,
+        "right": 203.15625,
+        "top": 73.03125,
+        "bottom": 86.03125
+      },
+      "zoom": {
+        "file": "code-pipe-tab-caret-2x.png",
+        "sha256": "214d3ceb3b9f5342a15300a67528ad03e890359d11f453edc953d5d90777087b",
+        "clip": {
+          "x": 83.15625,
+          "y": 48.03125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-math-plain.png",
+      "sha256": "a50a125042a1db124445c2c3385e3fd90f374fdc03df04056950020632112311",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "code-math-plain-caret-2x.png",
+        "sha256": "b463225063c93a902c36dda2b3303148cf3a2200c7a98ae5e70569ca028de092",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-math-quoted.png",
+      "sha256": "fd6a2eb7311af6c1370f0030ca838ea7addb404a3d3d3d609ed2cdd3b93859fa",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "code-math-quoted-caret-2x.png",
+        "sha256": "4e6c8a6c705ff1ad2c8a5e764cfe238de45655da5cbbd92b556c93aa7e89dcfa",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-quoted-dollars.png",
+      "sha256": "955a19bdbd7d05c35f09ef0f924243ecef0245bdbfe09dadd3f35e512f6cfe38",
+      "caret": {
+        "x": 228.2578125,
+        "y": 72.03125,
+        "width": 0,
+        "height": 14.5,
+        "top": 72.03125,
+        "right": 228.2578125,
+        "bottom": 86.53125,
+        "left": 228.2578125
+      },
+      "zoom": {
+        "file": "code-quoted-dollars-caret-2x.png",
+        "sha256": "81386e75858b1d10ee21cc5fb226ac25e5e3604c852eb847d943c89d65a63871",
+        "clip": {
+          "x": 108.2578125,
+          "y": 47.03125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-outdent-quoted.png",
+      "sha256": "af529c478bcaa9ad19ebdfd91dbc1355fe4606b90ffe260ecbfd3351de6963ae",
+      "caret": {
+        "x": 183.9609375,
+        "y": 72.03125,
+        "width": 0,
+        "height": 14.5,
+        "top": 72.03125,
+        "right": 183.9609375,
+        "bottom": 86.53125,
+        "left": 183.9609375
+      },
+      "zoom": {
+        "file": "code-outdent-quoted-caret-2x.png",
+        "sha256": "d73d061ed310d71270698c96acc224fc29f3438e3598c0df083dccd480edbd29",
+        "clip": {
+          "x": 63.9609375,
+          "y": 47.03125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-enter-indent.png",
+      "sha256": "5050a151a285831be27824b68b316c696b668d358defd87d11f1698e1828ce9d",
+      "caret": {
+        "x": 206.109375,
+        "y": 91.5625,
+        "width": 0,
+        "height": 14.5,
+        "top": 91.5625,
+        "right": 206.109375,
+        "bottom": 106.0625,
+        "left": 206.109375
+      },
+      "zoom": {
+        "file": "code-enter-indent-caret-2x.png",
+        "sha256": "7bfe464b4ddf1430cf273b843fe5f7ad49e90cbf50ad1723276141343a33d917",
+        "clip": {
+          "x": 86.109375,
+          "y": 66.5625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-enter-body-home.png",
+      "sha256": "1eb9b98a8615dea7eff6a9c9bdb713b0e6469678fa25c8610cea31c54aeb9b92",
+      "caret": {
+        "left": 176.578125,
+        "right": 176.578125,
+        "top": 91.5625,
+        "bottom": 106.0625
+      },
+      "zoom": {
+        "file": "code-enter-body-home-caret-2x.png",
+        "sha256": "e8dca1066d302b26a0f0d7f324dd33adec9b20a0bc7bf511baefe0724756d2a4",
+        "clip": {
+          "x": 56.578125,
+          "y": 66.5625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-enter-selection.png",
+      "sha256": "53bab6fdc2feae9a380c89c4899c3cd6b3faecf37bf0801e611f4787d45a3818",
+      "caret": {
+        "left": 176.578125,
+        "right": 176.578125,
+        "top": 91.5625,
+        "bottom": 106.0625
+      },
+      "zoom": {
+        "file": "code-enter-selection-caret-2x.png",
+        "sha256": "309b960a4ad39072e92db06684fb8e0533b4674363784103ac5f4be1ef06672c",
+        "clip": {
+          "x": 56.578125,
+          "y": 66.5625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-enter-closing-default.png",
+      "sha256": "67034f96b57814cad81a17b4fd5b3fcd67850281ea608e479fd0048fadb7e06c",
+      "caret": {
+        "x": 160.5,
+        "y": 113.09375,
+        "width": 0,
+        "height": 16,
+        "top": 113.09375,
+        "right": 160.5,
+        "bottom": 129.09375,
+        "left": 160.5
+      },
+      "zoom": {
+        "file": "code-enter-closing-default-caret-2x.png",
+        "sha256": "5f8bfd3da0fb34c9da3f403e2dc3db33cae725ceaa13b6246e4b5b06178026c0",
+        "clip": {
+          "x": 40.5,
+          "y": 88.09375,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-enter-multiple.png",
+      "sha256": "e17d1298d1468151676c91efffc300bf161d0731217ca35f27a989c56ec0b573",
+      "caret": {
+        "x": 176.578125,
+        "y": 90.46875,
+        "width": 0,
+        "height": 12.59375,
+        "top": 90.46875,
+        "right": 176.578125,
+        "bottom": 103.0625,
+        "left": 176.578125
+      },
+      "zoom": {
+        "file": "code-enter-multiple-caret-2x.png",
+        "sha256": "d97441c9999c48000acdfdb427b878ac141a230086f6f9e3b5aca4534081494c",
+        "clip": {
+          "x": 56.578125,
+          "y": 65.46875,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "code-number-clear.png",
+      "sha256": "6cf408c2469e9587f48643c2bce5507900c2a76e81637f1b15e02009331789ec",
+      "caret": {
+        "x": 160.5,
+        "y": 104.890625,
+        "width": 0,
+        "height": 16,
+        "top": 104.890625,
+        "right": 160.5,
+        "bottom": 120.890625,
+        "left": 160.5
+      },
+      "zoom": {
+        "file": "code-number-clear-caret-2x.png",
+        "sha256": "29ce8ff8a13bafe6b71d91cfa3293290dfd066f0db12c715f1a4051a39920148",
+        "clip": {
+          "x": 40.5,
+          "y": 79.890625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "list-home.png",
+      "sha256": "1cb0d01f6ae526402c7b7017e731c59ef7e7bffde99f33de919381d8f8403b2d",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "list-home-caret-2x.png",
+        "sha256": "03a8482ff9bf3371f1168661a18f217c913804eb883616e152b23247a501dbd3",
+        "clip": {
+          "x": 40.5,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "list-selection.png",
+      "sha256": "0b605753f439bc1783414db5a0415232816bf10f7c71568e92fd2992e9e9bd36",
+      "caret": {
+        "left": 169.1171875,
+        "right": 169.1171875,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "list-selection-caret-2x.png",
+        "sha256": "225fdc6ead932889a3b6f83401776b3f0afa5623f3b9f2f14f01a73d50b305a8",
+        "clip": {
+          "x": 49.1171875,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "list-multiple.png",
+      "sha256": "751fda4c24234675dedccbc21e467742ebdf12b1f54f766ab870635ee54e5f12",
+      "caret": {
+        "left": 169.1171875,
+        "right": 169.1171875,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "list-multiple-caret-2x.png",
+        "sha256": "2847fbee5e42cd10fad03b3facbbe634744b8261b8f7dcfd79f3de0f5df40bf4",
+        "clip": {
+          "x": 49.1171875,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "completion-list-open.png",
+      "sha256": "7806a0ddd2a975640ff97f2e36c109c1b9fbfc13c8aada64697f48874dccf10b",
+      "caret": {
+        "x": 233.1953125,
+        "y": 54.5,
+        "width": 0,
+        "height": 16,
+        "top": 54.5,
+        "right": 233.1953125,
+        "bottom": 70.5,
+        "left": 233.1953125
+      },
+      "zoom": {
+        "file": "completion-list-open-caret-2x.png",
+        "sha256": "fe8a59b14cf978a5b60ac8ac1f8efad7606093cbab031efaeed417b2151ff989",
+        "clip": {
+          "x": 113.1953125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "completion-list-enter.png",
+      "sha256": "c47ef490a79bb7d4cc3df0eed3a3fec94b6535d31c7f3a82aa6fc128ba57bf93",
+      "caret": {
+        "left": 245.578125,
+        "right": 245.578125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "completion-list-enter-caret-2x.png",
+        "sha256": "2e5272ec44aa524bb2e50bbc3c47c98ff114ca04273ea98178b3b79081000dce",
+        "clip": {
+          "x": 125.578125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "completion-list-tab.png",
+      "sha256": "c47ef490a79bb7d4cc3df0eed3a3fec94b6535d31c7f3a82aa6fc128ba57bf93",
+      "caret": {
+        "left": 245.578125,
+        "right": 245.578125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "completion-list-tab-caret-2x.png",
+        "sha256": "2e5272ec44aa524bb2e50bbc3c47c98ff114ca04273ea98178b3b79081000dce",
+        "clip": {
+          "x": 125.578125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "completion-mouse.png",
+      "sha256": "c47ef490a79bb7d4cc3df0eed3a3fec94b6535d31c7f3a82aa6fc128ba57bf93",
+      "caret": {
+        "left": 245.578125,
+        "right": 245.578125,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "completion-mouse-caret-2x.png",
+        "sha256": "2e5272ec44aa524bb2e50bbc3c47c98ff114ca04273ea98178b3b79081000dce",
+        "clip": {
+          "x": 125.578125,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "heading-hashtag.png",
+      "sha256": "943d18f29827e7ef0f346387218b1b79dd51757e0728e77070ad9a74cf557f1a",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "heading-hashtag-caret-2x.png",
+        "sha256": "469c970bc1d5579a903d8b6643f1688a992018ffd63289804c893571740a7e67",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "heading-indented.png",
+      "sha256": "c4be56230ed99097f10319f45259c61be3ae03ff89119a7cfb1f669e67675e70",
+      "caret": {
+        "left": 160.5,
+        "right": 160.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "heading-indented-caret-2x.png",
+        "sha256": "823d58d2feeebbca56eb59a3bfde029ffd46911ef49d636a5837a743dbbaf407",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "underline-empty.png",
+      "sha256": "c7c8de7a1666e7608d955d349dd17c838194c771404fbfed6d673b564c041bd2",
+      "caret": {
+        "x": 160.5,
+        "y": 54.5,
+        "width": 0,
+        "height": 16,
+        "top": 54.5,
+        "right": 160.5,
+        "bottom": 70.5,
+        "left": 160.5
+      },
+      "zoom": {
+        "file": "underline-empty-caret-2x.png",
+        "sha256": "648293a96455225892d6253e8c79bfa6c3e87016099eac9932d3b4c15aae9f43",
+        "clip": {
+          "x": 40.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "underline-drag.png",
+      "sha256": "a6fd88bc6a89784c6c7502638b91ea537c5de0994af9e8710e766d3fc51b6bba",
+      "caret": {
+        "left": 167.5546875,
+        "right": 167.5546875,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "underline-drag-caret-2x.png",
+        "sha256": "7946ea5e9380fd388eede2c57a09a979872040b6c0e129e24a9a1df1a90068b9",
+        "clip": {
+          "x": 47.5546875,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "kind": "html-export",
+      "file": "export-ordered.png",
+      "sha256": "fdfaae4f36b9d2e137ea4f32268659f48a05312318ec15dc9236ae1fe35d2524",
+      "published": false
+    },
+    {
+      "kind": "html-export",
+      "file": "export-ordered-start.png",
+      "sha256": "827e78a3b4d897ffe2cf563960f468fb815a7c241965248a23346691f5d5516d",
+      "published": false
+    },
+    {
+      "kind": "html-export",
+      "file": "export-mixed-lists.png",
+      "sha256": "6879583f92eee98d65d0e9fa84286c3c829a36a13c8bd49050cf5abad41dfdc4",
+      "published": false
+    },
+    {
+      "kind": "html-export",
+      "file": "export-tilde.png",
+      "sha256": "a9d0a75c077e875f39b957d3d40d0f629b52211d8ba79dd80d3f2136d8274897",
+      "published": false
+    },
+    {
+      "kind": "html-export",
+      "file": "export-fence-literal-inner.png",
+      "sha256": "69a7e3d8bbd9088aef77076a684b716c6b87011d781a4b3c6799b9ca0a88eabe",
+      "published": false
+    },
+    {
+      "kind": "html-export",
+      "file": "export-fence-unclosed.png",
+      "sha256": "a06e7d739333e520d20c76b1327b45ee6a61aa98cefd666c8bcad7dfab9acfc4",
+      "published": false
+    },
+    {
+      "kind": "html-export",
+      "file": "export-quoted-fence.png",
+      "sha256": "baa9839222899f8b63edfd0da8eb3a719fbfca1350f0e015130f96d68d658758",
+      "published": false
+    },
+    {
+      "kind": "html-export",
+      "file": "export-quoted-extra-marker.png",
+      "sha256": "d6137fda833458ec550e349056879a63b7d12bce4b05d29832353ca0e8876f30",
+      "published": false
+    },
+    {
+      "kind": "html-export",
+      "file": "export-pipe-without-delimiter.png",
+      "sha256": "0d37b3f80db1a0fe2948abfe083a0dd89df88ad6fe6e6701f3e2cce0ed9b6cbf",
+      "published": false
+    },
+    {
+      "kind": "html-export",
+      "file": "export-wide-dash.png",
+      "sha256": "e049016e557d4b69c28b2d7274f153f6fc0362ca14b5a9a99fac14dc993dde75",
+      "published": false
+    },
+    {
+      "kind": "html-export",
+      "file": "export-en-dash-align.png",
+      "sha256": "63fc4f190ed55859aca52fa93bf15ea7c43773f36d0ea741fb9b29758a326ffc",
+      "published": false
+    }
+  ],
+  "errors": [],
+  "metadata": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-common-final-source-3.2.11\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-common-final-source-3.2.11\\unpacked\\MarkPilot.exe",
+    "runtimeExecutableSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\cm6-common-final-source-3.2.11\\unpacked\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.11",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\cm6-common-final-source-3.2.11\\unpacked\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\cm6-common-final-source-3.2.11\\unpacked\\resources\\app.asar",
+    "asarSha256": "0ea5ef6c394dc0b62bf7464b89cb4a4afe8bca07a94028a5f6e343131ac3dcf7",
+    "bootMs": 945,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878",
+        "sourceSha256": "60b89391077c8e2a0ccfe4fff969316b2488d12c13c59dee57ef5d0b34219878"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T22:54:04.685Z",
+  "passed": true
+}

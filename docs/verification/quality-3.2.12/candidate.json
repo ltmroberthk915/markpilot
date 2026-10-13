@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "version": "3.2.12",
+  "builderVersion": "25.1.8",
+  "at": "2026-10-12T01:05:00.249Z",
+  "resource": {
+    "productName": "MarkPilot",
+    "productVersion": "3.2.12",
+    "fileVersion": "3.2.12.0"
+  },
+  "exeSha256": "d300992b1003765f2f64417269c124f0c7b14af65ce415ad2488d166e6f63e13",
+  "asarSha256": "f794e8c23ea631afe1b66552c8674d9bd8c0a48eaf4b957b581832b57b624143",
+  "sourceFiles": [
+    {
+      "file": "main.js",
+      "sha256": "be105040e75e3707d9b5d978eaffa6d17151004e0f46fac4cc87bab829ec3f33"
+    },
+    {
+      "file": "preload.js",
+      "sha256": "5d58d02e672705f4bb5c1475aa8be667b04a2cb9cb4111d285b9efead54a1521"
+    },
+    {
+      "file": "renderer/host.js",
+      "sha256": "4517f08c0f305d08c361c2079157e587b5a9e8097dc161ab748c26960a8c40f5"
+    },
+    {
+      "file": "shell/document-store.js",
+      "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+    },
+    {
+      "file": "shell/text-codec.js",
+      "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+    },
+    {
+      "file": "renderer/cm6/app.js",
+      "sha256": "570aae504d0e7ccf46e77c180c861cf6d030d2421d070885340d7a41d10a79ba"
+    },
+    {
+      "file": "renderer/cm6/markdown-worker.js",
+      "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+    }
+  ],
+  "isolatedAppId": "app.markpilot.quality.d6ad9ebb374d46dcbb04364f32154167",
+  "files": [
+    {
+      "file": "production/markpilot-3.2.12-portable.exe",
+      "bytes": 84351471,
+      "sha256": "40e6f365e9e4d5dd722712a604c0ad07b7d384e9c286abff8205f9cde897e9fa"
+    },
+    {
+      "file": "production/markpilot-Setup-3.2.12.exe",
+      "bytes": 84620253,
+      "sha256": "370415d583fee952b40c2673fb5ba4333087665e0cb485f8919e323f0db2868b"
+    },
+    {
+      "file": "isolated/markpilot-quality-Setup-3.2.12.exe",
+      "bytes": 84555405,
+      "sha256": "71b0206bdfdabeffe26dfca2bc14cdc12958911fdcca1da268a6d3ba90b303e6"
+    }
+  ],
+  "published": false
+}

@@ -1,0 +1,428 @@
+{
+  "suite": "document-workflows",
+  "schema": 1,
+  "startedAt": "2026-10-11T21:37:34.631Z",
+  "cases": [
+    {
+      "id": "same-text-other-file-starts-empty-history",
+      "status": "fail",
+      "trace": [
+        {
+          "name": "same-text-01-before-edit",
+          "text": "A base\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 160.5,
+            "y": 79.6953125,
+            "width": 0,
+            "height": 16,
+            "top": 79.6953125,
+            "right": 160.5,
+            "bottom": 95.6953125,
+            "left": 160.5
+          },
+          "scrollTop": 0,
+          "title": "history-A.md · 7 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "d9cf38da-0c44-42c3-9229-2b80f8d07823",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\negative-history\\history-A.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "same-text-01-before-edit.png",
+            "sha256": "f1b7900edcacc79957de4b7e76caf81169fd63b41a05ddb48433169b469b72ad",
+            "caret": {
+              "x": 160.5,
+              "y": 79.6953125,
+              "width": 0,
+              "height": 16,
+              "top": 79.6953125,
+              "right": 160.5,
+              "bottom": 95.6953125,
+              "left": 160.5
+            },
+            "zoom": {
+              "file": "same-text-01-before-edit-caret-2x.png",
+              "sha256": "42d82e0338d76ba214ae3585cb3da87a3c76d950b43d544e4aabe868475d5517",
+              "clip": {
+                "x": 40.5,
+                "y": 54.6953125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "same-text-02-A-edited",
+          "text": "A base\nFROM_A",
+          "selection": {
+            "anchor": 13,
+            "head": 13
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 220.5,
+            "right": 220.5,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "history-A.md · 13 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "d9cf38da-0c44-42c3-9229-2b80f8d07823",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\negative-history\\history-A.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "same-text-02-A-edited.png",
+            "sha256": "d83afca2e759a93fec96d90276e037679e74cd50466b0b979ead3d767a24eaec",
+            "caret": {
+              "left": 220.5,
+              "right": 220.5,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "zoom": {
+              "file": "same-text-02-A-edited-caret-2x.png",
+              "sha256": "6f6c0219182699c40aadf7480755d8e0688938ab60ffd65c3435293e3d961d0b",
+              "clip": {
+                "x": 100.5,
+                "y": 54.6953125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "same-text-03-B-before-undo",
+          "text": "A base\nFROM_A",
+          "selection": {
+            "anchor": 13,
+            "head": 13
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 220.5,
+            "right": 220.5,
+            "top": 79.6953125,
+            "bottom": 95.6953125
+          },
+          "scrollTop": 0,
+          "title": "history-B.md · 13 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "eed83ce2-d6ba-46b3-90ff-01972d990c4e",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\negative-history\\history-B.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "same-text-03-B-before-undo.png",
+            "sha256": "d83afca2e759a93fec96d90276e037679e74cd50466b0b979ead3d767a24eaec",
+            "caret": {
+              "left": 220.5,
+              "right": 220.5,
+              "top": 79.6953125,
+              "bottom": 95.6953125
+            },
+            "zoom": {
+              "file": "same-text-03-B-before-undo-caret-2x.png",
+              "sha256": "6f6c0219182699c40aadf7480755d8e0688938ab60ffd65c3435293e3d961d0b",
+              "clip": {
+                "x": 100.5,
+                "y": 54.6953125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "same-text-04-B-after-undo",
+          "text": "A base\n",
+          "selection": {
+            "anchor": 7,
+            "head": 7
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 160.5,
+            "y": 79.6953125,
+            "width": 0,
+            "height": 16,
+            "top": 79.6953125,
+            "right": 160.5,
+            "bottom": 95.6953125,
+            "left": 160.5
+          },
+          "scrollTop": 0,
+          "title": "history-B.md · 7 字 — MarkPilot",
+          "banner": "",
+          "host": {
+            "documentId": "eed83ce2-d6ba-46b3-90ff-01972d990c4e",
+            "filePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\negative-history\\history-B.md",
+            "dirty": false,
+            "saveInFlight": false,
+            "saveTimer": false
+          },
+          "screenshot": {
+            "file": "same-text-04-B-after-undo.png",
+            "sha256": "f1b7900edcacc79957de4b7e76caf81169fd63b41a05ddb48433169b469b72ad",
+            "caret": {
+              "x": 160.5,
+              "y": 79.6953125,
+              "width": 0,
+              "height": 16,
+              "top": 79.6953125,
+              "right": 160.5,
+              "bottom": 95.6953125,
+              "left": 160.5
+            },
+            "zoom": {
+              "file": "same-text-04-B-after-undo-caret-2x.png",
+              "sha256": "42d82e0338d76ba214ae3585cb3da87a3c76d950b43d544e4aabe868475d5517",
+              "clip": {
+                "x": 40.5,
+                "y": 54.6953125,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "disk-after-undo",
+          "A": "A base\nFROM_A",
+          "B": "A base\n"
+        }
+      ],
+      "error": "undo in newly opened B must not replay A history\n+ actual - expected\n\n+ 'A base\\n'\n- 'A base\\nFROM_A'\n           ^\n",
+      "ms": 2901
+    }
+  ],
+  "input": "CDP real key events and insertText; file opening uses real host IPC",
+  "artifact": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-history\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-history\\unpacked\\MarkPilot.exe",
+    "runtimeExecutableSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-history\\unpacked\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.10",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-history\\unpacked\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-history\\unpacked\\resources\\app.asar",
+    "asarSha256": "097fc863fb6b393a6004420770d1b64f0c0fbfaf4e5f9ec381abc16eeb37432e",
+    "bootMs": 972,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "9060890c33365482d60c35155370f64efa86c39e74162932f2dca609fc50e37c",
+        "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3",
+        "sourceSha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T21:37:44.443Z",
+  "passed": false,
+  "frames": [
+    {
+      "file": "same-text-01-before-edit.png",
+      "sha256": "f1b7900edcacc79957de4b7e76caf81169fd63b41a05ddb48433169b469b72ad",
+      "caret": {
+        "x": 160.5,
+        "y": 79.6953125,
+        "width": 0,
+        "height": 16,
+        "top": 79.6953125,
+        "right": 160.5,
+        "bottom": 95.6953125,
+        "left": 160.5
+      },
+      "zoom": {
+        "file": "same-text-01-before-edit-caret-2x.png",
+        "sha256": "42d82e0338d76ba214ae3585cb3da87a3c76d950b43d544e4aabe868475d5517",
+        "clip": {
+          "x": 40.5,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "same-text-02-A-edited.png",
+      "sha256": "d83afca2e759a93fec96d90276e037679e74cd50466b0b979ead3d767a24eaec",
+      "caret": {
+        "left": 220.5,
+        "right": 220.5,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "same-text-02-A-edited-caret-2x.png",
+        "sha256": "6f6c0219182699c40aadf7480755d8e0688938ab60ffd65c3435293e3d961d0b",
+        "clip": {
+          "x": 100.5,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "same-text-03-B-before-undo.png",
+      "sha256": "d83afca2e759a93fec96d90276e037679e74cd50466b0b979ead3d767a24eaec",
+      "caret": {
+        "left": 220.5,
+        "right": 220.5,
+        "top": 79.6953125,
+        "bottom": 95.6953125
+      },
+      "zoom": {
+        "file": "same-text-03-B-before-undo-caret-2x.png",
+        "sha256": "6f6c0219182699c40aadf7480755d8e0688938ab60ffd65c3435293e3d961d0b",
+        "clip": {
+          "x": 100.5,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "same-text-04-B-after-undo.png",
+      "sha256": "f1b7900edcacc79957de4b7e76caf81169fd63b41a05ddb48433169b469b72ad",
+      "caret": {
+        "x": 160.5,
+        "y": 79.6953125,
+        "width": 0,
+        "height": 16,
+        "top": 79.6953125,
+        "right": 160.5,
+        "bottom": 95.6953125,
+        "left": 160.5
+      },
+      "zoom": {
+        "file": "same-text-04-B-after-undo-caret-2x.png",
+        "sha256": "42d82e0338d76ba214ae3585cb3da87a3c76d950b43d544e4aabe868475d5517",
+        "clip": {
+          "x": 40.5,
+          "y": 54.6953125,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    }
+  ]
+}

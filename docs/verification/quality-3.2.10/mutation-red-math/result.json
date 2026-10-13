@@ -1,0 +1,561 @@
+{
+  "suite": "math-workflows",
+  "schema": 1,
+  "startedAt": "2026-10-11T21:38:21.527Z",
+  "seed": 32901,
+  "cases": [
+    {
+      "id": "multiline-quoted-block-glyph-click-edit-undo-redo",
+      "status": "fail",
+      "trace": [
+        {
+          "name": "before-click",
+          "target": {
+            "x": 595.8859375,
+            "y": 113.734375,
+            "text": "y",
+            "start": "3",
+            "end": "4"
+          },
+          "text": "Start\n\n> $$\n> x+\n> y\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 0,
+            "head": 0
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 170.5,
+            "right": 170.5,
+            "top": 54.5,
+            "bottom": 70.5
+          },
+          "scrollTop": 0,
+          "title": "multiline-quoted-block.md · 31 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "multiline-quoted-block-01-rendered.png",
+            "sha256": "e2787f323b0c4cc1a67943d7dcbdee55ef0e52ff3460b71725795aa349e24e90",
+            "caret": {
+              "left": 170.5,
+              "right": 170.5,
+              "top": 54.5,
+              "bottom": 70.5
+            },
+            "zoom": {
+              "file": "multiline-quoted-block-01-rendered-caret-2x.png",
+              "sha256": "f088b817e7c29f54c21f28d2e02c3d4ea13f30c6ab1a30db225f24ea0a799981",
+              "clip": {
+                "x": 50.5,
+                "y": 29.5,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "clicked-y",
+          "text": "Start\n\n> $$\n> x+\n> y\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 18,
+            "head": 18
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 584.9375,
+            "y": 148.65625,
+            "width": 0,
+            "height": 12.59375,
+            "top": 148.65625,
+            "right": 584.9375,
+            "bottom": 161.25,
+            "left": 584.9375
+          },
+          "scrollTop": 0,
+          "title": "multiline-quoted-block.md · 31 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "multiline-quoted-block-02-clicked.png",
+            "sha256": "94c247a4167413bbcf90e2a6a1db948a7193f63daba05ea4d7ba27822fbd3ae5",
+            "caret": {
+              "x": 584.9375,
+              "y": 148.65625,
+              "width": 0,
+              "height": 12.59375,
+              "top": 148.65625,
+              "right": 584.9375,
+              "bottom": 161.25,
+              "left": 584.9375
+            },
+            "zoom": {
+              "file": "multiline-quoted-block-02-clicked-caret-2x.png",
+              "sha256": "52486bffeb7f67a346d3aafacb0af3cbb07fa486129af079f98ef95914fdf2f3",
+              "clip": {
+                "x": 464.9375,
+                "y": 123.65625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "edited",
+          "text": "Start\n\n> $$\n> x+\n> zy\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 18,
+            "head": 18
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 582.140625,
+            "y": 148.65625,
+            "width": 0,
+            "height": 12.59375,
+            "top": 148.65625,
+            "right": 582.140625,
+            "bottom": 161.25,
+            "left": 582.140625
+          },
+          "scrollTop": 0,
+          "title": "● multiline-quoted-block.md · 32 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "multiline-quoted-block-03-edited.png",
+            "sha256": "8de6107d0f55be1b7583abf2d5430882b9c9451fc5a5ac97563d49fce5adb8c0",
+            "caret": {
+              "x": 582.140625,
+              "y": 148.65625,
+              "width": 0,
+              "height": 12.59375,
+              "top": 148.65625,
+              "right": 582.140625,
+              "bottom": 161.25,
+              "left": 582.140625
+            },
+            "zoom": {
+              "file": "multiline-quoted-block-03-edited-caret-2x.png",
+              "sha256": "39dade4add773b63df4c8f57c24c866971907277a6b41e2344b1bff636a4789e",
+              "clip": {
+                "x": 462.140625,
+                "y": 123.65625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "undo",
+          "text": "Start\n\n> $$\n> x+\n> y\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 18,
+            "head": 18
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 584.9375,
+            "y": 148.65625,
+            "width": 0,
+            "height": 12.59375,
+            "top": 148.65625,
+            "right": 584.9375,
+            "bottom": 161.25,
+            "left": 584.9375
+          },
+          "scrollTop": 0,
+          "title": "● multiline-quoted-block.md · 31 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "multiline-quoted-block-04-undo.png",
+            "sha256": "94c247a4167413bbcf90e2a6a1db948a7193f63daba05ea4d7ba27822fbd3ae5",
+            "caret": {
+              "x": 584.9375,
+              "y": 148.65625,
+              "width": 0,
+              "height": 12.59375,
+              "top": 148.65625,
+              "right": 584.9375,
+              "bottom": 161.25,
+              "left": 584.9375
+            },
+            "zoom": {
+              "file": "multiline-quoted-block-04-undo-caret-2x.png",
+              "sha256": "52486bffeb7f67a346d3aafacb0af3cbb07fa486129af079f98ef95914fdf2f3",
+              "clip": {
+                "x": 464.9375,
+                "y": 123.65625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "redo",
+          "text": "Start\n\n> $$\n> x+\n> zy\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 18,
+            "head": 18
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "x": 582.140625,
+            "y": 148.65625,
+            "width": 0,
+            "height": 12.59375,
+            "top": 148.65625,
+            "right": 582.140625,
+            "bottom": 161.25,
+            "left": 582.140625
+          },
+          "scrollTop": 0,
+          "title": "● multiline-quoted-block.md · 32 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "multiline-quoted-block-05-redo.png",
+            "sha256": "8de6107d0f55be1b7583abf2d5430882b9c9451fc5a5ac97563d49fce5adb8c0",
+            "caret": {
+              "x": 582.140625,
+              "y": 148.65625,
+              "width": 0,
+              "height": 12.59375,
+              "top": 148.65625,
+              "right": 582.140625,
+              "bottom": 161.25,
+              "left": 582.140625
+            },
+            "zoom": {
+              "file": "multiline-quoted-block-05-redo-caret-2x.png",
+              "sha256": "39dade4add773b63df4c8f57c24c866971907277a6b41e2344b1bff636a4789e",
+              "clip": {
+                "x": 462.140625,
+                "y": 123.65625,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        },
+        {
+          "name": "float-click-y",
+          "text": "Start\n\n> $$\n> x+\n> zy\n> $$\n\nEnd\n",
+          "selection": {
+            "anchor": 19,
+            "head": 19
+          },
+          "focus": true,
+          "activeElement": {
+            "tag": "DIV",
+            "class": "cm-content cm-lineWrapping"
+          },
+          "caret": {
+            "left": 582.140625,
+            "right": 582.140625,
+            "top": 149.75,
+            "bottom": 164.25
+          },
+          "scrollTop": 0,
+          "title": "multiline-quoted-block.md · 32 字 — MarkPilot",
+          "banner": "",
+          "screenshot": {
+            "file": "multiline-quoted-block-06-float-click.png",
+            "sha256": "fe7e7a497612c55daa3b4ac2b5da60aff8e24174b5518ebf7814c5345a69bc6a",
+            "caret": {
+              "left": 582.140625,
+              "right": 582.140625,
+              "top": 149.75,
+              "bottom": 164.25
+            },
+            "zoom": {
+              "file": "multiline-quoted-block-06-float-click-caret-2x.png",
+              "sha256": "28848ecf65f868063ae1e3bf22603fbaa448ec27efcb590b4b59444c61f1e6c4",
+              "clip": {
+                "x": 462.140625,
+                "y": 124.75,
+                "width": 300,
+                "height": 90,
+                "scale": 2
+              }
+            }
+          }
+        }
+      ],
+      "error": "clicking last glyph maps to its source endpoint past quote prefixes\n\n18 !== 20\n",
+      "ms": 3459
+    }
+  ],
+  "artifact": {
+    "executable": "MarkPilot.exe",
+    "executablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-math\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "runtimeExecutablePath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-math\\unpacked\\MarkPilot.exe",
+    "runtimeExecutableSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "artifactRoot": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-math\\unpacked\\resources\\app.asar",
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.10",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "resourcesPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-math\\unpacked\\resources",
+    "asarPath": "<repo>\\.mp-verify\\codex-audit\\cm6-workflow-activation-mutations-3.2.10\\stage-math\\unpacked\\resources\\app.asar",
+    "asarSha256": "74ae02c8095421c5db0b6813371f182043795562b028f4ab1c1d8ce7d36b15d4",
+    "bootMs": 929,
+    "node": "v24.14.1",
+    "platform": "win32",
+    "cpu": "Intel(R) Core(TM) Ultra 5 125H",
+    "ramGiB": 23,
+    "engineBundleSha256": null,
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383",
+        "sourceSha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020",
+        "sourceSha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907",
+        "sourceSha256": "bf5680247f032d6ba0ae6c0ed753b48afbf76b931dc6547aded1ea4022272907"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370",
+        "sourceSha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff",
+        "sourceSha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "15125491cead060b7d8a44dae33d4c9f1bf2f3af7e461fc7c232c4584d4618ca",
+        "sourceSha256": "503da1622bac7760b019f078b14f36fc33ada03e270700bfd8a9ef14b40a1af3"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04",
+        "sourceSha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "clipboard": {
+    "restored": true
+  },
+  "cleanup": {
+    "residual": []
+  },
+  "finishedAt": "2026-10-11T21:38:31.371Z",
+  "passed": false,
+  "frames": [
+    {
+      "file": "multiline-quoted-block-01-rendered.png",
+      "sha256": "e2787f323b0c4cc1a67943d7dcbdee55ef0e52ff3460b71725795aa349e24e90",
+      "caret": {
+        "left": 170.5,
+        "right": 170.5,
+        "top": 54.5,
+        "bottom": 70.5
+      },
+      "zoom": {
+        "file": "multiline-quoted-block-01-rendered-caret-2x.png",
+        "sha256": "f088b817e7c29f54c21f28d2e02c3d4ea13f30c6ab1a30db225f24ea0a799981",
+        "clip": {
+          "x": 50.5,
+          "y": 29.5,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "multiline-quoted-block-02-clicked.png",
+      "sha256": "94c247a4167413bbcf90e2a6a1db948a7193f63daba05ea4d7ba27822fbd3ae5",
+      "caret": {
+        "x": 584.9375,
+        "y": 148.65625,
+        "width": 0,
+        "height": 12.59375,
+        "top": 148.65625,
+        "right": 584.9375,
+        "bottom": 161.25,
+        "left": 584.9375
+      },
+      "zoom": {
+        "file": "multiline-quoted-block-02-clicked-caret-2x.png",
+        "sha256": "52486bffeb7f67a346d3aafacb0af3cbb07fa486129af079f98ef95914fdf2f3",
+        "clip": {
+          "x": 464.9375,
+          "y": 123.65625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        }
+      }
+    },
+    {
+      "file": "multiline-quoted-block-03-edited.png",
+      "sha256": "8de6107d0f55be1b7583abf2d5430882b9c9451fc5a5ac97563d49fce5adb8c0",
+      "caret": {
+        "x": 582.140625,
+        "y": 148.65625,
+        "width": 0,
+        "height": 12.59375,
+        "top": 148.65625,
+        "right": 582.140625,
+        "bottom": 161.25,
+        "left": 582.140625
+      },
+      "zoom": {
+        "file": "multiline-quoted-block-03-edited-caret-2x.png",
+        "sha256": "39dade4add773b63df4c8f57c24c866971907277a6b41e2344b1bff636a4789e",
+        "clip": {
+          "x": 462.140625,
+          "y": 123.65625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "multiline-quoted-block-04-undo.png",
+      "sha256": "94c247a4167413bbcf90e2a6a1db948a7193f63daba05ea4d7ba27822fbd3ae5",
+      "caret": {
+        "x": 584.9375,
+        "y": 148.65625,
+        "width": 0,
+        "height": 12.59375,
+        "top": 148.65625,
+        "right": 584.9375,
+        "bottom": 161.25,
+        "left": 584.9375
+      },
+      "zoom": {
+        "file": "multiline-quoted-block-04-undo-caret-2x.png",
+        "sha256": "52486bffeb7f67a346d3aafacb0af3cbb07fa486129af079f98ef95914fdf2f3",
+        "clip": {
+          "x": 464.9375,
+          "y": 123.65625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "multiline-quoted-block-05-redo.png",
+      "sha256": "8de6107d0f55be1b7583abf2d5430882b9c9451fc5a5ac97563d49fce5adb8c0",
+      "caret": {
+        "x": 582.140625,
+        "y": 148.65625,
+        "width": 0,
+        "height": 12.59375,
+        "top": 148.65625,
+        "right": 582.140625,
+        "bottom": 161.25,
+        "left": 582.140625
+      },
+      "zoom": {
+        "file": "multiline-quoted-block-05-redo-caret-2x.png",
+        "sha256": "39dade4add773b63df4c8f57c24c866971907277a6b41e2344b1bff636a4789e",
+        "clip": {
+          "x": 462.140625,
+          "y": 123.65625,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    },
+    {
+      "file": "multiline-quoted-block-06-float-click.png",
+      "sha256": "fe7e7a497612c55daa3b4ac2b5da60aff8e24174b5518ebf7814c5345a69bc6a",
+      "caret": {
+        "left": 582.140625,
+        "right": 582.140625,
+        "top": 149.75,
+        "bottom": 164.25
+      },
+      "zoom": {
+        "file": "multiline-quoted-block-06-float-click-caret-2x.png",
+        "sha256": "28848ecf65f868063ae1e3bf22603fbaa448ec27efcb590b4b59444c61f1e6c4",
+        "clip": {
+          "x": 462.140625,
+          "y": 124.75,
+          "width": 300,
+          "height": 90,
+          "scale": 2
+        },
+        "published": false
+      },
+      "published": false
+    }
+  ]
+}

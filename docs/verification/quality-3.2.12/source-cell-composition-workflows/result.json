@@ -1,0 +1,944 @@
+{
+  "schema": 1,
+  "suite": "cell-composition-workflows",
+  "version": "3.2.12",
+  "passed": true,
+  "recordedCaseCount": 1,
+  "publishedCaseCount": 1,
+  "artifact": {
+    "app": {
+      "name": "MarkPilot",
+      "version": "3.2.12",
+      "platform": "win32",
+      "versions": {
+        "node": "20.18.3",
+        "acorn": "8.14.0",
+        "ada": "2.9.2",
+        "ares": "1.34.4",
+        "base64": "0.5.2",
+        "brotli": "1.0.9",
+        "cjs_module_lexer": "1.4.1",
+        "cldr": "44.1",
+        "icu": "74.2",
+        "llhttp": "8.1.2",
+        "modules": "130",
+        "napi": "9",
+        "nghttp2": "1.61.0",
+        "openssl": "0.0.0",
+        "simdutf": "5.6.4",
+        "tz": "2024a",
+        "undici": "6.21.1",
+        "unicode": "15.1",
+        "uv": "1.46.0",
+        "uvwasi": "0.0.21",
+        "v8": "13.0.245.25-electron.0",
+        "zlib": "1.3.0.1-motley",
+        "electron": "33.4.11",
+        "chrome": "130.0.6723.191"
+      }
+    },
+    "sourceMode": false,
+    "exeSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+    "runtimeExecutableSha256": "c32d46ec6aebc4f587a8c9e1d4f345ccb7d5ebd99217c8c1cc672a38c89e5c7b",
+    "asarSha256": "f794e8c23ea631afe1b66552c8674d9bd8c0a48eaf4b957b581832b57b624143",
+    "artifactFiles": [
+      {
+        "file": "main.js",
+        "sha256": "be105040e75e3707d9b5d978eaffa6d17151004e0f46fac4cc87bab829ec3f33"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "5d58d02e672705f4bb5c1475aa8be667b04a2cb9cb4111d285b9efead54a1521"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "4517f08c0f305d08c361c2079157e587b5a9e8097dc161ab748c26960a8c40f5"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "570aae504d0e7ccf46e77c180c861cf6d030d2421d070885340d7a41d10a79ba"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "cleanup": {
+    "residual": [],
+    "complete": true
+  },
+  "clipboardOutcome": {
+    "touched": false
+  },
+  "transport": "Chromium renderer CDP only; OS IME candidates/229/native accelerators unverified",
+  "fixtureSha256": null,
+  "cases": [
+    {
+      "id": "cell-unicode-positive-history-continue",
+      "status": "pass",
+      "stage": "complete",
+      "productReached": true,
+      "trace": [
+        {
+          "name": "01-entry",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+          "focus": true,
+          "cellText": "a|b",
+          "domSelection": {
+            "anchor": 2,
+            "head": 2
+          },
+          "disk": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "bytes": 43,
+            "sha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3"
+          },
+          "events": [
+            {
+              "type": "mousedown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 759.2999999523163
+            },
+            {
+              "type": "focusout",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 770.1000000238419
+            },
+            {
+              "type": "focusin",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 770.8999999761581
+            },
+            {
+              "type": "mouseup",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 844.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 856.8999999761581
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 862.6999999284744
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 867
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 870.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 872
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 875.1000000238419
+            }
+          ]
+        },
+        {
+          "name": "02-ordinary-unicode",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+          "focus": true,
+          "cellText": "a|中文b",
+          "domSelection": {
+            "anchor": 4,
+            "head": 4
+          },
+          "disk": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "bytes": 43,
+            "sha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3"
+          },
+          "events": [
+            {
+              "type": "mousedown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 759.2999999523163
+            },
+            {
+              "type": "focusout",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 770.1000000238419
+            },
+            {
+              "type": "focusin",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 770.8999999761581
+            },
+            {
+              "type": "mouseup",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 844.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 856.8999999761581
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 862.6999999284744
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 867
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 870.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 872
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 875.1000000238419
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1229.7999999523163
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1232.2999999523163
+            }
+          ]
+        },
+        {
+          "name": "05-undo",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+          "focus": true,
+          "cellText": "a|b",
+          "domSelection": {
+            "anchor": 2,
+            "head": 2
+          },
+          "disk": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "bytes": 43,
+            "sha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3"
+          },
+          "events": [
+            {
+              "type": "mousedown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 759.2999999523163
+            },
+            {
+              "type": "focusout",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 770.1000000238419
+            },
+            {
+              "type": "focusin",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 770.8999999761581
+            },
+            {
+              "type": "mouseup",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 844.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 856.8999999761581
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 862.6999999284744
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 867
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 870.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 872
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 875.1000000238419
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1229.7999999523163
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1232.2999999523163
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1629.6999999284744
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1631
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1636.6000000238419
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1638.2999999523163
+            }
+          ]
+        },
+        {
+          "name": "07-continue-one",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文1b|KEEP|\n\nAfter\n",
+          "focus": true,
+          "cellText": "a|中文1b",
+          "domSelection": {
+            "anchor": 5,
+            "head": 5
+          },
+          "disk": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n",
+            "bytes": 43,
+            "sha256": "94ef102383a50e922a9d34a999e58c3e6f77ac1e00debf79857b8582ce450ec3"
+          },
+          "events": [
+            {
+              "type": "mousedown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 759.2999999523163
+            },
+            {
+              "type": "focusout",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 770.1000000238419
+            },
+            {
+              "type": "focusin",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 770.8999999761581
+            },
+            {
+              "type": "mouseup",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 844.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 856.8999999761581
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 862.6999999284744
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 867
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 870.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 872
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 875.1000000238419
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1229.7999999523163
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1232.2999999523163
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1629.6999999284744
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1631
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1636.6000000238419
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1638.2999999523163
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1996.7999999523163
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1998.1000000238419
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 2006.1000000238419
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 2009.2999999523163
+            },
+            {
+              "type": "keydown",
+              "key": "1",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 2011.3999999761581
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 2011.6000000238419
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 2012.1000000238419
+            },
+            {
+              "type": "keyup",
+              "key": "1",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 2016.5
+            }
+          ]
+        },
+        {
+          "name": "06-passive-redo-before-one",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文b|KEEP|\n\nAfter\n",
+          "focus": true,
+          "cellText": "a|中文b",
+          "domSelection": {
+            "anchor": 4,
+            "head": 4
+          }
+        },
+        {
+          "name": "08-saved",
+          "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文1b|KEEP|\n\nAfter\n",
+          "focus": true,
+          "cellText": "a|中文1b",
+          "domSelection": {
+            "anchor": 5,
+            "head": 5
+          },
+          "disk": {
+            "text": "Before\n\n|H|K|\n|---|---|\n|a\\|中文1b|KEEP|\n\nAfter\n",
+            "bytes": 50,
+            "sha256": "002d68fed6a3e852f24090605652a5191a05533086755a6c2a8c1f8cddfdf3e8"
+          },
+          "events": [
+            {
+              "type": "mousedown",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 759.2999999523163
+            },
+            {
+              "type": "focusout",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 770.1000000238419
+            },
+            {
+              "type": "focusin",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 770.8999999761581
+            },
+            {
+              "type": "mouseup",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 844.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 856.8999999761581
+            },
+            {
+              "type": "keyup",
+              "key": "Home",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 862.6999999284744
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 867
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 870.1000000238419
+            },
+            {
+              "type": "keydown",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 872
+            },
+            {
+              "type": "keyup",
+              "key": "ArrowRight",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 875.1000000238419
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1229.7999999523163
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1232.2999999523163
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1629.6999999284744
+            },
+            {
+              "type": "keydown",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1631
+            },
+            {
+              "type": "keyup",
+              "key": "z",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1636.6000000238419
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1638.2999999523163
+            },
+            {
+              "type": "keydown",
+              "key": "Control",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1996.7999999523163
+            },
+            {
+              "type": "keydown",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 1998.1000000238419
+            },
+            {
+              "type": "keyup",
+              "key": "y",
+              "ctrl": true,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 2006.1000000238419
+            },
+            {
+              "type": "keyup",
+              "key": "Control",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 2009.2999999523163
+            },
+            {
+              "type": "keydown",
+              "key": "1",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 2011.3999999761581
+            },
+            {
+              "type": "beforeinput",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 2011.6000000238419
+            },
+            {
+              "type": "input",
+              "ctrl": false,
+              "shift": false,
+              "inputType": "insertText",
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 2012.1000000238419
+            },
+            {
+              "type": "keyup",
+              "key": "1",
+              "ctrl": false,
+              "shift": false,
+              "trusted": true,
+              "defaultPrevented": false,
+              "at": 2016.5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scope": "Synthetic fixtures only. No user document/profile/registry/shortcut/original clipboard data. OS physical accelerator and actual IME claims are excluded."
+}

@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "version": "3.2.8",
+  "builderVersion": "25.1.8",
+  "at": "2026-10-11T18:51:42.274Z",
+  "resource": {
+    "fileVersion": "3.2.8.0",
+    "productVersion": "3.2.8",
+    "productName": "MarkPilot"
+  },
+  "exeSha256": "56579c5bba04a6b86853ba66ebc001bf6cde869322d6f5caf62e0558e18bd720",
+  "asarSha256": "6b64982fa461a6658d8289a651b57b0c2190685610289ef9e221b245df126940",
+  "sourceFiles": [
+    {
+      "file": "main.js",
+      "sha256": "178bb51a146b37ac15d6c913ddcaf50c9b80386751e8f51cdf0ba1c9e578bef8"
+    },
+    {
+      "file": "preload.js",
+      "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+    },
+    {
+      "file": "renderer/host.js",
+      "sha256": "81301eef4e4f09a3d499c50d2fe21f21604fc996c41173024ba7469ee191182d"
+    },
+    {
+      "file": "shell/document-store.js",
+      "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+    },
+    {
+      "file": "shell/text-codec.js",
+      "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+    },
+    {
+      "file": "renderer/cm6/app.js",
+      "sha256": "6cb9ce8d4452a1bb4b785ece5b8df7ed8e953830a011d3ca0cf2cb624a145fbc"
+    },
+    {
+      "file": "renderer/cm6/markdown-worker.js",
+      "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+    }
+  ],
+  "isolatedAppId": "app.markpilot.quality.a9c0b5e4ab854d0ca6682c98e0efbe88",
+  "files": [
+    {
+      "file": "production/markpilot-3.2.8-portable.exe",
+      "bytes": 84349616,
+      "sha256": "ece24d04130bd1ae0c948d2507b82057b2f00f12bca5ed11b626ff33dfed98ed"
+    },
+    {
+      "file": "production/markpilot-Setup-3.2.8.exe",
+      "bytes": 84618413,
+      "sha256": "ff255adcd32462e8202fc8d876b84bc6b36ab3cc07ee25f399113fc4cf40b1ec"
+    },
+    {
+      "file": "isolated/markpilot-quality-Setup-3.2.8.exe",
+      "bytes": 84553560,
+      "sha256": "ab450bbe000f1295cc62461632cf21f5129dbee4d653b5494c9b89bd3a1f6135"
+    }
+  ],
+  "published": false
+}

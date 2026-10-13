@@ -28,7 +28,9 @@ try{
   if(mode==='install'){
    outputDir(absolute,'install');const actualRoot=fs.realpathSync(absolute);assert(actualRoot.startsWith(fs.realpathSync(privateRoot)+path.sep));
    const target=path.join(actualRoot,'installed'),before=registry();assert(!fs.existsSync(target));
-   state={schema:1,isolatedAppId:candidate.isolatedAppId,target,before,installed:false};fs.writeFileSync(stateFile,JSON.stringify(state,null,2));run(installer,['/S','/D='+target]);
+   // electron-builder 25 uses StdUtils.GetParameter: quote the value itself
+   // when passing verbatim arguments, or a space truncates the target path.
+   state={schema:1,isolatedAppId:candidate.isolatedAppId,target,before,installed:false};fs.writeFileSync(stateFile,JSON.stringify(state,null,2));run(installer,['/S','/D="'+target+'"']);
   }else{state=JSON.parse(fs.readFileSync(stateFile,'utf8'));assert.equal(state.isolatedAppId,candidate.isolatedAppId);assert.equal(path.dirname(state.target),fs.realpathSync(absolute));}
   const {before,target}=state,after=registry();preserved(before,after);
   const added=after.filter(e=>!before.some(b=>b.key===e.key));assert.equal(added.length,1,'Exactly one isolated uninstall entry is expected');

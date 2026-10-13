@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "version": "3.2.13",
+  "status": "SOURCE_VERIFIED_REVIEW_UNAVAILABLE",
+  "formalPackageCreated": false,
+  "installed": false,
+  "independentlyVisuallyApproved": false,
+  "claimedImageOpens": 0,
+  "currentInstalledVersion": "3.2.12",
+  "currentInstalledAsarSha256": "f794e8c23ea631afe1b66552c8674d9bd8c0a48eaf4b957b581832b57b624143",
+  "currentInstalledExecutableSha256": "d300992b1003765f2f64417269c124f0c7b14af65ce415ad2488d166e6f63e13",
+  "sourceSuites": 24,
+  "sourceCases": 345,
+  "restoredMutationGroups": 1,
+  "unitChecks": 89,
+  "staticPreflightChecks": 124,
+  "pngBytes": 278208,
+  "pngFiles": 4,
+  "pushed": false,
+  "released": false,
+  "at": "2026-10-12T01:58:03.722Z",
+  "sourceRuntime": {
+    "appPackageVersion": "3.2.13",
+    "peResourceVersion": "3.2.12",
+    "reuseFrom": "3.2.12",
+    "exeSha256": "d300992b1003765f2f64417269c124f0c7b14af65ce415ad2488d166e6f63e13",
+    "asarSha256": "08a6de1a9b6be8a6b8033ec5c8dbf5b6fd3f8277a674ed4c35bcc6b58dad4e51"
+  },
+  "knownUnfixed": "Active-cell More > Reload loses editing focus: confirmed on installed 3.2.12 AND this same canonical source-3.2.13 ASAR. Separately recorded, excluded from 345 passing count and this single-root fix.",
+  "limitation": "Actual source GUI and restored fault injection passed; fresh independent visual review is unavailable. Accepted task dispatch is not model completion or approval. No installer/portable delivery or production upgrade of 3.2.13 is claimed."
+}

@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "version": "3.2.12",
+  "at": "2026-10-12T01:17:20.476Z",
+  "publisherSha256": "1ec409d8688e1624c0ce98fe064dbe05e81ea6f7f132d47b0781acc03c6d6c47",
+  "sourceSuites": 23,
+  "sourceCases": 343,
+  "negativeControlKinds": 3,
+  "deliveryBoundaryCases": {
+    "portable": 10,
+    "isolated": 52,
+    "installed": 28
+  },
+  "frameBytes": 1299711,
+  "uniquePngFiles": 22,
+  "openedReviewFrames": 57,
+  "installed": true,
+  "pushed": false,
+  "released": false,
+  "scope": "Actual synthetic source/main MenuItem/host/renderer/disk/cleanup and public frames only. Empty handled=true is an extra API contract, not native fallback invocation counting. Physical OS menu/accelerators, actual IME candidates and untested outside-view/scroll-return lifecycles remain unknown.",
+  "excluded": "Role prototype artifacts, wrong argv/50%-glyph oracles, entry-unconfirmed earlier runs, personal documents/profiles/registry/shortcuts/original clipboard and large intermediate outputs."
+}

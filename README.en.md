@@ -110,6 +110,8 @@ The part of the 2.0 series we polished hardest:
 - Export to Word / Excel / PowerPoint, with formulas delivered as **editable OMML** in DOCX — no Pandoc required
 - Light and dark themes, reading palettes, Ctrl+wheel zoom
 - Windows installer + portable build (no installation needed)
+- **Edit images in place**: click an image to edit its source above the retained preview. Broken images keep an editable link; long embedded images fold on screen while copy and save preserve their full content.
+- **Math and quotes**: edit formulas with a live preview. Formulas, images, code and diagrams inside quotes retain continuous shading, borders and indentation.
 
 ## Download and install
 

@@ -21,5 +21,6 @@ jobs:
           cache: npm
           cache-dependency-path: tools/quality/package-lock.json
       - run: npm ci --prefix tools/quality --ignore-scripts --no-audit --no-fund
+      - run: npm ci --prefix dsh-markpilot --ignore-scripts --legacy-peer-deps --no-audit --no-fund
       - run: npm run preflight --prefix tools/quality
       - run: npm test --prefix tools/quality

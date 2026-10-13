@@ -1,0 +1,127 @@
+{
+  "schema": 2,
+  "artifact": {
+    "schema": 1,
+    "executable": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-final-source-3.2.9\\unpacked\\MarkPilot.exe",
+    "exeSha256": "3cfaa172cfd79ba414e8118f330569894c7a1108ad6e02ae38422db0846b9f47",
+    "asarSha256": "dae852488c3b63e86d807c043f9b46f150ba869b4fe2d5bc5c782a3150e3d0bc",
+    "version": "3.2.9",
+    "files": [
+      {
+        "file": "main.js",
+        "sha256": "3fedc85b5558e4bf28a40189dbb4b15942d497c711bcf40365a1763d2366f383"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "fea9dd9535ddb73040030c279d54d6b35d3bf2857077f4fea6886ab40c3ef020"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "07f56591e566c4ceebfc2c49db57cf89eaebcf3b6f7188f00f7240617760059d"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "582bed132cf8878790f9458c3eb42919fb6091f0517db8cde7a7ac3faf3ba370"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "b4b11d263b9bbbe69a2651ecd4be37e0279b443a3061a47b0f0318952df66a7d"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      }
+    ]
+  },
+  "results": [
+    {
+      "suite": "critical",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-critical",
+      "total": 26,
+      "passed": true,
+      "reused": true,
+      "identityReceipt": "Same frozen stage path; stage ASAR manifest captured before initial run, full ASAR and executable rechecked before resume and after each suite; no product edits or restaging."
+    },
+    {
+      "suite": "acceptance",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-acceptance",
+      "total": 19,
+      "passed": true,
+      "reused": true,
+      "identityReceipt": "Same frozen stage path; stage ASAR manifest captured before initial run, full ASAR and executable rechecked before resume and after each suite; no product edits or restaging."
+    },
+    {
+      "suite": "editing",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-editing",
+      "total": 75,
+      "passed": true,
+      "reused": true,
+      "identityReceipt": "Same frozen stage path; stage ASAR manifest captured before initial run, full ASAR and executable rechecked before resume and after each suite; no product edits or restaging."
+    },
+    {
+      "suite": "worker-integration",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-worker-integration-final",
+      "total": 28,
+      "passed": true
+    },
+    {
+      "suite": "data-safety",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-data-safety",
+      "total": 23,
+      "passed": true
+    },
+    {
+      "suite": "performance",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-performance",
+      "total": 7,
+      "passed": true
+    },
+    {
+      "suite": "worker-latency",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-worker-latency",
+      "total": 1,
+      "passed": true
+    },
+    {
+      "suite": "images",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-images",
+      "total": 42,
+      "passed": true
+    },
+    {
+      "suite": "rich-workflows",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-rich-workflows",
+      "total": 14,
+      "passed": true
+    },
+    {
+      "suite": "document-workflows",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-document-workflows-final",
+      "total": 9,
+      "passed": true
+    },
+    {
+      "suite": "math-workflows",
+      "exitCode": 0,
+      "out": "<repo>\\.mp-verify\\codex-audit\\cm6-ready-3.2.9-math-workflows-trace-final",
+      "total": 11,
+      "passed": true
+    }
+  ],
+  "initialClipboardArmFailure": "Bitmap preservation fixture prevented the independent URL arm; no editor input occurred. Retained original failure and diagnostic; URL test now holds the clipboard without planting an unrelated bitmap.",
+  "passed": true
+}

@@ -7,6 +7,7 @@
 
 import { EditorSelection, Prec } from "@codemirror/state";
 import { EditorView, ViewPlugin, Decoration, WidgetType, keymap } from "@codemirror/view";
+import { codeBlockAt } from './markdown-context.js';
 
 const BULLET_RE = /^(\s*)([-*+]|\d+[.)])\s+/;
 const CHECK_RE = /^(\s*)([-*+])\s+\[([ xX])\]/;
@@ -39,7 +40,7 @@ function buildCheckboxes(view) {
     for (let pos = from; pos <= to;) {
       const line = doc.lineAt(pos);
       const m = CHECK_RE.exec(line.text);
-      if (m) {
+      if (m && !codeBlockAt(view.state, line.from)) {
         const start = line.from + m[1].length + m[2].length + 1; // '[' 的位置
         const end = start + 3;
         const inSel = view.state.selection.ranges.some((r) => r.from <= end && r.to >= start);
@@ -61,8 +62,9 @@ const checkboxPlugin = ViewPlugin.fromClass(
   { decorations: (v) => v.decorations },
 );
 
-function listContext(state) {
-  const line = state.doc.lineAt(state.selection.main.head);
+function listContext(state, pos = state.selection.main.from) {
+  if (codeBlockAt(state, pos)) return null;
+  const line = state.doc.lineAt(pos);
   const m = BULLET_RE.exec(line.text);
   if (!m) return null;
   return { line, indent: m[1], bullet: m[2], markerEnd: m[0].length };
@@ -70,9 +72,11 @@ function listContext(state) {
 
 /** Enter：列表项内续项；空项退出列表。 */
 function enterContinueList(view) {
-  const ctx = listContext(view.state);
-  if (!ctx) return false;
-  const { line, indent, bullet, markerEnd } = ctx;
+  const state = view.state;
+  const contexts = state.selection.ranges.map(r => listContext(state, r.from));
+  if (contexts.some((ctx, i) => !ctx || state.selection.ranges[i].from < ctx.line.from + ctx.markerEnd)) return false;
+  const spec = state.changeByRange(r => {
+  const { line, indent, bullet, markerEnd } = listContext(state, r.from);
   /* 【P1-4·补·2026-10-10】空**任务**项（`- [ ] `）也要算空项：原来只把 marker 之后的**原始**文本
      trim 一下就判空，而 `- [ ] ` 之后是 `"[ ] "` ⇒ trim 得 `"[ ]"` ≠ 空 ⇒ 落进"续项"分支，
      空任务项回车永远退不出列表（普查 T10 实测：`- 甲\n- [ ] ` + Enter ⇒ 又续出一行 `- [ ] `）。 */
@@ -81,11 +85,10 @@ function enterContinueList(view) {
     // 空**任务**项要连 `[ ] ` 一起删掉 —— 只删到 markerEnd 会留下 `[ ]` 残骸（实测 T10）。
     const cb = /^\[[ xX]\]\s*/.exec(line.text.slice(markerEnd));
     const cut = markerEnd + (cb ? cb[0].length : 0);
-    view.dispatch({
+    return {
       changes: { from: line.from, to: line.from + cut },
-      selection: EditorSelection.cursor(line.from),
-    });
-    return true;
+      range: EditorSelection.cursor(line.from),
+    };
   }
   let next = bullet;
   const ord = /^(\d+)([.)])$/.exec(bullet);
@@ -93,17 +96,20 @@ function enterContinueList(view) {
   const rest = line.text.slice(markerEnd);
   const check = /^(\[[ xX]\])\s*/.exec(rest);
   const tail = check ? "[ ] " : "";
-  const head = view.state.selection.main.head;
+  const head = r.from;
   const insert = `\n${indent}${next} ${tail}`;
-  view.dispatch({
-    changes: { from: head, to: head, insert },
-    selection: EditorSelection.cursor(head + insert.length),
+  return {
+    changes: { from: head, to: r.to, insert },
+    range: EditorSelection.cursor(head + insert.length),
+  };
   });
+  view.dispatch({ ...spec, userEvent: 'input.list', scrollIntoView: true });
   return true;
 }
 
 /** Tab：列表项整体缩进两空位。 */
 function tabIndentList(view) {
+  if (view.state.selection.ranges.length !== 1 || !view.state.selection.main.empty) return false;
   const ctx = listContext(view.state);
   if (!ctx) return false;
   const head = view.state.selection.main.head;
@@ -116,6 +122,7 @@ function tabIndentList(view) {
 
 /** Shift-Tab：反缩进（最多去两空位）。 */
 function shiftTabOutdentList(view) {
+  if (view.state.selection.ranges.length !== 1 || !view.state.selection.main.empty) return false;
   const ctx = listContext(view.state);
   if (!ctx) return false;
   const cut = ctx.line.text.startsWith("  ") ? 2 : ctx.line.text.startsWith(" ") ? 1 : 0;
