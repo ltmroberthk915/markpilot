@@ -14,7 +14,8 @@ import { EditorSelection } from '@codemirror/state';
 import { SearchQuery, getSearchQuery, setSearchQuery } from '@codemirror/search';
 import { reserveImageInsertion, captureImageDocument } from './image-insertion.js';
 import { mathSourcePosition } from './math-source-map.js';
-import { inlineImageAtoms, collectImageRefs, decodeImageAttribute } from './resource-images.js';
+import { collectImageRefs, decodeImageAttribute } from './resource-images.js';
+import { renderInline } from './inline-format.js';
 /* 【Typora 社区主题·2026-10-09】用户想直接用 Typora 的主题 CSS。
    改写逻辑**不在这里另写一份**：2.x 线早有一份纯函数实现（`user-theme.mjs` 的 adaptTyporaTheme）
    ——`#write` → 我们的写作区、`:root` 变量挂到作用域属性上、带相对 url() 的 @font-face 丢掉、
@@ -843,59 +844,12 @@ export function installExtras(deps) {
     return mathCssInflight.then((v) => { mathCssCache = v; mathCssInflight = null; return v; });
   }
   function inlineMd(line, srcMap, math = false) {
-    const stash = [];
-    /* 【A4b】`\|` 是**格内容的字面竖线**：渲染层在 toDOM 里已经还原（main.js），导出/复制侧
-       此前没还原 ⇒ 屏幕 `a|b`、导出件与剪贴板 `a\|b`（验收线点名的"字面保真"缺口）。
-       反斜杠转义在 markdown 里本来就该还原，所以这条与是否在表格里无关。 */
-    let s = String(line).replace(/\\\|/g, "|");
-    /* 【软换行 `<br>` 白名单·按段处理】`Shift+Enter` 在渲染面是换行（源码里落的是字面 `<br>`），
-       但本函数早先对它一律 `esc()` ⇒ **导出 HTML/PDF 与富文本复制里显示成字面 `&lt;br&gt;`
-       （用户看到的是"<br>"四个字符）**，而 `copyTable` 那条路反而注入了真标签 ⇒ 两条出口口径不一致。
-       与 `main.js` 的 `cellHTML` **同一套做法**：先按 `<br>` 切成段（带捕获组 ⇒ 命中段落在奇数下标），
-       命中段直接出真标签，其余段照原样走 esc + 数学扫描。这样：
-         · `<br>` 不会先被 esc 成 `&lt;br&gt;`；
-         · 也不会被当成 TeX 喂给 KaTeX（`$a<br>b$` 里 KaTeX 若把字面 `<br>` 转义进输出，白名单不会再还原它）；
-         · 纯文本/源码通道仍走 markdown 源码（本函数只服务 HTML 出口）。 */
-    const brParts = s.split(/(<br\s*\/?>)/i);
-    if (brParts.length > 1) {
-      let acc = "";
-      for (let k = 0; k < brParts.length; k++) {
-        if (!brParts[k]) continue;
-        acc += (k % 2 === 1) ? "<br>" : inlineMdSeg(brParts[k], srcMap, math);
-      }
-      return acc;
-    }
-    return inlineMdSeg(s, srcMap, math);
-  }
-  /** 单段行内渲染（`inlineMd` 的逐段内核；输入里不再含 `<br>` 白名单命中段）。 */
-  function inlineMdSeg(line, srcMap, math = false) {
-    const stash = [];
-    const source = String(line);
-    let mark = '\u0000M';
-    while (source.includes(mark)) mark += 'M';
-    const PH = i => mark + i + '\u0000';
-    // Protect raw atoms in their source order, before HTML escaping or inline
-    // formatting. URLs stay raw for mapSrc; code contents remain literal.
-    let s = source.replace(inlineImageAtoms(),
-      (atom, code, alt, angle, plain) => {
-        const html = code != null ? `<code>${esc(code)}</code>`
-          : /^<img\b/i.test(atom) ? rewriteImgTag(atom, srcMap)
-            : `<img alt="${attrEsc(alt)}" src="${attrEsc(mapSrc(angle != null ? angle : plain, srcMap))}">`;
-        return PH(stash.push(html) - 1);
-      });
-    if (math && mathApi) {
-      // $$…$$ 先切（引擎对**行中段** $$…$$ 也是按行内渲染，见 main.js scanMathSpans 注释）
-      s = s.replace(/(^|[^\\$])\$\$([^$]+?)\$\$/g, (_m, lead, tex) => lead + PH(stash.push(mathInlineHtml(tex.trim())) - 1))
-        // 行内 $…$：与引擎同口径（前一个字符是 `\` 或 `$` 的 $ 不算起手）
-        .replace(/(^|[^\\$])\$([^$\n]+)\$/g, (_m, lead, tex) => lead + PH(stash.push(mathInlineHtml(tex)) - 1));
-    }
-    let out = esc(s)
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-    // 未做公式排版（复制知乎/微信，或渲染器不可用）时保持旧观感：$…$ 仍是 <code>
-    if (!math || !mathApi) out = out.replace(/\$([^$\n]+)\$/g, '<code>$1</code>');
-    return out.replace(new RegExp(mark + '(\\d+)\u0000', 'g'), (_m, i) => stash[+i]);
+    return renderInline(String(line).replace(/\\\|/g, '|'), {
+      math: tex => math && mathApi ? mathInlineHtml(tex) : '<code>' + esc(tex) + '</code>',
+      image: image => image.src == null ? rewriteImgTag(image.raw, srcMap)
+        : '<img alt="' + attrEsc(image.alt) + '" src="' + attrEsc(mapSrc(image.src, srcMap)) + '">',
+      link: href => '<a href="' + attrEsc(href) + '">',
+    });
   }
   /** 正文分块生成器：边扫边吐块，调用方拿到一块就能写走（不攒整篇）
    *  【公式排版】opts.math=true 时块级公式走 KaTeX display（复用引擎 renderMathHTML）：

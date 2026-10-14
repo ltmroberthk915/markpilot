@@ -43,6 +43,7 @@ import { createCommandContext, applySourceHistory } from './command-context.js';
 import { editPlan, inlineCodeRanges, rangesTouching } from './edit-plan.js';
 import { installToolbar, wrap as wrapInline, TOOLBAR_ACTIONS } from "./toolbar.js";
 import { installExtras } from "./extras.js";
+import { renderInline } from './inline-format.js';
 import { fileUrlOfPath, resolveImageSource, hasImageCandidate } from './image-path.js';
 import { imageInsertions, cancelImageInsertions } from './image-insertion.js';
 import { mappedMathSource, mathSourcePosition } from './math-source-map.js';
@@ -1860,63 +1861,17 @@ function cellRangesOf(line) {
  *   注意给覆盖层/源码写入的是**字面四个字符** `<br>`（`syncCellEdit` 比对 `textContent`，插 DOM 节点会丢）。
  */
 function cellHTML(text) {
-  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  /** 单段渲染（原扫描器逐字搬进来，输入输出都只是"段"） */
-  const renderSeg = (src) => {
-    let out = "";
-    let buf = "";
-    let i = 0;
-    const flush = () => { if (buf) { out += esc(buf); buf = ""; } };
-    while (i < src.length) {
-      const ch = src[i];
-      if (ch === "\\" && src[i + 1] === "$") { buf += "$"; i += 2; continue; }   // 转义美元：原样显示一个 $
-      if (ch === "\\") { buf += src[i] + (src[i + 1] || ""); i += 2; continue; }
-      if (ch !== "$") { buf += ch; i++; continue; }
-      // 找闭合的 $（不跨过另一个未转义的 $）
-      let j = i + 1, tex = null;
-      while (j < src.length) {
-        if (src[j] === "\\") { j += 2; continue; }
-        if (src[j] === "$") { tex = src.slice(i + 1, j); break; }
-        j++;
-      }
-      if (tex == null || !tex.trim()) { buf += ch; i++; continue; }              // 未闭合/空公式：保持字面
-      const html = renderMathHTML(tex, false);
-      if (html == null) { buf += src.slice(i, j + 1); i = j + 1; continue; }       // KaTeX 报错：原样显示源码
-      flush();
-      out += `<span class="mp-cm6-math">${html}</span>`;
-      i = j + 1;
-    }
-    flush();
-    return out;
-  };
-  /* 【3.8 / 1.16】格内行内标记要**投影**（Typora 口径）：行内代码显示成等宽代码（反引号不显示）、
-     图片写法显示成真图。改前格内只做转义 + 数学 ⇒ 反引号与 `![…](…)` 原样露在格子里（清单 3.8 / 1.16 就是这么红的）。
-     **只动这两类**（最小改动面）：其余标记仍按原样走 esc + 数学，避免与编辑覆盖层/复制口径打架。 */
-  const escAttr = (s) => esc(s).replace(/"/g, "&quot;");
-  const renderWithMarks = (seg) => {
-    let out = "", last = 0, m;
-    const re = /(`+)([\s\S]*?)\1|!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g;
-    while ((m = re.exec(seg))) {
-      out += renderSeg(seg.slice(last, m.index));
-      if (m[1] !== undefined) {
-        out += '<code class="mp-cell-code">' + esc(m[2]) + '</code>';
-      } else {
-        const src = mpImgSrc(m[4]);                       // 与块级图同一条 src 解析（相对路径按文档目录）
-        const ref = /^https?:/i.test(src) ? ' referrerpolicy="no-referrer"' : '';
-        out += '<img class="mp-cell-img" src="' + escAttr(src) + '" alt="' + escAttr(m[3] || '') + '"' + ref + '>';
-      }
-      last = m.index + m[0].length;
-    }
-    out += renderSeg(seg.slice(last));
-    return out;
-  };
-  const parts = String(text == null ? "" : text).split(/(<br\s*\/?>)/i);
-  let out = "";
-  for (let k = 0; k < parts.length; k++) {
-    if (!parts[k]) continue;
-    out += (k % 2 === 1) ? "<br>" : renderWithMarks(parts[k]);
-  }
-  return out;
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const attr = s => esc(s).replace(/"/g, '&quot;');
+  return renderInline(text, {
+    code: source => '<code class="mp-cell-code">' + esc(source) + '</code>',
+    math: tex => { const html = renderMathHTML(tex, false); return html == null ? null : '<span class="mp-cm6-math">' + html + '</span>'; },
+    image: image => {
+      if (image.src == null) return null;
+      const src = mpImgSrc(image.src), ref = /^https?:/i.test(src) ? ' referrerpolicy="no-referrer"' : '';
+      return '<img class="mp-cell-img" src="' + attr(src) + '" alt="' + attr(image.alt || '') + '"' + ref + '>';
+    },
+  });
 }
 
 /* ══ Excel 式单元格内编辑（Typora 表格交互）══
@@ -1979,7 +1934,14 @@ function scheduleCellOverlay(revealCaret = false) {
         if (document.hasFocus() && document.activeElement === text && text.contains(selection?.focusNode)) {
           const range = document.createRange(); range.setStart(selection.focusNode, selection.focusOffset); range.collapse(true);
           const caret = range.getBoundingClientRect(), sc = owner.scrollDOM, zoom = mpZoomOf(sc), bounds = scrollViewportBounds(sc, zoom);
-          const top = bounds.top + 4, bottom = bounds.bottom - 4;
+          let top = bounds.top + 4;
+          for (const island of [document.querySelector('.mp-toolbar'), document.querySelector('.mp-table-bar')]) {
+            const rect = island?.getBoundingClientRect();
+            if (rect?.height > 0 && rect.width > 0 && rect.top < bounds.bottom && rect.bottom > bounds.top &&
+                rect.top < Math.max(top + 4, caret.bottom) && caret.right >= rect.left && caret.left <= rect.right &&
+                getComputedStyle(island).visibility !== 'hidden') top = Math.max(top, rect.bottom + 4);
+          }
+          const bottom = bounds.bottom - 4;
           const delta = caret.top < top ? caret.top - top : caret.bottom > bottom ? caret.bottom - bottom : 0;
           if (bottom > top && caret.height > 0 && delta) sc.scrollTop += delta / zoom;
         }
@@ -2005,9 +1967,77 @@ function scheduleCellOverlay(revealCaret = false) {
 }
 
 const tableRowIndexes = new WeakMap();
+const tableRowOrdinals = new WeakMap();
+const tableGeometryObservers = new WeakMap();
+function observeTableGeometry(inputView, wrap, rowFrom, lease, isHeader, columns, resizeWidth) {
+  if (!lease || typeof ResizeObserver === 'undefined') return;
+  const table = inputView.state.field(regionIndexField).byId.get(lease.id)?.data;
+  if (!table) return;
+  const ordinal = isHeader ? 'header' : tableRowOrdinals.get(tableRowIndex(table).get(rowFrom));
+  if (ordinal === undefined) return;
+  // Source offsets change after edits. Geometry belongs to the logical row,
+  // while every DOM node still owns its exact current source ranges and lease.
+  const key = [lease.epoch, lease.id, lease.contextVersion, ordinal, table.rows.length, columns].join(':');
+  let owner = tableGeometryObservers.get(inputView);
+  if (!owner) {
+    owner = { active: true, epoch: lease.epoch, nodes: new Set(), sizes: new WeakMap(), recent: new Map(), deliveries: 0, placements: 0, trimPending: false };
+    owner.trim = () => {
+      const limit = Math.max(256, owner.nodes.size * 2);
+      while (owner.recent.size > limit) owner.recent.delete(owner.recent.keys().next().value);
+    };
+    owner.observer = new ResizeObserver(entries => {
+      if (!owner.active || view !== inputView) return;
+      owner.deliveries++;
+      const changed = [];
+      for (const entry of entries) {
+        const item = owner.sizes.get(entry.target);
+        if (!item || !item.lease.valid()) continue;
+        const box = entry.borderBoxSize?.[0] || entry.borderBoxSize;
+        const width = box?.inlineSize ?? entry.contentRect.width;
+        const height = box?.blockSize ?? entry.contentRect.height;
+        if (width === item.width && height === item.height) continue;
+        if (width !== item.width) item.resizeWidth?.();
+        item.width = width; item.height = height;
+        owner.recent.delete(item.key); owner.recent.set(item.key, { width, height });
+        changed.push(item);
+      }
+      owner.trim();
+      if (!changed.length) return;
+      const target = tableBarTarget();
+      if (!target || !changed.some(item => item.rowFrom >= target.table.from && item.rowFrom <= target.table.to)) return;
+      // Floating chrome is outside table layout. Reposition before paint only
+      // when a current mounted segment changed; no per-key scan or new scroll.
+      owner.placements++;
+      positionTableBar();
+    });
+    tableGeometryObservers.set(inputView, owner);
+  }
+  owner.active = true;
+  if (owner.epoch !== lease.epoch) { owner.epoch = lease.epoch; owner.recent.clear(); }
+  const previous = owner.recent.get(key);
+  if (previous) { owner.recent.delete(key); owner.recent.set(key, previous); }
+  owner.nodes.add(wrap);
+  owner.sizes.set(wrap, { lease, rowFrom, key, resizeWidth, width: previous?.width ?? null, height: previous?.height ?? null });
+  owner.observer.observe(wrap);
+  lease.cleanup(() => {
+    owner.observer.unobserve(wrap);
+    owner.nodes.delete(wrap); owner.sizes.delete(wrap);
+    const epoch = inputView.state.field(regionIndexField, false)?.epoch;
+    if (epoch !== undefined && owner.epoch !== epoch) { owner.epoch = epoch; owner.recent.clear(); }
+    if (!owner.nodes.size) {
+      owner.active = false; owner.observer.disconnect();
+    }
+    // Keep dimensions across synchronous DOM replacements. Empty owners retain
+    // at most the small base cache; WeakMap ownership does not retain a view.
+    if (!owner.trimPending) {
+      owner.trimPending = true;
+      queueMicrotask(() => { owner.trimPending = false; owner.trim(); });
+    }
+  });
+}
 function tableRowIndex(tb) {
   let index = tableRowIndexes.get(tb);
-  if (!index) { index = new Map(tb.rows.map(row => [row.from,row])); tableRowIndexes.set(tb,index); }
+  if (!index) { index = new Map(tb.rows.map((row,ordinal) => { tableRowOrdinals.set(row,ordinal); return [row.from,row]; })); tableRowIndexes.set(tb,index); }
   return index;
 }
 class TableRowWidget extends WidgetType {
@@ -2035,9 +2065,8 @@ class TableRowWidget extends WidgetType {
     this.weights = weights;
   }
   /** 现算本次渲染用的列宽（%）：先按显示宽度比例，再把低于下限的列抬到下限、从宽列里扣回。 */
-  fitWidthsNow() {
+  fitWidthsNow(avail = this.tableEl?.clientWidth || 0) {
     if (!this.weights || !this.weights.length) return this.widths;
-    const avail = this.tableEl && this.tableEl.clientWidth ? this.tableEl.clientWidth : 0;
     const minPx = 64;                        // 4 个中文字 + 左右各 16 padding：至少能竖排前容纳 4 字
     const minPercent = avail > 0 ? Math.min(30, (minPx / avail) * 100) : 14;
     return fitWidths(this.weights, minPercent);
@@ -2091,18 +2120,29 @@ class TableRowWidget extends WidgetType {
     const cols = [];                         // col 元素留着，挂载后按实测宽度重写一次
     this.widths.forEach((w) => { const col = document.createElement("col"); col.style.width = w + "%"; colgroup.appendChild(col); cols.push(col); });
     table.appendChild(colgroup);
-    if (this.weights && this.weights.length === this.widths.length) {
+    let fitRaf = 0, fittedWidth = null;
+    const scheduleFit = () => {
+      if (!this.weights || this.weights.length !== this.widths.length || fitRaf) return;
       /* 【两段式宽度】首帧先按静态比例落一次（不读布局），插进 DOM 之后再按**实测表宽**把下限摊一遍：
          读 clientWidth 会强制一次布局，所以只在 toDOM 末尾做一次，不在每键路径上。 */
-      const fitRaf = requestAnimationFrame(() => {
+      fitRaf = requestAnimationFrame(() => {
+        fitRaf = 0;
         if (!wrap.isConnected || lease && !lease.valid()) return;
         try {
-          const fitted = this.fitWidthsNow();
+          const avail = table.clientWidth;
+          if (avail === fittedWidth) return;
+          fittedWidth = avail;
+          const fitted = this.fitWidthsNow(avail);
           for (let k = 0; k < cols.length; k++) if (fitted[k]) cols[k].style.width = fitted[k] + "%";
         } catch { /* 忽略：拿不到宽度就保持静态比例 */ }
       });
-      lease?.cleanup(() => cancelAnimationFrame(fitRaf));
-    }
+    };
+    scheduleFit();
+    lease?.cleanup(() => cancelAnimationFrame(fitRaf));
+    // A zoom/narrower editor changes the available CSS width without replacing
+    // the widget. Refresh its existing column-fit policy on that real change;
+    // height-only inputs never schedule fitting. RAF avoids RO feedback loops.
+    observeTableGeometry(inputView, wrap, this.rowFrom, lease, this.isHeader, this.widths.length, scheduleFit);
     const tr = table.insertRow();
     /* 【β1 选择层级】整表 ⇒ wrap 描边；行 ⇒ 本行 <tr>；列 ⇒ **每一行**的第 col 格（缺格的行不画）。 */
     if (this.selKind === "table") wrap.classList.add("mp-sel-table");
@@ -5526,7 +5566,12 @@ function installTableBar(v) {
   try { if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => positionTableBar()).observe(v.dom); } catch { /* 兜底：window resize */ }
   window.addEventListener("resize", positionTableBar);
   scheduleTableChrome();
-  return { position: positionTableBar, schedule: scheduleTableChrome, visible: () => tableBarVisible };
+  return { position: positionTableBar, schedule: scheduleTableChrome, visible: () => tableBarVisible,
+    geometry: () => {
+      const owner = tableGeometryObservers.get(v);
+      return { targets: owner?.nodes.size || 0, deliveries: owner?.deliveries || 0, placements: owner?.placements || 0,
+        cachedRows: owner?.recent.size || 0, epoch: owner?.epoch ?? null };
+    } };
 }
 
 function boot(content) {

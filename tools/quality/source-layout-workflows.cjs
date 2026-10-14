@@ -108,7 +108,7 @@ async function main(){
  const o=args(process.argv.slice(2));assert(o.exe&&o['expected-sha256'],'packaged --exe and --expected-sha256 required');
  const dir=outputDir(o.out,'source-layout-workflows'),release=acquireSlot();let run;
  const caseFilter=process.env.MP_QUALITY_CASES?new RegExp(process.env.MP_QUALITY_CASES):null;
- const result={schema:1,suite:'source-layout-workflows',expectedFullCases:15,filter:caseFilter?.source||null,startedAt:new Date().toISOString(),cases:[],errors:[],cleanup:null,notes:['Synthetic fixtures only; no clipboard. All frames need Root visual review.','No horizontal range: Shift-wheel marked not-applicable, never pass.','TODO: bad-TeX cache lifecycle, real source search, Shift-wheel actual horizontal movement and quoted source exactly two lines remain unverified.']};
+ const result={schema:1,suite:'source-layout-workflows',expectedFullCases:16,filter:caseFilter?.source||null,startedAt:new Date().toISOString(),cases:[],errors:[],cleanup:null,notes:['Synthetic fixtures only; no clipboard. All frames need Root visual review.','No horizontal range: Shift-wheel marked not-applicable, never pass.','TODO: bad-TeX cache lifecycle, real source search, Shift-wheel actual horizontal movement and quoted source exactly two lines remain unverified.']};
  const write=()=>fs.writeFileSync(path.join(dir,'result.json'),JSON.stringify(result,null,2));
  const check=async(id,body)=>{if(caseFilter&&!caseFilter.test(id))return;const c={id,status:'running',frames:[],trace:[]};result.cases.push(c);write();try{await body(c);c.status='pass';}catch(e){c.status='fail';c.error=e.stack;write();throw e;}finally{write();console.log(c.status.toUpperCase()+' '+id+(c.error?': '+c.error.split('\n')[0]:''));}};
  const capture=async(p,c,name,cell=true)=>{const s=await read(p);c.trace.push({step:name,...s});c.frames.push(await frame(p,dir,c.id+'-'+name,{caret:cell?'dom':undefined}));return s;};
@@ -129,7 +129,9 @@ async function main(){
    }
    // Native keyboard edit, exact independent source model, Undo / Redo, manual save.
    await keys(p,'End',true);s=await read(p);const at=s.selection.head,E1=E0.slice(0,at)+'R'+E0.slice(at);
+   const beforeInput=s;
    await phase(p,'precise-input');await insert(p,'R',true);s=await capture(p,c,'typed');assert.equal(s.text,E1);geometry(s,floor);
+   if(kind==='long'&&z===200){assert(Math.abs(s.cell.height-beforeInput.cell.height)<1,'same-line input retains row geometry');assert(Math.abs(s.domCaret.top-beforeInput.domCaret.top)<1,'same-line input retains native visual caret instead of deferred header reflow');}
    await sleep(1300);assert.equal(fs.readFileSync(file,'utf8'),E0,'manual profile must not autosave');assert((await read(p)).host.dirty);
    await keys(p,'Control+z',true);s=await capture(p,c,'undo');assert.equal(s.text,E0);
    await keys(p,'Control+y',true);s=await capture(p,c,'redo');assert.equal(s.text,E1);
@@ -151,6 +153,18 @@ async function main(){
     const html=fs.readFileSync(exported.file,'utf8');c.export=await p.evaluate(html=>{const d=new DOMParser().parseFromString(html,'text/html');return{text:d.body.textContent,hidden:d.querySelectorAll('.mp-cell-layout,.mp-cell-source-size,.mp-cell-rendered-size').length};},html);
     assert.equal(c.export.hidden,0,'export never includes hidden layout sizers');assert.equal((c.export.text.match(/WORD/g)||[]).length,1,'export contains true cell once');assert.equal((await read(p)).text,E1);
    }
+  });
+  await check('cell-caret-main-island',async c=>{
+   const E0=TABLE(LONG,'KEEP'),{p}=await fresh(c.id,E0);await zoom(p,100);await enter(p);await keys(p,'Control+Home',true);
+   const before=await read(p),island=await p.locator('.mp-toolbar').boundingBox();assert(island&&before.domCaret&&before.cellFocus,'real cell caret and visible main island');
+   const er=before.overlay,v=before.scrollViewport,x=(Math.max(er.left,v.left)+Math.min(er.right,v.right))/2,y=(Math.max(er.top,v.top)+Math.min(er.bottom,v.bottom))/2;
+   await phase(p,'cell-island-wheel');await p.mouse.move(x,y);await p.mouse.wheel(0,before.domCaret.top-(island.y+island.height/2));await sleep(150);
+   const under=await capture(p,c,'under-island');assert(under.cellFocus,'wheel preserves native cell owner');assert.deepEqual(under.selection,before.selection);
+   assert(under.domCaret.top>=island.y&&under.domCaret.top<island.y+island.height&&under.domCaret.left>=island.x&&under.domCaret.left<=island.x+island.width,'wheel exposes the actual caret under the actual main island');
+   const at=under.selection.head,E1=E0.slice(0,at)+'R'+E0.slice(at);await phase(p,'cell-island-input');await insert(p,'R',true);
+   const typed=await capture(p,c,'cleared-island');assert.equal(typed.text,E1);assert(typed.cellFocus);assert(typed.domCaret.top>=island.y+island.height+3,'input reveals caret below occupied island');
+   const hit=await p.evaluate(b=>{const e=document.querySelector('.mp-cell-overlay-text');return e.contains(document.elementFromPoint(b.left+.5,b.top+b.height/2));},typed.domCaret);assert(hit,'actual source caret is hittable after reveal');
+   await keys(p,'Control+z',true);assert.equal((await read(p)).text,E0);await keys(p,'Control+y',true);assert.equal((await read(p)).text,E1);
   });
   await check('cell-five-channel-and-shrink',async c=>{
    const a='WORD 中文🙂\\|tail '+('narrow '.repeat(25)),E0=TABLE(a,'KEEP'),{p}=await fresh(c.id,E0);await zoom(p,205);await capture(p,c,'pre-entry',false);await enter(p);await capture(p,c,'entry');
