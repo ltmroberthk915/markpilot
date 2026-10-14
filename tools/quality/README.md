@@ -226,3 +226,7 @@ Manifest 格式如下；`corpusSha256` 对应原文件完整字节，`span` 是 
 
 Autosave liveness: autosave-liveness-model.cjs extracts the actual host functions and checks 21 scheduling boundaries. autosave-liveness-workflows.cjs uses explicit EXE/SHA/output arguments and real CDP cell/body input, composition cancellation, disk reads, history and cell selection gestures. Cancellation has trusted update/beforeinput/input but untrusted compositionend on this Chromium; this is not an OS IME claim.
 
+
+### PDF export lifecycle (3.3.6)
+
+`export-two-frontier-workflows.cjs` covers cancellation during observed HTML appends, native editing/history/drag continuation, second-window busy and folder isolation, retired-generation rejection, existing PDF preservation and export recovery. The source-only fault notification is labeled separately. Observers forward actual handler arguments and original Promises without delay. `tests/export-writer-lifecycle.test.cjs` exercises real stream open/write/finish/abort settlement and asset cancellation.

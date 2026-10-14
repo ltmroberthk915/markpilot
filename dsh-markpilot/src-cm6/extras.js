@@ -995,9 +995,18 @@ export function installExtras(deps) {
     if (dir) {                                   // ① 桌面版：写到用户选的位置
       const beg = await window.mpHost.exportBeginHtml({ dir, name: safeFileName(title) + '.html' });
       if (!beg || !beg.ok) { toast(`写入失败：${(beg && beg.error) || '未知错误'}`); return { ok: false, error: (beg && beg.error) || 'begin-failed' }; }
-      for (const c of parts) await window.mpHost.exportAppendHtml({ id: beg.id, text: c });
-      const fin = await window.mpHost.exportFinishHtml({ id: beg.id });
-      if (!fin || !fin.ok) { toast(`写入失败：${(fin && fin.error) || '未知错误'}`); return { ok: false, error: (fin && fin.error) || 'write-failed' }; }
+      let fin;
+      try {
+        for (const c of parts) {
+          const r = await window.mpHost.exportAppendHtml({ id: beg.id, text: c });
+          if (!r?.ok) throw new Error(r?.error || '写入失败');
+        }
+        fin = await window.mpHost.exportFinishHtml({ id: beg.id });
+        if (!fin?.ok) throw new Error(fin?.error || '写入失败');
+      } catch (e) {
+        try { await window.mpHost.exportAbortHtml({ id: beg.id }); } catch { }
+        toast(`写入失败：${e.message}`); return { ok: false, error: e.message };
+      }
       const summary = { ok: true, mode: 'single-file', dir, file: fin.file, bytes: fin.bytes || bytes, ms: msBuild, msMathCss, mathCss: mathCssStat, math: !!mathApi };
       lastExport = summary;
       toastExported(`已导出：${fin.file || (safeFileName(title) + '.html')}`, fin.path || fin.dir || fin.file);
@@ -1095,7 +1104,7 @@ export function installExtras(deps) {
     let docPath = null;
     try { const info = await host.docInfo(); docPath = info && info.filePath ? info.filePath : null; } catch { }
 
-    const pick = await host.exportPickFolder({ defaultPath: opts.dir || undefined });
+    const pick = await host.exportPickFolder({ defaultPath: opts.dir || undefined, ...(opts.pdfSessionId !== undefined ? { pdfSessionId: opts.pdfSessionId } : {}) });
     if (!pick || !pick.ok) {
       if (pick && pick.canceled) return { ok: false, canceled: true };
       say(`导出失败：${(pick && pick.error) || '无法选择文件夹'}`);
@@ -1112,22 +1121,26 @@ export function installExtras(deps) {
     let prep = { entries: [], copied: 0, failed: 0, skipped: 0, bytes: 0 };
     if (refs.length) {
       say(`正在复制图片 0/${refs.length}…`, 60000);
-      try { prep = await host.exportPrepareAssets({ dir, docPath, refs, concurrency: IMG_CONCURRENCY }); }
+      try { prep = await host.exportPrepareAssets({ dir, docPath, refs, concurrency: IMG_CONCURRENCY, ...(opts.pdfSessionId !== undefined ? { pdfSessionId: opts.pdfSessionId } : {}) }); }
       catch (e) { prep = { entries: [], copied: 0, failed: refs.length, skipped: 0, bytes: 0, error: String((e && e.message) || e) }; }
       if (!prep || prep.ok === false) prep = { entries: [], copied: 0, failed: refs.length, skipped: 0, bytes: 0, error: (prep && prep.error) || 'prepare-failed' };
     }
     const srcMap = new Map();
     for (const e of (prep.entries || [])) if (e && e.ok && e.rel) { srcMap.set(e.src, e.rel); srcMap.set(decodeSafe(e.src), e.rel); }
 
-    const beg = await host.exportBeginHtml({ dir, name });
+    const beg = await host.exportBeginHtml({ dir, name, ...(opts.pdfSessionId !== undefined ? { pdfSessionId: opts.pdfSessionId } : {}) });
     if (!beg || !beg.ok) { say(`写入失败：${(beg && beg.error) || '未知错误'}`); return { ok: false, error: (beg && beg.error) || 'begin-failed' }; }
     let chunks = 0;
     try {
       const mathCss = mathApi ? await buildMathCss() : '';
       try { if (window.mpMermaid && window.mpMermaid.prerender) await window.mpMermaid.prerender(md); } catch { /* 失败就退回源码块 */ }
-      await host.exportAppendHtml({ id: beg.id, text: htmlHead(title, mathCss) });
-      for (const chunk of mdBodyChunks(md, { srcMap, math: true })) { await host.exportAppendHtml({ id: beg.id, text: chunk }); chunks++; }
-      await host.exportAppendHtml({ id: beg.id, text: HTML_TAIL });
+      const append = async text => {
+        const r = await host.exportAppendHtml({ id: beg.id, text });
+        if (!r?.ok) throw new Error(r?.error || '写入失败');
+      };
+      await append(htmlHead(title, mathCss));
+      for (const chunk of mdBodyChunks(md, { srcMap, math: true })) { await append(chunk); chunks++; }
+      await append(HTML_TAIL);
       const fin = await host.exportFinishHtml({ id: beg.id });
       if (!fin || !fin.ok) throw new Error((fin && fin.error) || '写入失败');
       const ms = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0;

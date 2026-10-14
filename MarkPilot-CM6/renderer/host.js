@@ -576,7 +576,7 @@ window.mpHost.onExportMakeHtml(async (payload) => {
     const fx = window.mpExtras;
     if (!fx || typeof fx.exportFolder !== 'function') return void (await reply({ ok: false, error: '引擎没有 exportFolder（当前宿主不支持文件夹导出流程）' }));
     // silent：这条路的目标目录是主进程的 staging 临时目录，不该把「已导出：<临时目录>\xxx.html」弹给用户
-    const r = await fx.exportFolder({ dir: payload && payload.stageDir, silent: true });
+    const r = await fx.exportFolder({ dir: payload && payload.stageDir, pdfSessionId: payload?.id, silent: true });
     if (!r || !r.ok) return void (await reply({ ok: false, error: (r && r.error) || 'exportFolder 未成功', mode: r && r.mode }));
     if (!r.file) return void (await reply({ ok: false, error: '引擎没有写出本地 HTML 文件（可能降级成下载导出了）', mode: r.mode }));
     // 公式 CSS：导出 HTML 里只有 `.katex` 标记，KaTeX 的类样式由引擎单独给出（buildMathCss）。
