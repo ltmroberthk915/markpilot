@@ -1,5 +1,11 @@
 # MarkPilot — AI-native Markdown editor for Windows, VS Code & Trae
 
+## MarkPilot 3.3.4 for Windows
+
+Table cells render bold, italic, underline and strikethrough. HTML/PDF exports use the same inline formatting. Column widths update when the editor is resized or zoomed, keeping the view steadier while typing and the caret clear of the top toolbars.
+
+**[Download installer](https://github.com/ltmroberthk915/markpilot/releases/download/v3.3.4/markpilot-Setup-3.3.4.exe)** · **[Download portable](https://github.com/ltmroberthk915/markpilot/releases/download/v3.3.4/markpilot-3.3.4-portable.exe)** · [Release notes](docs/RELEASE-3.3.4.md)
+
 ## MarkPilot 3.3.2 for Windows
 
 Search and replace immediately use the latest text in their input fields. Right-clicking the split source view preserves the selection in the editor, so you can apply formatting and keep typing. Right-clicks in search fields and other panels no longer invoke document formatting commands.

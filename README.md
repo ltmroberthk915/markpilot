@@ -1,5 +1,11 @@
 **[English](README.en.md)** · 中文
 
+## MarkPilot 3.3.4 · Windows
+
+表格单元格支持加粗、斜体、下划线和删除线，HTML/PDF 导出使用同一套行内格式渲染。缩放后的表格列宽及时更新，输入时视野更稳定，光标能够避开顶部工具条。
+
+**[下载安装版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.3.4/markpilot-Setup-3.3.4.exe)** · **[下载便携版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.3.4/markpilot-3.3.4-portable.exe)** · [更新说明](docs/RELEASE-3.3.4.md)
+
 ## MarkPilot 3.3.3 · Windows
 
 公式展开时保留高度和基线，块公式围栏显示在源码首尾行。表格编辑的高度、缩放、点击光标和滚轮统一按当前编辑内容处理，长文字不会溢出单元格。图片 HTML 导出和跨目录另存为也得到修复。
