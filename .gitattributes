@@ -2,3 +2,5 @@
 * -text
 # Generated JS contains intentional whitespace inside multiline string literals.
 MarkPilot-CM6/renderer/cm6/app.js whitespace=-blank-at-eol
+# Preserve exact pinned upstream whitespace in the maintained CodeMirror source.
+dsh-markpilot/renderer/vendor/codemirror/view.js whitespace=-blank-at-eol

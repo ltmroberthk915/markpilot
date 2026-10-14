@@ -59,11 +59,13 @@ import { editorFontVarsCss, editorHeadingsCss, editorContentMetricsCss, editorKa
  * 使淘汰后重建走 innerHTML 免解析；块高度记忆(128) 供 estimatedHeight 预留位。 */
 
 const widgetCache = new Map(); // LRU（cap 256）：命中＝同实例 → CM6 eq 复用 DOM，零重建
-const htmlCache = new Map(); // tex → HTML 串（字节预算 1MB／512 条；参数对齐 renderer 侧 markupCache）
+const htmlCache = new Map(); // Bounded results, large enough for a formula-heavy viewport and its revisit.
+const mathTemplates = new Map(); // Detached, content-only DOM; mounted nodes and leases are never cached here.
+let mathTemplateBytes = 0;
 const blockHeights = new Map(); // 块公式 tex → 实测高 px（cap 128，快滚高度记忆；只存稳态）
 let mathGeometryVersion = 0;
 const mathHeightKey = (tex,region) => `${mathGeometryVersion}:${region?.context.depth || 0}:${region?.context.indent || 0}:${tex}`;
-let lastLiveHeight = -1; // 本编辑会话上一 live 预览高度（K10 对抗③：miss 回退防每键抖动）
+let lastLiveHeight = -1, lastLiveHeightKey = ''; // Only the current live geometry may be reused.
 let htmlBytes = 0;
 
 function renderMathHTML(tex, display) {
@@ -76,20 +78,42 @@ function renderMathHTML(tex, display) {
   htmlCache.set(key, html);
   htmlBytes += key.length + html.length;
   for (const k of htmlCache.keys()) { // Map 迭代序＝插入序＝最旧先出
-    if (htmlBytes <= 1_000_000 && htmlCache.size <= 512) break;
+    if (htmlBytes <= 4_000_000 && htmlCache.size <= 1024) break;
     htmlBytes -= k.length + htmlCache.get(k).length;
     htmlCache.delete(k);
   }
   return html;
+}
+function renderMathDOM(span, tex, display) {
+  const key = (display ? 'B' : 'I') + tex, cached = mathTemplates.get(key);
+  if (cached) {
+    mathTemplates.delete(key); mathTemplates.set(key, cached);
+    span.appendChild(cached.template.content.cloneNode(true));
+    return;
+  }
+  const html = renderMathHTML(tex, display);
+  if (html === null) { span.textContent = tex; return; }
+  const template = document.createElement('template'); template.innerHTML = html;
+  span.appendChild(template.content.cloneNode(true));
+  const bytes = key.length + html.length;
+  if (bytes > 1_000_000) return;
+  mathTemplates.set(key, { template, bytes }); mathTemplateBytes += bytes;
+  while (mathTemplateBytes > 1_000_000 || mathTemplates.size > 128) {
+    const oldest = mathTemplates.keys().next().value;
+    mathTemplateBytes -= mathTemplates.get(oldest).bytes; mathTemplates.delete(oldest);
+  }
 }
 
 function rememberBlockHeight(tex, span, live = false, region = null, lease = null) {
   const key = mathHeightKey(tex,region);
   requestAnimationFrame(() => {
     try {
-      if (span.isConnected && span.offsetHeight > 0 && (!lease || lease.valid()) && key === mathHeightKey(tex,region)) {
-        if (live) { lastLiveHeight = span.offsetHeight; return; } // 中间态只进会话变量，不挤稳态表
-        blockHeights.set(key, span.offsetHeight);
+      if (span.isConnected && (!lease || lease.valid()) && key === mathHeightKey(tex,region)) {
+        const height = span.getBoundingClientRect().height;
+        if (!Number.isFinite(height) || height <= 0) return;
+        if (live) { lastLiveHeight = height; lastLiveHeightKey = mathHeightKey('',region) + ':' + region?.id; return; }
+        // CM measures block DOMRects in viewport pixels, including CSS zoom.
+        blockHeights.set(key, height);
         if (blockHeights.size > 128) blockHeights.delete(blockHeights.keys().next().value);
       }
     } catch { /* 未挂载则不记 */ }
@@ -469,9 +493,7 @@ class MathPreview extends WidgetType {
       if (region) { span.dataset.mpRegion = region.id; bindContainer(span, region.context, this.display); }
     }
     const lease = this.region ? rendererLifecycle.mount(inputView,this.region,span) : null;
-    const html = renderMathHTML(this.tex, this.display);
-    if (html != null) span.innerHTML = html;
-    else span.textContent = this.tex;
+    renderMathDOM(span, this.tex, this.display);
     if (!this.display && !this.live) rememberInlineMathMetrics(inputView, this.region, span);
     if (this.display) rememberBlockHeight(this.tex, span, this.live,this.region,lease);
     return span;
@@ -483,7 +505,7 @@ class MathPreview extends WidgetType {
     if (!this.display && !this.live) return -1;
     const h = blockHeights.get(mathHeightKey(this.tex,this.region));
     if (h !== undefined) return h;
-    return this.live && lastLiveHeight > 0 ? lastLiveHeight : -1;
+    return this.live && lastLiveHeight > 0 && lastLiveHeightKey === mathHeightKey('',this.region) + ':' + this.region?.id ? lastLiveHeight : -1;
   }
   ignoreEvent() { return false; } // 点击交给 view → 源码落位
   destroy(dom) { rendererLifecycle.release(dom); }
@@ -611,7 +633,11 @@ function mpApplyPageWidth() {
      `zoom` 的百分比按**未缩放**父盒解析（实测 1400 的盒在 1.5 档出 2100 视觉像素），
      所以文档坐标里的宽度要除以缩放，最终视觉宽度才等于滑杆值。 */
   const docPx = Math.round((vw * pct) / z);
-  root.style.setProperty("--mp-page-width", docPx + "px");
+  const width = docPx + "px";
+  if (root.style.getPropertyValue("--mp-page-width") !== width) {
+    mathGeometryVersion++;
+    root.style.setProperty("--mp-page-width", width);
+  }
 }
 /** 缩放外壳：`#editor` 的父级。工具栏/状态栏挂在 body 上 ⇒ 永远在缩放盒外（这就是"解耦"）。 */
 let zoomWrap = null;
@@ -1885,11 +1911,13 @@ const activeCellField = StateField.define({
   update(value, tr) {
     let v = value;
     for (const e of tr.effects) if (e.is(setActiveCell)) v = e.value;
-    if (v) {
-      v = { rowFrom: tr.changes.mapPos(v.rowFrom), col: v.col };
+    if (v && tr.docChanged) {
+      const rowFrom = tr.changes.mapPos(v.rowFrom);
+      if (rowFrom !== v.rowFrom) v = { rowFrom, col: v.col };
       const line = tr.state.doc.lineAt(v.rowFrom);
       if (line.from !== v.rowFrom || !parseTableRow(line.text)) v = null; // 行没了/变形 → 收场
     }
+    if (v && value && v.rowFrom === value.rowFrom && v.col === value.col) return value;
     return v;
   },
 });
@@ -1922,6 +1950,7 @@ function scheduleCellOverlay(revealCaret = false) {
   }
   const owner = view, edit = cellEdit, epoch = owner.state.field(regionIndexField).epoch;
   const owned = () => view === owner && cellEdit === edit && owner.state.field(regionIndexField).epoch === epoch;
+  let settleTicket = null;
   const queue = () => {
   if (cellPositionFrame) return;
   cellPositionFrame = requestAnimationFrame(() => {
@@ -1944,13 +1973,21 @@ function scheduleCellOverlay(revealCaret = false) {
           const bottom = bounds.bottom - 4;
           const delta = caret.top < top ? caret.top - top : caret.bottom > bottom ? caret.bottom - bottom : 0;
           if (bottom > top && caret.height > 0 && delta) sc.scrollTop += delta / zoom;
+          // A pending CM anchor compensation may follow the first reveal.
+          // Only a reveal that moved scroll gets two bounded confirmations;
+          // a later trusted pointer/key/wheel invalidates the input serial.
+          if (settleTicket && settleTicket.remaining > 0 && (delta || settleTicket.remaining < 2)) {
+            settleTicket.remaining--;
+            cellRevealIntent = reveal;
+            requestReveal(settleTicket);
+          }
         }
       }
     }
   });
   };
-  if (revealCaret) {
-    const ticket = cellMeasureIntent = { serial: cellRevealIntent };
+  const requestReveal = ticket => {
+    cellMeasureIntent = ticket;
     // CM may compensate its old scroll anchor after measure-request writes.
     // Position and reveal once in the following frame, after that compensation.
     // Sizer measurement is already pending; the fixed key merges fast inputs.
@@ -1963,13 +2000,55 @@ function scheduleCellOverlay(revealCaret = false) {
             document.hasFocus() && document.activeElement === text) queue();
       },
     });
+  };
+  if (revealCaret) {
+    settleTicket = { serial: cellRevealIntent, remaining: 2 };
+    requestReveal(settleTicket);
   } else if (!cellMeasureIntent || cellMeasureIntent.serial !== commands.serial()) queue();
 }
 
 const tableRowIndexes = new WeakMap();
 const tableRowOrdinals = new WeakMap();
 const tableGeometryObservers = new WeakMap();
-function observeTableGeometry(inputView, wrap, rowFrom, lease, isHeader, columns, resizeWidth) {
+const tableLayoutSignatures = new WeakMap();
+function tableRowGeometry(state, tb, block, isHeader, region) {
+  if (!region) return null;
+  tableRowIndex(tb);
+  const ordinal = isHeader ? 'header' : tableRowOrdinals.get(block);
+  if (ordinal === undefined) return null;
+  let rows = tableLayoutSignatures.get(tb);
+  if (!rows) { rows = new WeakMap(); tableLayoutSignatures.set(tb, rows); }
+  let signature = rows.get(block);
+  if (!signature) {
+    signature = JSON.stringify([block.cells, tb.widths, tb.weights, tb.aligns, tb.headerBlock.qDepth || 0, block.lead || 0]);
+    rows.set(block, signature);
+  }
+  return { key: [state.field(regionIndexField).epoch, region.id, region.contextVersion, ordinal, tb.rows.length, tb.widths.length].join(':'), signature };
+}
+function cachedTableGeometry(inputView, geometry) {
+  const cached = geometry && tableGeometryObservers.get(inputView)?.recent.get(geometry.key);
+  return cached?.signature === geometry.signature && cached.generation === mathGeometryVersion ? cached : null;
+}
+function primeTableGeometry(inputView, cell) {
+  if (!cell || !inputView.contentDOM.contains(cell)) return;
+  const owner = tableGeometryObservers.get(inputView);
+  if (!owner) return;
+  const rowFrom = Number(cell.dataset.mpRow), region = regionAt(inputView.state.field(regionIndexField), rowFrom, 'table');
+  const tb = region?.data, isHeader = cell.tagName === 'TH';
+  const block = tb && (isHeader ? tb.headerBlock : tableRowIndex(tb).get(rowFrom));
+  const identity = block && tableRowGeometry(inputView.state, tb, block, isHeader, region);
+  if (!identity || cachedTableGeometry(inputView, identity)) return;
+  // A cold click or a paint-only preference change may precede RO delivery.
+  // Measure only the visible row being handed off, never in a widget getter.
+  const wrap = cell.closest('.mp-table-wrap'), table = cell.closest('.mp-row');
+  const rect = wrap?.getBoundingClientRect(), scale = mpZoomOf(cell);
+  if (!rect || rect.height <= 0 || rect.width <= 0 || !(scale > 0)) return;
+  owner.recent.delete(identity.key);
+  owner.recent.set(identity.key, { width: rect.width / scale, height: rect.height / scale,
+    viewportHeight: rect.height, fittedWidth: table.clientWidth, signature: identity.signature, generation: mathGeometryVersion });
+  owner.trim();
+}
+function observeTableGeometry(inputView, wrap, rowFrom, lease, isHeader, columns, resizeWidth, geometry, fittedWidth) {
   if (!lease || typeof ResizeObserver === 'undefined') return;
   const table = inputView.state.field(regionIndexField).byId.get(lease.id)?.data;
   if (!table) return;
@@ -1977,7 +2056,7 @@ function observeTableGeometry(inputView, wrap, rowFrom, lease, isHeader, columns
   if (ordinal === undefined) return;
   // Source offsets change after edits. Geometry belongs to the logical row,
   // while every DOM node still owns its exact current source ranges and lease.
-  const key = [lease.epoch, lease.id, lease.contextVersion, ordinal, table.rows.length, columns].join(':');
+  const key = geometry?.key || [lease.epoch, lease.id, lease.contextVersion, ordinal, table.rows.length, columns].join(':');
   let owner = tableGeometryObservers.get(inputView);
   if (!owner) {
     owner = { active: true, epoch: lease.epoch, nodes: new Set(), sizes: new WeakMap(), recent: new Map(), deliveries: 0, placements: 0, trimPending: false };
@@ -1995,10 +2074,18 @@ function observeTableGeometry(inputView, wrap, rowFrom, lease, isHeader, columns
         const box = entry.borderBoxSize?.[0] || entry.borderBoxSize;
         const width = box?.inlineSize ?? entry.contentRect.width;
         const height = box?.blockSize ?? entry.contentRect.height;
-        if (width === item.width && height === item.height) continue;
+        const current = inputView.state.field(regionIndexField).byId.get(item.lease.id);
+        const tb = current?.data, block = tb && (item.isHeader ? tb.headerBlock : tableRowIndex(tb).get(item.rowFrom));
+        const identity = block && tableRowGeometry(inputView.state, tb, block, item.isHeader, current);
+        if (!identity || identity.key !== item.key) continue;
+        const previous = owner.recent.get(item.key);
+        if (width === item.width && height === item.height &&
+            previous?.signature === identity.signature && previous.generation === mathGeometryVersion) continue;
         if (width !== item.width) item.resizeWidth?.();
         item.width = width; item.height = height;
-        owner.recent.delete(item.key); owner.recent.set(item.key, { width, height });
+        owner.recent.delete(item.key);
+        owner.recent.set(item.key, { width, height, viewportHeight: height * inputView.scaleY, fittedWidth: item.fittedWidth?.() ?? null,
+          signature: identity.signature, generation: mathGeometryVersion });
         changed.push(item);
       }
       owner.trim();
@@ -2014,10 +2101,10 @@ function observeTableGeometry(inputView, wrap, rowFrom, lease, isHeader, columns
   }
   owner.active = true;
   if (owner.epoch !== lease.epoch) { owner.epoch = lease.epoch; owner.recent.clear(); }
-  const previous = owner.recent.get(key);
+  const previous = cachedTableGeometry(inputView, geometry);
   if (previous) { owner.recent.delete(key); owner.recent.set(key, previous); }
   owner.nodes.add(wrap);
-  owner.sizes.set(wrap, { lease, rowFrom, key, resizeWidth, width: previous?.width ?? null, height: previous?.height ?? null });
+  owner.sizes.set(wrap, { lease, rowFrom, key, isHeader, resizeWidth, fittedWidth, width: previous?.width ?? null, height: previous?.height ?? null });
   owner.observer.observe(wrap);
   lease.cleanup(() => {
     owner.observer.unobserve(wrap);
@@ -2040,8 +2127,24 @@ function tableRowIndex(tb) {
   if (!index) { index = new Map(tb.rows.map((row,ordinal) => { tableRowOrdinals.set(row,ordinal); return [row.from,row]; })); tableRowIndexes.set(tb,index); }
   return index;
 }
+const tableFitQueues = new WeakMap();
+function scheduleTableFit(inputView, work) {
+  let queue = tableFitQueues.get(inputView);
+  if (!queue) { queue = new Set(); tableFitQueues.set(inputView, queue); }
+  queue.add(work);
+  inputView.requestMeasure({ key: queue,
+    read: () => {
+      const pending = [...queue]; queue.clear();
+      return pending.map(item => ({ item, width: item.valid() ? item.table.clientWidth : null }));
+    },
+    write: measurements => {
+      for (const { item, width } of measurements) item.finish(width !== null && item.valid() ? width : null);
+    },
+  });
+  return () => queue.delete(work);
+}
 class TableRowWidget extends WidgetType {
-  constructor(cells, widths, isHeader, ranges, rowFrom, activeCol, qDepth = 0, qLead = 0, weights = null, selKey = "", aligns = null, region = null) {
+  constructor(cells, widths, isHeader, ranges, rowFrom, activeCol, qDepth = 0, qLead = 0, weights = null, selKey = "", aligns = null, region = null, geometry = null) {
     super(); this.cells = cells; this.widths = widths; this.isHeader = isHeader;
     this.ranges = ranges; this.rowFrom = rowFrom; this.activeCol = activeCol ?? -1;
     /* 【β1 选择层级】把 "kind:rowFrom:col" 解成三个字段：行/列/整表的高亮由它决定。
@@ -2058,7 +2161,7 @@ class TableRowWidget extends WidgetType {
        widget 是**整行块级替换**，`.mp-quote` 行类对它不生效 ⇒ 引用竖条与缩进必须在 widget 内部画，
        否则表一渲染，引用块就在这几行上"断了"。 */
     this.qDepth = qDepth || 0; this.qLead = qLead || 0;
-    this.region = region;
+    this.region = region; this.geometry = geometry;
     /* 【列宽下限·2026-10-08】weights＝各列的**显示宽度**权重（scanTables 算好）。
        `toDOM` 里按表格真实可用宽度现算一次"每列至少 minPercent"，防止窄窗口/窄版心下
        中文列被压成一字一行（用户 3.0.5 装机截图）。 */
@@ -2070,6 +2173,12 @@ class TableRowWidget extends WidgetType {
     const minPx = 64;                        // 4 个中文字 + 左右各 16 padding：至少能竖排前容纳 4 字
     const minPercent = avail > 0 ? Math.min(30, (minPx / avail) * 100) : 14;
     return fitWidths(this.weights, minPercent);
+  }
+  get estimatedHeight() {
+    // CM's height map uses viewport pixels; ResizeObserver stores CSS pixels.
+    // A replacement must keep the known height until its new DOM is measured.
+    const cached = view && cachedTableGeometry(view, this.geometry);
+    return cached?.viewportHeight > 0 ? cached.viewportHeight : -1;
   }
   eq(other) {
     if (other.region?.id !== this.region?.id || other.region?.contextVersion !== this.region?.contextVersion) return false;
@@ -2118,31 +2227,35 @@ class TableRowWidget extends WidgetType {
     this.tableEl = table;                    // fitWidthsNow 需要真实可用宽度（挂载后才有）
     const colgroup = document.createElement("colgroup");
     const cols = [];                         // col 元素留着，挂载后按实测宽度重写一次
-    this.widths.forEach((w) => { const col = document.createElement("col"); col.style.width = w + "%"; colgroup.appendChild(col); cols.push(col); });
+    const geometry = cachedTableGeometry(inputView, this.geometry);
+    const hasFit = geometry?.fittedWidth > 0;
+    const initialWidths = hasFit ? this.fitWidthsNow(geometry.fittedWidth) : this.widths;
+    initialWidths.forEach((w) => { const col = document.createElement("col"); col.style.width = w + "%"; colgroup.appendChild(col); cols.push(col); });
     table.appendChild(colgroup);
-    let fitRaf = 0, fittedWidth = null;
-    const scheduleFit = () => {
-      if (!this.weights || this.weights.length !== this.widths.length || fitRaf) return;
-      /* 【两段式宽度】首帧先按静态比例落一次（不读布局），插进 DOM 之后再按**实测表宽**把下限摊一遍：
-         读 clientWidth 会强制一次布局，所以只在 toDOM 末尾做一次，不在每键路径上。 */
-      fitRaf = requestAnimationFrame(() => {
-        fitRaf = 0;
-        if (!wrap.isConnected || lease && !lease.valid()) return;
-        try {
-          const avail = table.clientWidth;
-          if (avail === fittedWidth) return;
-          fittedWidth = avail;
-          const fitted = this.fitWidthsNow(avail);
-          for (let k = 0; k < cols.length; k++) if (fitted[k]) cols[k].style.width = fitted[k] + "%";
-        } catch { /* 忽略：拿不到宽度就保持静态比例 */ }
-      });
+    let fitPending = false, cancelFit = null, fittedWidth = hasFit ? geometry.fittedWidth : null;
+    const fitWork = { table, valid: () => wrap.isConnected && (!lease || lease.valid()),
+      finish: avail => {
+        fitPending = false; cancelFit = null;
+        if (avail === null || avail === fittedWidth) return;
+        fittedWidth = avail;
+        const cached = cachedTableGeometry(inputView, this.geometry);
+        if (cached) cached.fittedWidth = avail;
+        const fitted = this.fitWidthsNow(avail);
+        for (let k = 0; k < cols.length; k++) if (fitted[k]) cols[k].style.width = fitted[k] + "%";
+      },
     };
-    scheduleFit();
-    lease?.cleanup(() => cancelAnimationFrame(fitRaf));
+    const scheduleFit = () => {
+      if (!this.weights || this.weights.length !== this.widths.length || fitPending) return;
+      // Read all mounted row widths before writing any columns. Per-row RAF
+      // read/write pairs forced a full layout for each row entering the viewport.
+      fitPending = true; cancelFit = scheduleTableFit(inputView, fitWork);
+    };
+    if (!hasFit) scheduleFit();
+    lease?.cleanup(() => { cancelFit?.(); cancelFit = null; fitPending = false; });
     // A zoom/narrower editor changes the available CSS width without replacing
     // the widget. Refresh its existing column-fit policy on that real change;
-    // height-only inputs never schedule fitting. RAF avoids RO feedback loops.
-    observeTableGeometry(inputView, wrap, this.rowFrom, lease, this.isHeader, this.widths.length, scheduleFit);
+    // height-only inputs never schedule fitting. CM's read/write phases merge work.
+    observeTableGeometry(inputView, wrap, this.rowFrom, lease, this.isHeader, this.widths.length, scheduleFit, this.geometry, () => fittedWidth);
     const tr = table.insertRow();
     /* 【β1 选择层级】整表 ⇒ wrap 描边；行 ⇒ 本行 <tr>；列 ⇒ **每一行**的第 col 格（缺格的行不画）。 */
     if (this.selKind === "table") wrap.classList.add("mp-sel-table");
@@ -2387,6 +2500,7 @@ function ensureCellOverlay() {
   div.addEventListener("copy", cellOverlayCopy);
   div.addEventListener("blur", () => {
     if (cellEdit && !cellEdit.navigating && view) {
+      primeTableGeometry(view, activeCellDOM());
       commands.suspend();
       view.dispatch({ effects: setActiveCell.of(null) });
       deactivateCellOverlay();
@@ -2480,6 +2594,7 @@ function ensureCellOverlay() {
     }
     if (e.key === "Escape") {
       e.preventDefault();
+      if (view) primeTableGeometry(view, activeCellDOM());
       if (view) view.dispatch({ effects: [setActiveCell.of(null), setTableSel.of(null)] });
       deactivateCellOverlay();
       view?.focus();
@@ -2673,6 +2788,7 @@ const searchCellFocus = EditorView.domEventHandlers({
  *  所以先把 CM 光标落到**活动格起点**，再跑键位层核心。 */
 function moveActiveCellByKey(run) {
   if (!view) return;
+  primeTableGeometry(view, activeCellDOM());
   if (cellEdit) {
     const cur = view.state.selection.main;
     if (!(cur.head >= cellEdit.from && cur.head <= cellEdit.to)) {
@@ -2686,6 +2802,7 @@ function moveActiveCellByKey(run) {
   const rowFrom = dest.rowFrom, col = dest.col;
   const line = view.state.doc.lineAt(rowFrom);
   const ranges = cellRangesOf(line);
+  primeTableGeometry(view, view.contentDOM.querySelector(`.mp-row [data-mp-row="${rowFrom}"]`));
   view.dispatch({ effects: setActiveCell.of({ rowFrom, col }) });
   if (ranges[col]) activateCellOverlay(rowFrom, col, ranges.length, ranges[col][0], ranges[col][1]);
   else deactivateCellOverlay();
@@ -2840,9 +2957,9 @@ function tableRowWidgetFor(state,tb,block,isHeader,region) {
   if (!ranges.length) return null;
   const activeCol = active && active.rowFrom === block.from ? active.col : -1;
   return new TableRowWidget(isHeader ? tb.headerBlock.cells : block.cells, tb.widths, isHeader, ranges, block.from, activeCol,
-    tb.headerBlock.qDepth || 0, block.lead || 0, tb.weights || null, selKey, tb.aligns || null, region);
+    tb.headerBlock.qDepth || 0, block.lead || 0, tb.weights || null, selKey, tb.aligns || null, region, tableRowGeometry(state,tb,block,isHeader,region));
 }
-const tableDecorations = EditorView.decorations.compute(["selection", lineStylesField, activeCellField, tableSelectionField], (state) => {
+const tableDecorations = EditorView.decorations.compute([lineStylesField, activeCellField, tableSelectionField], (state) => {
   const out = [];
   for (const tb of state.field(lineStylesField).tables) {
     const mk = (block, isHeader) => {
@@ -2875,6 +2992,7 @@ const tableCellClick = EditorView.domEventHandlers({
     const realCol = Math.min(Math.max(0, col), ranges.length - 1);
     const r = ranges[realCol];
     if (!r) return false;
+    primeTableGeometry(view, cell);
     /* 【β1】点新格 ⇒ 清掉表级选择状态（行/列/整表高亮不该跨格留着） */
     view.dispatch({ effects: [setActiveCell.of({ rowFrom, col: realCol }), setTableSel.of(null)] });
     // Activation measures the current source layout before mapping this pointer;
@@ -5680,6 +5798,11 @@ function boot(content) {
         }),
         themeVars,
         EditorView.lineWrapping,
+        // Rich documents create expensive formula DOM outside the screen.
+        // Keep a smaller buffer while preserving the visible and selected blocks.
+        EditorView.viewportMargin.compute(["doc", mathSpansField, lineStylesField], state =>
+          state.doc.length > 50000 && (state.field(mathSpansField).spans.length > 128 ||
+            state.field(lineStylesField).tables.length > 16) ? 300 : 1000),
         tailSpace,
       ],
     }),

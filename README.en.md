@@ -746,3 +746,9 @@ Committed table-cell edits continue to autosave at the configured interval after
 
 - Canceling PDF generation now closes its producers before removing temporary files, allowing editing and export retries.
 - Export sessions reject retired work and preserve independent folder exports and document history in other windows.
+
+### v3.3.7 · Continuous table editing and long documents
+
+- Switching between adjacent cells preserves table position, including zoomed views and keyboard cell navigation.
+- Math-heavy long documents spend less work rendering beyond the visible page, with faster entry into formula editing after scrolling.
+- Tall formulas, repeated formulas and selection across screens retain their source ownership and undo history.
