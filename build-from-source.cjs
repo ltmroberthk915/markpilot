@@ -77,6 +77,14 @@ execFileSync(process.execPath, [
 ], { cwd: ENGINE_DIR, stdio: ['ignore', 'ignore', 'pipe'] });
 console.log('· 后台解析包 ' + sha16(WORKER_OUT) + '  ' + fs.statSync(WORKER_OUT).size + ' B');
 
+// Node's SaveAs and the renderer use the same fenced-code/image source parser.
+const IMAGES_SRC = path.join(ENGINE_DIR, 'src-cm6', 'resource-images.js');
+const IMAGES_OUT = path.join(SHELL, 'shell', 'markdown-images.js');
+execFileSync(process.execPath, [ESBUILD_BIN, IMAGES_SRC, '--bundle', '--platform=node', '--format=cjs',
+  '--outfile=' + IMAGES_OUT, '--minify', '--log-level=error'],
+  { cwd: ENGINE_DIR, stdio: ['ignore', 'ignore', 'pipe'] });
+console.log('· 共用图片源码包 ' + sha16(IMAGES_OUT) + '  ' + fs.statSync(IMAGES_OUT).size + ' B');
+
 /* ②-b 打印层用的 Knuth–Plass 排版包（PDF 精细断行；两条产品线共用同一份真源 ✓） */
 const KP_SRC = path.join(ROOT, 'Typora-Editor-App', 'app', 'renderer', 'js', 'knuth-plass.mjs');
 const KP_OUT = path.join(SHELL, 'renderer', 'pdf-typeset.js');

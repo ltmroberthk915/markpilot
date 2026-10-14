@@ -1,0 +1,2728 @@
+{
+  "schema": 1,
+  "version": "3.3.3",
+  "createdAt": "2026-10-14T00:09:35.556Z",
+  "artifact": {
+    "exeSha256": "4c4ee780c50a2ec67570424778b1b4d48ce3d7b0676c240638ee54cc57bfffde",
+    "asarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+    "coreResources": [
+      {
+        "file": "main.js",
+        "sha256": "0e7380457071916473afe9cf9b9a0de53f407f6f3bedf59e7a6156effc8060de"
+      },
+      {
+        "file": "preload.js",
+        "sha256": "13425c86ab0aa720af99734ae02822626c55d7fa48ab2fbd357adbef07611f0c"
+      },
+      {
+        "file": "renderer/host.js",
+        "sha256": "5841d75e1c476a7d4e7204fc88d749edeb663f6b0ba0be765d70441c86daa97a"
+      },
+      {
+        "file": "shell/document-store.js",
+        "sha256": "e1fefd0ac431322a94e4509ee21744d79938bada5b0c79c8470f5c3afc2487bf"
+      },
+      {
+        "file": "shell/text-codec.js",
+        "sha256": "bef83f890244b7b673a8c5410d7c79587e4dff3d4e836db27233cb7b6db276ff"
+      },
+      {
+        "file": "shell/save-policy.js",
+        "sha256": "4bf8cad2dcb35db304e433623e606a9bf6d526c81448c992e4972011214496ae"
+      },
+      {
+        "file": "renderer/cm6/app.js",
+        "sha256": "cb35784068107e2cea3acc097b6bd83091c618fc0d989e342650a1de4e829edd"
+      },
+      {
+        "file": "renderer/cm6/markdown-worker.js",
+        "sha256": "281c97bd645b87778bff2181be5b974deae5c1328c7fc4d6481d896f2e451c04"
+      },
+      {
+        "file": "export-folder.js",
+        "sha256": "ff192b44227044463cb5d96891779b8fbd8241f6443dd2216102cabcb1a076b7"
+      },
+      {
+        "file": "shell/markdown-images.js",
+        "sha256": "22b1af5e98f119dd3aba85228aeb2206a724882ae09a3fc9452335501b67d265"
+      },
+      {
+        "file": "shell/save-as-assets.js",
+        "sha256": "c3e818b7c0730e129df627edd1e863fd201888bd3bae770217e7b74fc8396f1f"
+      }
+    ],
+    "runtimeFiles": 73,
+    "asarResources": 144
+  },
+  "regression": {
+    "fresh": true,
+    "priorPassesReused": false,
+    "serial": true,
+    "startedAt": "2026-10-13T23:14:47.785Z",
+    "finishedAt": "2026-10-13T23:44:15.736Z",
+    "suites": 36,
+    "cases": 474,
+    "passed": true,
+    "sourceResourcesRuntimeFrozen": true,
+    "plan": [
+      {
+        "suite": "performance",
+        "probe": "tools/quality/performance.cjs",
+        "probeSha256": "a2165f5b26ad9f09a5626df6f6ae8b33b90a41b8bbd7489c1c6cfd964d2161e3",
+        "total": 7,
+        "passed": true,
+        "cases": [
+          {
+            "id": "plain-1000-lines",
+            "status": "pass"
+          },
+          {
+            "id": "plain-10000-lines",
+            "status": "pass"
+          },
+          {
+            "id": "plain-100000-lines",
+            "status": "pass"
+          },
+          {
+            "id": "math-1000-lines",
+            "status": "pass"
+          },
+          {
+            "id": "math-10000-lines",
+            "status": "pass"
+          },
+          {
+            "id": "backspace-100000-lines",
+            "status": "pass"
+          },
+          {
+            "id": "code-100000-lines",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "0a9cfa89e53e27ef3c00db81bad1b72a8816267d6e1fb3dff1a0e274f3417142"
+      },
+      {
+        "suite": "source-layout-workflows",
+        "probe": "tools/quality/source-layout-workflows.cjs",
+        "probeSha256": "b979223e3b749cb28bcb9729020679eca8a86deef4cb29a0f914bd53ab2b20cc",
+        "total": 15,
+        "passed": true,
+        "cases": [
+          {
+            "id": "cell-long-100",
+            "status": "pass"
+          },
+          {
+            "id": "cell-neighbor-100",
+            "status": "pass"
+          },
+          {
+            "id": "cell-sole-br-100",
+            "status": "pass"
+          },
+          {
+            "id": "cell-long-145",
+            "status": "pass"
+          },
+          {
+            "id": "cell-neighbor-145",
+            "status": "pass"
+          },
+          {
+            "id": "cell-sole-br-145",
+            "status": "pass"
+          },
+          {
+            "id": "cell-long-200",
+            "status": "pass"
+          },
+          {
+            "id": "cell-neighbor-200",
+            "status": "pass"
+          },
+          {
+            "id": "cell-sole-br-200",
+            "status": "pass"
+          },
+          {
+            "id": "cell-five-channel-and-shrink",
+            "status": "pass"
+          },
+          {
+            "id": "inline-tall",
+            "status": "pass"
+          },
+          {
+            "id": "inline-short",
+            "status": "pass"
+          },
+          {
+            "id": "inline-quoted-wrap",
+            "status": "pass"
+          },
+          {
+            "id": "body-wheel-owner-history",
+            "status": "pass"
+          },
+          {
+            "id": "input-two-raf-p95",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "3afb9cb5b99cd13e516a6fff9b63abd22fad2eb9489af58ff6f112b2e37cc35a"
+      },
+      {
+        "suite": "block-source-workflows",
+        "probe": "tools/quality/block-source-workflows.cjs",
+        "probeSha256": "b23702366f537cef71b2f091795dd1baa3eaeb97e75a759ffcc16c94bef0e443",
+        "total": 21,
+        "passed": true,
+        "cases": [
+          {
+            "id": "flow-plain-single",
+            "status": "pass"
+          },
+          {
+            "id": "flow-plain-multi",
+            "status": "pass"
+          },
+          {
+            "id": "flow-quote",
+            "status": "pass"
+          },
+          {
+            "id": "flow-nested-quote",
+            "status": "pass"
+          },
+          {
+            "id": "flow-empty",
+            "status": "pass"
+          },
+          {
+            "id": "flow-same-line",
+            "status": "pass"
+          },
+          {
+            "id": "flow-mixed-fence",
+            "status": "pass"
+          },
+          {
+            "id": "flow-leading-blank",
+            "status": "pass"
+          },
+          {
+            "id": "flow-trailing-blank",
+            "status": "pass"
+          },
+          {
+            "id": "flow-list-fallback",
+            "status": "pass"
+          },
+          {
+            "id": "flow-quote-blank",
+            "status": "pass"
+          },
+          {
+            "id": "open-LF",
+            "status": "pass"
+          },
+          {
+            "id": "close-LF",
+            "status": "pass"
+          },
+          {
+            "id": "quote-open-LF",
+            "status": "pass"
+          },
+          {
+            "id": "quote-close-LF",
+            "status": "pass"
+          },
+          {
+            "id": "quote-prefix-delete",
+            "status": "pass"
+          },
+          {
+            "id": "shift-click-range",
+            "status": "pass"
+          },
+          {
+            "id": "drag-range",
+            "status": "pass"
+          },
+          {
+            "id": "quote-shift-click-range",
+            "status": "pass"
+          },
+          {
+            "id": "reverse-drag-range",
+            "status": "pass"
+          },
+          {
+            "id": "source-anchor-shift-click",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "db9d9179f942c5404d3dd267d2c49c141f42b0b622463bd059dc0924e6b3608b"
+      },
+      {
+        "suite": "export-source-workflows",
+        "probe": "tools/quality/export-source-workflows.cjs",
+        "probeSha256": "77f71656ced6594e29a6d476848e5d08788508d43e250b60a1fc42b2a60df4e9",
+        "total": 19,
+        "passed": true,
+        "cases": [
+          {
+            "id": "dirty-body-and-cell-folder-export",
+            "status": "pass"
+          },
+          {
+            "id": "cross-directory-save-as-assets",
+            "status": "pass"
+          },
+          {
+            "id": "unsaved-document-export-and-isolation",
+            "status": "pass"
+          },
+          {
+            "id": "inline-export-angle-space-map",
+            "status": "pass"
+          },
+          {
+            "id": "inline-export-amp-src-alt",
+            "status": "pass"
+          },
+          {
+            "id": "inline-export-raw-entity-map",
+            "status": "pass"
+          },
+          {
+            "id": "inline-export-sanitize-image-attrs-styles",
+            "status": "pass"
+          },
+          {
+            "id": "inline-export-quotes-alt",
+            "status": "pass"
+          },
+          {
+            "id": "inline-export-image-before-after-code",
+            "status": "pass"
+          },
+          {
+            "id": "inline-export-leftmost-raw-and-markdown-atoms",
+            "status": "pass"
+          },
+          {
+            "id": "inline-export-code-literal-math-link-image-strong",
+            "status": "pass"
+          },
+          {
+            "id": "inline-export-bold-wrapper-image",
+            "status": "pass"
+          },
+          {
+            "id": "inline-export-math-toggle-with-code",
+            "status": "pass"
+          },
+          {
+            "id": "inline-export-invalid-tex-fallback",
+            "status": "pass"
+          },
+          {
+            "id": "inline-export-angle-parenthesized-url",
+            "status": "pass"
+          },
+          {
+            "id": "inline-export-markdown-title-consumed",
+            "status": "pass"
+          },
+          {
+            "id": "inline-export-user-nul-token-collision",
+            "status": "pass"
+          },
+          {
+            "id": "inline-export-malformed-literal",
+            "status": "pass"
+          },
+          {
+            "id": "inline-export-table-image-and-code-once",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "00e08dfc388c7d31b65b38576376e85971ab44cea0efc127855bc27250fff2c3"
+      },
+      {
+        "suite": "quoted-math-subrange-workflows",
+        "probe": "tools/quality/quoted-math-subrange-workflows.cjs",
+        "probeSha256": "75aa5260d9164e7525b9ad50e8024975b66cf8efdc1670dbf9a5262a6c8a03dd",
+        "total": 1,
+        "passed": true,
+        "cases": [
+          {
+            "id": "quoted-multiline-reverse-subrange-copy-cut-paste-history-continue",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "abdf369235827ff962fcb38712e3cba8f7f42e63834e20d429e21c5ed103e790"
+      },
+      {
+        "suite": "cell-composition-workflows",
+        "probe": "tools/quality/cell-composition-workflows.cjs",
+        "probeSha256": "27c719ebf7b81cc80f9c03c64463f698f5ceee9f37d53f67b63ac0ff5b58b7b2",
+        "total": 1,
+        "passed": true,
+        "cases": [
+          {
+            "id": "cell-unicode-positive-history-continue",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "810eb7fe25275d84f3be1b3fa24fac74bccbdce2edacaec1bb2dc37192b23be9"
+      },
+      {
+        "suite": "native-menu-workflows",
+        "probe": "tools/quality/native-menu-workflows.cjs",
+        "probeSha256": "f95df3cc5715838e97340f38fafb23caf8ee03794daf6828992f367a862ef845",
+        "total": 10,
+        "passed": true,
+        "cases": [
+          {
+            "id": "native-menu-body-undo-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "native-menu-body-redo-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "native-menu-cell-undo-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "native-menu-cell-redo-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "native-menu-search-undo-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "native-menu-search-redo-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "native-menu-body-empty-undo-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "native-menu-body-empty-redo-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "native-menu-cell-empty-undo-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "native-menu-cell-empty-redo-history-continue",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "b616287067201f235992dd80eecc99aef2003035419e9d3216a602a18594bf67"
+      },
+      {
+        "suite": "cross-page-drag-workflows",
+        "probe": "tools/quality/cross-page-drag-workflows.cjs",
+        "probeSha256": "22b173a6983a9371fe93058ead3660e3ed080565d492b54b8b5ad149f1d402d2",
+        "total": 2,
+        "passed": true,
+        "cases": [
+          {
+            "id": "plain-held-wheel-loop",
+            "status": "pass"
+          },
+          {
+            "id": "formula-held-wheel-loop",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "960091618c3bd204c19a99d496a0cce8ff1bf102b17a2b37dba4213f3c991797"
+      },
+      {
+        "suite": "math-gesture-workflows",
+        "probe": "tools/quality/math-gesture-workflows.cjs",
+        "probeSha256": "25f087b14d6dd1c7c18974a69a56631f440e1b51bc7a559d7b512ff16cb2cff6",
+        "total": 4,
+        "passed": true,
+        "cases": [
+          {
+            "id": "math-gesture-click-source-and-selection",
+            "status": "pass"
+          },
+          {
+            "id": "math-gesture-jitter-source-and-selection",
+            "status": "pass"
+          },
+          {
+            "id": "math-gesture-local-loop-source-and-selection",
+            "status": "pass"
+          },
+          {
+            "id": "math-gesture-wheel-only-source-and-selection",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "b916c85a0d05386396ac541c250f05187575bc28621714edb068a61932de0720"
+      },
+      {
+        "suite": "native-pending-image-workflows",
+        "probe": "tools/quality/native-pending-image-workflows.cjs",
+        "probeSha256": "3ae14c9d5914e6e1a3c65370edda894523419508cffcf1136b4d9eeff029896a",
+        "total": 2,
+        "passed": true,
+        "cases": [
+          {
+            "id": "native-menu-undo-pending-bitmap-empty-history",
+            "status": "pass"
+          },
+          {
+            "id": "native-menu-undo-pending-bitmap-nonempty-history",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "1af32783fe8e07b3d37c69766c05f42ad2c82afc23cd874e9aee5035fdb587d3"
+      },
+      {
+        "suite": "search-pending-image-workflows",
+        "probe": "tools/quality/search-pending-image-workflows.cjs",
+        "probeSha256": "847b10956e7c85583a70c30343407698acb03097b57ee2d8e37bf225215b3e37",
+        "total": 1,
+        "passed": true,
+        "cases": [
+          {
+            "id": "native-search-undo-retains-document-pending-bitmap",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "b46ea2ef88d29c81709b7e6efec98bff66382c03636f1368d768af9c48ffa278"
+      },
+      {
+        "suite": "split-source-workflows",
+        "probe": "tools/quality/split-source-workflows.cjs",
+        "probeSha256": "d8df9906f3b833eb1b123e7a9e49850fb24651bf9e8b254b54ea9435fa189c77",
+        "total": 2,
+        "passed": true,
+        "cases": [
+          {
+            "id": "active-cell-source-pane-click-immediate-edit-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "active-cell-source-pane-plain-click-immediate-edit-history-continue",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "5a13dff8630a9c488e1625bdca75184cc44684d245b066b8c3092b5123fbb95a"
+      },
+      {
+        "suite": "worker-latency",
+        "probe": "tools/quality/worker-latency.cjs",
+        "probeSha256": "bd4844b8d88493246b7466092d86b97f321fb3de6c6735d8ef713e42743b68b4",
+        "total": 1,
+        "passed": true,
+        "cases": [
+          {
+            "id": "pending-quote-enter-20-repetitions",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "0ea60f5abb65ba0591b8df2c91d51dcfe6556419c3249defdbf5ed70c2e0abb9"
+      },
+      {
+        "suite": "math-entry-workflows",
+        "probe": "tools/quality/math-entry-workflows.cjs",
+        "probeSha256": "c1142dbcf235b10d8cb7e6b82b0823bdc448e00774b5d46369394f8b6dff279e",
+        "total": 14,
+        "passed": true,
+        "cases": [
+          {
+            "id": "plain-down-immediate-type-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "plain-up-immediate-type-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "quoted-down-immediate-type-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "quoted-up-immediate-type-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "nested-quoted-down-immediate-type-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "nested-quoted-up-immediate-type-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "quoted-multiline-whitespace-down-immediate-type-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "quoted-multiline-whitespace-up-immediate-type-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "quoted-utf16-down-immediate-type-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "quoted-utf16-up-immediate-type-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "single-line-down-immediate-type-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "single-line-up-immediate-type-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "same-line-edges-down-immediate-type-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "same-line-edges-up-immediate-type-undo-redo",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "686700af18929cd422bb6064ee8da08751c06919e8fde22d152daea511f8033d"
+      },
+      {
+        "suite": "math-paste-workflows",
+        "probe": "tools/quality/math-paste-workflows.cjs",
+        "probeSha256": "6941962cfe563912c77864ae70532b290ea166bb05dfefa6b652cffae7f4c086",
+        "total": 9,
+        "passed": true,
+        "cases": [
+          {
+            "id": "html-ordinary-replace-inline-y-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "html-plain-shortcut-replace-inline-y-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "text-only-replace-inline-y-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "html-bold-collapsed-replace-inline-y-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "block-multiline-literal-replace-inline-y-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "html-only-replace-inline-y-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "html-only-literal-whitespace-replace-inline-y-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "quoted-block-emphasis-replace-inline-y-history-continue",
+            "status": "pass"
+          },
+          {
+            "id": "cross-formula-rich-replace-inline-y-history-continue",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "ec91000b96a4deea0a4fb49ac66874344e71ad3310a1b3227bbf8ab0dfeb912f"
+      },
+      {
+        "suite": "search-workflows",
+        "probe": "tools/quality/search-workflows.cjs",
+        "probeSha256": "ee49ffd407ee47889d40b4c6bfdd5a964477c3819a01ebb4713fa83213d6869c",
+        "total": 10,
+        "passed": true,
+        "cases": [
+          {
+            "id": "body-ctrl-f-search-focus-positive-control",
+            "status": "pass"
+          },
+          {
+            "id": "toolbar-find-replace-search-focus-positive-control",
+            "status": "pass"
+          },
+          {
+            "id": "active-cell-ctrl-f-opens-search-without-document-edit",
+            "status": "pass"
+          },
+          {
+            "id": "search-cell-match-direct-replacement-history",
+            "status": "pass"
+          },
+          {
+            "id": "search-escaped-pipe-emoji-math-cell-return-history",
+            "status": "pass"
+          },
+          {
+            "id": "search-ordinary-body-return-history-positive-control",
+            "status": "pass"
+          },
+          {
+            "id": "search-cross-cell-return-does-not-clamp-owner",
+            "status": "pass"
+          },
+          {
+            "id": "search-separator-return-does-not-clamp-owner",
+            "status": "pass"
+          },
+          {
+            "id": "search-partial-escape-return-preserves-native-range",
+            "status": "pass"
+          },
+          {
+            "id": "search-cell-immediate-return-type-history",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "7acc93656d40d94088c2e1702f37622eb157878f66025fe84b1e4ea63c7a98c0"
+      },
+      {
+        "suite": "mixed-selection-workflows",
+        "probe": "tools/quality/mixed-selection-workflows.cjs",
+        "probeSha256": "bafc475ac386c44e4098468b67a5b0acaa894c0c4ab56a56f0ebdf1b4b0413c7",
+        "total": 2,
+        "passed": true,
+        "cases": [
+          {
+            "id": "keyboard-page-extend-mixed-cut-replace-history",
+            "status": "pass"
+          },
+          {
+            "id": "mouse-reverse-drag-mixed-copy-replace-history",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "1deb1906dba3b095c98491fa53cc5f682a18267f880135cb6139f1eb1ca0bc72"
+      },
+      {
+        "suite": "selection-workflows",
+        "probe": "tools/quality/selection-workflows.cjs",
+        "probeSha256": "e424c38cf49b8c30329d72c6fc3c58d00206ef8b9bd7dc95311ccf1900bfde5b",
+        "total": 31,
+        "passed": true,
+        "cases": [
+          {
+            "id": "shift-forward-glyph-keeps-selection-copy-delete-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "shift-reverse-glyph-keeps-selection-copy-delete-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "shift-float-glyph-keeps-selection-copy-delete-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "shift-float-reverse-glyph-keeps-selection-copy-delete-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "selection-copy-after-line-copy-pastes-at-caret",
+            "status": "pass"
+          },
+          {
+            "id": "selection-copy-after-line-copy-pastes-at-caret-crlf-file",
+            "status": "pass"
+          },
+          {
+            "id": "selection-cut-after-line-copy-pastes-at-caret",
+            "status": "pass"
+          },
+          {
+            "id": "selection-cut-after-line-copy-pastes-at-caret-crlf-file",
+            "status": "pass"
+          },
+          {
+            "id": "early-cell-focus-survives-boot-fallback",
+            "status": "pass"
+          },
+          {
+            "id": "cell-typed-pipe-keeps-character-on-following-input",
+            "status": "pass"
+          },
+          {
+            "id": "active-cell-undo-redo-keeps-source-and-overlay-in-sync",
+            "status": "pass"
+          },
+          {
+            "id": "cell-history-continue-edit-after-undo-and-shift-redo",
+            "status": "pass"
+          },
+          {
+            "id": "cell-history-across-tab-keeps-restored-source-and-dom-in-same-cell",
+            "status": "pass"
+          },
+          {
+            "id": "cell-tab-home-keeps-caret-before-next-input",
+            "status": "pass"
+          },
+          {
+            "id": "cell-mouse-click-immediate-input-keeps-glyph-caret",
+            "status": "pass"
+          },
+          {
+            "id": "cell-last-row-tab-shift-tab-and-select-cell-preserve-source",
+            "status": "pass"
+          },
+          {
+            "id": "cell-end-boundary-undo-redo-retains-owner",
+            "status": "pass"
+          },
+          {
+            "id": "cell-empty-boundary-undo-redo-retains-owner",
+            "status": "pass"
+          },
+          {
+            "id": "cell-selected-pipe-forward-delete-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "cell-selected-pipe-reverse-replace-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "cell-existing-pipes-emoji-and-visible-backslash-preserve-neighbor",
+            "status": "pass"
+          },
+          {
+            "id": "cell-plain-paste-pipes-has-one-source-encoding-and-history",
+            "status": "pass"
+          },
+          {
+            "id": "cell-selected-pipe-copy-paste-in-next-cell-preserves-literal",
+            "status": "pass"
+          },
+          {
+            "id": "cell-selected-pipe-cut-paste-in-next-cell-preserves-literal",
+            "status": "pass"
+          },
+          {
+            "id": "boot-open-document-direct-typing-needs-no-click",
+            "status": "pass"
+          },
+          {
+            "id": "math-vertical-reversal-keeps-goal",
+            "status": "pass"
+          },
+          {
+            "id": "math-vertical-horizontal-reposition-resets-goal",
+            "status": "pass"
+          },
+          {
+            "id": "math-multiline-native-up-down-and-reversal-preserve-goal",
+            "status": "pass"
+          },
+          {
+            "id": "math-floating-pointer-reposition-starts-new-vertical-goal",
+            "status": "pass"
+          },
+          {
+            "id": "math-edit-undo-reposition-starts-new-vertical-goal",
+            "status": "pass"
+          },
+          {
+            "id": "math-copy-without-reposition-preserves-vertical-goal",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "1f0f6df2d611b507af5a8d5b775a80d1e97beae34d6434aa213226cf135e27f4"
+      },
+      {
+        "suite": "math-workflows",
+        "probe": "tools/quality/math-workflows.cjs",
+        "probeSha256": "560a2aea6dd0c2239a2db06214c13548ec8809de1f89f33b8901e4662f12ae75",
+        "total": 16,
+        "passed": true,
+        "cases": [
+          {
+            "id": "quoted-block-glyph-click-edit-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "nested-quoted-block-glyph-click-edit-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "multiline-quoted-block-glyph-click-edit-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "quoted-whitespace-block-glyph-click-edit-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "single-dollar-quoted-block-glyph-click-edit-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "ordinary-block-glyph-click-edit-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "ordinary-inline-glyph-click-edit-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "control-non-tail-left-literal-glyph-oracle",
+            "status": "pass"
+          },
+          {
+            "id": "control-non-tail-right-literal-glyph-oracle",
+            "status": "pass"
+          },
+          {
+            "id": "control-nested-quote-literal-glyph-oracle",
+            "status": "pass"
+          },
+          {
+            "id": "control-tail-after-literal-glyph-oracle",
+            "status": "pass"
+          },
+          {
+            "id": "repeated-prime-second-literal-glyph-oracle",
+            "status": "pass"
+          },
+          {
+            "id": "keyboard-page-navigation-full-source-copy-paste-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "mouse-double-click-text-replace-undo-redo-among-formulas",
+            "status": "pass"
+          },
+          {
+            "id": "shift-mouse-selection-across-inline-formula-copy-paste",
+            "status": "pass"
+          },
+          {
+            "id": "real-drag-formula-text-then-shift-key-copy-paste",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "6e8d3bc2242249bb27417534902d3c9bc46bec16e77fcbff4f1ee7b7e99172fb"
+      },
+      {
+        "suite": "critical",
+        "probe": "tools/quality/critical.cjs",
+        "probeSha256": "a303f67f151923aade313c125d342f0e64fa70dd6524725045ad42e42d8bf357",
+        "total": 26,
+        "passed": true,
+        "cases": [
+          {
+            "id": "windows-bitmap-control-v-assets",
+            "status": "pass"
+          },
+          {
+            "id": "windows-bitmap-control-v-inline",
+            "status": "pass"
+          },
+          {
+            "id": "bitmap-frontmatter-is-explicitly-refused",
+            "status": "pass"
+          },
+          {
+            "id": "bitmap-paste-after-plain-paste-shortcut",
+            "status": "pass"
+          },
+          {
+            "id": "unsaved-document-bitmap-paste-falls-back-inline",
+            "status": "pass"
+          },
+          {
+            "id": "fenced-code-enter-preserves-literal-list",
+            "status": "pass"
+          },
+          {
+            "id": "list-home-enter-does-not-duplicate-marker",
+            "status": "pass"
+          },
+          {
+            "id": "math-completion-prose-enter",
+            "status": "pass"
+          },
+          {
+            "id": "math-completion-prose-tab",
+            "status": "pass"
+          },
+          {
+            "id": "math-completion-list-enter",
+            "status": "pass"
+          },
+          {
+            "id": "math-completion-list-tab",
+            "status": "pass"
+          },
+          {
+            "id": "quoted-fence-does-not-render-table",
+            "status": "pass"
+          },
+          {
+            "id": "quoted-fence-tab-keeps-editor-focus",
+            "status": "pass"
+          },
+          {
+            "id": "hashtag-without-space-is-not-heading",
+            "status": "pass"
+          },
+          {
+            "id": "ordered-list-export-preserves-numbering",
+            "status": "pass"
+          },
+          {
+            "id": "tilde-fence-export-preserves-code",
+            "status": "pass"
+          },
+          {
+            "id": "wide-dash-table-export-matches-editor",
+            "status": "pass"
+          },
+          {
+            "id": "windows-format-undo-control-y-redo",
+            "status": "pass"
+          },
+          {
+            "id": "underline-empty-toggle-removes-entire-closing-tag",
+            "status": "pass"
+          },
+          {
+            "id": "secondary-save-preserves-own-bom-eol",
+            "status": "pass"
+          },
+          {
+            "id": "secondary-save-keeps-both-saved-texts",
+            "status": "pass"
+          },
+          {
+            "id": "primary-pdf-exports-primary-with-secondary-open",
+            "status": "pass"
+          },
+          {
+            "id": "secondary-save-as-keeps-primary-path",
+            "status": "pass"
+          },
+          {
+            "id": "utf16-chinese-safe-open-and-edit",
+            "status": "pass"
+          },
+          {
+            "id": "unsaved-native-close-control-keeps-window-open",
+            "status": "pass"
+          },
+          {
+            "id": "secondary-save-does-not-clear-primary-unsaved-close-guard",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "6dec464c9e26d07675417ab89cb1d8354df3909e49f59e20f7eca6216bf5ceb4"
+      },
+      {
+        "suite": "acceptance",
+        "probe": "tools/quality/acceptance.cjs",
+        "probeSha256": "42ff6ad75281b478a7c465f5f75915abd569ff13f844670c0bda03fdbb787ec8",
+        "total": 19,
+        "passed": true,
+        "cases": [
+          {
+            "id": "startup-exact-bytes-and-focus",
+            "status": "pass"
+          },
+          {
+            "id": "real-unicode-input-autosave",
+            "status": "pass"
+          },
+          {
+            "id": "format-bold-typing-and-toggle",
+            "status": "pass"
+          },
+          {
+            "id": "format-italic-typing-and-toggle",
+            "status": "pass"
+          },
+          {
+            "id": "format-underline-typing-and-toggle",
+            "status": "pass"
+          },
+          {
+            "id": "format-strike-typing-and-toggle",
+            "status": "pass"
+          },
+          {
+            "id": "format-code-typing-and-toggle",
+            "status": "pass"
+          },
+          {
+            "id": "format-selection-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "plain-input-model-fixed-seed",
+            "status": "pass"
+          },
+          {
+            "id": "markdown-projection-and-source-fidelity",
+            "status": "pass"
+          },
+          {
+            "id": "mermaid-render-and-content-update",
+            "status": "pass"
+          },
+          {
+            "id": "mermaid-invalid-source-safe-fallback",
+            "status": "pass"
+          },
+          {
+            "id": "task-list-widget-after-offset-shift",
+            "status": "pass"
+          },
+          {
+            "id": "mouse-drag-selection-and-shift-key-extension",
+            "status": "pass"
+          },
+          {
+            "id": "shift-mouse-click-and-real-double-click",
+            "status": "pass"
+          },
+          {
+            "id": "save-as-real-menu-and-disk",
+            "status": "pass"
+          },
+          {
+            "id": "secondary-window-eol-and-session-isolation",
+            "status": "pass"
+          },
+          {
+            "id": "large-document-real-input-latency",
+            "status": "pass"
+          },
+          {
+            "id": "no-renderer-exceptions",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "380049709e21f2c01067f0d2a4b02eb06e0c4012cfdf304b0634ebae5db8c050"
+      },
+      {
+        "suite": "editing",
+        "probe": "tools/quality/editing.cjs",
+        "probeSha256": "9725b3d009ef987e649ef3024be04e901457e711b11627bcf014f8bd3cf4fb98",
+        "total": 75,
+        "passed": true,
+        "cases": [
+          {
+            "id": "code-enter-backticks",
+            "status": "pass"
+          },
+          {
+            "id": "code-enter-tildes",
+            "status": "pass"
+          },
+          {
+            "id": "code-enter-quoted",
+            "status": "pass"
+          },
+          {
+            "id": "code-enter-nested-quote",
+            "status": "pass"
+          },
+          {
+            "id": "code-enter-longer-close",
+            "status": "pass"
+          },
+          {
+            "id": "code-enter-shorter-inner",
+            "status": "pass"
+          },
+          {
+            "id": "code-enter-different-inner",
+            "status": "pass"
+          },
+          {
+            "id": "code-enter-unclosed",
+            "status": "pass"
+          },
+          {
+            "id": "code-tab-plain",
+            "status": "pass"
+          },
+          {
+            "id": "code-tab-quoted",
+            "status": "pass"
+          },
+          {
+            "id": "code-no-table-quoted-table",
+            "status": "pass"
+          },
+          {
+            "id": "code-no-table-different-fence",
+            "status": "pass"
+          },
+          {
+            "id": "code-no-table-unclosed",
+            "status": "pass"
+          },
+          {
+            "id": "code-checkmark-is-literal",
+            "status": "pass"
+          },
+          {
+            "id": "code-pipe-tab-does-not-enter-table",
+            "status": "pass"
+          },
+          {
+            "id": "pipe-without-delimiter-editor-control",
+            "status": "pass"
+          },
+          {
+            "id": "code-math-is-literal-plain",
+            "status": "pass"
+          },
+          {
+            "id": "code-math-is-literal-quoted",
+            "status": "pass"
+          },
+          {
+            "id": "code-quoted-completion-and-auto-break-disabled",
+            "status": "pass"
+          },
+          {
+            "id": "code-closing-info-keeps-literal",
+            "status": "pass"
+          },
+          {
+            "id": "code-closing-tail-edit-and-undo",
+            "status": "pass"
+          },
+          {
+            "id": "code-quoted-shift-tab-preserves-container",
+            "status": "pass"
+          },
+          {
+            "id": "code-enter-indent",
+            "status": "pass"
+          },
+          {
+            "id": "code-enter-body-home",
+            "status": "pass"
+          },
+          {
+            "id": "code-enter-selection",
+            "status": "pass"
+          },
+          {
+            "id": "code-enter-closing-default",
+            "status": "pass"
+          },
+          {
+            "id": "code-enter-multiple-cursors",
+            "status": "pass"
+          },
+          {
+            "id": "code-line-numbers-map-and-remove",
+            "status": "pass"
+          },
+          {
+            "id": "code-bare-blank-line-ends-quote-like-parser",
+            "status": "pass"
+          },
+          {
+            "id": "list-enter-home",
+            "status": "pass"
+          },
+          {
+            "id": "list-enter-tail",
+            "status": "pass"
+          },
+          {
+            "id": "list-enter-ordered",
+            "status": "pass"
+          },
+          {
+            "id": "list-enter-task",
+            "status": "pass"
+          },
+          {
+            "id": "list-enter-empty",
+            "status": "pass"
+          },
+          {
+            "id": "list-enter-empty-task",
+            "status": "pass"
+          },
+          {
+            "id": "list-enter-indented",
+            "status": "pass"
+          },
+          {
+            "id": "list-enter-replaces-selection",
+            "status": "pass"
+          },
+          {
+            "id": "list-enter-multiple-cursors",
+            "status": "pass"
+          },
+          {
+            "id": "list-before-fence-plain-edit-maps-context",
+            "status": "pass"
+          },
+          {
+            "id": "task-widget-positive-control",
+            "status": "pass"
+          },
+          {
+            "id": "completion-prose-Enter",
+            "status": "pass"
+          },
+          {
+            "id": "completion-prose-Tab",
+            "status": "pass"
+          },
+          {
+            "id": "completion-list-Enter",
+            "status": "pass"
+          },
+          {
+            "id": "completion-list-Tab",
+            "status": "pass"
+          },
+          {
+            "id": "completion-nested-list-Enter",
+            "status": "pass"
+          },
+          {
+            "id": "completion-nested-list-Tab",
+            "status": "pass"
+          },
+          {
+            "id": "completion-ordered-Enter",
+            "status": "pass"
+          },
+          {
+            "id": "completion-ordered-Tab",
+            "status": "pass"
+          },
+          {
+            "id": "completion-quote-Enter",
+            "status": "pass"
+          },
+          {
+            "id": "completion-quote-Tab",
+            "status": "pass"
+          },
+          {
+            "id": "completion-mouse-acceptance",
+            "status": "pass"
+          },
+          {
+            "id": "completion-escape-resumes-list-enter",
+            "status": "pass"
+          },
+          {
+            "id": "heading-hashtag",
+            "status": "pass"
+          },
+          {
+            "id": "heading-tag-many",
+            "status": "pass"
+          },
+          {
+            "id": "heading-space",
+            "status": "pass"
+          },
+          {
+            "id": "heading-tab",
+            "status": "pass"
+          },
+          {
+            "id": "heading-empty",
+            "status": "pass"
+          },
+          {
+            "id": "heading-seven",
+            "status": "pass"
+          },
+          {
+            "id": "heading-indented",
+            "status": "pass"
+          },
+          {
+            "id": "bold-single-star-existing-toggle",
+            "status": "pass"
+          },
+          {
+            "id": "underline-empty-toggle",
+            "status": "pass"
+          },
+          {
+            "id": "underline-remove-forward",
+            "status": "pass"
+          },
+          {
+            "id": "underline-remove-reverse",
+            "status": "pass"
+          },
+          {
+            "id": "underline-real-drag-shift-toggle",
+            "status": "pass"
+          },
+          {
+            "id": "export-ordered",
+            "status": "pass"
+          },
+          {
+            "id": "export-ordered-start",
+            "status": "pass"
+          },
+          {
+            "id": "export-mixed-lists",
+            "status": "pass"
+          },
+          {
+            "id": "export-tilde",
+            "status": "pass"
+          },
+          {
+            "id": "export-fence-literal-inner",
+            "status": "pass"
+          },
+          {
+            "id": "export-fence-unclosed",
+            "status": "pass"
+          },
+          {
+            "id": "export-quoted-fence",
+            "status": "pass"
+          },
+          {
+            "id": "export-quoted-extra-marker",
+            "status": "pass"
+          },
+          {
+            "id": "export-pipe-without-delimiter",
+            "status": "pass"
+          },
+          {
+            "id": "export-wide-dash",
+            "status": "pass"
+          },
+          {
+            "id": "export-en-dash-align",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "b6b3c9e3bfaabe4a585baa1b9e74e67714d02cbb50f989df86f2438bdbdff7a6"
+      },
+      {
+        "suite": "worker-integration",
+        "probe": "tools/quality/worker-integration.cjs",
+        "probeSha256": "debfb99d79131329fa269540202932698c750f04c73d72b48f766b3d7f9e90ff",
+        "total": 28,
+        "passed": true,
+        "cases": [
+          {
+            "id": "large-paragraph-final-tree-eof",
+            "status": "pass"
+          },
+          {
+            "id": "large-paragraph-final-tree-newline",
+            "status": "pass"
+          },
+          {
+            "id": "rapid-input-undo-redo-keeps-current-revision",
+            "status": "pass"
+          },
+          {
+            "id": "large-mixed-document-preserves-nested-languages",
+            "status": "pass"
+          },
+          {
+            "id": "pending-cdp-composition-preserves-unicode-and-quotes",
+            "status": "pass"
+          },
+          {
+            "id": "pending-math-completion-keeps-priority-and-fast-path",
+            "status": "pass"
+          },
+          {
+            "id": "pending-quote-enter-preserves-native-command",
+            "status": "pass"
+          },
+          {
+            "id": "pending-quote-backspace-preserves-native-command",
+            "status": "pass"
+          },
+          {
+            "id": "pending-lazy-quote-enter",
+            "status": "pass"
+          },
+          {
+            "id": "pending-js-backtick-pair",
+            "status": "pass"
+          },
+          {
+            "id": "pending-js-string-quote",
+            "status": "pass"
+          },
+          {
+            "id": "pending-python-third-quote",
+            "status": "pass"
+          },
+          {
+            "id": "pending-js-closing-brace-indent",
+            "status": "pass"
+          },
+          {
+            "id": "pending-plain-leading-quote",
+            "status": "pass"
+          },
+          {
+            "id": "pending-js-backtick-delete-pair",
+            "status": "pass"
+          },
+          {
+            "id": "pending-js-word-delete",
+            "status": "pass"
+          },
+          {
+            "id": "pending-js-blank-line-indent",
+            "status": "pass"
+          },
+          {
+            "id": "pending-js-reindent",
+            "status": "pass"
+          },
+          {
+            "id": "pending-js-block-comment",
+            "status": "pass"
+          },
+          {
+            "id": "pending-js-matching-parenthesis",
+            "status": "pass"
+          },
+          {
+            "id": "pending-syntax-right",
+            "status": "pass"
+          },
+          {
+            "id": "pending-html-enter-indent",
+            "status": "pass"
+          },
+          {
+            "id": "pending-html-input-keeps-automatic-completion",
+            "status": "pass"
+          },
+          {
+            "id": "pending-python-explicit-completion",
+            "status": "pass"
+          },
+          {
+            "id": "pending-python-automatic-completion",
+            "status": "pass"
+          },
+          {
+            "id": "pending-fold-heading",
+            "status": "pass"
+          },
+          {
+            "id": "pending-fold-code",
+            "status": "pass"
+          },
+          {
+            "id": "pending-url-paste-over-selection",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "b4d1b069e89862c3d719d3216a0d635dc9f0ec2d62c69b18ddfbaee405340987"
+      },
+      {
+        "suite": "data-safety",
+        "probe": "tools/quality/data-safety.cjs",
+        "probeSha256": "4788aa8afe1bd13a158e6afbb2eca595d244422c92eb212afa8a7d171173bd26",
+        "total": 23,
+        "passed": true,
+        "cases": [
+          {
+            "id": "secondary-save-preserves-own-bom-eol",
+            "status": "pass"
+          },
+          {
+            "id": "secondary-save-keeps-both-saved-texts",
+            "status": "pass"
+          },
+          {
+            "id": "focused-primary-native-menu-save",
+            "status": "pass"
+          },
+          {
+            "id": "primary-pdf-exports-primary-with-secondary-open",
+            "status": "pass"
+          },
+          {
+            "id": "secondary-save-as-keeps-primary-path",
+            "status": "pass"
+          },
+          {
+            "id": "failed-save-as-retains-source-and-dirty-state",
+            "status": "pass"
+          },
+          {
+            "id": "same-file-two-windows-conflict-keeps-both-drafts",
+            "status": "pass"
+          },
+          {
+            "id": "external-change-with-identical-size-and-mtime-is-refused",
+            "status": "pass"
+          },
+          {
+            "id": "deleted-original-is-not-silently-recreated",
+            "status": "pass"
+          },
+          {
+            "id": "save-receipt-does-not-clear-later-edit",
+            "status": "pass"
+          },
+          {
+            "id": "late-save-receipt-does-not-change-new-document",
+            "status": "pass"
+          },
+          {
+            "id": "clean-view-reload-restores-revision-and-allows-later-save",
+            "status": "pass"
+          },
+          {
+            "id": "dirty-view-reload-cancel-preserves-unnamed-draft",
+            "status": "pass"
+          },
+          {
+            "id": "secondary-save-does-not-clear-primary-unsaved-close-guard",
+            "status": "pass"
+          },
+          {
+            "id": "save-and-close-with-cancelled-save-as-keeps-draft-and-cancels-close-intent",
+            "status": "pass"
+          },
+          {
+            "id": "utf16le-open-edit-reload-save-as-roundtrip",
+            "status": "pass"
+          },
+          {
+            "id": "utf16be-open-edit-reload-save-as-roundtrip",
+            "status": "pass"
+          },
+          {
+            "id": "odd-utf16-refused-without-mutating-current-document",
+            "status": "pass"
+          },
+          {
+            "id": "unpaired-utf16-refused-without-mutating-current-document",
+            "status": "pass"
+          },
+          {
+            "id": "utf32le-refused-without-mutating-current-document",
+            "status": "pass"
+          },
+          {
+            "id": "utf32be-refused-without-mutating-current-document",
+            "status": "pass"
+          },
+          {
+            "id": "invalid-utf8-refused-without-mutating-current-document",
+            "status": "pass"
+          },
+          {
+            "id": "utf8-nul-and-literal-replacement-character-remain-valid",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "8530e37f5463c1cd69e019361d473345c3003a99bac1cd2f7539512bcc0ee9d9"
+      },
+      {
+        "suite": "images",
+        "probe": "tools/quality/images.cjs",
+        "probeSha256": "cb10131ca8b5fd7e9ebac91ce88fad7cfa40009216eeb73f55a92f25df6a5266",
+        "total": 42,
+        "passed": true,
+        "cases": [
+          {
+            "id": "saved-screenshot-immediate",
+            "status": "pass"
+          },
+          {
+            "id": "long-document-paste-is-visible-without-extra-input",
+            "status": "pass"
+          },
+          {
+            "id": "image-start-boundary",
+            "status": "pass"
+          },
+          {
+            "id": "image-end-boundary",
+            "status": "pass"
+          },
+          {
+            "id": "ordinary-character-delete-creates-image",
+            "status": "pass"
+          },
+          {
+            "id": "source-address-remains-editable-inside",
+            "status": "pass"
+          },
+          {
+            "id": "inline-screenshot-immediate",
+            "status": "pass"
+          },
+          {
+            "id": "selection-replacement-undo-redo",
+            "status": "pass"
+          },
+          {
+            "id": "paste-keeps-origin-while-typing",
+            "status": "pass"
+          },
+          {
+            "id": "paste-replaced-selection-is-canceled",
+            "status": "pass"
+          },
+          {
+            "id": "same-text-reload-cancels-pending-image",
+            "status": "pass"
+          },
+          {
+            "id": "switch-document-cancels-pending-image",
+            "status": "pass"
+          },
+          {
+            "id": "two-pastes-keep-request-order",
+            "status": "pass"
+          },
+          {
+            "id": "undo-cancels-pending-image",
+            "status": "pass"
+          },
+          {
+            "id": "delete-image-balanced-url",
+            "status": "pass"
+          },
+          {
+            "id": "delete-image-html",
+            "status": "pass"
+          },
+          {
+            "id": "image-address-edit-and-stale-dialog-guard",
+            "status": "pass"
+          },
+          {
+            "id": "size-presets-are-distinct-stable-and-reversible",
+            "status": "pass"
+          },
+          {
+            "id": "size-presets-respect-editor-zoom",
+            "status": "pass"
+          },
+          {
+            "id": "image-menu-uses-second-image-identity",
+            "status": "pass"
+          },
+          {
+            "id": "image-attrs-quoted-greater",
+            "status": "pass"
+          },
+          {
+            "id": "image-attrs-balanced-parentheses",
+            "status": "pass"
+          },
+          {
+            "id": "image-attrs-html-entities",
+            "status": "pass"
+          },
+          {
+            "id": "image-attrs-data-src-boundary",
+            "status": "pass"
+          },
+          {
+            "id": "equal-length-middle-url-change-shows-new-pixels",
+            "status": "pass"
+          },
+          {
+            "id": "relative-file-data-copy-and-save-use-real-bytes",
+            "status": "pass"
+          },
+          {
+            "id": "two-windows-use-their-own-image-directory",
+            "status": "pass"
+          },
+          {
+            "id": "window-boot-and-new-document-preserve-session-identity",
+            "status": "pass"
+          },
+          {
+            "id": "concurrent-equal-size-images-never-overwrite-assets",
+            "status": "pass"
+          },
+          {
+            "id": "asset-created-during-save-is-never-overwritten",
+            "status": "pass"
+          },
+          {
+            "id": "failed-assets-write-keeps-inline-image",
+            "status": "pass"
+          },
+          {
+            "id": "unsaved-screenshot-renders-without-path",
+            "status": "pass"
+          },
+          {
+            "id": "mouse-combination-drag-copy-preserve-image-markdown",
+            "status": "pass"
+          },
+          {
+            "id": "readonly-directory-keeps-inline-image",
+            "status": "pass"
+          },
+          {
+            "id": "jpeg-webp-copy-save-preserve-format-bytes",
+            "status": "pass"
+          },
+          {
+            "id": "http-image-copy-save-use-original-bytes",
+            "status": "pass"
+          },
+          {
+            "id": "predecode-faults-do-not-swallow-real-screenshot",
+            "status": "pass"
+          },
+          {
+            "id": "custom-image-scale-has-useful-small-and-large-limits",
+            "status": "pass"
+          },
+          {
+            "id": "size-presets-follow-current-page-width",
+            "status": "pass"
+          },
+          {
+            "id": "high-image-next-to-table-keeps-image-menu",
+            "status": "pass"
+          },
+          {
+            "id": "document-switch-same-relative-name-updates-pixels",
+            "status": "pass"
+          },
+          {
+            "id": "extract-inline-image-cancels-on-concurrent-edit",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "96f0c2fee88f7d6f8782dc54732436aa72cf4b407ab658ece8bbc422929a4001"
+      },
+      {
+        "suite": "rich-workflows",
+        "probe": "tools/quality/rich-workflows.cjs",
+        "probeSha256": "c2b83bf226fd3123b16e194b9494c2fcc26aac522b7c2db66a7d1f36134bcd5e",
+        "total": 14,
+        "passed": true,
+        "cases": [
+          {
+            "id": "mixed-html-preserve-all-content-in-order",
+            "status": "pass"
+          },
+          {
+            "id": "wrapper-html-preserve-all-content-in-order",
+            "status": "pass"
+          },
+          {
+            "id": "bare-text-html-preserve-all-content-in-order",
+            "status": "pass"
+          },
+          {
+            "id": "adjacent-html-preserve-all-content-in-order",
+            "status": "pass"
+          },
+          {
+            "id": "single-html-preserve-all-content-in-order",
+            "status": "pass"
+          },
+          {
+            "id": "rich-no-table-html-preserve-all-content-in-order",
+            "status": "pass"
+          },
+          {
+            "id": "paragraph-bare-text-html-preserve-all-content-in-order",
+            "status": "pass"
+          },
+          {
+            "id": "uppercase-html-preserve-all-content-in-order",
+            "status": "pass"
+          },
+          {
+            "id": "nested-fallback-html-preserve-all-content-in-order",
+            "status": "pass"
+          },
+          {
+            "id": "merged-fallback-html-preserve-all-content-in-order",
+            "status": "pass"
+          },
+          {
+            "id": "one-row-html-preserve-all-content-in-order",
+            "status": "pass"
+          },
+          {
+            "id": "plain-tsv-html-preserve-all-content-in-order",
+            "status": "pass"
+          },
+          {
+            "id": "code-literal-html-preserve-all-content-in-order",
+            "status": "pass"
+          },
+          {
+            "id": "plain-shortcut-html-preserve-all-content-in-order",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "a9e17d4b8402b146ce633e2e13bc692d7c15741f9859248d90f24b4b96fed3e8"
+      },
+      {
+        "suite": "document-workflows",
+        "probe": "tools/quality/document-workflows.cjs",
+        "probeSha256": "605fa51853372c05ab4e4db9feb5df35ae54c45d388c2cb65da856efd4144bcb",
+        "total": 10,
+        "passed": true,
+        "cases": [
+          {
+            "id": "same-text-other-file-starts-empty-history",
+            "status": "pass"
+          },
+          {
+            "id": "new-empty-document-cannot-undo-deletion-in-old-file",
+            "status": "pass"
+          },
+          {
+            "id": "new-file-cannot-redo-old-file-edit",
+            "status": "pass"
+          },
+          {
+            "id": "different-text-open-does-not-undo-previous-file",
+            "status": "pass"
+          },
+          {
+            "id": "same-file-reload-preserves-undo-identical-bytes",
+            "status": "pass"
+          },
+          {
+            "id": "same-file-reload-preserves-undo-external-prefix",
+            "status": "pass"
+          },
+          {
+            "id": "explicit-reopen-same-path-starts-new-history",
+            "status": "pass"
+          },
+          {
+            "id": "open-from-active-cell-immediately-types-in-new-document",
+            "status": "pass"
+          },
+          {
+            "id": "open-keeps-focused-persistent-settings-control",
+            "status": "pass"
+          },
+          {
+            "id": "replacement-keeps-custom-keys-extras-and-open-source-pane",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "892d9605ffac71b4e0915c2dd682276cbbc5106e8ed8234003167e274f61e0e8"
+      },
+      {
+        "suite": "float-layout-workflows",
+        "probe": "tools/quality/float-layout-workflows.cjs",
+        "probeSha256": "de182879ec2dd45cd831c14e6bdc479a703ace2e530d95ede58d681509994bec",
+        "total": 10,
+        "passed": true,
+        "cases": [
+          {
+            "id": "quoted-long",
+            "status": "pass"
+          },
+          {
+            "id": "nested-quote-zoom",
+            "status": "pass"
+          },
+          {
+            "id": "block-narrow-zoom",
+            "status": "pass"
+          },
+          {
+            "id": "list-long",
+            "status": "pass"
+          },
+          {
+            "id": "fraction-block",
+            "status": "pass"
+          },
+          {
+            "id": "matrix-block",
+            "status": "pass"
+          },
+          {
+            "id": "split-long",
+            "status": "pass"
+          },
+          {
+            "id": "short-inline-control",
+            "status": "pass"
+          },
+          {
+            "id": "dense-next-paragraph",
+            "status": "pass"
+          },
+          {
+            "id": "dense-cover-fallback",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "d8e0b0e9daa7efd625ae288bf8d956cad546a5cf0a201a4e4cb40b976a8af8dd"
+      },
+      {
+        "suite": "region-workflows",
+        "probe": "tools/quality/region-workflows.cjs",
+        "probeSha256": "93312327ed745d18f7502e17fa6863ff6716f1bc6b5c7b9a87b3ead8b585482f",
+        "total": 13,
+        "passed": true,
+        "cases": [
+          {
+            "id": "image-standalone",
+            "status": "pass"
+          },
+          {
+            "id": "image-inline",
+            "status": "pass"
+          },
+          {
+            "id": "image-quote-scrolled",
+            "status": "pass"
+          },
+          {
+            "id": "image-html",
+            "status": "pass"
+          },
+          {
+            "id": "image-long-payload",
+            "status": "pass"
+          },
+          {
+            "id": "image-bad-source",
+            "status": "pass"
+          },
+          {
+            "id": "source-owned-code-eof",
+            "status": "pass"
+          },
+          {
+            "id": "source-owned-table-eof",
+            "status": "pass"
+          },
+          {
+            "id": "quote-context-0",
+            "status": "pass"
+          },
+          {
+            "id": "quote-context-1",
+            "status": "pass"
+          },
+          {
+            "id": "quote-context-2",
+            "status": "pass"
+          },
+          {
+            "id": "quote-context-3",
+            "status": "pass"
+          },
+          {
+            "id": "quote-comparison-literal",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "1488fb04639f3a4e9da90caeeb70431e1736ec89f49ff1a5e698900dc157088d"
+      },
+      {
+        "suite": "reload-workflows",
+        "probe": "tools/quality/reload-workflows.cjs",
+        "probeSha256": "ba8d2d7cd12b7274721ed84528a187dd45290f374a5086b7d251d210e6a9377c",
+        "total": 9,
+        "passed": true,
+        "cases": [
+          {
+            "id": "native-cell-selection-maps-without-command-flush",
+            "status": "pass"
+          },
+          {
+            "id": "save-error-recovery-save-as-returns-source-owner",
+            "status": "pass"
+          },
+          {
+            "id": "new-input-before-disk-read",
+            "status": "pass"
+          },
+          {
+            "id": "new-input-after-store-adoption",
+            "status": "pass"
+          },
+          {
+            "id": "persistent-native-control-during-read",
+            "status": "pass"
+          },
+          {
+            "id": "new-cell-owner-reverse-range-during-read",
+            "status": "pass"
+          },
+          {
+            "id": "same-width-inactive-cell-disk-reload",
+            "status": "pass"
+          },
+          {
+            "id": "document-switch-during-read",
+            "status": "pass"
+          },
+          {
+            "id": "canceled-reload-then-fresh-reload",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "7f7ad0e5baba6ed6a7adc7f176bfb1baec16f0d166095708cfdda6f0ecd3f69d"
+      },
+      {
+        "suite": "incremental-workflows",
+        "probe": "tools/quality/incremental-workflows.cjs",
+        "probeSha256": "d762d24ea8904dea5f3baae055e67c0a2eb622316623359e0d16762960a20ba5",
+        "total": 10,
+        "passed": true,
+        "cases": [
+          {
+            "id": "inline-formula-local-body",
+            "status": "pass"
+          },
+          {
+            "id": "quoted-multiline-formula-local-body",
+            "status": "pass"
+          },
+          {
+            "id": "standalone-image-local-alt",
+            "status": "pass"
+          },
+          {
+            "id": "quoted-image-local-alt",
+            "status": "pass"
+          },
+          {
+            "id": "closed-mermaid-same-length-body",
+            "status": "pass"
+          },
+          {
+            "id": "heading-space-removal",
+            "status": "pass"
+          },
+          {
+            "id": "heading-created-by-leading-letter-removal",
+            "status": "pass"
+          },
+          {
+            "id": "hr-retired-by-plain-letter",
+            "status": "pass"
+          },
+          {
+            "id": "inline-code-math-and-image-negatives",
+            "status": "pass"
+          },
+          {
+            "id": "parent-list-context-invalidates-inactive-block",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "7d3e3c16981e94e9a97eae39caaeda750bbc2c76d535723e7a522d6c5964b942"
+      },
+      {
+        "suite": "save-as-workflows",
+        "probe": "tools/quality/save-as-workflows.cjs",
+        "probeSha256": "b7667f81b0868c7286e02d4a29ac3bc884663fbb7a79b346afd1e75f63234635",
+        "total": 6,
+        "passed": true,
+        "cases": [
+          {
+            "id": "save-as-overlap-newer-path-wins",
+            "status": "pass"
+          },
+          {
+            "id": "save-as-cancel-keeps-source-owner",
+            "status": "pass"
+          },
+          {
+            "id": "save-as-newer-native-control-kept",
+            "status": "pass"
+          },
+          {
+            "id": "save-as-current-new-input-is-saved",
+            "status": "pass"
+          },
+          {
+            "id": "save-as-document-switch-late-grant",
+            "status": "pass"
+          },
+          {
+            "id": "save-as-grant-failure-returns-current-owner",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "42cee0c0de50a448484f50ed41c159e9dc653ff874dae6afd55856b7f8022a8c"
+      },
+      {
+        "suite": "command-workflows",
+        "probe": "tools/quality/command-workflows.cjs",
+        "probeSha256": "c1756d7b930924f3a8575b7ebd8f8d11099cffe1e63e1e95c80ccbb3549105f4",
+        "total": 3,
+        "passed": true,
+        "cases": [
+          {
+            "id": "async-context-cut-normal",
+            "status": "pass"
+          },
+          {
+            "id": "async-context-cut-selection-race",
+            "status": "pass"
+          },
+          {
+            "id": "async-context-cut-new-document",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "191f664bae1ea2cac7a3473680708d777c353d126e51133afd8afede4caa62e8"
+      },
+      {
+        "suite": "cell-reload-workflows-known-P2",
+        "probe": "docs/verification/quality-3.2.13/known-issues/cell-reload-workflows.cjs",
+        "probeSha256": "181ee155c02f8e759a480f9e61eb3acc639a3c4460c2a5802fa0b8722e855236",
+        "total": 1,
+        "passed": true,
+        "cases": [
+          {
+            "id": "active-cell-reverse-range-real-menu-reload-continue-history",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "8cf6e6f474406bb0c2672ab52509a21b700974618b61bc0db2e5458332a5b968"
+      },
+      {
+        "suite": "preview-controls-workflows",
+        "probe": "tools/quality/preview-controls-workflows.cjs",
+        "probeSha256": "d4283f1bd4b9cbb5c3fed9e892b2d54f84c4fe67f74066c58cbf36eaa9c7d547",
+        "total": 8,
+        "passed": true,
+        "cases": [
+          {
+            "id": "tall-braces-horizontal-natural-height",
+            "status": "pass"
+          },
+          {
+            "id": "native-setting-disable-and-source-history",
+            "status": "pass"
+          },
+          {
+            "id": "disabled-ordinary-caret-scroll-resize-zero-measures",
+            "status": "pass"
+          },
+          {
+            "id": "disabled-source-edits-skip-obstacle-scan",
+            "status": "pass"
+          },
+          {
+            "id": "preference-persists-and-shared-window-sync",
+            "status": "pass"
+          },
+          {
+            "id": "rapid-toggle-and-pending-document-retirement",
+            "status": "pass"
+          },
+          {
+            "id": "true-14-row-matrix-full-height",
+            "status": "pass"
+          },
+          {
+            "id": "light-theme-soft-boundary",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "981df5902c761cbcc237e2829ffa2da29b3a1101a09189087c805b35f176e756"
+      },
+      {
+        "suite": "note-entry-workflows",
+        "probe": "tools/quality/note-entry-workflows.cjs",
+        "probeSha256": "b91834c7299e7983bbcd758fc2b2ed976bf35f9b1649aa7f6d0d6b285a57f317",
+        "total": 9,
+        "passed": true,
+        "cases": [
+          {
+            "id": "split-right-forward-bold-immediate-history",
+            "status": "pass"
+          },
+          {
+            "id": "split-right-outside-preserves-drag-range",
+            "status": "pass"
+          },
+          {
+            "id": "split-middle-preserves-master",
+            "status": "pass"
+          },
+          {
+            "id": "master-right-body-menu-control",
+            "status": "pass"
+          },
+          {
+            "id": "active-cell-right-table-command-control",
+            "status": "pass"
+          },
+          {
+            "id": "native-query-right-keeps-input-context",
+            "status": "pass"
+          },
+          {
+            "id": "typed-query-first-enter",
+            "status": "pass"
+          },
+          {
+            "id": "insertText-query-first-enter",
+            "status": "pass"
+          },
+          {
+            "id": "insertText-replace-first-button",
+            "status": "pass"
+          }
+        ],
+        "originalReceiptSha256": "c81441eb831a8286be41a77402952cf5e465f38f718b0500d1e9f069c269e387"
+      }
+    ]
+  },
+  "unit": {
+    "tests": 169,
+    "pass": 169,
+    "fail": 0,
+    "receiptSha256": "5624382d989b7d8e9cd44f5777e0d86e0c278d1b1c4574c56b9c974950cdcf5f"
+  },
+  "preflight": {
+    "syntacticChecks": 124,
+    "passed": true,
+    "receiptSha256": "3da98bbe14818cc2633ad6ac37babc7729983f444e32adb87365916b10456028"
+  },
+  "negativeControls": {
+    "uniqueGuiMechanisms": 16,
+    "freshGuiMechanisms": 3,
+    "historicalRedMechanismsReused": 13,
+    "freshCurrentPositiveSuites": [
+      "source-layout-workflows",
+      "block-source-workflows",
+      "export-source-workflows",
+      "selection-workflows"
+    ],
+    "unchangedNodeGuardMechanisms": 2,
+    "passed": true,
+    "qualification": "13 historical real RED controls retained after gate-only whole-source AST and full application/runtime member comparison; corresponding final candidate cases newly GREEN. Three affected GUI mechanisms newly RED -> exact GREEN. Two unchanged real module publication/commit guards retain their exact module/probe identity.",
+    "retained": [
+      {
+        "arm": "inline-space",
+        "historicalRedReused": true,
+        "redAsarSha256": "2815d598146dca53eb3b8a7695895d8832ccf797414e28599724fb17c4230053",
+        "redReceiptSha256": "354ec311cc6ff099f27d83f899654cd0c12b08fcdf0b0006b7a03e1069d7ec63",
+        "originalProbeSha256": "bc4d78242d9a392b9349249998617bedabe261b35ca47a911a563e0939355625",
+        "finalGreenSuite": "source-layout-workflows",
+        "finalGreenCases": [
+          "inline-tall"
+        ],
+        "finalGreenAsarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+        "finalGreenReceiptSha256": "3afb9cb5b99cd13e516a6fff9b63abd22fad2eb9489af58ff6f112b2e37cc35a"
+      },
+      {
+        "arm": "table-floor",
+        "historicalRedReused": true,
+        "redAsarSha256": "73cece4244977b9208941392444550713e39162ed1bd9275315c2a1db337a058",
+        "redReceiptSha256": "317b3b9c9185c58f04c674e17f7327e14a9d39757b3401c09db8dc486a25da22",
+        "originalProbeSha256": "bc4d78242d9a392b9349249998617bedabe261b35ca47a911a563e0939355625",
+        "finalGreenSuite": "source-layout-workflows",
+        "finalGreenCases": [
+          "cell-sole-br-100"
+        ],
+        "finalGreenAsarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+        "finalGreenReceiptSha256": "3afb9cb5b99cd13e516a6fff9b63abd22fad2eb9489af58ff6f112b2e37cc35a"
+      },
+      {
+        "arm": "table-font",
+        "historicalRedReused": true,
+        "redAsarSha256": "bfb9f2119ec56e6454447077e4cd0d41b6678a5fd6669c6251190721a45d9d08",
+        "redReceiptSha256": "5ab684527a0fb95000493740b8378494b4849f2340fe27bb774167cd22784ef8",
+        "originalProbeSha256": "bc4d78242d9a392b9349249998617bedabe261b35ca47a911a563e0939355625",
+        "finalGreenSuite": "source-layout-workflows",
+        "finalGreenCases": [
+          "cell-long-145"
+        ],
+        "finalGreenAsarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+        "finalGreenReceiptSha256": "3afb9cb5b99cd13e516a6fff9b63abd22fad2eb9489af58ff6f112b2e37cc35a"
+      },
+      {
+        "arm": "table-point",
+        "historicalRedReused": true,
+        "redAsarSha256": "33c0d24e129ec7585a69b9b1d85b0739cadc5cb8fde42391ae4c226989c6cf82",
+        "redReceiptSha256": "1f65240ae3d1a6596ca8abfc2ef9689dc6abf8b3fd2b80c147d2d7cb41113f7c",
+        "originalProbeSha256": "bc4d78242d9a392b9349249998617bedabe261b35ca47a911a563e0939355625",
+        "finalGreenSuite": "source-layout-workflows",
+        "finalGreenCases": [
+          "cell-long-100"
+        ],
+        "finalGreenAsarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+        "finalGreenReceiptSha256": "3afb9cb5b99cd13e516a6fff9b63abd22fad2eb9489af58ff6f112b2e37cc35a"
+      },
+      {
+        "arm": "table-wheel",
+        "historicalRedReused": true,
+        "redAsarSha256": "fa8f10348d7dc054c1966a1dcc44b35a7d58022f234757c60535a50b4d696634",
+        "redReceiptSha256": "d0baaf8e4e8ab4cedd0f030e861f250879c2e9290b26f6b5804dab3b1768ecc6",
+        "originalProbeSha256": "bc4d78242d9a392b9349249998617bedabe261b35ca47a911a563e0939355625",
+        "finalGreenSuite": "source-layout-workflows",
+        "finalGreenCases": [
+          "cell-long-100"
+        ],
+        "finalGreenAsarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+        "finalGreenReceiptSha256": "3afb9cb5b99cd13e516a6fff9b63abd22fad2eb9489af58ff6f112b2e37cc35a"
+      },
+      {
+        "arm": "table-sizer",
+        "historicalRedReused": true,
+        "redAsarSha256": "7ba6f51251725f389a71494dd84cb082abeac2651d6ee323dc807b29f45d93ea",
+        "redReceiptSha256": "12a57d0149c455eef10636c2bbf3c2e9f2e22ec82f1aac2feb2f36b1f1461c1b",
+        "originalProbeSha256": "bc4d78242d9a392b9349249998617bedabe261b35ca47a911a563e0939355625",
+        "finalGreenSuite": "source-layout-workflows",
+        "finalGreenCases": [
+          "cell-long-100"
+        ],
+        "finalGreenAsarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+        "finalGreenReceiptSha256": "3afb9cb5b99cd13e516a6fff9b63abd22fad2eb9489af58ff6f112b2e37cc35a"
+      },
+      {
+        "arm": "table-viewport",
+        "historicalRedReused": true,
+        "redAsarSha256": "e68f7c28cf735dbac93cb22948a37979012a0a8d6eaf7d8ccdb750bdc3eb0d25",
+        "redReceiptSha256": "5c75a5bf26409595247da30c44ca0b9f2e6160e54bd9500e8e86ef9073de8a0d",
+        "originalProbeSha256": "bc4d78242d9a392b9349249998617bedabe261b35ca47a911a563e0939355625",
+        "finalGreenSuite": "source-layout-workflows",
+        "finalGreenCases": [
+          "cell-five-channel-and-shrink"
+        ],
+        "finalGreenAsarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+        "finalGreenReceiptSha256": "3afb9cb5b99cd13e516a6fff9b63abd22fad2eb9489af58ff6f112b2e37cc35a"
+      },
+      {
+        "arm": "image-preescape",
+        "historicalRedReused": true,
+        "redAsarSha256": "d2f69a1f728feca70ab8204948947beb4a1d6c93089bcc9ebd188eef6d91b318",
+        "redReceiptSha256": "2ac2ec13121432bff4dcf60bdb1dc8b0b2be7e0d235ca2ac19cecebd30872d54",
+        "originalProbeSha256": "77f71656ced6594e29a6d476848e5d08788508d43e250b60a1fc42b2a60df4e9",
+        "finalGreenSuite": "export-source-workflows",
+        "finalGreenCases": [
+          "dirty-body-and-cell-folder-export",
+          "cross-directory-save-as-assets",
+          "unsaved-document-export-and-isolation",
+          "inline-export-angle-space-map",
+          "inline-export-amp-src-alt",
+          "inline-export-raw-entity-map",
+          "inline-export-sanitize-image-attrs-styles",
+          "inline-export-quotes-alt",
+          "inline-export-image-before-after-code",
+          "inline-export-leftmost-raw-and-markdown-atoms",
+          "inline-export-code-literal-math-link-image-strong",
+          "inline-export-bold-wrapper-image",
+          "inline-export-math-toggle-with-code",
+          "inline-export-invalid-tex-fallback",
+          "inline-export-angle-parenthesized-url",
+          "inline-export-markdown-title-consumed",
+          "inline-export-user-nul-token-collision",
+          "inline-export-malformed-literal",
+          "inline-export-table-image-and-code-once"
+        ],
+        "finalGreenAsarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+        "finalGreenReceiptSha256": "00e08dfc388c7d31b65b38576376e85971ab44cea0efc127855bc27250fff2c3"
+      },
+      {
+        "arm": "image-code",
+        "historicalRedReused": true,
+        "redAsarSha256": "127dc3b505e55ccf5abe41b8865ec92aa80be60a93c3d03b656d1e46e2639fc4",
+        "redReceiptSha256": "3b2ddfd09a4454de01749c14a63505cfaf7e8870a801762a4d7fcbe185a5def4",
+        "originalProbeSha256": "77f71656ced6594e29a6d476848e5d08788508d43e250b60a1fc42b2a60df4e9",
+        "finalGreenSuite": "export-source-workflows",
+        "finalGreenCases": [
+          "dirty-body-and-cell-folder-export",
+          "cross-directory-save-as-assets",
+          "unsaved-document-export-and-isolation",
+          "inline-export-angle-space-map",
+          "inline-export-amp-src-alt",
+          "inline-export-raw-entity-map",
+          "inline-export-sanitize-image-attrs-styles",
+          "inline-export-quotes-alt",
+          "inline-export-image-before-after-code",
+          "inline-export-leftmost-raw-and-markdown-atoms",
+          "inline-export-code-literal-math-link-image-strong",
+          "inline-export-bold-wrapper-image",
+          "inline-export-math-toggle-with-code",
+          "inline-export-invalid-tex-fallback",
+          "inline-export-angle-parenthesized-url",
+          "inline-export-markdown-title-consumed",
+          "inline-export-user-nul-token-collision",
+          "inline-export-malformed-literal",
+          "inline-export-table-image-and-code-once"
+        ],
+        "finalGreenAsarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+        "finalGreenReceiptSha256": "00e08dfc388c7d31b65b38576376e85971ab44cea0efc127855bc27250fff2c3"
+      },
+      {
+        "arm": "image-double-escape",
+        "historicalRedReused": true,
+        "redAsarSha256": "77143a51f6416409847610ce2bb10175f0dfaf0c2014776d5e1f0c850f226baf",
+        "redReceiptSha256": "187701dc3b63efb52fecf9f8a6ee21be83f743f3c29f8dfbd6b5cc88e23fb816",
+        "originalProbeSha256": "77f71656ced6594e29a6d476848e5d08788508d43e250b60a1fc42b2a60df4e9",
+        "finalGreenSuite": "export-source-workflows",
+        "finalGreenCases": [
+          "dirty-body-and-cell-folder-export",
+          "cross-directory-save-as-assets",
+          "unsaved-document-export-and-isolation",
+          "inline-export-angle-space-map",
+          "inline-export-amp-src-alt",
+          "inline-export-raw-entity-map",
+          "inline-export-sanitize-image-attrs-styles",
+          "inline-export-quotes-alt",
+          "inline-export-image-before-after-code",
+          "inline-export-leftmost-raw-and-markdown-atoms",
+          "inline-export-code-literal-math-link-image-strong",
+          "inline-export-bold-wrapper-image",
+          "inline-export-math-toggle-with-code",
+          "inline-export-invalid-tex-fallback",
+          "inline-export-angle-parenthesized-url",
+          "inline-export-markdown-title-consumed",
+          "inline-export-user-nul-token-collision",
+          "inline-export-malformed-literal",
+          "inline-export-table-image-and-code-once"
+        ],
+        "finalGreenAsarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+        "finalGreenReceiptSha256": "00e08dfc388c7d31b65b38576376e85971ab44cea0efc127855bc27250fff2c3"
+      },
+      {
+        "arm": "image-entity",
+        "historicalRedReused": true,
+        "redAsarSha256": "f72900e57da0f9e629a0832aceccbe7fd322ae3495547be13b086a82b0343b07",
+        "redReceiptSha256": "5b83dd829fadf2b1ef80b31b7c7d6fe3fbcbb789f25252130befec55f9f6ce01",
+        "originalProbeSha256": "77f71656ced6594e29a6d476848e5d08788508d43e250b60a1fc42b2a60df4e9",
+        "finalGreenSuite": "export-source-workflows",
+        "finalGreenCases": [
+          "dirty-body-and-cell-folder-export",
+          "cross-directory-save-as-assets",
+          "unsaved-document-export-and-isolation",
+          "inline-export-angle-space-map",
+          "inline-export-amp-src-alt",
+          "inline-export-raw-entity-map",
+          "inline-export-sanitize-image-attrs-styles",
+          "inline-export-quotes-alt",
+          "inline-export-image-before-after-code",
+          "inline-export-leftmost-raw-and-markdown-atoms",
+          "inline-export-code-literal-math-link-image-strong",
+          "inline-export-bold-wrapper-image",
+          "inline-export-math-toggle-with-code",
+          "inline-export-invalid-tex-fallback",
+          "inline-export-angle-parenthesized-url",
+          "inline-export-markdown-title-consumed",
+          "inline-export-user-nul-token-collision",
+          "inline-export-malformed-literal",
+          "inline-export-table-image-and-code-once"
+        ],
+        "finalGreenAsarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+        "finalGreenReceiptSha256": "00e08dfc388c7d31b65b38576376e85971ab44cea0efc127855bc27250fff2c3"
+      },
+      {
+        "arm": "save-assets",
+        "historicalRedReused": true,
+        "redAsarSha256": "9239aeb79d32092013059dc7f2ad847c22eee74a4fbef1efd5c1fd4aae46551c",
+        "redReceiptSha256": "be037f9ca592541b09c0674e0b1602121dc1a565c5d21a904e8699502200a0eb",
+        "originalProbeSha256": "77f71656ced6594e29a6d476848e5d08788508d43e250b60a1fc42b2a60df4e9",
+        "finalGreenSuite": "export-source-workflows",
+        "finalGreenCases": [
+          "dirty-body-and-cell-folder-export",
+          "cross-directory-save-as-assets",
+          "unsaved-document-export-and-isolation",
+          "inline-export-angle-space-map",
+          "inline-export-amp-src-alt",
+          "inline-export-raw-entity-map",
+          "inline-export-sanitize-image-attrs-styles",
+          "inline-export-quotes-alt",
+          "inline-export-image-before-after-code",
+          "inline-export-leftmost-raw-and-markdown-atoms",
+          "inline-export-code-literal-math-link-image-strong",
+          "inline-export-bold-wrapper-image",
+          "inline-export-math-toggle-with-code",
+          "inline-export-invalid-tex-fallback",
+          "inline-export-angle-parenthesized-url",
+          "inline-export-markdown-title-consumed",
+          "inline-export-user-nul-token-collision",
+          "inline-export-malformed-literal",
+          "inline-export-table-image-and-code-once"
+        ],
+        "finalGreenAsarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+        "finalGreenReceiptSha256": "00e08dfc388c7d31b65b38576376e85971ab44cea0efc127855bc27250fff2c3"
+      },
+      {
+        "arm": "absolute-image",
+        "historicalRedReused": true,
+        "redAsarSha256": "4ffbd4cfc9d7007f609148a6dcc5574740b4d8e5288618f507f36593dbb02698",
+        "redReceiptSha256": "48c91f550d20893d023bf896d2c062388677ecf71ca3e6a0d4d53ca8f13ebbbd",
+        "originalProbeSha256": "77f71656ced6594e29a6d476848e5d08788508d43e250b60a1fc42b2a60df4e9",
+        "finalGreenSuite": "export-source-workflows",
+        "finalGreenCases": [
+          "dirty-body-and-cell-folder-export",
+          "cross-directory-save-as-assets",
+          "unsaved-document-export-and-isolation",
+          "inline-export-angle-space-map",
+          "inline-export-amp-src-alt",
+          "inline-export-raw-entity-map",
+          "inline-export-sanitize-image-attrs-styles",
+          "inline-export-quotes-alt",
+          "inline-export-image-before-after-code",
+          "inline-export-leftmost-raw-and-markdown-atoms",
+          "inline-export-code-literal-math-link-image-strong",
+          "inline-export-bold-wrapper-image",
+          "inline-export-math-toggle-with-code",
+          "inline-export-invalid-tex-fallback",
+          "inline-export-angle-parenthesized-url",
+          "inline-export-markdown-title-consumed",
+          "inline-export-user-nul-token-collision",
+          "inline-export-malformed-literal",
+          "inline-export-table-image-and-code-once"
+        ],
+        "finalGreenAsarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+        "finalGreenReceiptSha256": "00e08dfc388c7d31b65b38576376e85971ab44cea0efc127855bc27250fff2c3"
+      }
+    ],
+    "fresh": [
+      {
+        "arm": "block-fold",
+        "redReceiptSha256": "e458467f3d68535774d7b6495116cea7496a824eae24c81a2a28207c8d9fee1f",
+        "greenReceiptSha256": "f01bf3c6a357bf6c743984544a162ea6e82e05b4931aa3b56b07be6d9da2b4df",
+        "redAsarSha256": "bfedc1ccbf666bc6213c2123c0179cc83f0df2a4c2af800790e649fdc5a6c7df",
+        "greenAsarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+        "probeSha256": "b23702366f537cef71b2f091795dd1baa3eaeb97e75a759ffcc16c94bef0e443"
+      },
+      {
+        "arm": "block-pointer",
+        "redReceiptSha256": "c888165a0c5d942b5d05d53af24c4d483a6068faaa59bbb35553842e527093c0",
+        "greenReceiptSha256": "f0004f1e73585c976bfb51b8244685641b2a2e90812523f62227e1c686180d7c",
+        "redAsarSha256": "c711c292cbd03061f6a1462bb487e813cb32b4d0fb80914d7dbfea322e0c7529",
+        "greenAsarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+        "probeSha256": "b23702366f537cef71b2f091795dd1baa3eaeb97e75a759ffcc16c94bef0e443"
+      },
+      {
+        "arm": "block-native-vertical",
+        "redReceiptSha256": "14e246775e203fd996b3f53109a7258963ea959370b7004d44f150a20cb9c2a3",
+        "greenReceiptSha256": "3cf67c2fa886283b54cb3810afa6aabc274bc19d22ccc8088d8558eaf1df2447",
+        "redAsarSha256": "f68b66c538ea5411df70f1be110057dc1812f3dd4ef386a81168257039ff0f39",
+        "greenAsarSha256": "abd3354806fc661cb60224b03cc04f7776d039ede487bcfd540a6de17742e8c1",
+        "probeSha256": "e424c38cf49b8c30329d72c6fc3c58d00206ef8b9bd7dc95311ccf1900bfde5b"
+      }
+    ]
+  },
+  "visual": {
+    "actualImageReadCalls": 35,
+    "kind": "18 original layout; 9 new native-fence; 8 actual HTML/range supplement",
+    "rootReportsRead": true,
+    "rootCorrectionsConsumed": true,
+    "noBlocker": true,
+    "privatePixelsNotPublished": true,
+    "scope": "Local screenshots plus original selection/geometry/source bytes; does not claim OS or physical IME testing."
+  },
+  "performance": {
+    "budgetMs": 50,
+    "finalSteadyP95Ms": [
+      21,
+      22,
+      21,
+      19,
+      41,
+      21,
+      21
+    ],
+    "allWithinExistingBudget": true,
+    "noUniversalSpeedupClaim": true
+  },
+  "packaging": {
+    "frozenStageOnly": true,
+    "rebuildAfterAcceptance": false,
+    "payloads": [
+      {
+        "file": "production/markpilot-3.3.3-portable.exe",
+        "archiveSha256": "9885ffed647986a6f72da5c9b34e2aded982ea4b43ff62ded1f0d75c63c31a09",
+        "passed": true
+      },
+      {
+        "file": "production/markpilot-Setup-3.3.3.exe",
+        "archiveSha256": "1113ccb4076136f43429b885b6c19808862adc97bff049bb27954645f9863cc8",
+        "passed": true
+      },
+      {
+        "file": "isolated/markpilot-quality-Setup-3.3.3.exe",
+        "archiveSha256": "e7dfe03e300faa64b9a40194a2d6b85db637281ab58e2f222edcb74e7f7d0bd4",
+        "passed": true
+      }
+    ],
+    "isolatedInstallation": {
+      "actualInstalledVerifiedUninstalled": true,
+      "spacePath": true,
+      "originalRegistryRestored": true
+    },
+    "portable": {
+      "actualCases": 9,
+      "passed": true,
+      "cleanupResidual": []
+    }
+  },
+  "assets": [
+    {
+      "name": "markpilot-3.3.3-portable.exe",
+      "bytes": 84388073,
+      "sha256": "9885ffed647986a6f72da5c9b34e2aded982ea4b43ff62ded1f0d75c63c31a09"
+    },
+    {
+      "name": "markpilot-Setup-3.3.3.exe",
+      "bytes": 84652524,
+      "sha256": "1113ccb4076136f43429b885b6c19808862adc97bff049bb27954645f9863cc8"
+    }
+  ],
+  "limitations": [
+    "No coverage percentage inferred from synthetic case counts",
+    "Image grammar remains bounded; not complete CommonMark/HTML named-entity support",
+    "CDP trusted input is not physical OS/IME verification",
+    "Normal local upgrade is separate from the completed isolated installation boundary"
+  ]
+}

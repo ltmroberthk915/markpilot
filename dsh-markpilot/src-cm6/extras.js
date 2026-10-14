@@ -14,6 +14,7 @@ import { EditorSelection } from '@codemirror/state';
 import { SearchQuery, getSearchQuery, setSearchQuery } from '@codemirror/search';
 import { reserveImageInsertion, captureImageDocument } from './image-insertion.js';
 import { mathSourcePosition } from './math-source-map.js';
+import { inlineImageAtoms, collectImageRefs, decodeImageAttribute } from './resource-images.js';
 /* 【Typora 社区主题·2026-10-09】用户想直接用 Typora 的主题 CSS。
    改写逻辑**不在这里另写一份**：2.x 线早有一份纯函数实现（`user-theme.mjs` 的 adaptTyporaTheme）
    ——`#write` → 我们的写作区、`:root` 变量挂到作用域属性上、带相对 url() 的 @font-face 丢掉、
@@ -666,15 +667,6 @@ export function installExtras(deps) {
   const mdTitle = (md) => ((md.split('\n').find((l) => /^#\s+/.test(l)) || '# MarkPilot 导出').replace(/^#\s+/, '').trim() || 'MarkPilot 导出');
   const safeFileName = (s) => String(s).replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim().slice(0, 60) || 'markpilot';
 
-  /** 收集正文里出现的图片地址（markdown 与原始 <img> 两种写法都算），去重后返回 */
-  function collectImageRefs(md) {
-    const out = new Set();
-    for (const m of md.matchAll(/!\[[^\]]*\]\((?:<([^>]*)>|([^)\s]+))(?:\s+["'][^"']*["'])?\)/g)) out.add(String(m[1] || m[2] || '').trim());
-    for (const m of md.matchAll(/<img\b[^>]*\bsrc\s*=\s*"([^"]*)"/gi)) out.add(m[1].trim());
-    for (const m of md.matchAll(/<img\b[^>]*\bsrc\s*=\s*'([^']*)'/gi)) out.add(m[1].trim());
-    out.delete('');
-    return [...out];
-  }
   /** 图片地址映射：命中映射的换成相对路径（assets/x.png），其余原样（外链、data:、复制失败） */
   function mapSrc(raw, srcMap) {
     const s = String(raw == null ? '' : raw).trim().replace(/^<|>$/g, '');
@@ -700,22 +692,17 @@ export function installExtras(deps) {
     return kept.length ? kept.join('; ') : null;
   };
   const attrEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  /* 【只转义一次】markdown 图片语法那条路处理的是**已经过 esc() 的整行**（esc 管 `& < >`，不管引号），
-     到那儿再套一遍 attrEsc 会把 `a&b.png` 变成 `a&amp;amp;b.png` ⇒ 导出件里图直接裂
-     （实测：`![A & B](assets/a&b.png)` 的 naturalWidth=0；原始 `<img>` 那条路只转义一次，反而正常）。
-     那条路只缺"引号"这一层防护 ⇒ 用只转引号的 quoteEsc：补住属性位注入，又不二次转义。 */
-  const quoteEsc = (s) => String(s).replace(/"/g, '&quot;');
   /** 行内语法；srcMap 只影响 <img> 的地址；其余属性按白名单收拾（内联样式限三件套、事件处理器不带出） */
   const rewriteImgTag = (tag, srcMap) => String(tag)
-    .replace(/(\bsrc\s*=\s*)(["'])([^"']*)\2/i, (_m, p, q, u) => p + q + mapSrc(u, srcMap) + q)
     .replace(/^<img\b([^>]*?)\s*\/?>$/i, (_m, attrs) => {
       const keep = [];
       for (const a of String(attrs).matchAll(/([:\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g)) {
         const name = a[1].toLowerCase();
-        const value = a[2] != null ? a[2] : (a[3] != null ? a[3] : (a[4] || ''));
+        const raw = a[2] != null ? a[2] : (a[3] != null ? a[3] : (a[4] || ''));
+        const value = decodeImageAttribute(raw);
         if (name === 'style') { const s = cleanStyle(value); if (s) keep.push('style="' + s + '"'); continue; }
         if (!IMG_ATTRS.has(name)) continue;
-        keep.push(name + '="' + attrEsc(value) + '"');
+        keep.push(name + '="' + attrEsc(name === 'src' ? mapSrc(value, srcMap) : value) + '"');
       }
       return '<img' + (keep.length ? ' ' + keep.join(' ') : '') + '>';
     });
@@ -883,29 +870,32 @@ export function installExtras(deps) {
   /** 单段行内渲染（`inlineMd` 的逐段内核；输入里不再含 `<br>` 白名单命中段）。 */
   function inlineMdSeg(line, srcMap, math = false) {
     const stash = [];
-    let s = String(line);
+    const source = String(line);
+    let mark = '\u0000M';
+    while (source.includes(mark)) mark += 'M';
+    const PH = i => mark + i + '\u0000';
+    // Protect raw atoms in their source order, before HTML escaping or inline
+    // formatting. URLs stay raw for mapSrc; code contents remain literal.
+    let s = source.replace(inlineImageAtoms(),
+      (atom, code, alt, angle, plain) => {
+        const html = code != null ? `<code>${esc(code)}</code>`
+          : /^<img\b/i.test(atom) ? rewriteImgTag(atom, srcMap)
+            : `<img alt="${attrEsc(alt)}" src="${attrEsc(mapSrc(angle != null ? angle : plain, srcMap))}">`;
+        return PH(stash.push(html) - 1);
+      });
     if (math && mathApi) {
       // $$…$$ 先切（引擎对**行中段** $$…$$ 也是按行内渲染，见 main.js scanMathSpans 注释）
       s = s.replace(/(^|[^\\$])\$\$([^$]+?)\$\$/g, (_m, lead, tex) => lead + PH(stash.push(mathInlineHtml(tex.trim())) - 1))
         // 行内 $…$：与引擎同口径（前一个字符是 `\` 或 `$` 的 $ 不算起手）
         .replace(/(^|[^\\$])\$([^$\n]+)\$/g, (_m, lead, tex) => lead + PH(stash.push(mathInlineHtml(tex)) - 1));
     }
-    // 【实测踩坑】原始 <img> 标签要**原样留成 HTML、只重写 src**：早先把整行先替换再 esc，
-    // 结果 `<` 被转义成 &lt;，5 个 HTML 图片在导出里全成了字面文本（旧版导出更是直接丢图）。
-    const parts = s.split(/(<img\b[^>]*>)/gi);
-    let out = parts.map((p) => (/^<img\b/i.test(p) ? rewriteImgTag(p, srcMap) : esc(p))).join('')
+    let out = esc(s)
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/!\[([^\]]*)\]\((?:<([^>]*)>|([^)\s]+))(?:\s+["'][^"']*["'])?\)/g,
-        // alt/src 是裸插值进属性位的：必须转义引号，否则 `![" onerror="alert(1)](a.png)` 会打出真事件处理器；
-        // 但这行**已经过 esc()**，所以这里只补引号那一层（quoteEsc）——再套 attrEsc 会把 `&` 二次转义、图裂。
-        (_m, alt, angle, plain) => `<img alt="${quoteEsc(alt)}" src="${quoteEsc(mapSrc(angle || plain, srcMap))}">`)
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-    if (stash.length) out = out.replace(/\u0000M(\d+)\u0000/g, (_m, i) => stash[+i]);
     // 未做公式排版（复制知乎/微信，或渲染器不可用）时保持旧观感：$…$ 仍是 <code>
-    else out = out.replace(/\$([^$\n]+)\$/g, '<code>$1</code>');
-    return out;
+    if (!math || !mathApi) out = out.replace(/\$([^$\n]+)\$/g, '<code>$1</code>');
+    return out.replace(new RegExp(mark + '(\\d+)\u0000', 'g'), (_m, i) => stash[+i]);
   }
   /** 正文分块生成器：边扫边吐块，调用方拿到一块就能写走（不攒整篇）
    *  【公式排版】opts.math=true 时块级公式走 KaTeX display（复用引擎 renderMathHTML）：

@@ -33,9 +33,10 @@ function classify(raw, { docPath } = {}) {
     try { abs = fileURLToPath(src); } catch { abs = null; }
     return abs ? local(abs, src) : { kind: 'remote', src };
   }
-  if (isExternal(src)) return { kind: 'remote', src };
+  if (/^\/\//.test(src)) return { kind: 'remote', src };
   const decoded = decode(src).replace(/\//g, path.sep);
   if (path.isAbsolute(decoded) || isAbsWin(decoded)) return local(path.normalize(decoded), src);
+  if (isExternal(src)) return { kind: 'remote', src };
   if (!docPath) return { kind: 'unresolved', src };
   return local(path.resolve(path.dirname(docPath), decoded), src);
 }

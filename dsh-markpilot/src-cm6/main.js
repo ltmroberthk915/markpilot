@@ -38,7 +38,7 @@ import { createRegionIndex, regionAt, regionsBetween } from './region-index.js';
 import { createRegionSession, activateRegion, retireRegion, expandRegionPayload } from './region-session.js';
 import { containerContext, createContainerContextReader, bindContainer } from './container-presentation.js';
 import { createRenderLifecycle } from './render-lifecycle.js';
-import { createViewportIntent } from './viewport-intent.js';
+import { createViewportIntent, scrollViewportBounds } from './viewport-intent.js';
 import { createCommandContext, applySourceHistory } from './command-context.js';
 import { editPlan, inlineCodeRanges, rangesTouching } from './edit-plan.js';
 import { installToolbar, wrap as wrapInline, TOOLBAR_ACTIONS } from "./toolbar.js";
@@ -471,6 +471,7 @@ class MathPreview extends WidgetType {
     const html = renderMathHTML(this.tex, this.display);
     if (html != null) span.innerHTML = html;
     else span.textContent = this.tex;
+    if (!this.display && !this.live) rememberInlineMathMetrics(inputView, this.region, span);
     if (this.display) rememberBlockHeight(this.tex, span, this.live,this.region,lease);
     return span;
   }
@@ -485,6 +486,55 @@ class MathPreview extends WidgetType {
   }
   ignoreEvent() { return false; } // 点击交给 view → 源码落位
   destroy(dom) { rendererLifecycle.release(dom); }
+}
+
+// KaTeX already supplies ascent/depth in em. Keep that region's last rendered
+// metrics while its source is open, without reading layout or cloning glyphs.
+const inlineMathMetrics = new Map();
+function inlineMetricKey(inputView, region) {
+  return region ? inputView.state.field(regionIndexField).epoch + ':' + region.id : null;
+}
+function rememberInlineMathMetrics(inputView, region, dom) {
+  const key = inlineMetricKey(inputView, region);
+  if (!key) return null;
+  let ascent = 0, depth = 0, found = false;
+  for (const strut of dom.querySelectorAll('.katex-html > .katex-base > .katex-strut, .katex-html > .base > .strut')) {
+    if (!strut.style.height.endsWith('em')) continue;
+    const height = parseFloat(strut.style.height), below = -(parseFloat(strut.style.verticalAlign) || 0);
+    if (!Number.isFinite(height) || !Number.isFinite(below)) continue;
+    ascent = Math.max(ascent, height - below); depth = Math.max(depth, below); found = true;
+  }
+  if (!found) { inlineMathMetrics.delete(key); return null; }
+  const metrics = { ascent, depth };
+  inlineMathMetrics.delete(key); inlineMathMetrics.set(key, metrics);
+  if (inlineMathMetrics.size > 256) inlineMathMetrics.delete(inlineMathMetrics.keys().next().value);
+  return metrics;
+}
+class InlineMathSpace extends WidgetType {
+  constructor(tex, region, epoch) {
+    super(); this.tex = tex; this.region = region; this.epoch = epoch;
+    this.metrics = inlineMathMetrics.get(epoch + ':' + region?.id);
+  }
+  eq(other) {
+    return other.epoch === this.epoch && other.region?.id === this.region?.id &&
+      other.region?.contextVersion === this.region?.contextVersion &&
+      (this.metrics && other.metrics ? this.metrics.ascent === other.metrics.ascent && this.metrics.depth === other.metrics.depth : other.tex === this.tex);
+  }
+  toDOM(inputView) {
+    if (!this.metrics) {
+      const rendered = document.createElement('span'), html = renderMathHTML(this.tex, false);
+      if (html) rendered.innerHTML = html;
+      this.metrics = rememberInlineMathMetrics(inputView, this.region, rendered);
+    }
+    const space = document.createElement('span');
+    space.className = 'katex mp-inline-math-space'; space.setAttribute('aria-hidden', 'true');
+    if (this.metrics) {
+      space.style.height = (this.metrics.ascent + this.metrics.depth) + 'em';
+      space.style.verticalAlign = -this.metrics.depth + 'em';
+    }
+    return space;
+  }
+  ignoreEvent() { return true; }
 }
 
 /* ══ 引擎级偏好（版心宽度 / 内容缩放 / 工具岛尺寸 / 状态栏）═════════════════════════
@@ -1160,6 +1210,9 @@ function buildInlineMath(state, spans = state.field(mathSpansField).spans) {
     if (s.display) continue; // 块级走 blockMathField（StateField 直供）
     const sel = inSel(s);
     if (headIn(s)) {
+      const region = regionAt(state.field(regionIndexField), s.from, 'math');
+      out.push(Decoration.widget({ mpRegion: region?.id,
+        widget: new InlineMathSpace(s.tex, region, state.field(regionIndexField).epoch), side: -1 }).range(s.from));
       if (head >= s.from && head <= s.to && s.tex) {
         // 【用户裁定·Typora 行为】编辑预览＝浮动层（absolute 浮于源码上方），
         // 不占排版流——点开公式时正文/后续段落零移动；只有源码展开本身改变
@@ -1221,6 +1274,54 @@ const mathDecorations = StateField.define({
  *  ＋选中底色，与行内同规则（D8）。
  *  注意：create 里不许读别的 field（CM6 规则）——直接重扫；update 读
  *  mathSpansField 依赖扩展序（mathSpansField 排在前）。 */
+const blockFenceLayouts = new WeakMap();
+function blockFenceLayout(state, span) {
+  const cached = blockFenceLayouts.get(span);
+  if (cached?.doc === state.doc) return cached.ranges;
+  const opening = state.doc.lineAt(span.from), closing = state.doc.lineAt(span.to);
+  const prefix = line => quoteLead(line.text).off;
+  const bodyLines = closing.number - opening.number - 1, map = span.texMap;
+  let ranges = null;
+  if (bodyLines > 0 && span.tex && map?.length === bodyLines &&
+      opening.from === span.from && closing.to === span.to &&
+      opening.text.slice(prefix(opening)).trim() === '$$' && closing.text.slice(prefix(closing)).trim() === '$$') {
+    const first = state.doc.line(opening.number + 1), last = state.doc.line(closing.number - 1);
+    if (map[0].docFrom === first.from + prefix(first) && map[map.length - 1].docFrom === last.from + prefix(last)) {
+      ranges = [[opening.to, map[0].docFrom], [last.to, closing.from + prefix(closing)]];
+    }
+  }
+  blockFenceLayouts.set(span, { doc: state.doc, ranges });
+  return ranges;
+}
+function mathFencePointerPosition(state, pos) {
+  const index = state.field(regionIndexField, false), region = regionAt(index, pos, 'math');
+  if (!region?.data.display || !state.field(regionSessionField, false)?.presentation.get(region.id)?.editing) return pos;
+  const ranges = blockFenceLayout(state, region.data);
+  if (!ranges) return pos;
+  if (pos >= ranges[0][0] && pos <= ranges[0][1]) return ranges[0][1];
+  if (pos >= ranges[1][0] && pos <= ranges[1][1]) return ranges[1][0];
+  return pos;
+}
+const mathFencePointerSelection = EditorState.transactionFilter.of(tr => {
+  if (tr.docChanged || !tr.selection) return tr;
+  // Native vertical hit-testing can choose a hidden fence-break alias. Resolve
+  // it at the same source boundary as pointer input, preserving the visual goal.
+  // The native annotation extender runs later, so use this view's live key intent.
+  const nativeVertical = view?.__mpVerticalInput && view.state === tr.startState &&
+    tr.annotation(Transaction.userEvent) === 'select';
+  if (!tr.isUserEvent('select.pointer') && !nativeVertical) return tr;
+  const state = tr.startState, selection = tr.newSelection;
+  let changed = false;
+  const ranges = selection.ranges.map(range => {
+    const head = mathFencePointerPosition(state, range.head);
+    const keepAnchor = !range.empty && state.selection.ranges.some(old => old.anchor === range.anchor);
+    const anchor = keepAnchor ? range.anchor : mathFencePointerPosition(state, range.anchor);
+    if (head === range.head && anchor === range.anchor) return range;
+    changed = true;
+    return EditorSelection.range(anchor, head, range.goalColumn, range.bidiLevel, range.assoc);
+  });
+  return changed ? [tr, { selection: EditorSelection.create(ranges, selection.mainIndex), annotations: Transaction.addToHistory.of(false) }] : tr;
+});
 function buildBlockMath(state, spans) {
   const out = [];
   const head = state.selection.main.head;
@@ -1230,6 +1331,12 @@ function buildBlockMath(state, spans) {
   for (const s of spans) {
     if (!s.display) continue;
     if (headIn(s)) {
+      // Only the visual fence breaks fold. Source bytes, source positions and
+      // history stay in the same document; unsupported containers stay literal.
+      const region = regionAt(state.field(regionIndexField), s.from, 'math')?.id;
+      for (const [from, to] of blockFenceLayout(state, s) || []) {
+        if (to > from) out.push(Decoration.replace({ mpRegion: region, inclusiveStart: false, inclusiveEnd: false }).range(from, to));
+      }
       // 【Typora 块公式编辑语义】光标在块内＝编辑中：源码可见（不加 replace）＋
       // 浮动预览（Typora：浮于真文本之上不占排版流——旧块级 widget 在流内，
       // 每次点开推挤后续段落）。光标不在块内的选区穿越：只显源码不挂预览。
@@ -1833,6 +1940,69 @@ const activeCellField = StateField.define({
 });
 let cellEdit = null; // { text, from, to }：活动格当前镜像（模块级，跨 widget 生命周期）
 let cellComposing = false;
+let activeCellLayout = null, cellPositionFrame = 0, cellRevealIntent = null, cellMeasureIntent = null;
+const cellPositionMeasureKey = {};
+function renderedCellLayout(inputView, rowFrom, col, source) {
+  const epoch = inputView.state.field(regionIndexField).epoch;
+  if (!activeCellLayout || activeCellLayout.epoch !== epoch || activeCellLayout.rowFrom !== rowFrom || activeCellLayout.col !== col) {
+    activeCellLayout = { epoch, rowFrom, col, html: cellHTML(mappedCellSource(source).text) };
+  }
+  return activeCellLayout;
+}
+function activeCellDOM() {
+  const active = view?.state.field(activeCellField, false);
+  return active && view.contentDOM.querySelector(`.mp-row [data-mp-row="${active.rowFrom}"][data-mp-col="${active.col}"]`);
+}
+function updateCellSizer(edit) {
+  if (!cellEdit || edit !== cellOverlay?.querySelector('.mp-cell-overlay-text') ||
+      cellEdit.epoch !== view?.state.field(regionIndexField).epoch) return;
+  const size = activeCellDOM()?.querySelector('.mp-cell-source-size');
+  if (size && size.textContent !== edit.textContent) { size.textContent = edit.textContent; view.requestMeasure(); }
+}
+function scheduleCellOverlay(revealCaret = false) {
+  if (!view || !cellEdit) return;
+  if (revealCaret) {
+    cellRevealIntent = commands.serial();
+    if (cellPositionFrame) { cancelAnimationFrame(cellPositionFrame); cellPositionFrame = 0; }
+  }
+  const owner = view, edit = cellEdit, epoch = owner.state.field(regionIndexField).epoch;
+  const owned = () => view === owner && cellEdit === edit && owner.state.field(regionIndexField).epoch === epoch;
+  const queue = () => {
+  if (cellPositionFrame) return;
+  cellPositionFrame = requestAnimationFrame(() => {
+    cellPositionFrame = 0;
+    const reveal = cellRevealIntent; cellRevealIntent = null;
+    if (owned()) {
+      positionCellOverlay();
+      if (reveal !== null && commands.serial() === reveal) {
+        const selection = getSelection(), text = cellOverlay?.querySelector('.mp-cell-overlay-text');
+        if (document.hasFocus() && document.activeElement === text && text.contains(selection?.focusNode)) {
+          const range = document.createRange(); range.setStart(selection.focusNode, selection.focusOffset); range.collapse(true);
+          const caret = range.getBoundingClientRect(), sc = owner.scrollDOM, zoom = mpZoomOf(sc), bounds = scrollViewportBounds(sc, zoom);
+          const top = bounds.top + 4, bottom = bounds.bottom - 4;
+          const delta = caret.top < top ? caret.top - top : caret.bottom > bottom ? caret.bottom - bottom : 0;
+          if (bottom > top && caret.height > 0 && delta) sc.scrollTop += delta / zoom;
+        }
+      }
+    }
+  });
+  };
+  if (revealCaret) {
+    const ticket = cellMeasureIntent = { serial: cellRevealIntent };
+    // CM may compensate its old scroll anchor after measure-request writes.
+    // Position and reveal once in the following frame, after that compensation.
+    // Sizer measurement is already pending; the fixed key merges fast inputs.
+    owner.requestMeasure({ key: cellPositionMeasureKey, read: () => null,
+      write: () => {
+        if (cellMeasureIntent !== ticket) return;
+        cellMeasureIntent = null;
+        const text = cellOverlay?.querySelector('.mp-cell-overlay-text');
+        if (owned() && cellRevealIntent === ticket.serial && commands.serial() === ticket.serial &&
+            document.hasFocus() && document.activeElement === text) queue();
+      },
+    });
+  } else if (!cellMeasureIntent || cellMeasureIntent.serial !== commands.serial()) queue();
+}
 
 const tableRowIndexes = new WeakMap();
 function tableRowIndex(tb) {
@@ -1949,8 +2119,15 @@ class TableRowWidget extends WidgetType {
       else cell.dataset.mpPhantom = "1";
       /* 【β2·对齐渲染】行内 style 覆盖 CSS 里的 `text-align: left`（左/未标注都写 left，与 CSS 默认一致）。 */
       cell.style.textAlign = (this.aligns && this.aligns[k]) || "left";
-      if (k === this.activeCol) cell.className = "mp-cell-editing";
-      else cell.innerHTML = cellHTML(mappedCellSource(this.cells[k] || "").text);
+      if (k === this.activeCol) {
+        cell.className = "mp-cell-editing";
+        const layout = document.createElement('div'); layout.className = 'mp-cell-layout'; layout.setAttribute('aria-hidden', 'true');
+        const rendered = document.createElement('div'); rendered.className = 'mp-cell-rendered-size';
+        rendered.innerHTML = renderedCellLayout(inputView, this.rowFrom, k, this.cells[k] || '').html;
+        const source = document.createElement('div'); source.className = 'mp-cell-source-size';
+        source.textContent = mappedCellSource(this.cells[k] || '').text;
+        layout.append(rendered, source); cell.appendChild(layout);
+      } else cell.innerHTML = cellHTML(mappedCellSource(this.cells[k] || "").text);
       if (this.selKind === "col" && k === this.selCol) cell.classList.add("mp-sel-col");
       tr.appendChild(cell);
     }
@@ -2007,7 +2184,7 @@ function syncCellEdit(edit) {
   const newText = edit.textContent || '';
   const source = view.state.doc.sliceString(cellEdit.from, cellEdit.to);
   const change = cellTextChange(source, newText);
-  if (!change) { syncCellSelection(edit); return; }
+  if (!change) { syncCellSelection(edit); updateCellSizer(edit); scheduleCellOverlay(true); return; }
   const dom = cellDOMSelection(edit), mapped = mappedCellSource(change.source);
   const from = cellEdit.from;
   const selection = dom ? {
@@ -2022,7 +2199,7 @@ function syncCellEdit(edit) {
   /* 【A7-(b)】这里原先每次输入都刷一次格内预览（含一次 cellHTML 渲染比较）。已按决定删除：
      预览卡片与"不遮住下一行"在相邻行上结构性互斥（可用带宽 2px vs 卡片 30px+），
      而去掉它同时最贴 Typora、并在每键路径上**净省**一次 innerHTML 写入 + 一次渲染比较。 */
-  requestAnimationFrame(positionCellOverlay); // 行高可能变，重定位
+  updateCellSizer(edit); scheduleCellOverlay(true);
 }
 /** 撤销后外向同步：源码 → 编辑面 */
 function resyncCellEdit(edit) {
@@ -2051,7 +2228,8 @@ function resyncCellEdit(edit) {
   const [from, to] = range, mapped = mappedCellSource(view.state.doc.sliceString(from, to));
   Object.assign(cellEdit, { from, to, text: mapped.text, rowFrom: active.rowFrom, col: active.col, cols: ranges.length });
   if (edit.textContent !== mapped.text) edit.textContent = mapped.text;
-  edit.focus();
+  updateCellSizer(edit);
+  edit.focus({ preventScroll: true });
   setCellDOMSelection(edit, cellTextOffset(mapped, sel.anchor - from), cellTextOffset(mapped, sel.head - from));
   positionCellOverlay();
 }
@@ -2152,7 +2330,19 @@ function ensureCellOverlay() {
     div.__mpCellInputType = e.inputType;
     if (!cellComposing) syncCellSelection(div);
   });
-  div.addEventListener("input", () => { if (!cellComposing) syncCellEdit(div); });
+  div.addEventListener("input", () => {
+    if (!cellComposing) syncCellEdit(div);
+    else { updateCellSizer(div); scheduleCellOverlay(true); }
+  });
+  box.addEventListener('wheel', e => {
+    if (!cellEdit || !view?.dom.isConnected || !box.isConnected || box.style.display === 'none') return;
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) { mpZoomBy(e.deltaY < 0 ? MP_ZOOM_STEP : -MP_ZOOM_STEP); scheduleCellOverlay(); return; }
+    const scale = e.deltaMode === 1 ? (parseFloat(getComputedStyle(div).lineHeight) || 24) : e.deltaMode === 2 ? view.scrollDOM.clientHeight : 1;
+    const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0), dy = e.shiftKey && !e.deltaX ? 0 : e.deltaY;
+    const z = mpZoomOf(view.scrollDOM);
+    view.scrollDOM.scrollBy({ left: dx * scale / z, top: dy * scale / z, behavior: 'instant' });
+  }, { passive: false });
   /* 【N1】copy 必须挂在覆盖层自己身上：它挂 body、事件在 contentDOM 之外，CM6 的处理器收不到。 */
   div.addEventListener("copy", cellOverlayCopy);
   div.addEventListener("blur", () => {
@@ -2163,6 +2353,7 @@ function ensureCellOverlay() {
     }
   });
   div.addEventListener("keydown", (e) => {
+    if (/^(?:Arrow|Home$|End$|Page)/.test(e.key)) scheduleCellOverlay(true);
     /* 【IME 组字期间一律不拦截】—— 实测（真机 + 无头）：组字中途按 Tab 会**丢拼音**并把
        上屏文字串到下一格；Enter 那一下也会被下面的 preventDefault 吞掉。
        ⚠️ 必须**同时** preventDefault：只 `return` 的话 Tab 会走浏览器焦点遍历 ⇒ 覆盖层 blur
@@ -2302,9 +2493,11 @@ function positionCellOverlay() {
   if (!view || !cellOverlay) return;
   const active = view.state.field(activeCellField, false);
   if (!active) { cellOverlay.style.display = "none"; return; }
-  const cell = view.contentDOM.querySelector(`.mp-row th[data-mp-row="${active.rowFrom}"][data-mp-col="${active.col}"], .mp-row td[data-mp-row="${active.rowFrom}"][data-mp-col="${active.col}"]`);
+  const cell = activeCellDOM();
   if (!cell) { cellOverlay.style.display = "none"; return; }
-  const r = cell.getBoundingClientRect();
+  const r = cell.getBoundingClientRect(), source = cell.querySelector('.mp-cell-source-size');
+  if (!source) { cellOverlay.style.display = 'none'; return; }
+  const sr = source.getBoundingClientRect(), z = mpZoomOf(cell);
   cellOverlay.style.display = "block";
   /* 【A7】排版抄**该 td 的计算样式**（覆盖层挂 body，em 基准与表格里不同，写死字号/padding 必然错位）。
      ⚠️ 只在**活动格变了**的那一次读 computed style：本函数被滚动/rAF/每次输入的 rAF 反复调用。 */
@@ -2312,16 +2505,16 @@ function positionCellOverlay() {
      （图片尚未加载 / 夹具稍后用 CSS 撑高 / 行 widget 刚重建），垂直居中补偿会按旧高度算一次然后被缓存住
      —— 复核线复跑实测就是这个症状：高行格 `dy=−36.91px`、`padTop=9px`（补偿项为 0）。
      高度变化才会重算，因此每帧代价仍只是"一次字符串比较 + 一次整数比较"。 */
-  const styleKey = active.rowFrom + ":" + active.col + ":" + Math.round(r.height);
+  const styleKey = active.rowFrom + ":" + active.col + ":" + r.width + ':' + r.height + ':' + z;
   if (overlayStyledFor !== styleKey) {
     overlayStyledFor = styleKey;
     try {
       const cs = getComputedStyle(cell);
       cellOverlay.style.fontFamily = cs.fontFamily;
-      cellOverlay.style.fontSize = cs.fontSize;
+      cellOverlay.style.fontSize = (parseFloat(cs.fontSize) * z) + 'px';
       cellOverlay.style.fontWeight = cs.fontWeight;
-      cellOverlay.style.lineHeight = cs.lineHeight;
-      cellOverlay.style.letterSpacing = cs.letterSpacing;
+      cellOverlay.style.lineHeight = cs.lineHeight === 'normal' ? 'normal' : (parseFloat(cs.lineHeight) * z) + 'px';
+      cellOverlay.style.letterSpacing = cs.letterSpacing === 'normal' ? 'normal' : (parseFloat(cs.letterSpacing) * z) + 'px';
       /* 【β2·A4】进格编辑时排版不横跳：覆盖层抄 td 的 textAlign（不补的话点进右对齐格会从左排）。 */
       cellOverlay.style.textAlign = cs.textAlign;
       cellOverlay.style.color = cs.color;
@@ -2330,16 +2523,12 @@ function positionCellOverlay() {
          · td 默认 `vertical-align: middle`，覆盖层是块级从顶排 ⇒ 行高小于格高时整体偏上
            —— 实测格高 117px 时同偏移 Range 的 Δy = **−37.91px**（不是 12px，12px 只是 42px 行高那档），
            补垂直居中后 −0.02px。 */
-      const padL = parseFloat(cs.paddingLeft) || 0, padR = parseFloat(cs.paddingRight) || 0;
-      const padT = parseFloat(cs.paddingTop) || 0, padB = parseFloat(cs.paddingBottom) || 0;
-      const bordL = parseFloat(cs.borderLeftWidth) || 0, bordR = parseFloat(cs.borderRightWidth) || 0;
-      const bordT = parseFloat(cs.borderTopWidth) || 0, bordB = parseFloat(cs.borderBottomWidth) || 0;
-      const lineH = parseFloat(cs.lineHeight) || (parseFloat(cs.fontSize) || 14) * 1.5;
-      const innerH = Math.max(0, r.height - bordT - bordB - padT - padB);
-      overlayPadTop = padT + bordT + Math.max(0, (innerH - lineH) / 2);
-      cellOverlay.style.padding = `${overlayPadTop}px ${padR + bordR}px ${padB + bordB}px ${padL + bordL}px`;
+      overlayPadTop = Math.max(0, sr.top - r.top);
     } catch { overlayPadTop = 0; }
   }
+  // The grid centers the complete source block and contributes its real height
+  // to the row. Rects are already viewport pixels; do not scale them twice.
+  cellOverlay.style.padding = `${Math.max(0, sr.top-r.top)}px ${Math.max(0, r.right-sr.right)}px ${Math.max(0, r.bottom-sr.bottom)}px ${Math.max(0, sr.left-r.left)}px`;
   cellOverlay.style.left = r.left + "px";
   cellOverlay.style.top = r.top + "px";
   cellOverlay.style.width = r.width + "px";
@@ -2347,18 +2536,19 @@ function positionCellOverlay() {
   cellOverlay.style.height = r.height + "px";
 }
 /** 激活/切换活动格：建覆盖层、播种源码文本、落焦点 */
-function activateCellOverlay(rowFrom, col, cols, from, to, caretOffset, selectAll, sourceSelection) {
+function activateCellOverlay(rowFrom, col, cols, from, to, caretOffset, selectAll, sourceSelection, pointer) {
   const box = ensureCellOverlay();
   const div = box.querySelector(".mp-cell-overlay-text");
   const mapped = mappedCellSource(view ? view.state.doc.sliceString(from, to) : "");
   div.textContent = mapped.text;
-  cellEdit = { text: mapped.text, from, to, col, cols, rowFrom, navigating: false };
+  cellEdit = { text: mapped.text, from, to, col, cols, rowFrom, navigating: false, epoch: view.state.field(regionIndexField).epoch };
   const edit = cellEdit, ownedDoc = view?.state.doc;
   box.style.display = "block";
+  updateCellSizer(div);
   positionCellOverlay();
   const focusIt = () => {
     if (cellEdit !== edit || view?.state.doc !== ownedDoc) return;
-    div.focus();
+    div.focus({ preventScroll: true });
     if (sourceSelection) {
       setCellDOMSelection(div, cellTextOffset(mapped, sourceSelection.anchor - from),
         cellTextOffset(mapped, sourceSelection.head - from));
@@ -2366,8 +2556,17 @@ function activateCellOverlay(rowFrom, col, cols, from, to, caretOffset, selectAl
       return;
     }
     const rng = document.createRange();
-    /* 【点格落点】给了 caretOffset（点格时按点击位置算的比例）就把光标放到文本的对应字符上，
-       否则沿用旧行为折到末尾。offset 钳在 [0, 文本长度]，跨节点安全。 */
+    if (pointer && div.firstChild) {
+      const r = div.getBoundingClientRect();
+      const x = Math.max(r.left + .5, Math.min(pointer.x, r.right - .5));
+      const y = Math.max(r.top + .5, Math.min(pointer.y, r.bottom - .5));
+      const hit = document.caretRangeFromPoint(x, y);
+      if (hit && div.contains(hit.startContainer)) {
+        const s = getSelection(); s.removeAllRanges(); s.addRange(hit); syncCellSelection(div); return;
+      }
+    }
+    // Command offsets are source coordinates; pointer entry uses the live DOM
+    // above. Convert command offsets with the same escaped-pipe source codec.
     const node = div.firstChild;
     const len = node && node.nodeType === 3 ? node.nodeValue.length : 0;
     if (typeof caretOffset === "number" && node && node.nodeType === 3) {
@@ -2391,6 +2590,9 @@ function activateCellOverlay(rowFrom, col, cols, from, to, caretOffset, selectAl
 function deactivateCellOverlay() {
   if (cellOverlay) cellOverlay.style.display = "none";
   cellEdit = null;
+  activeCellLayout = null;
+  cellRevealIntent = null;
+  if (cellPositionFrame) { cancelAnimationFrame(cellPositionFrame); cellPositionFrame = 0; }
 }
 // A source range inside a replacement table row needs its existing cell owner.
 // Search and split navigation share the exact codec mapping and one history.
@@ -2635,23 +2837,10 @@ const tableCellClick = EditorView.domEventHandlers({
     if (!r) return false;
     /* 【β1】点新格 ⇒ 清掉表级选择状态（行/列/整表高亮不该跨格留着） */
     view.dispatch({ effects: [setActiveCell.of({ rowFrom, col: realCol }), setTableSel.of(null)] });
-    /* 【点格落点】按点击点在格内的横向比例估一个源码字符位置（渲染文本与源码长度不同 ⇒ 近似）。
-       用户报过"点了某处、光标却不在那"——旧行为是一律落格尾。
-       ⚠ 必须用**活节点**的矩形：mousedown 期间 CM6 可能刚重建过整行 widget，
-       事件里的 cell 会脱离文档，而 detached 节点的 getBoundingClientRect() 全是 0
-       ⇒ frac 兜底成 1 ⇒ 光标永远落格尾（实测就是这个坑）。positionCellOverlay 也是按 row/col 现查的。 */
-    let caretOffset;
-    try {
-      let live = null;
-      for (const el of view.dom.querySelectorAll(".mp-row th[data-mp-row], .mp-row td[data-mp-row]")) {
-        if (Number(el.dataset.mpRow) === rowFrom && Number(el.dataset.mpCol) === realCol) { live = el; break; }
-      }
-      const box = (live || cell).getBoundingClientRect();
-      const frac = box.width > 0 ? (event.clientX - box.left) / box.width : 1;
-      const srcText = view.state.doc.sliceString(r[0], r[1]);
-      caretOffset = Math.round(Math.max(0, Math.min(1, frac)) * srcText.length);
-    } catch (err) { console.error("[mp] caretOffset 计算失败：", err); caretOffset = undefined; }
-    activateCellOverlay(rowFrom, realCol, ranges.length, r[0], r[1], caretOffset);
+    // Activation measures the current source layout before mapping this pointer;
+    // the rendered cell may have been detached by the active-cell transaction.
+    activateCellOverlay(rowFrom, realCol, ranges.length, r[0], r[1], undefined, false, undefined,
+      { x: event.clientX, y: event.clientY });
     return true;
   },
 });
@@ -4459,6 +4648,7 @@ ${editorKaiRuleCss()}
  * 且吸收 KaTeX .katex-display 的 1em margin——内联根会让子 margin 漏出盒外
  * （DOM 与高度图差 ~15px→点击漂移一行）；间距一律走自身 padding。 */
 .mp-cm6-math { background: transparent; padding: 0; border-radius: 0; font-size: 1em; }
+.mp-inline-math-space { display: inline-block; width: 0; overflow: visible; visibility: hidden; pointer-events: none; user-select: none; }
 /* ══ 代码块行号栏（3.0.9 · 对齐 Typora 实测规格）═══════════════════════════════════
  *  规格：行号在代码块**左侧独立栏**、右对齐、字号略小、低对比灰、与代码之间有**1px 细竖线**；
  *  每个块**从 1 重新计数**；**空行也占号**（号挂在行元素上，空行一样 +1）；带语言/不带语言都有号。
@@ -4677,6 +4867,9 @@ table.mp-row th { background: var(--mp-capsule); font-weight: 500; }
 .mp-cell-img { max-width: 100%; max-height: 160px; vertical-align: middle; border-radius: 3px; }
 .mp-cell-overlay { position: fixed; display: none; background: transparent; border: 0; padding: 8px 16px; z-index: 30; box-sizing: border-box; outline: none; min-width: 40px; overflow: visible; }
 .mp-cell-overlay-text { outline: none; white-space: pre-wrap; word-break: break-all; min-height: 1.3em; }
+.mp-cell-layout { display: grid; min-width: 0; visibility: hidden; pointer-events: none; user-select: none; }
+.mp-cell-layout > div { grid-area: 1 / 1; min-width: 0; align-self: center; }
+.mp-cell-source-size { white-space: pre-wrap; word-break: break-all; min-height: 1.3em; }
 .mp-cell-editing { outline: 1px solid color-mix(in srgb, var(--mp-primary) 45%, transparent); outline-offset: -1px; }
 /* 【β2 表格工具栏】浮在表格上方空行里，不占排版流（出现/消失时正文与表格一个像素都不动）。
    z-index 48 = 盖住格编辑覆盖层(30)、被右键菜单(60)/补全(50)盖住；表面语言与工具岛同源（不写死色值）。
@@ -5328,7 +5521,7 @@ function scheduleTableChrome() {
 }
 function installTableBar(v) {
   ensureTableBar();
-  v.scrollDOM.addEventListener("scroll", () => { positionCellOverlay(); positionTableBar(); }, { passive: true });
+  // The master scroll listener installed in boot handles both surfaces once.
   /* 双开/大纲停靠/toggle 都不产生事务与滚动 ⇒ 用 ResizeObserver 盯编辑面几何跟随 */
   try { if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => positionTableBar()).observe(v.dom); } catch { /* 兜底：window resize */ }
   window.addEventListener("resize", positionTableBar);
@@ -5371,6 +5564,7 @@ function boot(content) {
         mathDecorations, // 派生层（行内）：selection+预计算 spans → 投影/源码切换＋编辑浮动预览
         mathSpansField, // 数据层：仅文档变化时重扫（选区变化零重扫）
         blockMathField, // 块级投影：StateField 直供（须排在 mathSpansField 之后——update 读其 spans）
+        mathFencePointerSelection,
         headingDecorations, // 标题井号投影：光标入行显源码、离行隐藏
         lineStylesField, // 行级样式数据层（标题/围栏/引用，仅文档变化重扫）
         lineClassDecorations, // 行类派生（mp-h1..h6/mp-code/mp-quote → telari 版式）
@@ -5458,7 +5652,7 @@ function boot(content) {
   }, true);
   // 表格格编辑覆盖层随滚动重定位
   /* 【β2】滚动钩子合并：先覆盖层、再表格工具栏（监听器数量不变，rAF 数量不增）。 */
-  view.scrollDOM.addEventListener("scroll", () => { positionCellOverlay(); positionTableBar(); }, { passive: true });
+  view.scrollDOM.addEventListener("scroll", () => { scheduleCellOverlay(); positionTableBar(); }, { passive: true });
   /* Ctrl+滚轮 ＝ 内容缩放（Typora/v2.3.3 同款手感）：只在指针位于**编辑面**内时接管，
      按 10% 一档、与快捷键共用同一个 setter；`passive:false` 才能 preventDefault 掉页面缩放。
      注意方向：deltaY < 0（向上滚）＝放大。 */
@@ -5498,6 +5692,9 @@ function boot(content) {
       return { blocks, math, inline, styles, mermaid: fresh ? scanMermaidBlocks(state.doc,blocks) : state.field(mermaidBlocksField) };
     },
     _view: () => view, // 调试/取证通道
+    __cellLayout: () => ({ active: view.state.field(activeCellField),
+      owner: cellEdit && { rowFrom: cellEdit.rowFrom, col: cellEdit.col, epoch: cellEdit.epoch },
+      matched: !!activeCellDOM(), sizer: !!activeCellDOM()?.querySelector('.mp-cell-source-size') }),
     __regions: () => {
       const index = view.state.field(regionIndexField);
       return { epoch: index.epoch, version: index.version, session: view.state.field(regionSessionField),
@@ -5575,6 +5772,7 @@ function boot(content) {
         keyCompartment.reconfigure(keyCompartment.get(old) ?? []),
       ] }).state;
       deactivateCellOverlay();
+      inlineMathMetrics.clear();
       commands.invalidate(); sourceRevision = 0;
       cellComposing = composingDirty = false;
       mathPass = null; blockPassDir = 0; lastLiveHeight = -1;

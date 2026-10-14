@@ -1,5 +1,13 @@
 import { ViewPlugin } from '@codemirror/view';
 
+export function scrollViewportBounds(sc, zoom) {
+  const rect = sc.getBoundingClientRect();
+  return {
+    top: Math.max(0, rect.top + sc.clientTop * zoom),
+    bottom: Math.min(innerHeight, rect.top + (sc.clientTop + sc.clientHeight) * zoom),
+  };
+}
+
 export function createViewportIntent(indexField, zoomOf) {
   const records = new WeakMap(), measureKey = {};
   const record = view => { let r = records.get(view); if (!r) records.set(view, r = { serial: 0, anchor: null }); return r; };
@@ -13,15 +21,17 @@ export function createViewportIntent(indexField, zoomOf) {
         const wrapper = [...v.dom.querySelectorAll('.mp-img[data-mp-region]')].find(n => n.dataset.mpRegion === id);
         const image = wrapper?.querySelector('img:not(.mp-img-pending)') || wrapper;
         if (!image) return null;
-        const sc = v.scrollDOM, box = image.getBoundingClientRect(), sr = sc.getBoundingClientRect();
+        const sc = v.scrollDOM, box = image.getBoundingClientRect();
         const caret = v.coordsAtPos(v.state.selection.main.head), z = zoomOf(sc);
         let delta = box.top - intent.top;
         // At viewport edges the caret must remain reachable. Apply only the
         // minimum additional movement; the image anchor has priority otherwise.
         if (caret) {
-          const top = sr.top + sc.clientTop * z + 4, bottom = Math.min(sr.bottom, innerHeight) - 4;
-          if (caret.top - delta < top) delta = caret.top - top;
-          else if (caret.bottom - delta > bottom) delta = caret.bottom - bottom;
+          const bounds = scrollViewportBounds(sc, z), top = bounds.top + 4, bottom = bounds.bottom - 4;
+          if (bottom > top) {
+            if (caret.top - delta < top) delta = caret.top - top;
+            else if (caret.bottom - delta > bottom) delta = caret.bottom - bottom;
+          }
         }
         return { delta: delta / z, scrollTop: sc.scrollTop, max: Math.max(0, sc.scrollHeight - sc.clientHeight) };
       },
