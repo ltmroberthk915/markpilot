@@ -47,7 +47,7 @@ async function launch(o, doc, runDir, extraEnv = {}) {
   fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify({ restoreLast: false, theme: 'light', autosaveEnabled: true, autosaveIntervalMs: 1000, winBounds: { width: 1100, height: 800, x: 50, y: 50 }, ...o.settings }));
   const env = { ...process.env, MP_TEST_NO_DIALOG: '1', MP_TEST_HOOKS: '1', MP_DEBUG: '1', MP_MIGRATE_FROM: path.join(runDir, 'absent-legacy-profile'), ...extraEnv };
   delete env.ELECTRON_RUN_AS_NODE;
-  const argv = [...(o.app ? [path.resolve(o.app)] : []), doc, '--remote-debugging-port=0', '--user-data-dir=' + profile, '--enable-logging=stderr'];
+  const argv = [...(o.app ? [path.resolve(o.app)] : []), doc, ...(o.inspectMain ? ['--inspect=0'] : []), '--remote-debugging-port=0', '--user-data-dir=' + profile, '--enable-logging=stderr'];
   const child = spawn(exe, argv, { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   let launchLog = '', spawnError = null;
   child.on('error', e => { spawnError = e; });
@@ -127,7 +127,7 @@ async function launch(o, doc, runDir, extraEnv = {}) {
     const asarSha256=asarPath&&fs.existsSync(asarPath)?sha256(asarPath):null;
     const runtimeExecutablePath=o.app?exe:path.join(path.dirname(resourcesPath),'MarkPilot.exe');
     const runtimeExecutableSha256=fs.existsSync(runtimeExecutablePath)?sha256(runtimeExecutablePath):null;
-    return { browser, page, child, profile, cleanup, metadata: { executable: path.basename(exe), executablePath:exe, exeSha256: hash, runtimeExecutablePath,runtimeExecutableSha256, artifactRoot,app: info, sourceMode: !!o.app, resourcesPath, asarPath, asarSha256, bootMs: Math.round(performance.now() - started), node: process.version, platform: process.platform, cpu: os.cpus()[0]?.model, ramGiB: Math.round(os.totalmem()/1073741824), engineBundleSha256: o.app ? sha256(path.join(o.app, 'renderer/cm6/app.js')) : null,artifactFiles } };
+    return { browser, page, child, profile, cleanup, ...(o.inspectMain ? { nodeInspectorURL: launchLog.match(/Debugger listening on (ws:\/\/127\.0\.0\.1:\d+\/[a-z0-9-]+)/i)?.[1] } : {}), metadata: { executable: path.basename(exe), executablePath:exe, exeSha256: hash, runtimeExecutablePath,runtimeExecutableSha256, artifactRoot,app: info, sourceMode: !!o.app, resourcesPath, asarPath, asarSha256, bootMs: Math.round(performance.now() - started), node: process.version, platform: process.platform, cpu: os.cpus()[0]?.model, ramGiB: Math.round(os.totalmem()/1073741824), engineBundleSha256: o.app ? sha256(path.join(o.app, 'renderer/cm6/app.js')) : null,artifactFiles } };
   } catch (e) { await cleanup(); throw new Error(e.message + '\n' + launchLog.slice(-1200)); }
 }
 module.exports = { ROOT, sleep, sha256, acquireSlot, args, launch };

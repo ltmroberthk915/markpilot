@@ -48,7 +48,7 @@ function local(abs, src) {
  * 复制图片进 <dir>/assets/，返回映射表。
  * @returns {{assetsDir:string, entries:Array, copied:number, failed:number, skipped:number, bytes:number, ms:number}}
  */
-async function prepareAssets({ dir, docPath, refs, concurrency = 4, onProgress } = {}) {
+async function prepareAssets({ dir, docPath, refs, concurrency = 4, onProgress, isCanceled } = {}) {
   const t0 = Date.now();
   const assetsDir = path.join(dir, 'assets');
   await fsp.mkdir(assetsDir, { recursive: true });
@@ -83,9 +83,11 @@ async function prepareAssets({ dir, docPath, refs, concurrency = 4, onProgress }
   let cursor = 0, done = 0;
   const worker = async () => {
     while (cursor < jobs.length) {
+      if (isCanceled?.()) return;
       const job = jobs[cursor++];
       try {
         const st = await fsp.stat(job.info.abs);
+        if (isCanceled?.()) return;
         if (!st.isFile()) throw new Error('不是普通文件');
         if (job.info.abs.toLowerCase() !== job.targetAbs.toLowerCase()) await fsp.copyFile(job.info.abs, job.targetAbs);
         byAbs.set(job.info.abs.toLowerCase(), { rel: job.rel, bytes: st.size });
@@ -98,6 +100,7 @@ async function prepareAssets({ dir, docPath, refs, concurrency = 4, onProgress }
     }
   };
   await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrency, jobs.length || 1)) }, worker));
+  if (isCanceled?.()) return { ok: false, canceled: true, assetsDir, entries };
 
   const copied = entries.filter((e) => e.ok && !e.dedup).length;
   const failed = entries.filter((e) => !e.ok && !e.skipped).length;
@@ -111,37 +114,52 @@ function createHtmlWriter({ dir, name } = {}) {
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, safeName(name, 'markpilot') + '.html');
   const stream = fs.createWriteStream(file, { encoding: 'utf8' });
+  const closed = new Promise(resolve => stream.once('close', resolve));
   const opened = new Promise((resolve, reject) => {
     stream.once('open', resolve);
     stream.once('error', reject);
+    stream.once('close', () => reject(new Error('写流已关闭')));
   });
+  stream.on('error', () => { /* write/end callbacks and opened own the failure. */ });
   opened.catch(() => { /* 由各方法 await 时抛出 */ });
-  let bytes = 0, chunks = 0, finished = false;
+  let bytes = 0, chunks = 0, finished = false, aborted = false, finishing, aborting;
   const id = `exp-${process.pid}-${++seq}`;
   return {
     id, file,
     async write(text) {
+      if (finished || aborted) throw new Error('写流已结束');
       await opened;
-      if (finished) throw new Error('写流已结束');
+      if (finished || aborted) throw new Error('写流已结束');
       const s = String(text == null ? '' : text);
       bytes += Buffer.byteLength(s, 'utf8');
       chunks++;
       await new Promise((resolve, reject) => stream.write(s, (e) => (e ? reject(e) : resolve())));
       return { bytes, chunks };
     },
-    async finish() {
-      await opened;
-      if (!finished) {
+    finish() {
+      return finishing ||= (async () => {
+        if (aborted) throw new Error('写流已取消');
         finished = true;
+        await opened;
+        if (aborted) throw new Error('写流已取消');
         await new Promise((resolve, reject) => stream.end((e) => (e ? reject(e) : resolve())));
-      }
-      return { ok: true, file, bytes, chunks };
+        await closed;
+        if (aborted) throw new Error('写流已取消');
+        return { ok: true, file, bytes, chunks };
+      })();
     },
-    async abort() {
+    abort({ remove = true } = {}) {
+      if (aborting) return aborting;
+      aborted = true;
       finished = true;
-      try { stream.destroy(); } catch { /* 已关 */ }
-      try { await fsp.unlink(file); } catch { /* 没建成就没有 */ }
-      return { ok: true, removed: file };
+      stream.destroy();
+      return aborting = (async () => {
+        await closed;
+        if (remove) {
+          try { await fsp.unlink(file); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+        }
+        return { ok: true, ...(remove ? { removed: file } : { retained: file }) };
+      })();
     },
   };
 }

@@ -1591,35 +1591,50 @@ const exportWriters = new Map();
 /** 当前 PDF 导出会话（staging 目录 + 取消位 + 等渲染侧交 HTML 的承诺）；null = 没有 PDF 导出在进行 */
 let pdfActive = null;
 let pdfSeq = 0;
+function pdfStage(e, dir, pdfSessionId) {
+  const resolved = typeof dir === 'string' ? path.resolve(dir) : null;
+  const rel = resolved ? path.relative(app.getPath('temp'), resolved) : '';
+  const reserved = rel && !path.isAbsolute(rel) && rel.split(path.sep)[0].toLowerCase().startsWith('markpilot-pdf-');
+  if (pdfSessionId === undefined && !reserved) return null;
+  const s = pdfActive;
+  if (!s || s.canceled || s.closing || s.owner !== e.sender.id || pdfSessionId !== s.id || !resolved || !s.dir || path.relative(s.dir, resolved) !== '') {
+    throw failure('MP_EXPORT_CANCELED', 'PDF 导出已结束或取消');
+  }
+  return s;
+}
 handle('doc:info', (e) => { const S = sessionOf(e && e.sender); try { dbg('doc:info:read', { wcId: e && e.sender ? e.sender.id : null, isPrimary: S === state, path: (S.filePath || '').split('\\').pop() || null, mapSize: sessions.size }); } catch { } return { filePath: S.filePath, documentId: S.documentId, name: S.filePath ? path.basename(S.filePath) : null }; });
 handle('export:pickFolder', async (e, opts = {}) => {
   const S = sessionOf(e.sender), W = windowOf(e);
-  if (pdfActive?.owner === e.sender.id) {
+  if (opts.pdfSessionId !== undefined) {
+    if (!pdfActive || pdfActive.canceled || pdfActive.closing || pdfActive.owner !== e.sender.id || pdfActive.id !== opts.pdfSessionId) return { ok: false, canceled: true, code: 'MP_EXPORT_CANCELED', error: 'PDF 导出已结束或取消' };
     if (!pdfActive.dir || pdfActive.pickUsed) return { ok: false, error: 'PDF 正在导出，请稍后再导出文件夹' };
     pdfActive.pickUsed = true; return { ok: true, dir: pdfActive.dir, staging: true };
   }
+  if (pdfActive?.owner === e.sender.id) return { ok: false, error: 'PDF 正在导出，请稍后再导出文件夹' };
   const envDir = process.env.MP_EXPORT_DIR;
   if (envDir) { try { await fsp.mkdir(envDir, { recursive: true }); return { ok: true, dir: envDir, auto: true }; } catch (err) { return { ok: false, error: err.message }; } }
   const base = S.filePath ? path.dirname(S.filePath) : app.getPath('documents');
   const r = await dialog.showOpenDialog(W, { title: '导出为文件夹（图片放进 assets/）', defaultPath: opts.defaultPath || base, buttonLabel: '导出到此文件夹', properties: ['openDirectory', 'createDirectory'] });
   return r.canceled || !r.filePaths[0] ? { ok: false, canceled: true } : { ok: true, dir: r.filePaths[0] };
 });
-handle('export:prepareAssets', async (e, { dir, docPath, refs, concurrency } = {}) => {
+handle('export:prepareAssets', async (e, { dir, docPath, refs, concurrency, pdfSessionId } = {}) => {
   const S = sessionOf(e.sender), W = windowOf(e);
   if (!dir) return { ok: false, error: '缺少目标文件夹' };
   try {
-    return await exporter.prepareAssets({ dir, docPath: docPath || S.filePath, refs, concurrency, onProgress: p => sendTo(W, 'export:progress', p) });
+    const stage = pdfStage(e, dir, pdfSessionId);
+    const pending = exporter.prepareAssets({ dir, docPath: docPath || S.filePath, refs, concurrency, onProgress: p => sendTo(W, 'export:progress', p), ...(stage ? { isCanceled: () => stage.canceled || stage.closing } : {}) });
+    stage?.assetJobs.add(pending);
+    try { return await pending; } finally { stage?.assetJobs.delete(pending); }
   } catch (err) { return { ok: false, error: err.message }; }
 });
 function ownedWriter(e, id) { const w = exportWriters.get(id); return w?.owner === e.sender.id ? w : null; }
-handle('export:beginHtml', (e, { dir, name } = {}) => {
+handle('export:beginHtml', (e, { dir, name, pdfSessionId } = {}) => {
   sessionOf(e.sender);
   try {
-    if (pdfActive?.owner === e.sender.id && path.resolve(dir) === pdfActive.dir) {
-      if (pdfActive.htmlWriterCreated) return { ok: false, error: 'PDF 的 HTML 已在生成' };
-      pdfActive.htmlWriterCreated = true;
-    }
+    const stage = pdfStage(e, dir, pdfSessionId);
+    if (stage?.htmlWriterCreated) return { ok: false, error: 'PDF 的 HTML 已在生成' };
     const writer = exporter.createHtmlWriter({ dir, name });
+    if (stage) { stage.htmlWriterCreated = true; stage.htmlWriter = writer; }
     exportWriters.set(writer.id, { owner: e.sender.id, writer });
     return { ok: true, id: writer.id, file: writer.file };
   } catch (err) { return { ok: false, error: err.message }; }
@@ -1693,7 +1708,7 @@ handle('export:pdf', async (e, opts = {}) => {
   const S = sessionOf(e.sender), W = windowOf(e), t0 = Date.now();
   if (pdfActive) return { ok: false, error: '已有一个 PDF 导出在进行中' };
   const stem = S.filePath ? path.basename(S.filePath, path.extname(S.filePath)) : '未命名';
-  const session = { id: 'pdf-' + process.pid + '-' + (++pdfSeq), owner: e.sender.id, documentId: S.documentId, canceled: false, waiter: deferred(), phases: [], dir: null };
+  const session = { id: 'pdf-' + process.pid + '-' + (++pdfSeq), owner: e.sender.id, documentId: S.documentId, canceled: false, waiter: deferred(), phases: [], dir: null, assetJobs: new Set(), htmlWriter: null };
   pdfActive = session; // Reserve before the first dialog or filesystem await.
   const progress = p => sendTo(W, 'export:progress', p);
   const ownerClosed = () => { session.canceled = true; session.waiter.resolve({ ok: false, canceled: true }); };
@@ -1701,9 +1716,17 @@ handle('export:pdf', async (e, opts = {}) => {
   let dir = null, outFile = opts.outFile || process.env.MP_EXPORT_PDF || null, htmlTimer;
   const mem = pdfExporter.memorySampler(app, { intervalMs: 200 });
   const cleanupStaging = async () => {
-    if (!dir || process.env.MP_KEEP_STAGING) return;
+    session.closing = true;
+    if (!dir) return;
     const target = path.resolve(dir), parent = path.resolve(app.getPath('temp'));
     if (path.dirname(target) !== parent || !path.basename(target).startsWith('markpilot-pdf-')) throw new Error('PDF 临时目录超出清理范围');
+    await Promise.allSettled([...session.assetJobs]);
+    if (session.htmlWriter) {
+      const entry = exportWriters.get(session.htmlWriter.id);
+      if (entry?.owner === session.owner && entry.writer === session.htmlWriter) exportWriters.delete(session.htmlWriter.id);
+      await session.htmlWriter.abort({ remove: !process.env.MP_KEEP_STAGING });
+    }
+    if (process.env.MP_KEEP_STAGING) return;
     await fsp.rm(target, { recursive: true, force: true });
   };
   try {

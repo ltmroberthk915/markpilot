@@ -741,3 +741,8 @@ Formula previews expand to their full height and use a thin horizontal scrollbar
 
 Committed table-cell edits continue to autosave at the configured interval after composition is canceled, while the caret and viewport stay stable.
 
+
+### v3.3.6 · PDF cancellation and export sessions
+
+- Canceling PDF generation now closes its producers before removing temporary files, allowing editing and export retries.
+- Export sessions reject retired work and preserve independent folder exports and document history in other windows.
