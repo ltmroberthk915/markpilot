@@ -230,3 +230,7 @@ Autosave liveness: autosave-liveness-model.cjs extracts the actual host function
 ### PDF export lifecycle (3.3.6)
 
 `export-two-frontier-workflows.cjs` covers cancellation during observed HTML appends, native editing/history/drag continuation, second-window busy and folder isolation, retired-generation rejection, existing PDF preservation and export recovery. The source-only fault notification is labeled separately. Observers forward actual handler arguments and original Promises without delay. `tests/export-writer-lifecycle.test.cjs` exercises real stream open/write/finish/abort settlement and asset cancellation.
+
+### Table geometry and rich-document viewport budget (3.3.7)
+
+`table-scroll-workflows.cjs` uses seven synthetic native-input cases: three zoomed cell handoffs with paint-only invalidation, source/history and independent save checks; block height units; a tall atomic formula with document-budget restoration through undo; identical formula owner isolation; and automatic drag selection across screens with reversal, release, and Shift-key continuation. `tests/table-geometry.test.cjs` extracts the actual geometry and state-field code. `tests/viewport-budget.test.cjs` verifies the pinned maintained view and default/finite bounds. `build-check.cjs` requires one view and one state module.

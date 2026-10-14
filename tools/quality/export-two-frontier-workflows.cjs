@@ -12,7 +12,7 @@ const originalA='# '+markerA+'\n\n'+Array.from({length:18000},(_,i)=>'Paragraph 
 const originalB='# '+markerB+'\n\nIndependent window note.\n\n|H|K|\n|---|---|\n|**bold** and _italic_|KEEP|\n';
 const shortA='# A_RECOVERY_'+token+'\n\nShort note exported after cancellation.\n';
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
-const result={schema:1,kind:'two-bounded-export-frontiers',version:'3.3.6',suite:'export-two-frontier-workflows',startedAt:new Date().toISOString(),cases:[],errors:[],cleanupErrors:[],frames:[],clipboardTouched:false,menuRoute:'Actual installed MenuItem callback; no physical accelerator claim',instrumentation:'Original IPC handlers and HTML writer methods forwarded synchronously; original Promise returned; no artificial delay'};
+const result={schema:1,kind:'two-bounded-export-frontiers',version:require(path.join(ROOT,'MarkPilot-CM6/package.json')).version,suite:'export-two-frontier-workflows',startedAt:new Date().toISOString(),cases:[],errors:[],cleanupErrors:[],frames:[],clipboardTouched:false,menuRoute:'Actual installed MenuItem callback; no physical accelerator claim',instrumentation:'Original IPC handlers and HTML writer methods forwarded synchronously; original Promise returned; no artificial delay'};
 fs.writeFileSync(aFile,originalA,{flag:'wx'});fs.writeFileSync(bFile,originalB,{flag:'wx'});
 let run,release,debug,a,b;
 async function connectInspector(url){
@@ -64,7 +64,7 @@ async function pdfResult(page,after){let value;await waitUntil(async()=>{const o
 async function nativeReplace(page,text){await page.bringToFront();await page.locator('.cm-line').first().click();await page.keyboard.press('Control+a');await page.keyboard.insertText(text);await waitUntil(()=>page.evaluate(text=>window.mpEngine._view().state.doc.toString()===text,text),'native whole-note replacement');}
 (async()=>{try{
  release=acquireSlot();run=await launch({...options,inspectMain:true,settings:{autosaveEnabled:false,restoreLast:false}},aFile,out,{MP_EXPORT_PDF:pdf,MP_EXPORT_DIR:bFolder,MP_KEEP_STAGING:''});
- result.artifact=run.metadata;assert.equal(run.metadata.app.version,'3.3.6');
+ result.artifact=run.metadata;assert.equal(run.metadata.app.version,result.version);
  debug=await connectInspector(run.nodeInspectorURL);result.observers=await debug.evaluate('('+installObservers.toString()+')()');a=run.page;await attach(a);b=await newWindow(run,a,bFile);await attach(b);
  const initialA=await state(a),initialB=await state(b);assert.equal(initialA.source,originalA);assert.equal(initialB.source,originalB);result.owners={a:initialA.sessions.mine,b:initialB.sessions.mine};assert.notEqual(result.owners.a,result.owners.b);assert.notEqual(initialA.document.documentId,initialB.document.documentId);
  result.fixture={aBytes:Buffer.byteLength(originalA),aSha256:hash(originalA),bSha256:hash(originalB)};

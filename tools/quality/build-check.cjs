@@ -11,7 +11,7 @@ const dir=outputDir(argv[1],'build-check'),engine=path.join(ROOT,'dsh-markpilot'
 const binary=path.join(engine,'node_modules/esbuild/bin/esbuild');
 if(!fs.existsSync(binary))throw new Error('Install engine dependencies with npm ci --prefix dsh-markpilot --ignore-scripts --legacy-peer-deps');
 const output=path.join(dir,'app.js');
-execFileSync(process.execPath,[binary,'src-cm6/main.js','--bundle','--format=iife','--outfile='+output,'--loader:.woff=file','--loader:.woff2=file','--loader:.ttf=file','--minify','--log-level=error'],{cwd:engine,stdio:['ignore','ignore','pipe']});
+execFileSync(process.execPath,[binary,'src-cm6/main.js','--bundle','--format=iife','--alias:@codemirror/view='+path.join(engine,'renderer/vendor/codemirror/view.js'),'--metafile='+path.join(dir,'engine-inputs.json'),'--outfile='+output,'--loader:.woff=file','--loader:.woff2=file','--loader:.ttf=file','--minify','--log-level=error'],{cwd:engine,stdio:['ignore','ignore','pipe']});
 const checked=path.join(ROOT,'MarkPilot-CM6/renderer/cm6/app.js');
 const worker=path.join(dir,'markdown-worker.js'),checkedWorker=path.join(ROOT,'MarkPilot-CM6/renderer/cm6/markdown-worker.js');
 execFileSync(process.execPath,[binary,'src-cm6/markdown-worker.js','--bundle','--format=iife','--outfile='+worker,'--minify','--log-level=error'],{cwd:engine,stdio:['ignore','ignore','pipe']});
@@ -20,4 +20,8 @@ const versions={};for(const name of Object.keys({...pkg.dependencies,...pkg.devD
 const result={schema:1,at:new Date().toISOString(),node:process.version,sourceCommit:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),versions,built:{sha256:sha256(output),bytes:fs.statSync(output).size},checkedIn:{sha256:sha256(checked),bytes:fs.statSync(checked).size}};
 result.worker={built:{sha256:sha256(worker),bytes:fs.statSync(worker).size},checkedIn:{sha256:sha256(checkedWorker),bytes:fs.statSync(checkedWorker).size}};
 result.matches=result.built.sha256===result.checkedIn.sha256&&result.worker.built.sha256===result.worker.checkedIn.sha256;
+const inputs=Object.keys(JSON.parse(fs.readFileSync(path.join(dir,'engine-inputs.json'),'utf8')).inputs);
+result.viewModules=inputs.filter(f=>/codemirror[\\/]view[\\/]dist[\\/]index\.js$|vendor[\\/]codemirror[\\/]view\.js$/.test(f));
+result.stateModules=inputs.filter(f=>/@codemirror[\\/]state[\\/]dist[\\/]index\.(?:js|cjs)$/.test(f));
+result.matches=result.matches&&result.viewModules.length===1&&/vendor[\\/]codemirror[\\/]view\.js$/.test(result.viewModules[0])&&result.stateModules.length===1;
 fs.writeFileSync(path.join(dir,'result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));process.exitCode=result.matches?0:1;

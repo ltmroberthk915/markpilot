@@ -59,8 +59,11 @@ const ENGINE_DIR = path.join(ROOT, 'dsh-markpilot');
 // from the exact locked upstream package before resolving engine imports.
 execFileSync(process.execPath, [path.join(ROOT, 'tools/vendor/build-katex.cjs')],
   { cwd: ROOT, stdio: 'inherit', windowsHide: true });
+execFileSync(process.execPath, [path.join(ROOT, 'tools/vendor/build-codemirror-view.cjs')],
+  { cwd: ROOT, stdio: 'inherit', windowsHide: true });
 execFileSync(process.execPath, [
   ESBUILD_BIN, path.relative(ENGINE_DIR, SRC), '--bundle', '--format=iife',
+  '--alias:@codemirror/view=' + path.join(ENGINE_DIR, 'renderer/vendor/codemirror/view.js'),
   '--outfile=' + OUT, '--loader:.woff=file', '--loader:.woff2=file', '--loader:.ttf=file',
   '--minify', '--log-level=error',
 ], { cwd: ENGINE_DIR, stdio: ['ignore', 'ignore', 'pipe'] });

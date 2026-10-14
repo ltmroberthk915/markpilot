@@ -186,6 +186,17 @@ async function main(){
    await keys(p,'Control+Shift+Home',true);
    const selected=await read(p);c.trace.push({step:'native-delete-selection',...selected});assert.deepEqual(selected.domSelection,{anchor:600,head:0},'native CtrlShiftHome selects exactly inserted payload');await keys(p,'Backspace',true);
    const shrunk=await capture(p,c,'deleted');assert.equal(shrunk.text,E0);assert(Math.abs(shrunk.cell.height-before.cell.height)<1,'deletion shrinks source row to frozen render floor');visibleCaret(shrunk);
+   await sleep(600); // Begin a distinct native history group after deletion.
+   // A new native wheel owns the viewport even while input reveal is settling.
+   const ov=shrunk.overlay,vp=shrunk.scrollViewport,wheelPoint={x:(Math.max(ov.left,vp.left)+Math.min(ov.right,vp.right))/2,y:(Math.max(ov.top,vp.top)+Math.min(ov.bottom,vp.bottom))/2};
+   await p.mouse.move(wheelPoint.x,wheelPoint.y);await phase(p,'input-wheel-cancel');
+   const wheelStart=await read(p),next=E0.slice(0,wheelStart.selection.head)+payload+E0.slice(wheelStart.selection.head);
+   await p.keyboard.insertText(payload);await p.mouse.wheel(0,180);await sleep(150);const wheel=await read(p);await sleep(150);const settled=await read(p);
+   assert.equal(wheel.text,next);assert.equal(settled.text,next);assert(wheel.cellFocus&&settled.cellFocus);
+   assert(wheel.events.some(e=>e.phase==='input-wheel-cancel'&&e.type==='wheel'&&e.trusted&&e.inCell),'Native wheel reaches the actual input overlay');
+   assert(Math.abs(settled.scroll.top-wheel.scroll.top)<1,'Canceled input reveal does not chase the viewport after native wheel');
+   c.wheelCancelsReveal={before:wheel.scroll,after:settled.scroll,selection:settled.selection,trusted:true};
+   await keys(p,'Control+z',true);assert.equal((await read(p)).text,E0);
   });
   for(const f of [
    {id:'inline-tall',text:'Before $\\dfrac{a}{b}$ after.\n\nEND'+TAIL,tall:true},
