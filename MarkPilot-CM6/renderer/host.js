@@ -316,7 +316,12 @@ function saveFailure(r, path) {
 async function doSave(force = false, grant = null, saveAsOperation = null, automatic = null) {
   const operationCurrent = () => saveAsOperation === null || saveAsOperation === saveAsSerial;
   if (!operationCurrent() || (!force && (!automatic || !autoCurrent(automatic)))) return false;
-  if (window.mpEngine?.commands && !window.mpEngine.commands.capture()) return false;
+  if (window.mpEngine?.commands && !window.mpEngine.commands.capture()) {
+    // A canceled composition may leave the committed source unchanged. Keep the
+    // current automatic save alive without saving preedit or awaiting new input.
+    if (!force && automatic && autoCurrent(automatic)) scheduleSave();
+    return false;
+  }
   syncSource();
   if (!filePath && !grant) {
     if (force) return saveAsFlow();

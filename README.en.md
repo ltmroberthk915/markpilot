@@ -736,3 +736,8 @@ Local first. Editing, rendering and exporting all happen on your machine; AI com
 Formula previews expand to their full height and use a thin horizontal scrollbar for wide expressions. Nearby placement moves at most 67.2 px; turn it off in Settings to show the preview directly below the source.
 
 [Download the 3.3.1 installer and portable edition](https://github.com/ltmroberthk915/markpilot/releases/tag/v3.3.1)
+
+### Autosave after composition
+
+Committed table-cell edits continue to autosave at the configured interval after composition is canceled, while the caret and viewport stay stable.
+

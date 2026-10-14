@@ -223,3 +223,6 @@ Manifest 格式如下；`corpusSha256` 对应原文件完整字节，`span` 是 
 ```
 
 输入链只确认进入目标公式源码范围，并按实际原生选区核对编辑结果；不独立证明字形的精确落点。保存不等于重开，语料扫描数量不等于渲染成功数量，CDP 输入不等于系统 IME。本工具不声称拖拽、跨屏、所有环境内部编辑或性能已覆盖。报告不记录正文，但 fixture、manifest.text、截图仍含原文，应留在私有输出；公开的是工具源码与合成夹具。[统一交互方案与实测边界](../../docs/LOG-3.2.13-REGION-ARCHITECTURE.md)
+
+Autosave liveness: autosave-liveness-model.cjs extracts the actual host functions and checks 21 scheduling boundaries. autosave-liveness-workflows.cjs uses explicit EXE/SHA/output arguments and real CDP cell/body input, composition cancellation, disk reads, history and cell selection gestures. Cancellation has trusted update/beforeinput/input but untrusted compositionend on this Chromium; this is not an OS IME claim.
+
