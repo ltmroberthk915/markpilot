@@ -10,7 +10,7 @@ function createSession(){
   return {documentId:crypto.randomUUID(),revision:0,lastSavedRevision:0,filePath:null,savedText:'',diskMtime:0,baseline:null,bom:false,eol:'\n',encoding:'utf8',dirty:false,saveAsRequest:0,saveAsGrant:null,lastSave:null,loadRequest:0,pendingSaves:new Set()};
 }
 class DocumentStore{
-  constructor({beforeReplace=async()=>{}}={}){this.jobs=new Map();this.commitTail=Promise.resolve();this.beforeReplace=beforeReplace;}
+  constructor({beforeReplace=async()=>{},prepareSaveAs=async()=>null}={}){this.jobs=new Map();this.commitTail=Promise.resolve();this.beforeReplace=beforeReplace;this.prepareSaveAs=prepareSaveAs;}
   reset(S){const pending=S.pendingSaves,request=S.loadRequest+1;Object.assign(S,createSession(),{pendingSaves:pending,loadRequest:request});return this.metadata(S);}
   metadata(S){return {documentId:S.documentId,revision:S.revision,filePath:S.filePath,text:S.savedText,bom:S.bom,eol:S.eol,encoding:S.encoding};}
   async canonical(file){
@@ -77,6 +77,7 @@ class DocumentStore{
     const job=(async()=>{
       const {filePath,text,documentId,revision,saveAsToken}=request;
       if(documentId!==S.documentId||typeof text!=='string'||!Number.isSafeInteger(revision)||revision<0)throw failure('MP_DOC_MISMATCH','文档或编辑版本已改变，保存已取消');
+      const sourcePath=S.filePath,ownerCurrent=typeof request.ownerCurrent==='function'?request.ownerCurrent:()=>true;
       const grant=saveAsToken&&S.saveAsGrant;
       const grantCurrent=()=>!grant||(S.documentId===grant.documentId&&S.saveAsRequest===grant.request);
       if(saveAsToken&&(!grant||grant.token!==saveAsToken||grant.documentId!==documentId||grant.filePath!==path.resolve(filePath)))throw failure('MP_SAVE_TARGET','另存为许可已失效，请重新选择路径');
@@ -90,14 +91,21 @@ class DocumentStore{
         const baseline=grant?grant.baseline:S.baseline,format={bom:S.bom,eol:S.eol,encoding:S.encoding},out=encodeDocument(text,format);
         await this.validate(target,baseline);
         await fs.mkdir(path.dirname(target),{recursive:true});
+        const saveAsCurrent=()=>S.documentId===documentId&&grantCurrent()&&revision>=S.lastSavedRevision&&ownerCurrent();
+        const prepared=grant?await this.prepareSaveAs({sourcePath,filePath:path.resolve(filePath),text,canonical:f=>this.canonical(f),current:saveAsCurrent}):null;
+        const assets=prepared?.summary||prepared;
+        if(grant&&!saveAsCurrent())throw failure('MP_DOC_MISMATCH','另存为的文档或窗口已改变');
         const tmp=path.join(path.dirname(target),'.'+path.basename(target)+'.mp-tmp-'+process.pid+'-'+crypto.randomUUID());
         try{
           await fs.writeFile(tmp,out,{flag:'wx'});
           await this.beforeReplace({session:S,filePath:target,text,revision});
           return await this.commit(async()=>{
             // The short shared commit also protects alternate names of the same file.
+            if(grant&&this.key(await this.canonical(filePath))!==this.key(target))throw failure('MP_FILE_CONFLICT','另存为目标位置已改变，请重新选择路径');
+            if(typeof prepared?.validate==='function')await prepared.validate();
             await this.validate(target,baseline);
             if(!grantCurrent())throw failure('MP_SAVE_TARGET','另存为操作已被新的选择替代');
+            if(grant&&!saveAsCurrent())throw failure('MP_DOC_MISMATCH','另存为的文档或窗口已改变');
             await fs.rename(tmp,target);const st=await fs.stat(target),id=crypto.randomUUID();
             const current=S.documentId===documentId&&grantCurrent();
             if(current){
@@ -105,7 +113,7 @@ class DocumentStore{
               S.lastSavedRevision=revision;S.dirty=S.revision!==revision;
               S.lastSave={id,documentId,revision,filePath:S.filePath};
             }
-            return {ok:true,saveId:id,documentId,revision,filePath:path.resolve(filePath),current,mtimeMs:st.mtimeMs,bytes:out.length};
+            return {ok:true,saveId:id,documentId,revision,filePath:path.resolve(filePath),current,mtimeMs:st.mtimeMs,bytes:out.length,...(assets?{assets}:{})};
           });
         }finally{await fs.unlink(tmp).catch(()=>{});}
       });

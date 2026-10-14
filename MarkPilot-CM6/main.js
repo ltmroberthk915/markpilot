@@ -16,6 +16,7 @@ const exporter = require('./export-folder');
 const pdfExporter = require('./export-pdf');
 const { DocumentStore, createSession, failure } = require('./shell/document-store');
 const documents = new DocumentStore({
+  prepareSaveAs: context => require('./shell/save-as-assets').prepareSaveAsAssets(context),
   // Deterministic receipt/race regressions; absent from normal launches.
   beforeReplace: async () => {
     const ms = process.env.MP_TEST_HOOKS === '1' ? Math.min(2000, Math.max(0, Number(process.env.MP_TEST_SAVE_DELAY_MS) || 0)) : 0;
@@ -1112,7 +1113,8 @@ handle('file:save', async (e, { filePath, text, ...metadata }) => {
   try {
     if (metadata.automatic && state.settings.autosaveEnabled !== true) return { ok: false, code: 'MP_AUTOSAVE_DISABLED' };
     const S = sessionOf(e.sender);
-    const r = await writeDoc(filePath, text, S, metadata);
+    const owner=e.sender;
+    const r = await writeDoc(filePath, text, S, { ...metadata, ownerCurrent:()=>!owner.isDestroyed()&&sessions.get(owner.id)===S });
     if (r.current) syncPathUi(S, windowOf(e));
     dbg('file:save', { filePath, bytes: r.bytes });
     return r;
