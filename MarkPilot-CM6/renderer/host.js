@@ -163,6 +163,7 @@ function docDirOf(p) {
 function publishDocDir(filePathForDir) {
   const dir = docDirOf(filePathForDir);
   try { window.__mpDocDir = dir; } catch { /* 极端情况下赋值失败也不影响编辑 */ }
+  window.__mpDocPath = filePathForDir || null;
   try {
     window.dispatchEvent(new CustomEvent('mp:docdir', { detail: { dir, filePath: filePathForDir || null } }));
   } catch (e) { console.error('[host] mp:docdir 派发失败', e); }
@@ -170,12 +171,33 @@ function publishDocDir(filePathForDir) {
 }
 
 /* ── 文档装载 ── */
-function applyDoc(text, path, id, loadedRevision = 0, loadKind = 'replace', ticket = null) {
+function checkpointRendererDocument() {
+  const engine = window.mpEngine?.checkpointDocument?.();
+  if (booted && !engine) throw new Error('请先完成当前输入');
+  const old = { booted, documentId, revision, saveBlocked, filePath, lastSaveError, charCount, knownLen, observedSource, dirty };
+  let active = true;
+  return {
+    commit() { if (!active) return false; if (engine && !engine.commit()) throw new Error('文档提交事务已过期'); active = false; return true; },
+    rollback() {
+      if (!active) return;
+      active = false;
+      // A failed source restoration must block saving; never attach an unknown
+      // buffer to the previous file and describe it as a retained draft.
+      try { if (engine && !engine.rollback()) throw new Error('文档恢复事务已过期'); }
+      catch (error) { saveBlocked = true; lastSaveError = error.message; throw error; }
+      ({ booted, documentId, revision, saveBlocked, filePath, lastSaveError, charCount, knownLen, observedSource, dirty } = old);
+      publishDocDir(filePath); refreshTitle(); scheduleSave();
+    },
+  };
+}
+function applyDoc(text, path, id, loadedRevision = 0, loadKind = 'replace', ticket = null, keepOwnerOnFailure = false, transaction = null) {
+  let checkpoint;
   retireAutosave();
   // Supply the resource base before mounting. Commit metadata only after the
   // source was accepted; an engine failure must keep the existing buffer.
-  publishDocDir(path || null);
   try {
+    checkpoint = transaction || checkpointRendererDocument();
+    publishDocDir(path || null);
     if (!booted) { const fn = bus.open; if (!fn) throw new Error('编辑器尚未就绪'); fn({ content: text }); booted = true; grabBootFocus(); }
     else {
       const engine = window.mpEngine;
@@ -183,18 +205,23 @@ function applyDoc(text, path, id, loadedRevision = 0, loadKind = 'replace', tick
       const accepted = typeof engine?.[name] === 'function' ? engine[name](text, ticket) : bus[name]?.(text);
       if (accepted === false || !engine || engine.getValue() !== text) throw new Error('编辑器未接收读取结果');
     }
-  } catch (e) { publishDocDir(filePath); retainBufferAfterRead({ text, filePath: path, documentId: id, revision: loadedRevision }, e.message); return false; }
-  documentId = id; revision = loadedRevision; saveBlocked = false;
-  filePath = path || null;
-  publishDocDir(filePath);                            // ← 必须在 down() 之前
-  hideBanner();
-  lastSaveError = null;
-  charCount = text.length;
-  knownLen = text.length;                             // 装载即校准"已知体积"（守卫的基线）
-  observedSource = window.mpEngine?.documentSession?.() || null;
-  dirty = false;
-  refreshTitle();
-  return true;
+    documentId = id; revision = loadedRevision; saveBlocked = false;
+    filePath = path || null;
+    publishDocDir(filePath);
+    hideBanner(); lastSaveError = null;
+    charCount = knownLen = text.length;
+    observedSource = window.mpEngine?.documentSession?.() || null;
+    dirty = false; refreshTitle();
+    if (!transaction) checkpoint.commit();
+    return true;
+  } catch (e) {
+    try { checkpoint?.rollback(); }
+    catch (restoreError) { showBanner('文档状态未能恢复，已暂停保存。请复制正文备份：' + restoreError.message); return false; }
+    publishDocDir(filePath);
+    if (keepOwnerOnFailure) { showBanner('新文档未能打开，已保留原稿：' + e.message); scheduleSave(); }
+    else retainBufferAfterRead({ text, filePath: path, documentId: id, revision: loadedRevision }, e.message);
+    return false;
+  }
 }
 function syncSource(content = window.mpEngine?.documentSession?.()) {
   const stamp = content && Number.isSafeInteger(content.sourceRevision) ? content : null;
@@ -223,7 +250,7 @@ function retainBufferAfterRead(payload, reason) {
   ]);
 }
 function consumeReload(payload, pending) {
-  if (pending && (payload.requestId !== pending.requestId || payload.loadKind !== 'reload' || payload.filePath !== pending.filePath || typeof payload.documentId !== 'string' || typeof payload.text !== 'string')) return pending.result = { ok: false, code: 'MP_DOC_MISMATCH', error: '读取结果不属于当前请求' };
+  if (pending && (payload.requestId !== pending.requestId || payload.loadKind !== 'reload' || (payload.requestedPath || payload.filePath) !== pending.filePath || typeof payload.documentId !== 'string' || typeof payload.text !== 'string')) return pending.result = { ok: false, code: 'MP_DOC_MISMATCH', error: '读取结果不属于当前请求' };
   if (consumedReloads.has(payload.requestId)) return pending?.result || { ok: true, duplicate: true };
   consumedReloads.add(payload.requestId);
   if (consumedReloads.size > 64) consumedReloads.delete(consumedReloads.values().next().value);
@@ -257,6 +284,50 @@ async function reloadDocument({ origin = 'toolbar' } = {}) {
 }
 window.mpReloadDocument = reloadDocument;
 
+let pendingOpen = null;
+window.mpPrepareOpen = async ({ requestId }) => {
+  const engine = window.mpEngine, ticket = engine?.commands.capture();
+  if (!booted || !ticket) return { ok: false, code: 'MP_COMPOSING' };
+  const pending = pendingOpen = { requestId, documentId, ticket, engine };
+  if (!(await syncDirty()) || pendingOpen !== pending || !engine.commands.valid(ticket, { intent: false })) return { ok: false, code: 'MP_OPEN_STALE' };
+  return { ok: true, documentId, revision };
+};
+window.mpCancelOpen = ({ requestId }) => { if (pendingOpen?.requestId === requestId) pendingOpen = null; };
+function commitOpenedDoc(payload) {
+  const pending = pendingOpen, engine = window.mpEngine;
+  const valid = pending?.requestId === payload.requestId && pending.documentId === documentId && pending.engine === engine
+    && engine.commands.valid(pending.ticket, { intent: false }) && !engine._view().composing;
+  if (!valid) {
+    window.mpHost.commitOpen({ requestId: payload.requestId, phase: 'reject' });
+    showBanner('读取期间有新修改，已保留原文档。'); return false;
+  }
+  // Final ticket check, metadata adoption, and source application occupy this
+  // one synchronous turn. Input cannot fall into an acceptance/apply gap.
+  const accepted = window.mpHost.commitOpen({ requestId: payload.requestId, documentId, phase: 'adopt' });
+  if (!accepted?.ok) return false;
+  let checkpoint;
+  try {
+    checkpoint = checkpointRendererDocument();
+    if (!applyDoc(payload.text, payload.filePath, payload.documentId, payload.revision, 'replace', pending.ticket, true, checkpoint)) {
+      window.mpHost.commitOpen({ requestId: payload.requestId, phase: 'rollback' }); return false;
+    }
+    const finished = window.mpHost.commitOpen({ requestId: payload.requestId, phase: 'finish' });
+    if (!finished?.ok) throw new Error('文档打开提交未确认');
+    checkpoint.commit(); pendingOpen = null; return true;
+  } catch (error) {
+    try { checkpoint?.rollback(); } catch (restoreError) { saveBlocked = true; lastSaveError = restoreError.message; }
+    window.mpHost.commitOpen({ requestId: payload.requestId, phase: 'rollback' });
+    showBanner(saveBlocked ? '文档状态未能恢复，已暂停保存。请复制正文备份。' : '新文档未能打开，已保留原稿：' + error.message);
+    return false;
+  }
+}
+window.mpCloseState = async () => {
+  const engine = window.mpEngine;
+  if (engine?._view?.()?.composing || !engine?.commands?.capture()) { showBanner('请先完成当前输入，再关闭文档。'); return { ok: false, composing: true }; }
+  if (!(await syncDirty())) return { ok: false };
+  return { ok: true, documentId, revision, dirty, source: engine.documentSession() };
+};
+
 /* ── 取当前文本（引擎侧 requestText → text 上行） ── */
 function currentText(timeoutMs = 4000) {
   return new Promise((resolve, reject) => {
@@ -275,7 +346,9 @@ const engineValue = () => {
 };
 // A direct page reload must not discard an unsaved editor buffer.
 window.addEventListener('beforeunload', event => {
-  if (dirty || saveInFlight) { event.preventDefault(); event.returnValue = false; }
+  const inputReady = !booted || !!window.mpEngine?.commands?.capture();
+  if (booted && window.mpEngine?.documentSession) syncSource();
+  if (!inputReady || dirty || saveInFlight || window.mpEngine?._view?.()?.composing) { event.preventDefault(); event.returnValue = false; }
 });
 
 /* ── 保存 ──
@@ -354,8 +427,10 @@ async function doSave(force = false, grant = null, saveAsOperation = null, autom
       }
       const r = await window.mpHost.save(capture.filePath, text, { documentId: capture.documentId, revision: capture.revision, ...(!force ? { automatic: true } : {}), ...(grant ? { saveAsToken: grant.saveAsToken } : {}) });
       saveTrace('doSave:saved', { filePath: capture.filePath, ok: !!r?.ok, revision: capture.revision, code: r?.code, error: r?.error });
-      if (documentId !== capture.documentId || recoverySerial !== capture.recoverySerial || !operationCurrent()) return false;
-      if (!r?.ok) { if (r?.code !== 'MP_AUTOSAVE_DISABLED') saveFailure(r, capture.filePath); return false; }
+      if (documentId !== capture.documentId || recoverySerial !== capture.recoverySerial) return false;
+      // A later Save As intent can cancel a picker, but cannot undo a completed
+      // disk commit. Reconcile that receipt before the next queued intent runs.
+      if (!r?.ok) { if (operationCurrent() && r?.code !== 'MP_AUTOSAVE_DISABLED') saveFailure(r, capture.filePath); return false; }
       if (!r.current) return false;
       filePath = r.filePath; publishDocDir(filePath); knownLen = text.length;
       dirty = revision !== capture.revision;
@@ -466,6 +541,7 @@ window.mpHost.onDoc((payload) => {
   window.__mpDbg = window.__mpDbg || {};
   window.__mpDbg.docEvents = (window.__mpDbg.docEvents || 0) + 1;
   if (!payload) return;
+  if (payload.loadKind === 'open' && payload.requestId) { commitOpenedDoc(payload); return; }
   if (payload.loadKind === 'reload' && payload.requestId) { consumeReload(payload, reloadPending?.requestId === payload.requestId ? reloadPending : null); return; }
   if (!bus.open) { pendingDoc = payload; return; }
   // 主进程推来的就是权威文档：直接应用（不再用 booted 分流，applyDoc 两种情形都处理）
@@ -485,11 +561,16 @@ window.mpHost.onMenu(async (cmd) => {
        这里补上这一半：一次清掉本进程**全部 mp-\* 键**，再 reload 让界面以干净状态重起。
        （壳层那套由删 settings.json / 设置面板负责 ✓ 这里不重复、也不猜它各键的默认值 ✗。） */
     case 'resetAll': {
+      const removed = await window.mpHost.themeRemove();
+      const defaults = Object.fromEntries(['body','h1','h2','h3','h4','h5','h6','italic','bold','code'].map(id => [id,'']));
+      const fonts = await window.mpHost.fontSave(defaults);
+      if (!removed.ok || !fonts.ok) { showBanner('恢复外观默认失败：' + (removed.error || fonts.error)); return; }
       let cleared = 0;
       try {
         const keys = [];
         for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.indexOf('mp-') === 0) keys.push(k); }
         for (const k of keys) { localStorage.removeItem(k); cleared++; }
+        localStorage.removeItem('editor-theme'); localStorage.removeItem('dark');
       } catch { /* 忽略 */ }
       try { console.log('[resetAll] 已清渲染侧偏好键 ' + cleared + ' 个，即将重载'); } catch { /* 忽略 */ }
       try { location.reload(); } catch { /* 忽略 */ }

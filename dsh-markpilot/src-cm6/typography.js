@@ -53,7 +53,7 @@ export function editorFontVarsCss() {
 /* ── 编辑面：标题阶（逐字等于原来的六条 .cm-line.mp-hN 规则） ── */
 export function editorHeadingsCss() {
   return MP_TYPO.headings.map((h) => {
-    const font = h.bodyFont ? ' font-family: var(--mp-font-body);' : '';
+    const font = ` font-family: var(--mp-type-h${h.level}, var(--mp-type-body, var(--mp-font-body)));`;
     const border = h.border ? ' border-bottom: 1px solid var(--mp-border);' : '';
     return `.cm-line.mp-h${h.level} { font-size: ${h.size}px; line-height: ${h.lineHeight}px; font-weight: 700; color: var(--mp-heading);${font}${border} }`;
   }).join('\n');
@@ -70,7 +70,7 @@ export function editorContentMetricsCss() {
 /* ── 编辑面：楷体斜体（HighlightStyle 用的三项） ── */
 export function editorKaiStyle() {
   return {
-    fontFamily: `'${MP_TYPO.kai.family}', var(--mp-font-latin), serif`,
+    fontFamily: `var(--mp-type-italic, '${MP_TYPO.kai.family}'), var(--mp-font-latin), serif`,
     fontStyle: 'italic',
     fontSynthesisStyle: 'none',
     fontSize: `${MP_TYPO.kai.em}em`,

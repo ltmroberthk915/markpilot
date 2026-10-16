@@ -4,14 +4,16 @@ const encodingError = message => Object.assign(new Error(message), { code: 'MP_E
 
 function isBinary(bytes) {
   const head = bytes.subarray(0, 4096), b = i => head[i];
-  const magic = (b(0) === 0x89 && b(1) === 0x50 && b(2) === 0x4e && b(3) === 0x47)
+  const begins = value => head.length >= value.length && head.subarray(0, value.length).equals(Buffer.from(value, 'binary'));
+  const bmp = begins('BM') && head.length >= 26 && head.readUInt16LE(6) === 0 && head.readUInt16LE(8) === 0
+    && [12, 40, 52, 56, 64, 108, 124].includes(head.readUInt32LE(14));
+  const magic = begins('\x89PNG\r\n\x1a\n')
     || (b(0) === 0xff && b(1) === 0xd8 && b(2) === 0xff)
-    || (b(0) === 0x47 && b(1) === 0x49 && b(2) === 0x46)
-    || (b(0) === 0x42 && b(1) === 0x4d)
-    || (b(0) === 0x25 && b(1) === 0x50 && b(2) === 0x44 && b(3) === 0x46)
-    || (b(0) === 0x50 && b(1) === 0x4b)
-    || (b(0) === 0x7f && b(1) === 0x45 && b(2) === 0x4c && b(3) === 0x46)
-    || (b(0) === 0x52 && b(1) === 0x49 && b(2) === 0x46 && b(3) === 0x46)
+    || begins('GIF87a') || begins('GIF89a') || bmp
+    || /^%PDF-\d\.\d/.test(head.subarray(0, 8).toString('ascii'))
+    || begins('PK\x03\x04') || begins('PK\x05\x06') || begins('PK\x07\x08')
+    || begins('\x7fELF')
+    || (begins('RIFF') && head.length >= 12 && ['WEBP', 'WAVE', 'AVI '].includes(head.subarray(8, 12).toString('ascii')))
     || (b(0) === 0 && b(1) === 0 && b(2) === 1 && b(3) === 0);
   let printable = 0;
   for (const c of head) if (c === 9 || c === 10 || c === 13 || (c >= 32 && c < 127) || c >= 128) printable++;
@@ -39,9 +41,10 @@ function decodeDocument(bytes, file = '') {
   } catch {
     throw encodingError('文件不是完整有效的 ' + (encoding === 'utf8' ? 'UTF-8' : 'UTF-16') + ' 文本，已停止打开以保护原文件：' + file);
   }
-  const crlf = (text.match(/\r\n/g) || []).length, lf = (text.match(/\n/g) || []).length;
-  const eol = crlf > 0 && crlf >= lf - crlf ? '\r\n' : '\n';
-  return { text: text.replace(/\r\n/g, '\n'), bom, eol, encoding };
+  const crlf = (text.match(/\r\n/g) || []).length, lf = (text.match(/\n/g) || []).length - crlf;
+  const cr = (text.match(/\r/g) || []).length - crlf;
+  const eol = crlf > 0 && crlf >= lf && crlf >= cr ? '\r\n' : cr > lf ? '\r' : '\n';
+  return { text: text.replace(/\r\n?|\n/g, '\n'), bom, eol, encoding };
 }
 
 function encodeDocument(text, { bom = false, eol = '\n', encoding = 'utf8' } = {}) {
@@ -55,7 +58,8 @@ function encodeDocument(text, { bom = false, eol = '\n', encoding = 'utf8' } = {
       if (!(next >= 0xdc00 && next <= 0xdfff)) throw encodingError('文档包含不完整的 Unicode 字符，已停止保存。请删除该字符后重试或撤销最近输入。');
     } else if (c >= 0xdc00 && c <= 0xdfff) throw encodingError('文档包含不完整的 Unicode 字符，已停止保存。请删除该字符后重试或撤销最近输入。');
   }
-  const value = (bom ? '\ufeff' : '') + (eol === '\r\n' ? text.replace(/\n/g, '\r\n') : text);
+  const lineBreak = ['\n', '\r\n', '\r'].includes(eol) ? eol : '\n';
+  const value = (bom ? '\ufeff' : '') + text.replace(/\r\n?|\n/g, lineBreak);
   const bytes = Buffer.from(value, encoding === 'utf8' ? 'utf8' : 'utf16le');
   return encoding === 'utf16be' ? bytes.swap16() : bytes;
 }

@@ -21,7 +21,13 @@ function registry(){
 function preserved(before,after){for(const row of before)assert.deepEqual(after.find(e=>e.key===row.key),row,'Existing installation must remain identical: '+row.key);}
 function uninstallerPath(row){const command=row.uninstall||'',match=command.match(/^"([^"]+\.exe)"/i)||command.match(/^(.+?\.exe)(?:\s|$)/i);assert(match,'An explicit uninstaller executable is required');return path.resolve(match[1]);}
 function installationDirectory(row){return row.location?path.resolve(row.location):path.dirname(uninstallerPath(row));}
-function run(exe,args){execFileSync(exe,args,{windowsHide:true,windowsVerbatimArguments:true,stdio:'inherit',timeout:180000});}
+function run(exe,args){
+ // NSIS's default name-based shutdown can affect another appId. Never run an
+ // installation mutation while any user/probe instance could be affected.
+ const pids=JSON.parse(execFileSync(process.env.MP_PWSH||'pwsh.exe',['-NoProfile','-NonInteractive','-Command',"$ErrorActionPreference='Stop'; $rows=@(Get-CimInstance Win32_Process -Filter \"Name = 'MarkPilot.exe'\" | ForEach-Object {$_.ProcessId}); ConvertTo-Json -InputObject @($rows) -Compress"],{encoding:'utf8',windowsHide:true,timeout:15000}));
+ assert.equal(pids.length,0,'Close MarkPilot normally before install/uninstall; no instance will be terminated: '+pids.join(','));
+ execFileSync(exe,args,{windowsHide:true,windowsVerbatimArguments:true,stdio:'inherit',timeout:180000});
+}
 try{
  if(mode==='install'||mode==='verify'){
   let state;

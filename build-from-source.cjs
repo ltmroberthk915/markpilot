@@ -55,6 +55,9 @@ console.log('· esbuild = ' + ESBUILD_BIN);
    ② cwd 必须是 dsh-markpilot：字体是**相对路径** import 的 ✓，从仓库根跑会解析错 ✗；
    ③ --minify：与内部构建同口径 ✓（不开的话产物 hash 对不上，无法做等价性核对 ✗）。 */
 const ENGINE_DIR = path.join(ROOT, 'dsh-markpilot');
+execFileSync(process.execPath, [path.join(SHELL, 'scripts/build-native.cjs')], { cwd: ROOT, stdio: 'inherit', windowsHide: true });
+fs.copyFileSync(path.join(ENGINE_DIR, 'src-cm6/font-preferences.cjs'), path.join(SHELL, 'shell/font-preferences.cjs'));
+fs.copyFileSync(path.join(ENGINE_DIR, 'src-cm6/data-images.cjs'), path.join(SHELL, 'shell/data-images.cjs'));
 // Rebuild the maintained source-map renderer and all matching font/CSS assets
 // from the exact locked upstream package before resolving engine imports.
 execFileSync(process.execPath, [path.join(ROOT, 'tools/vendor/build-katex.cjs')],

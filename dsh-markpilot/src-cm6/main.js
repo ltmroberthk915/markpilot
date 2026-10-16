@@ -427,11 +427,10 @@ const mermaidDecorations = StateField.define({
   provide: f => EditorView.decorations.from(f),
 });
 
-/** 【导出侧接口·2026-10-11】只暴露两件事：预渲染（异步，导出前 await 一次）与取缓存 SVG（同步）。
- *  为什么导出不能自己渲染：mermaid 的 API 在**编辑面**这一侧（懒加载 + strict 配置 ＋ parse 前置 ＋ 容器），
- *  导出再实现一份就是错-4（同功能两份实现）✗。导出只需**同步查缓存** ⇒ 生成器保持同步 ✓。 */
+// Each export owns its SVG results until its writer finishes. The viewport LRU
+// remains bounded independently and cannot evict an earlier exported diagram.
 window.mpMermaid = {
-  /** 扫 md 里的 mermaid 围栏，逐个渲染进缓存；返回 { 总数, 成功, 失败: [{src, err}] } */
+  /** Render through the shared queue; the caller releases svgs in finally. */
   async prerender(md) {
     const blocks = scanMermaidBlocks(Text.of(String(md || '').split('\n'))).map(b => b.src).filter(s => s.trim());
     /* 【导出应当用**浅色主题**渲图·2026-10-11 逐页验收实测缺陷】
@@ -441,15 +440,30 @@ window.mpMermaid = {
        ⇒ 导出与打印同口径用**浅色** ✓（与壳层 PRINT_CSS 的"白纸黑字"一致 ✓）；
          编辑面仍跟随主题 ✓（缓存键含主题 ⇒ 两套 SVG 并存，互不干扰 ✓）。 */
     const expTheme = exportDiagramTheme();
-    const cacheHits = blocks.filter((s) => svgCache.get(svgKey(s, expTheme))).length;
-    const todo = blocks.filter((s) => !svgCache.get(svgKey(s, expTheme)));
-    let 成功 = cacheHits, 失败 = [];
-    for (const src of todo) {
-      /* 串行渲染（与编辑面同一条队列语义 ✓）；每个都等到底，避免导出时图还没出来 */
-      const r = await new Promise((resolve) => requestMermaid(src, expTheme, null, (svg, err) => resolve({ svg, err })));
-      if (r.svg) 成功 += 1; else 失败.push({ src: src.slice(0, 40), err: String((r.err || '').slice(0, 120)) });
-    }
-    return { 总数: blocks.length, 成功, 失败, 主题: expTheme };
+    const svgs = new Map(), counts = new Map(), todo = [];
+    for (const src of blocks) counts.set(src, (counts.get(src) || 0) + 1);
+    let bytes = 0, 成功 = 0;
+    const 失败 = [], maxBytes = 32 * 1024 * 1024;
+    const retain = (src, svg) => {
+      // Bound the operation set, without enlarging the permanent viewport cache.
+      if (svg.length > maxBytes - bytes) throw new Error('导出图表超过 32 MB，请拆分文档');
+      const size = new TextEncoder().encode(svg).byteLength;
+      if (size > maxBytes - bytes) throw new Error('导出图表超过 32 MB，请拆分文档');
+      bytes += size; svgs.set(src, svg); 成功 += counts.get(src);
+    };
+    try {
+      // Retain all warm hits before a newly rendered block can evict them.
+      for (const src of counts.keys()) {
+        const hit = svgCache.get(svgKey(src, expTheme));
+        if (hit?.svg) retain(src, hit.svg); else todo.push(src);
+      }
+      for (const src of todo) {
+        const r = await new Promise(resolve => requestMermaid(src, expTheme, null, (svg, err) => resolve({ svg, err })));
+        if (r.svg) retain(src, r.svg);
+        else 失败.push({ src: src.slice(0, 40), err: String((r.err || '').slice(0, 120)) });
+      }
+      return { 总数: blocks.length, 成功, 失败, 主题: expTheme, bytes, svgs };
+    } catch (error) { svgs.clear(); throw error; }
   },
   /** 同步取缓存（导出生成器用；未命中返回 null ⇒ 调用方退回 <pre><code> ✓）
    *  【导出取的是**浅色**那份 ✓】与 prerender 同一口径 ✓：先查导出主题，再退回当前主题 ✓
@@ -1820,7 +1834,9 @@ function scanTables(doc, blocks = scanFencedBlocks(doc)) {
          再用 `fitWidths` 把下限摊回去。旧口径数源码字符 ⇒ TeX 长格把中文列挤成 89px（3.0.5 用户截图）。 */
       const weights = [];
       for (let c = 0; c < cols; c++) {
-        weights[c] = Math.max(2, displayWidth(header.cells[c] || ""), ...rows.map((r) => displayWidth(r.cells[c] || "")));
+        let weight = Math.max(2, displayWidth(header.cells[c] || ""));
+        for (const row of rows) weight = Math.max(weight, displayWidth(row.cells[c] || ""));
+        weights[c] = weight;
       }
       const widths = fitWidths(weights);
       const total = weights.reduce((a, b) => a + b, 0) || 1;
@@ -4506,7 +4522,7 @@ function imgCopyFill(event, view) {
         return `<img src="${u}" alt="${String(alt).replace(/"/g, "&quot;")}">`;
       });
     }).join("<br>");
-    cb.setData("text/html", html);
+    cb.setData("text/html", '<div data-markpilot-source="markdown">' + html + '</div>');
   } catch { /* 忽略 */ }
   /* 【关键】二进制图片口味：微信/DeepSeek 网页端只认这个。多图时先给第一张（微信一次一张），
      其余仍在 HTML 里，粘到支持多图的目标（Word/网页编辑器）能拿到全部。 */
@@ -4721,7 +4737,7 @@ function applyEditorTheme() {
   // 自相矛盾，菜单却仍显示「GitHub 深色 · 当前」。现在有登记表（window.mpTheme，由 installExtras 建立）
   // 就**全部委托给它**——它是唯一写者；本函数只在登记表就位前用 TELARI 兜底，
   // 保证 --mp-bg 从第一帧起就有值（否则 html 透明露出原生底，比现状更糟）。
-  if (window.mpTheme && window.mpTheme.has(id)) { window.mpTheme.apply(id); return; }
+  if (window.mpTheme) { window.mpTheme.apply(id); return; }
   const t = TELARI[id.endsWith("dark") ? "dark" : "light"];
   root.dataset.editorTheme = id;
   root.dataset.mode = t.mode;
@@ -4772,6 +4788,7 @@ html, body { margin: 0; padding: 0; height: 100%; background: var(--mp-bg); }
  *  期望 ≤2px）——文案一改那条就会红，届时按新的 title 更新本选择器即可。 */
 .cm-content .cm-specialChar[title="Control character zero width space"] { font-size: 0; }
 .cm-content {
+  font-family: var(--mp-type-body, var(--mp-font-body));
   /* 正文微加肥（telari：宋体单字重，0.007em 描边常态）；公式/标题/代码清零见下 */
   ${editorContentMetricsCss()}
   caret-color: var(--mp-primary);
@@ -4798,7 +4815,7 @@ ${editorHeadingsCss()}
   color: var(--mp-muted); opacity: 0.85; pointer-events: none;
 }
 /* 强调：strong 900+.015em 描边（fontsize.css）；em 楷体斜体（1.18em/字距/字号调整来自唯一真源） */
-.cm-content strong { font-weight: 900; -webkit-text-stroke: .015em currentColor; }
+.cm-content strong { font-weight: 900; -webkit-text-stroke: .015em currentColor; font-family:var(--mp-type-bold, inherit); }
 ${editorKaiRuleCss()}
 /* 公式：裸排（vditor 观感——无胶囊底/无面板），保留命中区与光标语义。
  * 【高度图纪律】widget 元素自身禁 vertical margin（同不进高度图）；间距用 padding。 */
@@ -5369,14 +5386,14 @@ const themeVars = EditorView.theme({
  * 语法着色（标记弱化、链接主色、行内代码胶囊、删除线）——telari 语法梯子。 */
 const mdHighlight = HighlightStyle.define([
   /* strong/em 走 tag 规则（CM6 产 span 不产 strong/em 元素——CSS 元素选择器打不中） */
-  { tag: t.strong, fontWeight: "900", WebkitTextStroke: ".015em currentColor" },
+  { tag: t.strong, fontWeight: "900", WebkitTextStroke: ".015em currentColor", fontFamily: "var(--mp-type-bold, inherit)" },
   { tag: t.emphasis, ...editorKaiStyle() },
   { tag: t.strikethrough, textDecoration: "line-through" },
   { tag: t.link, color: "var(--mp-primary)", textDecoration: "none" },
   { tag: t.url, color: "var(--mp-muted)", fontSize: "0.92em" },
   { tag: [t.processingInstruction, t.meta], color: "var(--mp-faint)" },
   { tag: t.quote, color: "var(--mp-muted)" },
-  { tag: t.monospace, fontFamily: "var(--mp-font-mono)", background: "var(--mp-codeBg)", borderRadius: "3px", padding: "0.15em 0.3em", fontSize: "0.9em" },
+  { tag: t.monospace, fontFamily: "var(--mp-type-code, var(--mp-font-mono))", background: "var(--mp-codeBg)", borderRadius: "3px", padding: "0.15em 0.3em", fontSize: "0.9em" },
   /* 代码围栏语法梯子（telari 六级，2.3.3 hljs 对齐） */
   { tag: t.keyword, color: "var(--mp-kw)" },
   { tag: t.string, color: "var(--mp-str)" },
@@ -5414,6 +5431,34 @@ const commands = createCommandContext({
   composing: () => cellComposing || !!view?.composing,
   cancelViewport: v => viewportIntent.cancel(v),
 });
+
+// A checkpoint owns the exact CM state, including history and region epoch.
+// Its lifetime is one synchronous turn, so a delayed reply cannot restore over
+// subsequent user input. Command intent serials and allocated epochs never rewind.
+function checkpointDocument() {
+  const target = view, ticket = commands.capture();
+  if (!target || !ticket) return null;
+  const state = target.state, revision = sourceRevision, pendingComposition = composingDirty;
+  const top = target.scrollDOM.scrollTop, left = target.scrollDOM.scrollLeft;
+  let active = true;
+  queueMicrotask(() => { active = false; });
+  return {
+    commit() { if (!active || view !== target) return false; active = false; return true; },
+    rollback() {
+      if (!active || view !== target) return false;
+      active = false; commands.invalidate(); deactivateCellOverlay();
+      const suppressed = suppressChange; suppressChange = true;
+      try { if (target.state !== state) target.setState(state); }
+      finally { sourceRevision = revision; composingDirty = pendingComposition; suppressChange = suppressed; }
+      target.scrollDOM.scrollTop = top; target.scrollDOM.scrollLeft = left;
+      // Auxiliary view failures cannot prevent restoration of the source state.
+      try { window.mpSplit?.mirror(state); } catch (error) { console.error('[document] mirror restore', error); }
+      try { scheduleTableChrome(); positionTableBar(); } catch (error) { console.error('[document] chrome restore', error); }
+      commands.resume(ticket, { intent: false });
+      return true;
+    },
+  };
+}
 
 /* ══ β2 表格工具栏（光标入表浮出）══
  *  形态照 Typora 实测（4 槽：▦ 表格菜单 / ≡左 ≡中 ≡右 / ⋮ 更多 / 🗑 删除表格）；
@@ -5489,6 +5534,8 @@ function ensureTableBar() {
      用户粘出来就是"上一个内容"（他剪贴板里恰好是截图时，Excel 里就出现一张整窗图）。
      传了 from，菜单锚点就落在表内，两个复制项都能定位到正确的表。 */
   const openTableMenu = (b) => {
+    // Resolve the toolbar table only after committing its active cell.
+    if (!commands.capture()) return;
     const r = b.getBoundingClientRect();
     let tf = null;
     try { const t = tableBarTarget(); tf = t && t.table ? t.table.from : null; } catch { /* 取不到就退化为原行为 */ }
@@ -5931,8 +5978,12 @@ function boot(content) {
       const r = view.state.selection.main;
       return { anchor: r.anchor, head: r.head, selected: view.state.doc.sliceString(Math.min(r.anchor, r.head), Math.max(r.anchor, r.head)) };
     },
+    checkpointDocument,
     replaceDocument: (text) => {
-      if (!view) return;
+      if (!view || cellComposing || view.composing) return false;
+      const checkpoint = checkpointDocument();
+      if (!checkpoint) return false;
+      try {
       const old = view.state;
       const state = EditorState.create({ doc: typeof text === 'string' ? text : '', extensions: documentExtensions });
       const fresh = state.update({ effects: [
@@ -5941,7 +5992,6 @@ function boot(content) {
       ] }).state;
       deactivateCellOverlay();
       inlineMathMetrics.clear();
-      commands.invalidate(); sourceRevision = 0;
       cellComposing = composingDirty = false;
       mathPass = null; blockPassDir = 0; lastLiveHeight = -1;
       overlayStyledFor = tableBarKey = '';
@@ -5949,13 +5999,17 @@ function boot(content) {
       view.__mpImageClick = null; view.__mpRegionGesture = null;
       view.__mpMathGesture = null; view.__mpVerticalInput = false;
       suppressChange = true;
-      try { view.setState(fresh); } finally { suppressChange = false; }
+      try { view.setState(fresh); }
+      finally { suppressChange = false; }
+      commands.invalidate(); sourceRevision = 0;
       view.scrollDOM.scrollTop = view.scrollDOM.scrollLeft = 0;
       window.mpSplit && window.mpSplit.mirror(fresh);
       scheduleTableChrome(); positionTableBar();
       const active = document.activeElement;
       if (!active || active === document.body || active === document.documentElement ||
           view.contentDOM.contains(active) || cellOverlay?.contains(active)) view.focus();
+      checkpoint.commit(); return true;
+      } catch (error) { checkpoint.rollback(); throw error; }
     },
     setValue: (text, ticket = null) => {
       if (!view || cellComposing || view.composing) return false;

@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld('mpHost', {
   docReady: () => ipcRenderer.invoke('doc:ready'),
   open: () => ipcRenderer.invoke('file:open'),
   openPath: (p) => ipcRenderer.invoke('file:openPath', p),
+  // A constant-time metadata commit, used only inside one renderer turn after
+  // its final source-ticket check. No disk IO or document text crosses this call.
+  commitOpen: (request) => ipcRenderer.sendSync('doc:commit-open', request),
   save: (filePath, text, metadata = {}) => ipcRenderer.invoke('file:save', { ...metadata, filePath, text }),
   __save: () => ipcRenderer.invoke('file:requestSave'),
   saveAs: () => ipcRenderer.invoke('file:saveAs'),
@@ -19,7 +22,7 @@ contextBridge.exposeInMainWorld('mpHost', {
   exists: (p) => ipcRenderer.invoke('file:exists', p),
   // 读本地文件为 base64（导出公式排版内联 KaTeX 字体用；本地资源走宿主通道，不走 URL 请求）
   // 3.1.0 起返回值补 `mime`（按扩展名判）与 `path`（绝对路径回显）；`ok/base64/bytes` 字段不变
-  readFileBase64: (p) => ipcRenderer.invoke('file:readBase64', p),
+  readFileBase64: (p, options = {}) => ipcRenderer.invoke('file:readBase64', p, options),
   /* ── 图片策略（3.1.0，接口与引擎侧书面敲定）─────────────────────────────────
    *  pickImages      选图（原生多选文件框）⇒ 绝对路径列表；取消 ⇒ {ok:false,canceled:true}
    *  saveImageToAssets  srcPath **或** base64 二选一 ⇒ 落 <文档目录>\assets\ ⇒ 相对路径
@@ -61,6 +64,12 @@ contextBridge.exposeInMainWorld('mpHost', {
   /* Typora 社区主题：选一个 .css（默认落在 Typora 的主题目录）⇒ 读回全文交给渲染侧改写与注入。
      读文件必须走壳层（渲染进程零文件权限）；主题里的相对 url() 由渲染侧的改写层中和掉，不会去打 404。 */
   pickThemeCss: () => ipcRenderer.invoke('theme:pickCss'),
+  themeRead: () => ipcRenderer.invoke('theme:read'),
+  themeSave: (theme) => ipcRenderer.invoke('theme:save', theme),
+  themeRemove: () => ipcRenderer.invoke('theme:remove'),
+  fontRead: () => ipcRenderer.invoke('font:read'),
+  fontSave: (patch) => ipcRenderer.invoke('font:save', patch),
+  onAppearance: (cb) => ipcRenderer.on('appearance', (_e, state) => cb(state)),
   docDirty: (dirty, metadata) => ipcRenderer.invoke('doc:dirty', metadata ? { ...metadata, dirty } : dirty),
   docPath: (filePath, metadata = {}) => ipcRenderer.invoke('doc:path', filePath, metadata),
   docSaved: (filePath, receipt = {}) => ipcRenderer.invoke('doc:saved', { ...receipt, filePath }),

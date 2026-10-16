@@ -26,12 +26,12 @@ async function main(){
  async function read(){return p.evaluate(()=>{
   const v=window.mpEngine._view(),s=v.state.selection.main,caret=v.coordsAtPos(s.head),protocol=window.mpEngine.__regions?.();
   const rect=e=>e.getBoundingClientRect().toJSON();
-  return{text:v.state.doc.toString(),selection:{anchor:s.anchor,head:s.head},focus:document.hasFocus()&&v.hasFocus,cellFocus:document.hasFocus()&&document.activeElement===document.querySelector('.mp-cell-overlay-text'),caret,
+  return{text:v.state.doc.toString(),selection:{anchor:s.anchor,head:s.head},focus:document.hasFocus()&&v.hasFocus,cellFocus:document.hasFocus()&&document.activeElement===document.querySelector('.mp-cell-overlay-text'),caret,devicePixelRatio,
    scrollTop:v.scrollDOM.scrollTop,maxScroll:v.scrollDOM.scrollHeight-v.scrollDOM.clientHeight,protocol,
    host:{filePath:typeof filePath==='string'?filePath:null,dirty:typeof dirty==='boolean'?dirty:null,revision:typeof revision==='number'?revision:null,saveInFlight:typeof saveInFlight==='boolean'?saveInFlight:null,saveBlocked:typeof saveBlocked==='boolean'?saveBlocked:null,lastSaveError:typeof lastSaveError==='string'?lastSaveError:null,saveTrace:window.__mpDbg?.saveTrace,banner:document.querySelector('#mp-banner')?.textContent},
    images:[...v.contentDOM.querySelectorAll('.mp-img')].map(e=>({region:e.dataset.mpRegion,retained:e.classList.contains('mp-img-retained'),rect:rect(e),imageRect:rect(e.querySelector('img:not(.mp-img-pending)')||e),decoded:!!e.querySelector('img')?.naturalWidth,failed:e.classList.contains('is-failed')})),
    floats:[...v.contentDOM.querySelectorAll('.mp-inline-float')].map(e=>({rect:rect(e),font:parseFloat(getComputedStyle(e.querySelector('.katex')||e).fontSize),scrollWidth:e.scrollWidth,clientWidth:e.clientWidth})),
-   blocks:[...v.contentDOM.querySelectorAll('.mp-cm6-math-block')].map(e=>({rect:rect(e),quote:Number(e.dataset.mpQuoteDepth||0),border:getComputedStyle(e).borderLeftWidth,font:parseFloat(getComputedStyle(e.querySelector('.katex')||e).fontSize)})),
+   blocks:[...v.contentDOM.querySelectorAll('.mp-cm6-math-block')].map(e=>({rect:rect(e),quote:Number(e.dataset.mpQuoteDepth||0),border:getComputedStyle(e).borderLeftWidth,borderStyle:getComputedStyle(e).borderLeftStyle,font:parseFloat(getComputedStyle(e.querySelector('.katex')||e).fontSize)})),
    rendered:[...v.contentDOM.querySelectorAll('.mp-cm6-math .katex')].map(e=>({rect:rect(e),font:parseFloat(getComputedStyle(e).fontSize)})),
    lines:[...v.contentDOM.querySelectorAll('.cm-line')].map(e=>({text:e.textContent,rect:rect(e),class:e.className})),events:window.__regionEvents||[]};
  });}
@@ -113,7 +113,7 @@ async function main(){
   for(const depth of [0,1,2,3]){const id='quote-context-'+depth;if(!wanted(id))continue;await record(id,async trace=>{
    const q=depth?'> '.repeat(depth):'',text='# Context\n\n'+q+'$\\begin{aligned}x&=a+b\\\\&=c+d\\end{aligned}$\n'+q+'Follow $a=b$.\n'+q+'\n'+q+'Continue.\n\nAFTER\n';
    await open(id,text);const block=p.locator('.mp-cm6-math-block').first();await block.scrollIntoViewIfNeeded();
-   const normal=await capture(trace,id,'01-normal',true);assert.equal(normal.blocks[0].quote,depth,'semantic container on block projection');if(depth)assert.equal(normal.blocks[0].border,'3px','shared quote bar over block height');
+   const normal=await capture(trace,id,'01-normal',true);assert.equal(normal.blocks[0].quote,depth,'semantic container on block projection');if(depth){assert.equal(normal.blocks[0].borderStyle,'solid','shared quote bar is actually drawn');assert(Math.abs(parseFloat(normal.blocks[0].border)-3)<=1/normal.devicePixelRatio,'3 CSS px quote bar within one physical pixel of Chromium border quantization: '+normal.blocks[0].border);}
    await block.click({delay:65});const live=await capture(trace,id,'02-live');assert(live.focus&&live.floats.length===1);const ratio=live.floats[0].font/normal.blocks[0].font;assert(Math.abs(ratio-.93)<.002,'preview equals .93 of same contextual normal font: '+ratio);assert.equal(live.text,text);
    return{depth,ratio,sourceUntouched:true};
   });}

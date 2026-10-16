@@ -104,7 +104,8 @@ async function main() {
           await p.keyboard.insertText('R'); await sleep(150); const continued = await capture('07-continue');
           const final = kind === 'search' ? initial : kind === 'cell' ? afterValue.replace(empty || command === 'undo' ? '|a\\|b|KEEP|' : '|a\\|中文b|KEEP|', empty || command === 'undo' ? '|a\\|Rb|KEEP|' : '|a\\|中文Rb|KEEP|') : (empty || command === 'undo' ? 'R' : 'XR') + BODY;
           assert.equal(continued.text, final); if (kind === 'search') assert.equal(continued.searchValue, (command === 'undo' ? 'ab' : 'abc') + 'R');
-          await waitUntil(() => fs.readFileSync(file).equals(Buffer.from(final)), 'exact final UTF-8 disk', 5000); await capture('08-saved'); item.stage = 'complete'; return { menuCallbackConfirmed: true, rendererPositiveControls: true, command, kind };
+          await waitUntil(() => p.evaluate(() => !saveInFlight && !dirty), 'host acknowledges final save commit', 5000);
+          assert(fs.readFileSync(file).equals(Buffer.from(final)), 'exact final UTF-8 disk after commit'); await capture('08-saved'); item.stage = 'complete'; return { menuCallbackConfirmed: true, rendererPositiveControls: true, command, kind };
         } catch (e) { try { await capture('failure'); } catch (x) { trace.push({ name: 'failure-frame-error', error: x.message }); } throw e; }
       });
       const c = result.cases.at(-1); if (c.error?.startsWith('ENTRY_UNCONFIRMED:')) c.status = 'entry-unconfirmed'; else if (c.status === 'fail') c.failureKind = c.productReached ? 'product-check' : 'harness-or-setup';

@@ -56,7 +56,7 @@ async function main(){
     await waitUntil(()=>{const log=path.join(run.profile,'main-debug.log');return fs.existsSync(log)&&fs.readFileSync(log,'utf8').split('\n').some(l=>l.includes('test:reload-delay')&&l.includes(plan.phase))},'actual '+plan.phase+' barrier');
     trace.push({name:'actual-delay-phase',phase:plan.phase,milliseconds:2400});
     if(plan.control){
-     await p.locator('.mp-tb-item[data-mp-id="more"]').click({delay:65});await p.locator('.mp-pop').getByText('设置',{exact:true}).click({delay:65});const control=p.locator('.mp-dlg input.mp-rng[data-p]').first();await control.click({delay:65});
+     await p.locator('.mp-tb-item[data-mp-id="more"]').click({delay:65});await p.locator('.mp-pop').getByText('设置',{exact:true}).click({delay:65});await p.locator('[data-settings-tab="layout"]').click({delay:65});const control=p.locator('.mp-dlg input.mp-rng[data-p]').first();await control.click({delay:65});
      const value=await control.evaluate(el=>({value:Number(el.value),step:Number(el.step)||1,max:Number(el.max)}));await p.keyboard.press('ArrowRight');const expected=Math.min(value.max,value.value+value.step);assert.equal(await control.inputValue(),String(expected));await settled();const loaded=await capture('03-native-control-kept');assert(loaded.reply.ok);assert.equal(loaded.text,external);assert(await control.evaluate(el=>document.hasFocus()&&document.activeElement===el));
      await p.keyboard.press('ArrowRight');assert.equal(await control.inputValue(),String(Math.min(value.max,expected+value.step)),'immediate key remains native control');assert.equal((await read()).text,external);
     }else if(plan.cell){

@@ -140,6 +140,7 @@ async function main() {
       const initial='A settings control\n',{page:p}=await fresh('settings-focus-old',initial);
       await p.locator('.mp-tb-item[data-mp-id="more"]').click({delay:65});
       await p.locator('.mp-pop').getByText('设置',{exact:true}).click({delay:65});
+      await p.locator('[data-settings-tab="layout"]').click({delay:65});
       const control=p.locator('.mp-dlg input.mp-rng[data-p]').first();
       await control.click({delay:65});
       const before=await control.evaluate(el=>{

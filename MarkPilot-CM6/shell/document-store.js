@@ -4,6 +4,7 @@ const fs=require('node:fs/promises');
 const path=require('node:path');
 const crypto=require('node:crypto');
 const {decodeDocument,encodeDocument}=require('./text-codec');
+const {prepareFile}=require('./safe-file');
 const failure=(code,message)=>Object.assign(new Error(message),{code});
 const digest=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 function createSession(){
@@ -38,14 +39,16 @@ class DocumentStore{
   }
   async load(S,file,expected=null){
     if(typeof file!=='string'||!file)throw failure('MP_BAD_PATH','没有指定文件路径');
-    const current=()=>!expected||(S.documentId===expected.documentId&&S.revision===expected.revision&&this.key(S.filePath||'')===this.key(expected.filePath||''));
+    const origin=expected||{documentId:S.documentId,revision:S.revision,filePath:S.filePath};
+    const current=()=>S.documentId===origin.documentId&&S.revision===origin.revision&&this.key(S.filePath||'')===this.key(origin.filePath||'');
     if(!current()||(expected&&expected.loadRequest!==S.loadRequest))throw failure('MP_DOC_MISMATCH','重载期间文档或编辑版本已改变');
     const request=++S.loadRequest,canonical=await this.canonical(file);
     return this.queue(this.key(canonical),async()=>{
       const snap=await this.snapshot(canonical),decoded=decodeDocument(snap.bytes,file);
+      if(this.key(await this.canonical(file))!==this.key(canonical))throw failure('MP_FILE_CONFLICT','读取期间文件位置已改变，已保留原文档：'+file);
       if(request!==S.loadRequest||!current())throw failure('MP_DOC_MISMATCH','文档已切换或继续编辑，本次读取已取消');
       const pending=S.pendingSaves,{text,...format}=decoded;
-      Object.assign(S,createSession(),format,{pendingSaves:pending,loadRequest:request,filePath:path.resolve(file),savedText:text,baseline:snap.baseline,diskMtime:snap.baseline.mtimeMs});
+      Object.assign(S,createSession(),format,{pendingSaves:pending,loadRequest:request,filePath:canonical,savedText:text,baseline:snap.baseline,diskMtime:snap.baseline.mtimeMs});
       return this.metadata(S);
     });
   }
@@ -95,27 +98,33 @@ class DocumentStore{
         const prepared=grant?await this.prepareSaveAs({sourcePath,filePath:path.resolve(filePath),text,canonical:f=>this.canonical(f),current:saveAsCurrent}):null;
         const assets=prepared?.summary||prepared;
         if(grant&&!saveAsCurrent())throw failure('MP_DOC_MISMATCH','另存为的文档或窗口已改变');
-        const tmp=path.join(path.dirname(target),'.'+path.basename(target)+'.mp-tmp-'+process.pid+'-'+crypto.randomUUID());
+        // A valid target may already use the filesystem's entire name budget.
+        // Keep the sibling staging/backup components independent of its basename.
+        const tmp=path.join(path.dirname(target),'.mp-tmp-'+process.pid+'-'+crypto.randomUUID());
+        let stage,primaryFailure;
         try{
-          await fs.writeFile(tmp,out,{flag:'wx'});
+          const outHash=digest(out);
+          stage=await prepareFile(target,tmp,{baseline,output:{bytes:out.length,sha256:outHash}});
+          await fs.writeFile(tmp,out,{flag:'r+'});
           await this.beforeReplace({session:S,filePath:target,text,revision});
           return await this.commit(async()=>{
             // The short shared commit also protects alternate names of the same file.
-            if(grant&&this.key(await this.canonical(filePath))!==this.key(target))throw failure('MP_FILE_CONFLICT','另存为目标位置已改变，请重新选择路径');
+            if(this.key(await this.canonical(filePath))!==this.key(target))throw failure('MP_FILE_CONFLICT','保存位置已改变，请重新加载或另存为');
             if(typeof prepared?.validate==='function')await prepared.validate();
             await this.validate(target,baseline);
             if(!grantCurrent())throw failure('MP_SAVE_TARGET','另存为操作已被新的选择替代');
             if(grant&&!saveAsCurrent())throw failure('MP_DOC_MISMATCH','另存为的文档或窗口已改变');
-            await fs.rename(tmp,target);const st=await fs.stat(target),id=crypto.randomUUID();
+            const receipt=await stage.commit();const st=await fs.stat(target),id=crypto.randomUUID();
             const current=S.documentId===documentId&&grantCurrent();
             if(current){
-              S.filePath=path.resolve(filePath);S.savedText=text;S.baseline={sha256:digest(out),mtimeMs:st.mtimeMs,size:out.length,nlink:st.nlink};S.diskMtime=st.mtimeMs;
+              S.filePath=target;S.savedText=text;S.baseline={sha256:outHash,mtimeMs:st.mtimeMs,size:out.length,nlink:st.nlink};S.diskMtime=st.mtimeMs;
               S.lastSavedRevision=revision;S.dirty=S.revision!==revision;
               S.lastSave={id,documentId,revision,filePath:S.filePath};
             }
-            return {ok:true,saveId:id,documentId,revision,filePath:path.resolve(filePath),current,mtimeMs:st.mtimeMs,bytes:out.length,...(assets?{assets}:{})};
+            return {ok:true,saveId:id,documentId,revision,filePath:target,current,mtimeMs:st.mtimeMs,bytes:out.length,...(receipt?.backupRetained?{recoveryBackup:receipt.backupRetained}:{}),...(assets?{assets}:{})};
           });
-        }finally{await fs.unlink(tmp).catch(()=>{});}
+        }catch(error){primaryFailure=error;throw error;}
+        finally{try{await stage?.abort();}catch(error){if(primaryFailure)primaryFailure.cleanupError=error.message;else throw error;}}
       });
     })();
     S.pendingSaves.add(job);const clear=()=>S.pendingSaves.delete(job);job.then(clear,clear);return job;

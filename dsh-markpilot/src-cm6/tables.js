@@ -37,8 +37,10 @@ export const withTableLead = (q, body) => (q || "") + body;
  *  放宽方向与 A4c 一致：多认一种分隔行只会让"本来就该是表"的东西渲染成表，
  *  不会把普通段落误判成表（判据仍要求行内有**裸管道**、且与表头行相邻、前缀逐字相同）。 */
 const DASHES = "\\-\\u2013\\u2014";
-export const SEPARATOR_BODY_RE = new RegExp("^\\s*\\|?[\\s:|" + DASHES + "]*[" + DASHES + "][\\s:|" + DASHES + "]*\\|?\\s*$");
-export const isSeparatorBody = (body) => SEPARATOR_BODY_RE.test(body) && new RegExp("[" + DASHES + "]").test(body);
+// Check dash presence and the complete character set in two linear scans.
+// Overlapping whitespace quantifiers made ordinary invalid long lines stall.
+export const SEPARATOR_BODY_RE = new RegExp("^(?=[\\s:|" + DASHES + "]*[" + DASHES + "])[\\s:|" + DASHES + "]*$");
+export const isSeparatorBody = (body) => SEPARATOR_BODY_RE.test(body);
 
 /* 【列宽估算·2026-10-08】表格列宽按"**看得见的宽度**"分配，不按 markdown 源码字符数。
  *  旧口径直接数源码长度 ⇒ `$v_t=P\,v_{t+1}$`（15 字符）被当成 15 个拉丁字宽，而它渲染出来只有 9 个；
@@ -189,7 +191,7 @@ function cellAnchor(state, cells, idx) {
 /** 表行区间：**与渲染层 scanTables 同口径** —— 一张表＝分隔行及其上一行（表头）到块尾。
  *  块里位于表头之上的行（`--- | ---` 打头的那种块、引用层级不同的行）在渲染层是普通段落，
  *  键位层也必须不算表内（否则"屏幕上是段落、Tab 却按表格跳格"）。 */
-function tableSpanOf(state, lineNumber) {
+export function tableSpanOf(state, lineNumber) {
   const block = tableBlockOf(state, lineNumber);
   if (!block) return null;
   const headerNum = block.sep - 1;

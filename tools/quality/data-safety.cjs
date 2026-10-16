@@ -24,7 +24,7 @@ const o=args(argv);
   async function capture(p,n){result.frames.push(await frame(p,dir,n));}
   async function open(p,file){const r=await p.evaluate(file=>window.mpHost.openPath(file),file);assert(r.ok,'open succeeded: '+JSON.stringify(r));await waitUntil(()=>p.evaluate(file=>window.mpHost.currentDoc().then(d=>d?.filePath===file),file),'opened document');await sleep(200);await focus(p);}
   try{
-    run=await launch(o,aFile,dir,{MP_TEST_SAVE_AS:saveAs,MP_KEEP_STAGING:'1',MP_TEST_SAVE_DELAY_MS:'300',TEMP:temp,TMP:temp});
+    run=await launch(o,aFile,dir,{MP_TEST_SAVE_AS:saveAs,MP_KEEP_STAGING:'1',MP_TEST_SAVE_DELAY_MS:'300',MP_TEST_REPLACE_RESPONSE:'discard',TEMP:temp,TMP:temp});
     result.metadata=run.metadata;const p=run.page;await focus(p);
     if(scope!=='encoding'){
       const b=await newWindow(run,p,bFile);await focus(b);
@@ -75,8 +75,9 @@ const o=args(argv);
       });
       await check('late-save-receipt-does-not-change-new-document',async trace=>{
         const old=path.join(dir,'switch-old.md'),next=path.join(dir,'switch-new.md');fs.writeFileSync(old,'OLD\n');fs.writeFileSync(next,'NEW\n');const x=await newWindow(run,p,old);await focus(x);await x.keyboard.press('Control+End');await x.keyboard.insertText('SAVING');await x.evaluate(()=>{window.__qualitySave=doSave(true);});await x.waitForFunction(()=>saveInFlight);
-        // Explicit test-only discard: exercise receipt ownership, not a user confirmation dialog.
-        await x.evaluate(()=>window.mpHost.docDirty(false));await open(x,next);await x.evaluate(()=>window.__qualitySave);const s=await snapshot(x),info=await x.evaluate(()=>window.mpHost.currentDoc());trace.push({state:s,info,old:fs.readFileSync(old,'utf8')});assert.equal(s.text,'NEW\n');assert.equal(info.filePath,next);assert.equal(info.text,'NEW\n');assert.equal(fs.readFileSync(next,'utf8'),'NEW\n');
+        // The guarded test dialog explicitly selects discard. Clearing only the
+        // main dirty flag cannot override the renderer's fresh source handshake.
+        await open(x,next);await x.evaluate(()=>window.__qualitySave);const s=await snapshot(x),info=await x.evaluate(()=>window.mpHost.currentDoc());trace.push({state:s,info,old:fs.readFileSync(old,'utf8')});assert.equal(s.text,'NEW\n');assert.equal(info.filePath,next);assert.equal(info.text,'NEW\n');assert.equal(fs.readFileSync(next,'utf8'),'NEW\n');
       });
       await check('clean-view-reload-restores-revision-and-allows-later-save',async trace=>{
         const file=path.join(dir,'view-reload.md');fs.writeFileSync(file,'RELOAD BASE\n');const x=await newWindow(run,p,file);await focus(x);

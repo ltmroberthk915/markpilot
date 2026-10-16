@@ -17,7 +17,7 @@ if(!opts.runtime||!opts.out)throw new Error('--runtime and --out are required');
  for(const rel of ['package.json','main.js','preload.js','export-folder.js','export-pdf.js','shell','renderer','build'])fs.cpSync(path.join(source,rel),path.join(app,rel),{recursive:true});
  fs.mkdirSync(path.join(bin,'resources'),{recursive:true});
  const asar=require(path.resolve(opts['asar-tool']||path.join(ROOT,'MarkPilot-CM6/node_modules/@electron/asar')));
- await asar.createPackage(app,path.join(bin,'resources/app.asar'));
+ await asar.createPackageWithOptions(app,path.join(bin,'resources/app.asar'),{unpackDir:path.join('shell','native')});
  const hash=f=>crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
  const artifact={schema:1,executable:path.join(bin,'MarkPilot.exe'),exeSha256:hash(path.join(bin,'MarkPilot.exe')),asarSha256:hash(path.join(bin,'resources/app.asar')),version:JSON.parse(fs.readFileSync(path.join(source,'package.json'),'utf8')).version,
   files:require('./artifact-files.cjs').map(file=>({file,sha256:fs.existsSync(path.join(source,file))?hash(path.join(source,file)):null}))};

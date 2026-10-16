@@ -86,14 +86,13 @@ const { bitmap, verifyBitmap, verifyText } = require("./clipboard.cjs");
     await sleep(150);
   };
   const reopen = async (file) => {
-    await p.evaluate(() => window.mpHost.docDirty(false));
     const r = await p.evaluate((file2) => window.mpHost.openPath(file2), file);
     assert(r.ok, "open owned fixture: " + JSON.stringify(r));
     await waitUntil(() => p.evaluate((file2) => window.mpHost.docInfo().then((d) => d.filePath === file2), file), "document ownership");
     await sleep(180);
   };
   try {
-    run = await launch(o, doc, dir, { MP_TEST_IMAGE_SAVE_AS: saveImage, MP_TEST_IMAGE_DELAY_MS: String(imageDelayMs) });
+    run = await launch(o, doc, dir, { MP_TEST_IMAGE_SAVE_AS: saveImage, MP_TEST_IMAGE_DELAY_MS: String(imageDelayMs), MP_TEST_REPLACE_RESPONSE: 'discard' });
     p = run.page;
     result.metadata = run.metadata;
     result.metadata.imageHostDelayMs = imageDelayMs;

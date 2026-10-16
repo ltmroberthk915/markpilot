@@ -1,5 +1,13 @@
 # MarkPilot — AI-native Markdown editor for Windows, VS Code & Trae
 
+## MarkPilot 3.4.0 for Windows
+
+Open, edit, save, and export Markdown with stronger draft and document isolation. Large tables open smoothly, mixed text and image paste preserves Markdown, long filenames and repeated Save As operations remain usable, and Mermaid diagrams and inline images travel with exports.
+
+Imported CSS is kept in MarkPilot's theme directory. Body text, H1–H6, italic text, and other font roles have separate preferences, with settings grouped by purpose.
+
+[3.4.0 release notes](docs/RELEASE-3.4.0.md)
+
 ## MarkPilot 3.3.4 for Windows
 
 Table cells render bold, italic, underline and strikethrough. HTML/PDF exports use the same inline formatting. Column widths update when the editor is resized or zoomed, keeping the view steadier while typing and the caret clear of the top toolbars.

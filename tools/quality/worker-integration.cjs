@@ -10,14 +10,17 @@ const {StreamLanguage,LanguageDescription,LanguageSupport}=requireEngine('@codem
 const {EditorState}=requireEngine('@codemirror/state');
 const {Direction}=requireEngine('@codemirror/view');
 const {basicSetup}=requireEngine('codemirror');
-const {ensureSyntaxTree}=requireEngine('@codemirror/language');
+const {ensureSyntaxTree,syntaxTreeAvailable}=requireEngine('@codemirror/language');
 const commands=requireEngine('@codemirror/commands');
 const {insertBracket,deleteBracketPair}=requireEngine('@codemirror/autocomplete');
 const languages=[['python',['py'],'python','python'],['javascript',['js','jsx'],'javascript','javascript'],['json',[],'javascript','json'],['css',[],'css','css'],['shell',['bash','sh'],'shell','shell'],['xml',['html'],'xml','xml']].map(([name,alias,module,exportName])=>LanguageDescription.of({name,alias,support:new LanguageSupport(StreamLanguage.define(requireEngine('@codemirror/legacy-modes/mode/'+module)[exportName]))}));
 const nativeParser=markdown({base:markdownLanguage,codeLanguages:languages}).language.parser;
 function originalCommand(text,anchor,head,action) {
  let state=EditorState.create({doc:text,selection:{anchor,head},extensions:[basicSetup,markdown({base:markdownLanguage,codeLanguages:languages})]});
- ensureSyntaxTree(state,state.doc.length,1000);state=state.update({}).state;
+ const referenceTree=ensureSyntaxTree(state,state.doc.length,10000);
+ assert(referenceTree&&referenceTree.length===state.doc.length,'native reference must finish parsing before comparing commands');
+ state=state.update({}).state;
+ assert(syntaxTreeAvailable(state,state.doc.length),'published native reference must include the command position');
  const view={state,viewport:{from:0,to:text.length},textDirectionAt:()=>Direction.LTR,lineBlockAt(pos){return this.state.doc.lineAt(pos);}};
  view.dispatch=tr=>{view.state=tr?.state??view.state.update(tr).state;};
  if(action.input!==undefined){const pos=view.state.selection.main.head,tr=insertBracket(view.state,action.input);view.dispatch(tr??{changes:{from:pos,insert:action.input},selection:{anchor:pos+action.input.length},userEvent:'input.type'});}

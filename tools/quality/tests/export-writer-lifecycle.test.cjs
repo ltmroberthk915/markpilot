@@ -95,13 +95,17 @@ test('abort after successful finish removes the completed file', async (t) => {
   assert.equal(await fs.stat(writer.file).catch(e => e.code), 'ENOENT');
 });
 
-test('open failure rejects finish and abort cannot disguise directory unlink failure as success', async (t) => {
+test('an existing directory named as the output is preserved and export chooses another name', async (t) => {
   const dir = await tempDir(t);
   await fs.mkdir(path.join(dir,'blocked.html'));
   const writer = createHtmlWriter({ dir, name: 'blocked' });
-  await assert.rejects(within(writer.finish(), 'finish after open failure'));
-  await assert.rejects(within(writer.abort(), 'abort after open failure'), (e) => e.code !== 'ENOENT');
-  assert.equal((await fs.stat(writer.file)).isDirectory(), true);
+  await writer.write('new output');
+  const result = await within(writer.finish(), 'unique output beside directory');
+  assert.equal((await fs.stat(path.join(dir,'blocked.html'))).isDirectory(), true);
+  assert.equal(await fs.readFile(result.file,'utf8'),'new output');
+  assert.notEqual(result.file,path.join(dir,'blocked.html'));
+  await writer.abort();
+  assert.equal((await fs.stat(path.join(dir,'blocked.html'))).isDirectory(), true);
 });
 
 test('asset preparation stops taking jobs once cancellation is observed', async (t) => {

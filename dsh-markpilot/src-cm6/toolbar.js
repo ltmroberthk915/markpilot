@@ -16,6 +16,7 @@
 
 import { undo, redo } from "@codemirror/commands";
 import { openSearchPanel } from "@codemirror/search";
+import { selectedLines } from './selection-lines.js';
 
 const svg = (d, extra = "") => `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" ${extra}><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
@@ -184,8 +185,7 @@ function wrapSource(view, open, close) {
 function linePrefix(view, prefix, ordered = false) {
   const st = view.state;
   const r = st.selection.main;
-  const first = st.doc.lineAt(r.from).number;
-  const last = st.doc.lineAt(r.to).number;
+  const { first, last } = selectedLines(st.doc, r);
   const changes = [];
   let n = 0;
   /* 光标是否真的跟着"插入"走：只有**全部行都是插入**时才前移（任何一行是删除 ⇒ 不动，语义含混时不猜） */
@@ -224,8 +224,7 @@ function headingCycle(view) {
 function indentLines(view, delta) {
   const st = view.state;
   const r = st.selection.main;
-  const first = st.doc.lineAt(r.from).number;
-  const last = st.doc.lineAt(r.to).number;
+  const { first, last } = selectedLines(st.doc, r);
   const changes = [];
   for (let i = first; i <= last; i++) {
     const line = st.doc.line(i);

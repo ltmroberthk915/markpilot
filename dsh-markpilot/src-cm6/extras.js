@@ -8,7 +8,7 @@
 /* 【引用区表格·2026-10-08】表块前缀判据必须与渲染层/tables.js **同源**（同一函数，不是抄一份）：
    三处（渲染层 scanTables / 源码键位 tableBlockOf / 本模块的行列命令与复制）不同源，
    就会出现"渲染成表了、命令说不在表内"。 */
-import { tableLead, withTableLead, isFenceAt, isSeparatorBody } from "./tables.js";
+import { tableLead, withTableLead, isFenceAt, isSeparatorBody, tableSpanOf } from "./tables.js";
 import { codeBlockAt, quoteLead, scanFenceLines, codeBody } from './markdown-context.js';
 import { EditorSelection } from '@codemirror/state';
 import { SearchQuery, getSearchQuery, setSearchQuery } from '@codemirror/search';
@@ -16,6 +16,10 @@ import { reserveImageInsertion, captureImageDocument } from './image-insertion.j
 import { mathSourcePosition } from './math-source-map.js';
 import { collectImageRefs, decodeImageAttribute } from './resource-images.js';
 import { renderInline } from './inline-format.js';
+import { FONT_ROLES, normalizeFontPreferences, fontPreferenceCss } from './font-preferences.cjs';
+import { planDataImages } from './data-images.cjs';
+import { selectedLines } from './selection-lines.js';
+import { embedImageRefs } from './image-export.js';
 /* 【Typora 社区主题·2026-10-09】用户想直接用 Typora 的主题 CSS。
    改写逻辑**不在这里另写一份**：2.x 线早有一份纯函数实现（`user-theme.mjs` 的 adaptTyporaTheme）
    ——`#write` → 我们的写作区、`:root` 变量挂到作用域属性上、带相对 url() 的 @font-face 丢掉、
@@ -100,6 +104,19 @@ const CSS = `
 .mp-key { display: inline-block; min-width: 58px; padding: 1px 7px; border: 1px solid var(--mp-border); border-radius: 5px;
   background: color-mix(in srgb, var(--mp-bg) 86%, var(--mp-fg)); font: 12px/1.6 var(--mp-font-mono); cursor: pointer; }
 .mp-key.editing { border-color: var(--mp-primary); color: var(--mp-primary); }
+.mp-settings { width:min(760px,calc(100vw - 48px)); box-sizing:border-box; overflow:hidden; }
+.mp-settings-body { display:grid; grid-template-columns:130px minmax(0,1fr); height:min(540px,58vh); min-height:220px; }
+.mp-settings-nav { display:flex; flex-direction:column; gap:4px; padding:4px 12px 4px 0; border-right:1px solid var(--mp-border); overflow:auto; }
+.mp-settings-nav button { text-align:left; padding:7px 10px; border:0; border-radius:6px; background:transparent; color:var(--mp-fg); font:inherit; cursor:pointer; }
+.mp-settings-nav button[aria-selected="true"] { background:var(--mp-codeBg); color:var(--mp-primary); }
+.mp-settings-content { overflow:auto; min-width:0; padding:0 12px; }
+.mp-settings-content [hidden] { display:none !important; }
+.mp-settings .k { color:color-mix(in srgb,var(--mp-fg) 80%,var(--mp-bg)); }
+.mp-settings-content input[data-font-role] { box-sizing:border-box; width:100%; padding:5px 7px; border:1px solid var(--mp-border); border-radius:5px; background:var(--mp-bg); color:var(--mp-fg); font:13px system-ui,sans-serif; }
+.mp-settings-content :disabled { cursor:not-allowed; opacity:.6; }
+.mp-settings-content td:first-child { min-width:90px; }
+.mp-settings-content .mp-key { color:var(--mp-fg); }
+@media(max-width:540px) { .mp-settings-body { grid-template-columns:100px minmax(0,1fr); } .mp-settings-content { padding:0 6px; } .mp-settings-content td { display:block; } }
 /* 【导出后可点链接·2026-10-09】提示条里的"打开所在文件夹"：跟主题色走，可点区域够大。 */
 .mp-toast-link { color: var(--mp-primary); text-decoration: underline; cursor: pointer; margin-left: 4px; }
 .mp-toast-link:hover { text-decoration: none; }
@@ -381,6 +398,13 @@ export function installExtras(deps) {
     root.dataset.editorTheme = p.id;
     root.dataset.mode = p.dark ? 'dark' : 'light';
     for (const [k, v] of Object.entries(p.vars)) root.style.setProperty(k, v);   // 键本身带 --mp- 前缀
+    // Keep the imported theme as the final appearance layer at every entry.
+    // The element guard also keeps the initial palette call outside its TDZ.
+    if (document.getElementById('mp-user-theme')) applyUserTheme();
+    if (root.dataset.mpReading === '1') {
+      const reading = READING_PALETTES.find(x => x.id === readingPalette());
+      if (reading?.vars) for (const [key,value] of Object.entries(reading.vars)) root.style.setProperty(key,value);
+    }
     try { localStorage.setItem('editor-theme', p.id); localStorage.setItem('dark', p.dark ? 'true' : 'false'); } catch { }
     return p;
   }
@@ -516,7 +540,7 @@ export function installExtras(deps) {
      （AGENTS 错-4；本文件原有一份 wrapSelection 与它行为不同，已删除）。 */
   function toggleLinePrefix(view, prefix) {
     const r = view.state.selection.main;
-    const a = view.state.doc.lineAt(r.from).number, b = view.state.doc.lineAt(r.to).number;
+    const { first: a, last: b } = selectedLines(view.state.doc, r);
     const changes = [];
     for (let n = a; n <= b; n++) {
       const line = view.state.doc.line(n);
@@ -628,7 +652,7 @@ export function installExtras(deps) {
    *  · 文件夹导出：本地图片逐张复制进 <目标>/assets/，HTML 里写相对路径；外链/失败的原样保留；
    *  · HTML 分块生成、逐块经 IPC 流式落盘 —— 渲染进程一次只持有一块（v2.3.3 的教训：一次性整篇
    *    md2html + 全图 base64，会让同一份图片在内存里出现 5–6 份副本 → 696KB 源就让 worker 冲到 2.6GB）；
-   *  · 单文件下载导出沿用原路径（不复制图片）；宿主没有这套 IPC 时自动降级到下载导出并提示。
+   *  · 单文件 HTML 在宿主支持读取时内联本地图片；外链与失败项如实提示。
    */
   const CHUNK_CHARS = 256 * 1024;   // 每块 HTML 字符上限
   const IMG_CONCURRENCY = 4;        // 图片复制并发（主进程 fs 逐张：读进来就写出去，不进渲染进程内存）
@@ -653,16 +677,20 @@ export function installExtras(deps) {
   }
   /* 【作者层样式·同源】由 typography.js 唯一真源生成（与编辑面同一张值表），本文件不再手抄一套。
      导出页专属的少量适配追加在后面（公式块独占一行等）。 */
-  const exportCssText = () => exportTypoCss() + '\n'
+  const exportCssText = () => exportTypoCss() + '\n' + (fontsLocked() ? '' : fontPreferenceCss(fontPreferences, true)) + '\n'
     + '.mp-math-block{margin:14px 0;text-align:center;overflow-x:auto;overflow-y:hidden}\n'
     + '.mp-math-block .katex-display{margin:0}\n'
     + '.mp-math{white-space:nowrap}\n'
     + 'pre.mp-math{font:13px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--mp-com);white-space:pre-wrap;margin:10px 0}\n';
   /** 导出页 head：颜色 token 快照 ＋ 同源作者层样式 ＋ 引擎自己那份 KaTeX CSS（字体已内联为 data URL ⇒ 离线可排版）。
    *  mathCss 为空（宿主取不到样式表）时退化为只有前两者，公式会缺排版——由调用方提示。 */
+  // HTML RAWTEXT ends at a literal closing style tag even inside a CSS string.
+  // CSS escapes retain the original value without exposing an HTML delimiter.
+  const cssRawText = css => String(css).replace(/</g, '\\3c ');
   const htmlHead = (title, mathCss = '') => '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n'
-    + `<title>${esc(String(title || 'MarkPilot 导出'))}</title>\n<style>${colorTokenSnapshot()}</style>\n<style>${exportCssText()}</style>\n`
-    + (mathCss ? `<style>${mathCss}</style>\n` : '')
+    + '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'none\'; style-src \'unsafe-inline\'; img-src data: blob: file: https: http:; font-src data: file:; base-uri \'none\'; form-action \'none\'">\n'
+    + `<title>${esc(String(title || 'MarkPilot 导出'))}</title>\n<style>${cssRawText(colorTokenSnapshot())}</style>\n<style>${cssRawText(exportCssText())}</style>\n`
+    + (mathCss ? `<style>${cssRawText(mathCss)}</style>\n` : '')
     + '</head>\n<body>\n';
   const HTML_TAIL = '\n</body>\n</html>\n';
   const mdTitle = (md) => ((md.split('\n').find((l) => /^#\s+/.test(l)) || '# MarkPilot 导出').replace(/^#\s+/, '').trim() || 'MarkPilot 导出');
@@ -670,9 +698,10 @@ export function installExtras(deps) {
 
   /** 图片地址映射：命中映射的换成相对路径（assets/x.png），其余原样（外链、data:、复制失败） */
   function mapSrc(raw, srcMap) {
-    const s = String(raw == null ? '' : raw).trim().replace(/^<|>$/g, '');
+    const text = String(raw == null ? '' : raw).trim();
+    const s = text.startsWith('<') && text.endsWith('>') ? text.slice(1, -1) : text;
     if (!srcMap || !srcMap.size) return s;
-    return srcMap.get(s) || srcMap.get(decodeSafe(s)) || s;
+    return srcMap.get(s) || s;
   }
   /* 【导出件卫生·白名单】正文里**原样穿过** esc 的 HTML 只有 <img>（其余标签在 inlineMd 里被 esc 成字面
      文本）。照抄的话，源文档里的 style / on* 会跟着进导出件、也进 PDF 的打印窗口：
@@ -758,6 +787,7 @@ export function installExtras(deps) {
     try {
       const url = new URL(u);
       let p = decodeURIComponent(url.pathname || '');
+      if (url.hostname) return '//' + url.hostname + p;
       if (/^\/[A-Za-z]:/.test(p)) p = p.slice(1);        // /E:/x → E:/x（Windows 盘符）
       return p || null;
     } catch { return null; }
@@ -859,7 +889,7 @@ export function installExtras(deps) {
    *   · 单个公式的 TeX 源码最多攒 MATH_TEX_MAX 字符（超限退回 <pre> 文本），块级缓存与整篇无关。 */
   const MATH_TEX_MAX = 32 * 1024;
   function* mdBodyChunks(md, opts = {}) {
-    const { srcMap = null, chunkChars = CHUNK_CHARS, math = false } = opts;
+    const { srcMap = null, chunkChars = CHUNK_CHARS, math = false, mermaidSvgs = null } = opts;
     const lines = md.split('\n'), codeStarts = new Map(scanFenceLines(lines).map(b => [b.startLine - 1, b]));
     let buf = [], size = 0, list = null;
     const take = () => { if (!buf.length) return null; const s = buf.join('\n') + '\n'; buf = []; size = 0; return s; };
@@ -876,7 +906,7 @@ export function installExtras(deps) {
         const parts = lines.slice(i + 1, last).map(t => codeBody(t, code).text);
         const src = parts.join('\n');
         const api = typeof window !== 'undefined' ? window.mpMermaid : null;
-        const svg = /^mermaid$/i.test(code.info) && api?.getSvg ? api.getSvg(src) : null;
+        const svg = /^mermaid$/i.test(code.info) ? (mermaidSvgs ? mermaidSvgs.get(src) : api?.getSvg?.(src)) : null;
         for (let n = 0; n < code.depth; n++) push('<blockquote>');
         if (svg) push(`<div class="mp-mermaid">${svg}</div>`);
         else {
@@ -972,32 +1002,35 @@ export function installExtras(deps) {
 
   async function exportHtml() {
     const v = getView(); if (!v) return { ok: false };
-    const md = v.state.doc.toString();
+    const md = v.state.doc.toString(), directory = window.__mpDocDir || null;
     let dir = null;
     if (canDiskExport()) { dir = await pickDir(); if (!dir) return { ok: false, canceled: true }; }   // 让用户选存哪儿
     toast('正在导出…');
     const title = mdTitle(md);
     const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    const images = await embedImageRefs(collectImageRefs(md), directory, async (url, maxBytes) => {
+      if (!hostReadable()) return { ok: false, error: '当前宿主不支持读取本地图片' };
+      return window.mpHost.readFileBase64(fileUrlToPath(url), { maxBytes });
+    });
     // 公式排版：先把 KaTeX 样式＋字体（data URL）准备好，再分块吐正文——正文不进一次性大字符串，
     // 写盘/Blob 都直接吃块数组（旧写法先 concat 全文，等于同一份内容在内存里躺两份）。
     const mathCss = mathApi ? await buildMathCss() : '';
     /* 【mermaid 预渲染·2026-10-11】与公式同一个范式：**先 await 一次**把全部图表渲进缓存，
        下面的同步生成器才能直接查缓存吐 `<div class="mp-mermaid">` ✓（一个钩子覆盖 HTML/PDF/复制 ✓）。 */
     let mermaidStat = null;
-    try { if (window.mpMermaid && window.mpMermaid.prerender) mermaidStat = await window.mpMermaid.prerender(md); } catch (e) { mermaidStat = { 失败: [{ err: String((e && e.message) || e) }] }; }
+    try { if (window.mpMermaid?.prerender) mermaidStat = await window.mpMermaid.prerender(md); }
+    catch (e) { toast('导出失败：' + (e?.message || e)); return { ok: false, error: String(e?.message || e) }; }
+    try {
     const msMathCss = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0;
     const head = htmlHead(title, mathCss);
-    const parts = [head];
-    let bytes = head.length;
-    for (const c of mdBodyChunks(md, { math: true })) { parts.push(c); bytes += c.length; }
-    parts.push(HTML_TAIL); bytes += HTML_TAIL.length;
+    function* chunks() { yield head; yield* mdBodyChunks(md, { math: true, srcMap: images.map, mermaidSvgs: mermaidStat?.svgs }); yield HTML_TAIL; }
     const msBuild = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0;
     if (dir) {                                   // ① 桌面版：写到用户选的位置
-      const beg = await window.mpHost.exportBeginHtml({ dir, name: safeFileName(title) + '.html' });
+      const beg = await window.mpHost.exportBeginHtml({ dir, name: safeFileName(title) });
       if (!beg || !beg.ok) { toast(`写入失败：${(beg && beg.error) || '未知错误'}`); return { ok: false, error: (beg && beg.error) || 'begin-failed' }; }
       let fin;
       try {
-        for (const c of parts) {
+        for (const c of chunks()) {
           const r = await window.mpHost.exportAppendHtml({ id: beg.id, text: c });
           if (!r?.ok) throw new Error(r?.error || '写入失败');
         }
@@ -1007,23 +1040,25 @@ export function installExtras(deps) {
         try { await window.mpHost.exportAbortHtml({ id: beg.id }); } catch { }
         toast(`写入失败：${e.message}`); return { ok: false, error: e.message };
       }
-      const summary = { ok: true, mode: 'single-file', dir, file: fin.file, bytes: fin.bytes || bytes, ms: msBuild, msMathCss, mathCss: mathCssStat, math: !!mathApi };
+      const summary = { ok: true, mode: 'single-file', dir, file: fin.file, bytes: fin.bytes, ms: msBuild, msMathCss, images: images.summary, selfContained: !images.summary.failed && !images.summary.remote, mathCss: mathCssStat, math: !!mathApi };
       lastExport = summary;
-      toastExported(`已导出：${fin.file || (safeFileName(title) + '.html')}`, fin.path || fin.dir || fin.file);
+      toastExported(`已导出：${fin.file || (safeFileName(title) + '.html')}${images.summary.failed ? `；${images.summary.failed} 张本地图片未能内联，仍依赖源路径` : ''}${images.summary.remote ? `；${images.summary.remote} 张外链图片仍需联网` : ''}`, fin.path || fin.dir || fin.file);
       return summary;
     }
+    const parts = [...chunks()];
     const blob = new Blob(parts, { type: 'text/html;charset=utf-8' });   // ② 插件：退回浏览器下载
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = safeFileName(title) + '.html';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
-    const summary = { ok: true, mode: 'download', bytes, ms: msBuild, msMathCss, mathCss: mathCssStat, math: !!mathApi };
+    const summary = { ok: true, mode: 'download', bytes: blob.size, ms: msBuild, msMathCss, images: images.summary, selfContained: !images.summary.failed && !images.summary.remote, mathCss: mathCssStat, math: !!mathApi };
     lastExport = summary;
     toast(mathCssStat && mathCssStat.failed
-      ? `导出完成（${(bytes / 1024).toFixed(0)} KB）；${mathCssStat.failed} 个公式字体未能内联，离线打开可能缺字形`
-      : `导出完成（${(bytes / 1024).toFixed(0)} KB，公式已排版、字体已内联）；当前宿主不支持选目录，已用浏览器下载`);
+      ? `导出完成（${(blob.size / 1024).toFixed(0)} KB）；${mathCssStat.failed} 个公式字体未能内联，离线打开可能缺字形`
+      : `导出完成（${(blob.size / 1024).toFixed(0)} KB）；已用浏览器下载${images.summary.failed ? `；${images.summary.failed} 张本地图片未内联` : ''}${images.summary.remote ? `；${images.summary.remote} 张外链图片仍需联网` : ''}`);
     return summary;
+    } finally { mermaidStat?.svgs?.clear(); }
   }
 
   /** PDF：壳层冻结的接口（内部自己选目标 → staging → printToPDF → 分片落盘）。 */
@@ -1051,7 +1086,7 @@ export function installExtras(deps) {
       + ` style="${ok ? '' : 'color:var(--mp-muted);background:color-mix(in srgb, var(--mp-bg) 86%, var(--mp-fg));opacity:1;cursor:not-allowed'}">${name}</button></td><td class="k">${desc}</td></tr>`;
     dialog('导出', `<table>`
       + row('pdf', 'PDF', pdf ? '打印级排版；暗色主题自动转白纸黑字。会先让你选保存位置。' : '需要桌面版（当前宿主不支持）。', pdf)
-      + row('html', '单文件 HTML', disk ? '图片内联，一个文件发给别人也能看。会先让你选目录。' : '当前宿主不支持选目录，将直接用浏览器下载。', true)
+      + row('html', '单文件 HTML', disk ? '本地图片内联，外链图片仍需联网。会先让你选目录；较大图片建议使用图片文件夹。' : '将用浏览器下载；本地图片需要宿主支持，外链图片仍需联网。', true)
       + row('folder', 'HTML + 图片文件夹', disk ? '图片不内联、放进 assets/，适合长期归档。会先让你选目录。' : '需要桌面版（当前宿主不支持）。', disk)
       + `</table><p class="k" style="margin:12px 0 6px">或者直接复制：</p><table>`
       + row('copy-rich', '复制为知乎/微信格式', '整篇富文本进剪贴板，直接粘到公众号/知乎编辑器。', true)
@@ -1101,8 +1136,7 @@ export function installExtras(deps) {
     const md = v.state.doc.toString();
     const title = mdTitle(md);
     const name = safeFileName(title);
-    let docPath = null;
-    try { const info = await host.docInfo(); docPath = info && info.filePath ? info.filePath : null; } catch { }
+    const docPath = window.__mpDocPath || (window.__mpDocDir ? window.__mpDocDir.replace(/[\\/]+$/, '') + '/__export__.md' : null);
 
     const pick = await host.exportPickFolder({ defaultPath: opts.dir || undefined, ...(opts.pdfSessionId !== undefined ? { pdfSessionId: opts.pdfSessionId } : {}) });
     if (!pick || !pick.ok) {
@@ -1117,6 +1151,12 @@ export function installExtras(deps) {
     }
 
     const refs = collectImageRefs(md);
+    const pdfStage = opts.pdfSessionId !== undefined;
+    if (pdfStage) {
+      // Reject oversized/invalid payloads before IPC copies their encoded data.
+      try { planDataImages(refs); }
+      catch (e) { say('导出失败：' + (e?.message || e)); return { ok: false, error: String(e?.message || e) }; }
+    }
     const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
     let prep = { entries: [], copied: 0, failed: 0, skipped: 0, bytes: 0 };
     if (refs.length) {
@@ -1125,21 +1165,25 @@ export function installExtras(deps) {
       catch (e) { prep = { entries: [], copied: 0, failed: refs.length, skipped: 0, bytes: 0, error: String((e && e.message) || e) }; }
       if (!prep || prep.ok === false) prep = { entries: [], copied: 0, failed: refs.length, skipped: 0, bytes: 0, error: (prep && prep.error) || 'prepare-failed' };
     }
+    if (pdfStage && (prep.error || prep.entries.some(e => e.kind === 'data' && !e.ok))) {
+      const error = prep.error || '内联图片未能写入导出目录';
+      say('导出失败：' + error); return { ok: false, error };
+    }
     const srcMap = new Map();
-    for (const e of (prep.entries || [])) if (e && e.ok && e.rel) { srcMap.set(e.src, e.rel); srcMap.set(decodeSafe(e.src), e.rel); }
+    for (const e of (prep.entries || [])) if (e && e.ok && e.rel) srcMap.set(e.src, e.rel);
 
     const beg = await host.exportBeginHtml({ dir, name, ...(opts.pdfSessionId !== undefined ? { pdfSessionId: opts.pdfSessionId } : {}) });
     if (!beg || !beg.ok) { say(`写入失败：${(beg && beg.error) || '未知错误'}`); return { ok: false, error: (beg && beg.error) || 'begin-failed' }; }
-    let chunks = 0;
+    let chunks = 0, mermaidStat = null;
     try {
       const mathCss = mathApi ? await buildMathCss() : '';
-      try { if (window.mpMermaid && window.mpMermaid.prerender) await window.mpMermaid.prerender(md); } catch { /* 失败就退回源码块 */ }
+      if (window.mpMermaid?.prerender) mermaidStat = await window.mpMermaid.prerender(md);
       const append = async text => {
         const r = await host.exportAppendHtml({ id: beg.id, text });
         if (!r?.ok) throw new Error(r?.error || '写入失败');
       };
       await append(htmlHead(title, mathCss));
-      for (const chunk of mdBodyChunks(md, { srcMap, math: true })) { await append(chunk); chunks++; }
+      for (const chunk of mdBodyChunks(md, { srcMap, math: true, mermaidSvgs: mermaidStat?.svgs })) { await append(chunk); chunks++; }
       await append(HTML_TAIL);
       const fin = await host.exportFinishHtml({ id: beg.id });
       if (!fin || !fin.ok) throw new Error((fin && fin.error) || '写入失败');
@@ -1156,7 +1200,7 @@ export function installExtras(deps) {
       try { await host.exportAbortHtml({ id: beg.id }); } catch { }
       say(`导出失败：${(e && e.message) || e}`);
       return { ok: false, error: String((e && e.message) || e) };
-    }
+    } finally { mermaidStat?.svgs?.clear(); }
   }
   /** 最近一次导出的统计（探针/报告取证用，不参与业务逻辑） */
   let lastExport = null;
@@ -1183,8 +1227,12 @@ export function installExtras(deps) {
       .replace(/<hr>/g, '<hr style="border:0;border-top:1px solid #e1e4e8;margin:18px 0">');
     /* 【mermaid 预渲染·复制路径】与导出同一范式：先 await 一次补齐缓存，再同步生成 ✓
        （少了这一步，复制到知乎/微信时图表位置会变成源码块 —— 与"导出有图、复制没图"的不一致 ✗）。 */
-    try { if (window.mpMermaid && window.mpMermaid.prerender) await window.mpMermaid.prerender(md); } catch { /* 退回源码块 */ }
-    const html = inlineCss(mdToHtml(md));
+    let mermaidStat = null, html;
+    try {
+      if (window.mpMermaid?.prerender) mermaidStat = await window.mpMermaid.prerender(md);
+      html = inlineCss(mdToHtml(md, { mermaidSvgs: mermaidStat?.svgs }));
+    } catch (e) { toast('复制失败：' + (e?.message || e)); return false; }
+    finally { mermaidStat?.svgs?.clear(); }
     try {
       await navigator.clipboard.write([new ClipboardItem({
         'text/html': new Blob([html], { type: 'text/html' }),
@@ -1203,8 +1251,6 @@ export function installExtras(deps) {
   /* 【引用区表格·2026-10-08】前缀感知：表格可以长在引用区里（`> | a | b |`）。
      判据与渲染层/tables.js **同一个** tableLead，三处必须同源——不同源就会出现
      "渲染成表了、命令说不在表内"（用户报障的形态）。 */
-  /* 【A3】右键菜单打开时记下的**被点的格**（文档位置）：tableOp 优先用它，用完即清（一次性）。 */
-  let menuAnchor = null;
   /* 【A4c 口径统一】"哪一行算表"以**渲染层**为准（main.js 的 parseTableRow/scanTables 是用户看得见的
      事实源）：去掉可选首尾管道后，中间还有**裸** `|` 才算一行。改前这里用 `/^\s*\|/`（必须前导管）
      ⇒ 遇到无前导管的数据行会**断块** ⇒ 只看到表头+分隔行 ⇒ 插入列只重写前两行（表头多一列、数据行不变）。 */
@@ -1214,20 +1260,13 @@ export function installExtras(deps) {
   };
   function tableAt(pos) {
     const v = getView();
-    // 【纪律】不依赖 lineStylesField.tables 的字段时机（实测：整表重写后紧接着的第二次操作取不到表格），
-    // 直接按光标所在行上下收集连续表行 + 必须有分隔行，才算一张表。
     const line = v.state.doc.lineAt(pos);
-    if (codeBlockAt(v.state, pos) || !rowText(line.text)) return null;
-    const base = tableLead(line.text);
-    const same = (n) => { const ld = tableLead(v.state.doc.line(n).text); return ld.q === base.q && rowText(v.state.doc.line(n).text); };
-    let a = line.number, b = line.number;
-    while (a > 1 && same(a - 1)) a--;
-    while (b < v.state.doc.lines && same(b + 1)) b++;
+    const span = tableSpanOf(v.state, line.number);
+    if (!span) return null;
+    const a = span.headerNum, b = span.block.to;
     const rows = [];
     for (let n = a; n <= b; n++) rows.push(v.state.doc.line(n));
-    // 分隔行判据也要**剥前缀**：`> | --- | --- |` 的原文不以 `|` 开头，不剥就认不出表
-    if (rows.length < 2 || !rows.some((r) => isSep(r.text.slice(tableLead(r.text).off)))) return null;
-    return { rows, fromLine: a, toLine: b, lead: base.q };
+    return { rows, fromLine: a, toLine: b, lead: span.lead };
   }
   const splitRow = (text) => text.slice(tableLead(text).off).trim().replace(/^\||\|$/g, '').split(/(?<!\\)\|/).map((c) => c.trim());
   const isSepBody = text => isSeparatorBody(text.slice(tableLead(text).off));
@@ -1276,15 +1315,14 @@ export function installExtras(deps) {
     view.dispatch({ changes: { from, to, insert: out.join('\n') }, selection: { anchor: after + off + firstCellOffset(out[kRow] || '') }, userEvent: 'input.table' });
     return true;
   }
-  function tableOp(op) {
-    return window.mpEngine.commands.run(() => tableOperation(op));
+  function tableOp(op, target = null) {
+    return window.mpEngine.commands.run(() => tableOperation(op, target));
   }
-  function tableOperation(op) {
+  function tableOperation(op, target) {
     const v = getView();
-    /* 【A3】锚点优先级：右键菜单记下的**被点的格** > CM 选区。菜单命令必须作用在"被点的那一格"上，
-       否则会出现"点第 3 行、命令作用在光标所在行"。用完即清，键盘路径不受影响。 */
-    const pos = menuAnchor != null ? menuAnchor : v.state.selection.main.head;
-    menuAnchor = null;
+    // Only the invoking menu can supply a target. Keyboard commands use the
+    // current selection after the command context has committed the cell owner.
+    const pos = target != null ? target : v.state.selection.main.head;
     const cur = tableAt(pos);
     if (!cur) { toast('光标不在表格内'); return false; }
     const { fromLine, toLine, lead } = cur;
@@ -1392,13 +1430,12 @@ export function installExtras(deps) {
   /** 【β2·A7/A8】显式对齐：**只动分隔行该格两侧的冒号**，保留用户写的短横个数；
    *  未标注的列点「左」＝**无操作**（不产生 dispatch、不产生撤销项 —— 用户没写冒号我们不替他写）。
    *  锚点优先级与 tableOp 一致（被点的格 > CM 选区）。 */
-  function setAlign(align) {
-    return window.mpEngine.commands.run(() => setColumnAlign(align));
+  function setAlign(align, target = null) {
+    return window.mpEngine.commands.run(() => setColumnAlign(align, target));
   }
-  function setColumnAlign(align) {
+  function setColumnAlign(align, target) {
     const v = getView();
-    const pos = menuAnchor != null ? menuAnchor : v.state.selection.main.head;
-    menuAnchor = null;
+    const pos = target != null ? target : v.state.selection.main.head;
     const cur = tableAt(pos);
     if (!cur) { toast('光标不在表格内'); return false; }
     const sepRow = cur.rows.find((r) => isSep(r.text));
@@ -1513,25 +1550,23 @@ export function installExtras(deps) {
     const cell = target?.closest?.('.mp-cell-overlay-text');
     const inCell = cell?.isConnected && cell === document.querySelector('.mp-cell-overlay-text');
     if (!v.scrollDOM.contains(target) && !source?.scrollDOM.contains(target) && !inCell) return;
-    menuAnchor = null;                                            // 每次右键都从干净状态开始
+    // Commit the current cell before deriving the clicked source position.
+    if (!window.mpEngine.commands.capture()) return;
     const hitCell = cellFromPoint(event.clientX, event.clientY);
     if (hitCell) {
       const pos = anchorPosInCell(hitCell.rowFrom, hitCell.col);
       if (pos != null && tableAt(pos)) {
         event.preventDefault();
-        menuAnchor = pos;                                         // 命令锚到**被点的那一格**
-        tableMenu(event);
+        tableMenu(event, pos);
         return;
       }
     }
-    /* 【N3】兜底分支**也要设 menuAnchor**。这条分支正是"表格左右 1px 外侧那圈点"（cellFromPoint 的
-       几何命中落空）唯一能弹菜单的路径；posAtCoords 在这些点上命中的是**表格源码行内**的位置，
-       所以它就是"被点的那一格"的合理解。不设锚点的后果实测：菜单照弹，点「复制表格」却走
-       `v.state.selection.main.head`（不在表内）⇒ toast「光标不在表格内」、剪贴板一个字节不写。 */
+    // The 1px border fallback supplies its clicked position through the same
+    // explicit target protocol as the cell hit and floating toolbar.
     const hit = v.posAtCoords({ x: event.clientX, y: event.clientY });
     const pos = hit == null ? v.state.selection.main.head : hit;
     const cur = tableAt(pos);
-    if (cur) { event.preventDefault(); menuAnchor = pos; tableMenu(event); return; }
+    if (cur) { event.preventDefault(); tableMenu(event, pos); return; }
     /* 【正文右键·2026-10-10 用户要求】命中表格走表格菜单；**其余位置给正文菜单**（照 Typora 分组）。
        改前这里直接 return ⇒ 正文右键什么都没有（用户报"正文右键功能没有做"）。
        动作全部复用工具栏那一批命令（toolbarClick），不另写第二份实现。 */
@@ -1594,6 +1629,10 @@ export function installExtras(deps) {
      菜单开着时 Esc 优先关菜单，并且不再往下传（否则会顺手退出阅读模式）。 */
   const closePopOnEsc = (e) => {
     if (e.key !== 'Escape' && e.keyCode !== 27) return;
+    const font = e.target;
+    if (font?.matches?.('[data-font-role]') && font.value !== fontPreferences[font.dataset.fontRole]) {
+      font.value = fontPreferences[font.dataset.fontRole] || ''; e.preventDefault(); e.stopImmediatePropagation(); return;
+    }
     const layers = [...document.querySelectorAll('.mp-pop, .mp-dlg, .cm-panel')].filter(el => el.getClientRects().length && (el === pop || el.querySelector('.mp-pop-close, .close, button[name="close"]')));
     const el = layers.sort((a,b) => (Number(getComputedStyle(a).zIndex)||0) - (Number(getComputedStyle(b).zIndex)||0)).at(-1);
     if (!el) return;
@@ -1879,40 +1918,61 @@ export function installExtras(deps) {
     void pos;
   }
   function tableMenu(anchorEvent, tableFrom) {
-    /* 【2026-10-10】tableFrom = 浮动条当前那张表的位置（⋮ 按钮传进来）：表格是 block widget，
-       点它不会移动 CM 光标 ⇒ 菜单项里 tableAt(光标) 必空。有它就把它当锚点，复制项才能定位到表。 */
-    if (tableFrom != null) menuAnchor = tableFrom;
+    closePop();
+    const v = getView(), commands = window.mpEngine?.commands;
+    const before = v?.state.doc, ticket = commands?.capture();
+    if (!v || !ticket) return;
+    // Internal callers commit before resolving a geometric target. Reject an
+    // uncommitted external numeric target instead of guessing its new offset.
+    if (tableFrom != null && before !== v.state.doc) { toast('表格内容已变化，请重新打开菜单'); return; }
+    const target = tableFrom != null ? tableFrom : v.state.selection.main.head;
     const h = host(); if (!h) return;
-    pop = document.createElement('div');
+    const panel = document.createElement('div');
+    pop = panel;
+    armPanel(panel);
     /* 【右键菜单不带关闭键·2026-10-10 用户报】菜单里的 ✕ 点了没反应（菜单的关闭语义是
        "选一项 / 点外面 / Esc / 滚动"，另塞一个 ✕ 只会误导）。标记类让关闭键守卫跳过它。 */
     pop.className = 'mp-pop mp-pop-menu';
     const hr = h.getBoundingClientRect();
     pop.style.left = Math.max(6, anchorEvent.clientX - hr.left) + 'px';
     pop.style.top = Math.max(6, anchorEvent.clientY - hr.top) + 'px';
-    const add = (label, fn, k) => { const d = document.createElement('div'); d.className = 'mp-pop-item'; d.innerHTML = `<span>${label}</span>${k ? `<span class="k">${k}</span>` : ''}`; d.onclick = () => { closePop(); fn(); }; pop.appendChild(d); };
-    add('上方插入行', () => tableOp('row-above'), 'Ctrl+Shift+Enter');
-    add('下方插入行', () => tableOp('row-below'), 'Ctrl+Enter');
-    add('左侧插入列', () => tableOp('col-left'), 'Ctrl+Alt+←');
-    add('右侧插入列', () => tableOp('col-right'), 'Ctrl+Alt+→');
+    const add = (label, fn, k) => {
+      const d = document.createElement('div'); d.className = 'mp-pop-item';
+      d.innerHTML = `<span>${label}</span>${k ? `<span class="k">${k}</span>` : ''}`;
+      d.onclick = () => {
+        if (pop !== panel || !panel.isConnected) return;
+        return commands.run(() => {
+          // run() flushes the owner first; validate after that flush as well.
+          const current = getView() === v && commands.valid(ticket, { intent: false });
+          closePanel(panel);
+          if (!current) { toast('表格内容已变化，请重新打开菜单'); return false; }
+          return fn(target);
+        });
+      };
+      panel.appendChild(d);
+    };
+    add('上方插入行', pos => tableOp('row-above', pos), 'Ctrl+Shift+Enter');
+    add('下方插入行', pos => tableOp('row-below', pos), 'Ctrl+Enter');
+    add('左侧插入列', pos => tableOp('col-left', pos), 'Ctrl+Alt+←');
+    add('右侧插入列', pos => tableOp('col-right', pos), 'Ctrl+Alt+→');
     const sep = document.createElement('div'); sep.className = 'mp-pop-sep'; pop.appendChild(sep);
     /* 【β1·Q19】移动与插入**并列写明**（两组键形近：Alt+方向＝移动、Ctrl+Alt+左右＝插入） */
-    add('上移该行', () => tableOp('row-move-up'), 'Alt+↑');
-    add('下移该行', () => tableOp('row-move-down'), 'Alt+↓');
-    add('左移该列', () => tableOp('col-move-left'), 'Alt+←');
-    add('右移该列', () => tableOp('col-move-right'), 'Alt+→');
+    add('上移该行', pos => tableOp('row-move-up', pos), 'Alt+↑');
+    add('下移该行', pos => tableOp('row-move-down', pos), 'Alt+↓');
+    add('左移该列', pos => tableOp('col-move-left', pos), 'Alt+←');
+    add('右移该列', pos => tableOp('col-move-right', pos), 'Alt+→');
     const sepM = document.createElement('div'); sepM.className = 'mp-pop-sep'; pop.appendChild(sepM);
-    add('删除本行', () => tableOp('row-delete'), 'Ctrl+Shift+Backspace');
-    add('删除本列', () => tableOp('col-delete'), 'Ctrl+Alt+Delete');
+    add('删除本行', pos => tableOp('row-delete', pos), 'Ctrl+Shift+Backspace');
+    add('删除本列', pos => tableOp('col-delete', pos), 'Ctrl+Alt+Delete');
     const sep2 = document.createElement('div'); sep2.className = 'mp-pop-sep'; pop.appendChild(sep2);
-    add('复制表格（可粘 Excel）', () => copyTable());
+    add('复制表格（可粘 Excel）', pos => copyTable(pos));
     /* 【B-1·③ 折中】markdown 源码出口从 Ctrl+C 让给了 TSV/HTML（整表选区），但"要源码"的场合仍在
        —— 显式命令挂在**同一个**表格菜单里（不新造交互），紧跟「复制表格」；不含表的选区行为不变。 */
-    add('复制为 Markdown 源码', () => copyTableSource());
-    add('删除表格', () => tableOp('table-delete'));
+    add('复制为 Markdown 源码', pos => copyTableSource(pos));
+    add('删除表格', pos => tableOp('table-delete', pos));
     h.appendChild(pop);
-    const away = (e) => { if (pop && !pop.contains(e.target)) { menuAnchor = null; closePop(); document.removeEventListener('mousedown', away, true); } };
-    setTimeout(() => document.addEventListener('mousedown', away, true), 0);
+    // Shared panel close handlers cover Escape, outside presses, blur, scroll
+    // and document changes. No per-menu delayed listener survives its panel.
   }
   /* 【N1/B-1 同源·唯一实现】"表格的格行" ⇒ 剪贴板载荷（TSV + `<table>` HTML）。
      三个出口**必须**都调这里（PLAN-3.1.0 §4 的 ③ 口径），否则又会分裂成
@@ -1958,13 +2018,9 @@ export function installExtras(deps) {
     });
     return { rowCells, aligns };
   }
-  async function copyTable() {
+  async function copyTable(target = null) {
     const v = getView();
-    /* 【A4e】锚点与 tableOp 同一套优先级：右键菜单记下的**被点的格** > CM 选区。
-       改前这里写死读选区 ⇒ 光标在表外时「右键格子 → 复制表格」**完全静默**（无载荷、无提示；
-       A3 复核实测：ClipboardItem 构造 0 次、toast=null、剪贴板不变）。失败时也补一句提示。 */
-    const pos = menuAnchor != null ? menuAnchor : v.state.selection.main.head;
-    menuAnchor = null;
+    const pos = target != null ? target : v.state.selection.main.head;
     const cur = tableAt(pos);
     if (!cur) { toast('光标不在表格内'); return; }
     const args = tableClipArgs(cur);
@@ -1973,11 +2029,10 @@ export function installExtras(deps) {
     else toast('复制表格失败：剪贴板不可用');
   }
   /** 【B-1 配套】显式命令：整表按**文档源码**（markdown）写剪贴板 —— ③ 折中里给"要源码"的场合留的出口。
-   *  锚点优先级与 copyTable/tableOp 同一套（被点的格 > CM 选区），失败也给提示，不静默。 */
-  async function copyTableSource() {
+   *  显式菜单目标或当前 CM 选区，与 copyTable/tableOp 同一套。 */
+  async function copyTableSource(target = null) {
     const v = getView();
-    const pos = menuAnchor != null ? menuAnchor : v.state.selection.main.head;
-    menuAnchor = null;
+    const pos = target != null ? target : v.state.selection.main.head;
     const cur = tableAt(pos);
     if (!cur) { toast('光标不在表格内'); return false; }
     const text = cur.rows.map((r) => r.text).join('\n');
@@ -2048,7 +2103,7 @@ export function installExtras(deps) {
   const prefWrite = (id, v) => { if (window.mpEngine && window.mpEngine.setPref) window.mpEngine.setPref(id, v); };
   // 中置编辑区方案已撤回（外壳未给 main 面板渲染槽位的能力）⇒ 清掉可能残留的模式键。
   try { localStorage.removeItem('mp-panel-mode'); } catch { /* 忽略 */ }
-  function settingsDialog() {
+  function settingsDialog(section = 'general') {
     const rows = SURFACES.map((s) => {
       const body = s.items.map((it) => {
         const cur = surfaceSaved(s.key, it.id, it.def);
@@ -2100,16 +2155,54 @@ export function installExtras(deps) {
       + `<label style="margin-left:14px">间隔 <input id="mp-autosave-seconds" type="number" min="1" max="3600" step="1" value="30" disabled style="width:72px"> 秒</label>`
       + `<div class="k" style="margin-top:2px">默认手动保存，按 Ctrl+S 写入文件。开启后按间隔保存有修改的文件；未命名文档需先另存为。</div></td></tr>`
       + `<tr><td style="white-space:nowrap">Typora 主题</td><td>`
-      + `<button class="mp-key" id="mp-theme-install">安装 .css…</button>`
-      + `<span class="k" style="margin-left:8px">当前：<b id="mp-theme-name">${userThemeName() || '未安装'}</b>${userThemeCss() ? `（${Math.round(userThemeCss().length / 1024)} KB）` : ''}</span>`
+      + `<button class="mp-key" id="mp-theme-install">导入 .css…</button>`
+      + `<span class="k" style="margin-left:8px">当前：<b id="mp-theme-name">${esc(userThemeName() || '未导入')}</b><span id="mp-theme-bytes">${currentUserTheme ? `（${themeSizeLabel()}）` : ''}</span></span>`
       + `<button class="mp-key" id="mp-theme-remove" style="margin-left:10px"${userThemeCss() ? '' : ' disabled'}>移除</button>`
-      + `<div class="k" style="margin-top:2px">选一个 Typora 主题的 <b>.css</b>（默认打开 Typora 的主题目录）：正文与界面配色一起换，重启后仍在。主题里自带的字体/图片文件不会跟着走（CSS 里的相对引用会被忽略，避免整页报错）。</div></td></tr>`
+      + `<div class="k" style="margin-top:2px">导入会把 CSS 复制到 MarkPilot 自己的主题目录。原文件移动或删除不影响使用，重新导入才会更新副本。CSS 引用的相对字体、图片文件不会自动复制。</div></td></tr>`
       + `</table>`;
-    dialog('设置', layoutSec + outlineSec + rows
-      + `<p class="k" style="margin-top:12px">每一项独立调整、互不影响，改完立即生效并被记住。</p>`
-      + `<p style="margin-top:10px"><button class="mp-key" data-act="reset">恢复默认</button>`
-      + `<button class="mp-key" data-act="keys" style="margin-left:8px">快捷键设置…</button></p>`);
+    const sections = [['general','常规与保存'],['theme','主题'],['fonts','字体'],['layout','页面与缩放'],['reading','阅读与排版'],['images','图片'],['interface','界面与大纲'],['keys','快捷键']];
+    dialog('设置', `<div class="mp-settings-body"><nav class="mp-settings-nav" role="tablist" aria-label="设置分类">${sections.map(([id,label]) => `<button type="button" role="tab" id="mp-settings-tab-${id}" data-settings-tab="${id}" aria-controls="mp-settings-panel-${id}">${label}</button>`).join('')}</nav><div class="mp-settings-content">`
+      + sections.map(([id,label]) => `<section role="tabpanel" id="mp-settings-panel-${id}" data-settings-panel="${id}" aria-labelledby="mp-settings-tab-${id}"><h4>${label}</h4>${id === 'layout' ? layoutSec : id === 'interface' ? outlineSec + rows : ''}</section>`).join('')
+      + `</div></div><p class="k">修改立即生效并保存。</p>`);
     const d = dlgEl; if (!d) return;
+    d.classList.add('mp-settings');
+    const panel = id => d.querySelector(`[data-settings-panel="${id}"]`);
+    const moveRow = (selector,id) => {
+      const row = d.querySelector(selector)?.closest('tr'); if (!row) return;
+      let table = panel(id).querySelector('table'); if (!table) { table = document.createElement('table'); panel(id).appendChild(table); }
+      table.appendChild(row);
+    };
+    moveRow('#mp-restore-last','general'); moveRow('#mp-autosave','general'); moveRow('#mp-theme-install','theme');
+    moveRow('input[name="mp-image-pref"]','images'); moveRow('input[name="mp-typo-pref"]','reading');
+    panel('theme').insertAdjacentHTML('afterbegin', `<p><label>内置配色 <select id="mp-settings-palette">${PALETTES.map(p => `<option value="${p.id}"${p.id === currentPalette ? ' selected' : ''}>${p.name}</option>`).join('')}</select></label></p><p class="k">导入的 CSS 会覆盖内置配色；移除 CSS 后显示所选内置配色。</p>`);
+    const fontOptions = [['','默认'],['SimSun','宋体'],['Microsoft YaHei','微软雅黑'],['KaiTi','楷体'],['Arial','Arial'],['Georgia','Georgia'],['Consolas','Consolas'],['serif','系统衬线'],['sans-serif','系统无衬线'],['__custom','自定义']];
+    panel('fonts').insertAdjacentHTML('beforeend', `<p id="mp-font-hint" class="k"></p><table>${FONT_ROLES.map(r => `<tr><td><label for="mp-font-${r.id}">${r.label}</label></td><td><select data-font-preset="${r.id}" aria-label="${r.label}常用字体">${fontOptions.map(([v,n])=>`<option value="${v}">${n}</option>`).join('')}</select><input id="mp-font-${r.id}" data-font-role="${r.id}" placeholder="默认或自定义字体" aria-label="${r.label}字体"></td></tr>`).join('')}</table><p><button class="mp-key" id="mp-font-reset">恢复默认字体</button></p><p class="k">选择常用字体，或输入字体名称后按回车。只影响文档内容。</p>`);
+    panel('keys').insertAdjacentHTML('beforeend', '<p>查看、录入组合键，或恢复默认快捷键。</p><button class="mp-key" data-act="keys">快捷键设置…</button>');
+    panel('interface').insertAdjacentHTML('beforeend', '<p><button class="mp-key" data-act="reset">恢复版式与界面默认</button></p>');
+    const showSection = id => {
+      if (!sections.some(([key]) => key === id)) id = 'general';
+      d.dataset.section = id;
+      for (const el of d.querySelectorAll('[data-settings-panel]')) el.hidden = el.dataset.settingsPanel !== id;
+      for (const el of d.querySelectorAll('[data-settings-tab]')) { const active = el.dataset.settingsTab === id; el.setAttribute('aria-selected',String(active)); el.tabIndex = active ? 0 : -1; }
+      d.querySelector('.mp-settings-content').scrollTop = 0;
+    };
+    d.querySelectorAll('[data-settings-tab]').forEach(el => {
+      el.onclick = () => showSection(el.dataset.settingsTab);
+      el.onkeydown = event => {
+        const i = sections.findIndex(([id]) => id === el.dataset.settingsTab);
+        const next = event.key === 'ArrowDown' ? (i+1)%sections.length : event.key === 'ArrowUp' ? (i+sections.length-1)%sections.length : event.key === 'Home' ? 0 : event.key === 'End' ? sections.length-1 : -1;
+        if (next < 0) return; event.preventDefault(); showSection(sections[next][0]); d.querySelector(`[data-settings-tab="${sections[next][0]}"]`).focus();
+      };
+    });
+    showSection(section);
+    d.querySelector('#mp-settings-palette').onchange = event => applyPalette(event.target.value);
+    d.querySelectorAll('[data-font-role]').forEach(el => {
+      el.onchange = () => { void setFontPreference({ [el.dataset.fontRole]:el.value }); };
+      el.onkeydown = event => { if (event.key === 'Enter') { event.preventDefault(); el.blur(); } };
+    });
+    d.querySelectorAll('[data-font-preset]').forEach(el => { el.onchange = () => { if(el.value === '__custom') d.querySelector('#mp-font-'+el.dataset.fontPreset).focus(); else void setFontPreference({[el.dataset.fontPreset]:el.value}); }; });
+    d.querySelector('#mp-font-reset').onclick = () => { void setFontPreference(Object.fromEntries(FONT_ROLES.map(r => [r.id,'']))); };
+    refreshAppearanceControls();
     {
       const hp = window.mpHost, enabled = d.querySelector('#mp-autosave'), seconds = d.querySelector('#mp-autosave-seconds');
       let current = { enabled: false, seconds: 30 }, busy = false;
@@ -2186,7 +2279,7 @@ export function installExtras(deps) {
     /* 【Typora 社区主题】安装/移除按钮：装完重开一次设置面板，让"当前"与字节数即时刷新。 */
     {
       const bi = d.querySelector('#mp-theme-install');
-      if (bi) bi.onclick = async () => { await installTyporaTheme(); closeDlg(); settingsDialog(); };
+      if (bi) bi.onclick = async () => { bi.disabled = true; try { await installTyporaTheme(); } finally { if (d.isConnected) { bi.disabled = false; refreshAppearanceControls(); } } };
       /* 「打开上次的文件」：先把壳层里的当前值取回来回填，再在改动时写回。 */
       const rl = d.querySelector('#mp-restore-last');
       if (rl) {
@@ -2200,7 +2293,7 @@ export function installExtras(deps) {
         };
       }
       const br = d.querySelector('#mp-theme-remove');
-      if (br) br.onclick = () => { removeTyporaTheme(); closeDlg(); settingsDialog(); };
+      if (br) br.onclick = async () => { br.disabled = true; try { await removeTyporaTheme(); } finally { if (d.isConnected) refreshAppearanceControls(); } };
     }
     /* 【只挑表面滑杆·2026-10-06 修「假滑杆」】选择器必须是 `input.mp-rng[data-s]`：
        本文件早先写的是 `querySelectorAll('input.mp-rng')`——在只有表面参数滑杆的年代无害，
@@ -2226,7 +2319,7 @@ export function installExtras(deps) {
       // 版式四项一并回默认（否则"恢复默认"只恢复一半，用户会以为没生效）
       try { for (const k of ['pageWidth', 'zoom', 'island', 'statusbar', 'floatAvoidance']) localStorage.removeItem('mp-pref-' + k); } catch { }
       if (window.mpEngine && window.mpEngine.applyPrefs) window.mpEngine.applyPrefs();
-      applySurfaces(); settingsDialog();
+      applySurfaces(); settingsDialog(d.dataset.section);
     };
     const ko = d.querySelector('[data-act="keys"]');
     if (ko) ko.onclick = () => { closeDlg(); shortcutDialog(); };
@@ -2277,17 +2370,24 @@ export function installExtras(deps) {
     "--quote-bg-color": "--mp-quoteBg",
   };
   const UT_INLINE_SET = new Set();      // 我们写过的内联 token（移除时要清干净）
-  /** 从主题 CSS 里解析变量：**全文扫、首个声明胜出**。
+  /** 从主题 CSS 里解析变量：全文扫，跨规则首见胜出，块内遵循浏览器声明语义。
       为什么不只认 `:root`：实测 konayuki dark 把 `--bg-color` 写在 `:root` 之外的选择器下，
       只读 `:root` 会漏掉背景色（现象：装完字色变了、底色没变）。 */
   function extractThemeVars(css) {
     const out = {};
-    const re = /(--[a-z0-9-]+)\s*:\s*([^;{}]+);/gi;
-    let m;
-    while ((m = re.exec(String(css)))) {
-      const k = m[1].trim(), v = m[2].trim();
-      if (v && !(k in out)) out[k] = v;
-    }
+    // A detached sheet accepts the final declaration without a semicolon and
+    // ignores comments. It is never attached, so raw imports/resources are not loaded.
+    const sheet = new CSSStyleSheet(); sheet.replaceSync(String(css));
+    const scan = rules => {
+      for (const rule of rules) {
+        if (rule.style) for (const key of rule.style) {
+          const value = rule.style.getPropertyValue(key).trim();
+          if (key.startsWith('--') && value && !Object.hasOwn(out,key)) out[key] = value;
+        }
+        if (rule.cssRules) scan(rule.cssRules);
+      }
+    };
+    scan(sheet.cssRules);
     return out;
   }
   /* 【版式守卫·2026-10-09 实测踩到】Typora 主题是给 Typora 的**富块结构**写的（`#write` 上写着
@@ -2345,75 +2445,187 @@ export function installExtras(deps) {
     for (const k of [...UT_INLINE_SET]) { try { el.style.removeProperty(k); } catch { } }
     UT_INLINE_SET.clear();
   }
-  const userThemeName = () => { try { return localStorage.getItem(UT_NAME_KEY) || ""; } catch { return ""; } };
-  const userThemeCss = () => { try { return localStorage.getItem(UT_CSS_KEY) || ""; } catch { return ""; } };
-  /** 应用（或摘掉）用户主题样式；返回是否处于"已装"状态 */
+  // The managed CSS is authoritative. Browser storage is a portable fallback
+  // and the one-time upgrade source for older desktop installations.
+  const APPEARANCE_CACHE = 'mp-appearance-cache-v1';
+  const FONT_CACHE = 'mp-font-preferences-v1';
+  let appearanceRequest = 0;
+  let themeRevision = 0, fontRevision = 0;
+  let fontPreferences = normalizeFontPreferences({});
+  let currentUserTheme = (() => {
+    try {
+      const cached = localStorage.getItem(APPEARANCE_CACHE);
+      if (cached) return JSON.parse(cached).theme || null;
+      const css = localStorage.getItem(UT_CSS_KEY);
+      return css ? { css, text: css, legacyAdapted: true, name: localStorage.getItem(UT_NAME_KEY) || '自定义主题', vars: JSON.parse(localStorage.getItem(UT_VARS_KEY) || '{}'), bytes: new TextEncoder().encode(css).length } : null;
+    } catch { return null; }
+  })();
+  try { fontPreferences = normalizeFontPreferences(JSON.parse(localStorage.getItem(FONT_CACHE) || '{}')); } catch { }
+  function fixedThemeFonts(css) {
+    try {
+      const sheet = new CSSStyleSheet(); sheet.replaceSync(css);
+      const scan = rules => Array.from(rules).some(rule => {
+        if (rule.type === CSSRule.FONT_FACE_RULE) return false;
+        const family = rule.style?.getPropertyValue('font-family')?.trim();
+        const content = /\.cm-content\b|\.cm-scroller\b|\.cm-line\b|^:root\[data-mp-user-theme\]$/.test(rule.selectorText || '');
+        return !!(content && family && !/^(inherit|initial|unset|revert|revert-layer)$/i.test(family)) || (rule.cssRules && scan(rule.cssRules));
+      });
+      return scan(sheet.cssRules);
+    } catch { return false; }
+  }
+  if (currentUserTheme) currentUserTheme.fontsLocked = fixedThemeFonts(currentUserTheme.css);
+  const fontsLocked = () => !!currentUserTheme?.fontsLocked;
+  const userThemeName = () => currentUserTheme?.name || '';
+  const userThemeCss = () => currentUserTheme?.css || '';
+  const themeSizeLabel = () => { const n = currentUserTheme?.bytes || 0; return n < 1024 ? n + ' B' : (n / 1024).toFixed(1) + ' KB'; };
+  function refreshAppearanceControls() {
+    const d = dlgEl; if (!d?.classList.contains('mp-settings')) return;
+    const name = d.querySelector('#mp-theme-name'); if (name) name.textContent = userThemeName() || '未导入';
+    const bytes = d.querySelector('#mp-theme-bytes'); if (bytes) bytes.textContent = currentUserTheme ? '（' + themeSizeLabel() + '）' : '';
+    const remove = d.querySelector('#mp-theme-remove'); if (remove) remove.disabled = !currentUserTheme;
+    const locked = fontsLocked();
+    const hint = d.querySelector('#mp-font-hint'); if (hint) hint.textContent = locked ? '当前 CSS 主题固定了字体，字体修改已停用。移除主题后会恢复你保存的字体设置。' : '留空使用默认字体。标题、正文、斜体、粗体与代码各自独立；可输入系统字体名称或字体列表。';
+    for (const el of d.querySelectorAll('[data-font-role]')) {
+      el.disabled = locked;
+      if (document.activeElement !== el) el.value = fontPreferences[el.dataset.fontRole] || '';
+    }
+    const reset = d.querySelector('#mp-font-reset'); if (reset) reset.disabled = locked;
+    for (const preset of d.querySelectorAll('[data-font-preset]')) { preset.disabled = locked; const value = fontPreferences[preset.dataset.fontPreset] || ''; preset.value = [...preset.options].some(o => o.value === value) ? value : '__custom'; }
+  }
+  function applyFontPreferences() {
+    let el = document.getElementById('mp-font-preferences');
+    if (!el) { el = document.createElement('style'); el.id = 'mp-font-preferences'; document.head.appendChild(el); }
+    el.textContent = fontsLocked() ? '' : fontPreferenceCss(fontPreferences);
+    const v = getView(); v?.requestMeasure(); window.mpEngine?.commands.geometryIntent();
+    document.dispatchEvent(new CustomEvent('mp-typography-changed'));
+    refreshAppearanceControls();
+  }
+  function cacheUserTheme(theme) {
+    if (theme) theme.fontsLocked = fixedThemeFonts(theme.css);
+    currentUserTheme = theme;
+    try {
+      localStorage.setItem(APPEARANCE_CACHE, JSON.stringify({ theme }));
+      localStorage.removeItem(UT_CSS_KEY); localStorage.removeItem(UT_NAME_KEY); localStorage.removeItem(UT_VARS_KEY);
+    } catch { /* The native copy remains authoritative even if cache is full. */ }
+  }
+  function prepareUserTheme(text, name) {
+    const res = adaptTyporaTheme(String(text || ''), { scope: UT_SCOPE, surface: '.cm-content' });
+    const guarded = sanitizeThemeCss(res?.css || '');
+    if (!guarded.css.trim() || !res?.report?.rules) return { ok: false, error: '没有可用的主题规则，请选择有效的 CSS 文件' };
+    const theme = { text: String(text), name: String(name || '自定义主题'), css: guarded.css, vars: extractThemeVars(text), bytes: new TextEncoder().encode(text).length, fontsLocked: fixedThemeFonts(guarded.css), legacyAdapted: false };
+    return { ok: true, theme, report: res.report, stripped: guarded.stripped };
+  }
   function applyUserTheme() {
-    const css = userThemeCss();
-    let el = document.getElementById("mp-user-theme");
+    const css = userThemeCss(); let el = document.getElementById('mp-user-theme');
     if (!css) {
-      if (el) el.remove();
-      clearThemeVarsInline();
-      try { delete document.documentElement.dataset.mpUserTheme; } catch { }
+      if (el) el.remove(); clearThemeVarsInline(); delete document.documentElement.dataset.mpUserTheme;
       return false;
     }
-    if (!el) { el = document.createElement("style"); el.id = "mp-user-theme"; document.head.appendChild(el); }
+    if (!el) { el = document.createElement('style'); el.id = 'mp-user-theme'; document.head.appendChild(el); }
     el.textContent = css + UT_BRIDGE;
-    document.documentElement.dataset.mpUserTheme = "1";
-    let vars = {};
-    try { vars = JSON.parse(localStorage.getItem(UT_VARS_KEY) || "{}"); } catch { vars = {}; }
-    applyThemeVarsInline(vars);
+    document.documentElement.dataset.mpUserTheme = '1';
+    applyThemeVarsInline(currentUserTheme.vars || {});
+    if (currentUserTheme.vars?.['--text-color']) { document.documentElement.style.setProperty('--mp-heading',currentUserTheme.vars['--text-color']); UT_INLINE_SET.add('--mp-heading'); }
     return true;
   }
-  /** 安装核心（对话框与探针都走这一条，保证两条路同源） */
-  function installTyporaThemeFromText(text, name) {
-    const res = adaptTyporaTheme(String(text || ""), { scope: UT_SCOPE, surface: ".cm-content" });
-    if (!res || !res.css || !res.css.trim()) return { ok: false, error: "改写后没有可用规则（确认选的是 Typora 主题 .css）" };
-    /* 【变量内联覆盖·2026-10-09 实测踩到】引擎的调色板把 --mp-* 写在 documentElement 的**内联样式**上，
-       内联优先级高于任何样式表规则 ⇒ 光靠 UT_BRIDGE 那条 `:root[data-mp-user-theme]{--mp-bg:var(--bg-color)}`
-       **改不动颜色**（实测装完 bg 还是引擎自己的 #1f2126）。所以安装时把主题的 :root 变量解析出来，
-       以**内联**写回 documentElement（同为内联、后写者胜）；移除时清掉这些内联项并重新应用当前调色板。 */
-    const vars = extractThemeVars(String(text || ""));
-    const guarded = sanitizeThemeCss(res.css);          // 版式守卫：剥掉抢版面的声明（见上）
-    const finalCss = guarded.css;
+  function renderAppearance() {
+    clearThemeVarsInline();
+    themeApply(currentPalette);
+    applyUserTheme(); applyFontPreferences();
+    // An explicit reading palette takes precedence while reading is active.
+    if (document.documentElement.dataset.mpReading === '1') applyReading();
+  }
+  async function refreshAppearance() {
+    const epoch = ++appearanceRequest, h = window.mpHost;
+    if (!h?.themeRead) { renderAppearance(); return { ok: true }; }
     try {
-      localStorage.setItem(UT_CSS_KEY, finalCss);
-      localStorage.setItem(UT_NAME_KEY, String(name || "自定义主题"));
-      localStorage.setItem(UT_VARS_KEY, JSON.stringify(vars));
-    } catch { return { ok: false, error: "主题太大，浏览器存储放不下" }; }
-    applyUserTheme();
-    lastThemeReport = res.report || null;
-    return { ok: true, name: String(name || "自定义主题"), bytes: finalCss.length, report: res.report || null, vars: Object.keys(vars).length, stripped: guarded.stripped };
+      const [theme, fonts] = await Promise.all([h.themeRead(), h.fontRead()]);
+      if (epoch !== appearanceRequest) return { ok: true, stale: true };
+      if (!theme.ok) throw new Error(theme.error);
+      if (!fonts.ok) toast('读取字体设置失败：' + fonts.error, 6000);
+      if (theme.revision < themeRevision || fonts.revision < fontRevision) return { ok: true, stale: true };
+      themeRevision = theme.revision; if (fonts.ok) fontRevision = fonts.revision;
+      if (!theme.exists && currentUserTheme) {
+        const migrated = await h.themeSave({ ...currentUserTheme, migration:true });
+        if (epoch !== appearanceRequest) return { ok: true, stale: true };
+        if (!migrated.ok) throw new Error(migrated.error);
+        if (migrated.revision < themeRevision) return { ok: true, stale: true };
+        themeRevision = migrated.revision;
+        cacheUserTheme(migrated.theme);
+      } else if (theme.theme && !theme.theme.legacyAdapted) {
+        const prepared = prepareUserTheme(theme.theme.text, theme.theme.name);
+        if (!prepared.ok) throw new Error(prepared.error);
+        cacheUserTheme({ ...theme.theme, ...prepared.theme });
+      } else cacheUserTheme(theme.theme);
+      if (fonts.ok) fontPreferences = normalizeFontPreferences(fonts.value);
+      renderAppearance(); return { ok: true };
+    } catch (error) {
+      if (epoch === appearanceRequest) { currentUserTheme = null; renderAppearance(); toast('读取外观设置失败：' + error.message, 6000); }
+      return { ok: false, error: error.message };
+    }
+  }
+  async function installTyporaThemeFromText(text, name) {
+    const candidate = prepareUserTheme(text, name); if (!candidate.ok) return candidate;
+    ++appearanceRequest;
+    try {
+      const h = window.mpHost;
+      if (h?.themeSave) {
+        const r = await h.themeSave(candidate.theme); if (!r.ok) return r;
+        themeRevision = Math.max(themeRevision, r.revision);
+        await refreshAppearance();
+      } else { cacheUserTheme(candidate.theme); renderAppearance(); }
+      lastThemeReport = candidate.report;
+      return { ok: true, name: candidate.theme.name, bytes: candidate.theme.bytes, report: candidate.report };
+    } catch (e) { return { ok: false, error: e.message }; }
   }
   async function installTyporaTheme() {
     const h = window.mpHost;
-    if (!h || typeof h.pickThemeCss !== "function") { toast("当前宿主不支持选择主题文件"); return { ok: false }; }
-    let r = null;
-    try { r = await h.pickThemeCss(); }
-    catch (e) { toast("选择主题文件失败：" + String((e && e.message) || e)); return { ok: false }; }
-    if (!r || !r.ok) { if (r && !r.canceled) toast("读取主题失败：" + (r.error || "未知错误")); return r || { ok: false }; }
-    const res = installTyporaThemeFromText(r.text, r.name);
-    if (!res.ok) { toast("安装主题失败：" + res.error); return res; }
-    const rep = res.report || {};
-    toast(`已装上 Typora 主题「${res.name}」：${rep.rules || 0} 条规则生效`
-      + (rep.fontFacesDropped ? `（${rep.fontFacesDropped} 个主题自带字体未随 CSS 导入）` : "")
-      + (rep.urlsNeutralized ? `，已忽略 ${rep.urlsNeutralized} 处图片/字体引用` : ""));
-    return res;
-  }
-  function removeTyporaTheme() {
-    const had = userThemeName();
-    try { localStorage.removeItem(UT_CSS_KEY); localStorage.removeItem(UT_NAME_KEY); localStorage.removeItem(UT_VARS_KEY); } catch { }
-    applyUserTheme();
-    /* 清掉内联覆盖后，把当前调色板重新应用一次（否则引擎的 --mp-* 内联值已被我们删掉，界面会失去配色）。 */
+    if (!h?.pickThemeCss) { toast('当前宿主不支持选择主题文件'); return { ok: false }; }
     try {
-      const cur = (() => { try { return localStorage.getItem("editor-theme") || "telari-dark"; } catch { return "telari-dark"; } })();
-      applyPalette(cur);
-    } catch { }
-    if (had) toast(`已移除主题「${had}」`);
-    return { ok: true, removed: had || null };
+      const r = await h.pickThemeCss();
+      if (!r?.ok) { if (r && !r.canceled) toast('读取主题失败：' + r.error, 6000); return r; }
+      const result = await installTyporaThemeFromText(r.text, r.name);
+      if (!result.ok) toast('导入主题失败：' + result.error, 6000);
+      else toast('已导入主题「' + result.name + '」' + (h.themeSave ? '，副本已保存在 MarkPilot 主题目录' : '') + (result.report?.urlsNeutralized ? '；相对字体和图片引用已忽略' : ''));
+      return result;
+    } catch (e) { toast('导入主题失败：' + e.message, 6000); return { ok: false, error: e.message }; }
   }
-  const userThemeInfo = () => ({ name: userThemeName(), bytes: userThemeCss().length, report: lastThemeReport });
-  applyUserTheme();      // 启动即恢复上次装的主题
+  async function removeTyporaTheme() {
+    ++appearanceRequest;
+    try {
+      const r = window.mpHost?.themeRemove ? await window.mpHost.themeRemove() : { ok: true };
+      if (!r.ok) { toast('移除主题失败：' + r.error, 6000); return r; }
+      if (!window.mpHost?.themeRemove || r.revision >= themeRevision) { themeRevision = r.revision || themeRevision; cacheUserTheme(null); renderAppearance(); }
+      await refreshAppearance(); toast('已移除 CSS 主题'); return r;
+    } catch (e) { toast('移除主题失败：' + e.message, 6000); return { ok: false, error: e.message }; }
+  }
+  async function setFontPreference(patch) {
+    if (fontsLocked()) return { ok: false, error: '当前主题固定了字体' };
+    ++appearanceRequest;
+    try {
+      normalizeFontPreferences(patch);
+      for (const value of Object.values(patch)) if (value && !window.CSS.supports('font-family', value)) throw new Error('字体名称或字体列表无效');
+      if (window.mpHost?.fontSave) {
+        const r = await window.mpHost.fontSave(patch); if (!r.ok) throw new Error(r.error); fontRevision = Math.max(fontRevision, r.revision); await refreshAppearance();
+      } else { fontPreferences = normalizeFontPreferences({ ...fontPreferences, ...patch }); localStorage.setItem(FONT_CACHE, JSON.stringify(fontPreferences)); applyFontPreferences(); }
+      return { ok: true };
+    } catch (e) { toast('保存字体失败：' + e.message, 6000); refreshAppearanceControls(); return { ok: false, error: e.message }; }
+  }
+  const userThemeInfo = () => ({ name: userThemeName(), bytes: currentUserTheme?.bytes || 0, fontsLocked: fontsLocked(), report: lastThemeReport });
+  applyUserTheme(); applyFontPreferences();
+  void refreshAppearance();
+  window.mpHost?.onAppearance?.(() => { void refreshAppearance(); });
+  window.addEventListener('storage', event => {
+    if (event.key === APPEARANCE_CACHE || event.key === FONT_CACHE) {
+      if (window.mpHost?.themeRead) { void refreshAppearance(); return; }
+      try {
+        if (event.key === APPEARANCE_CACHE) currentUserTheme = JSON.parse(event.newValue || '{}').theme || null;
+        else fontPreferences = normalizeFontPreferences(JSON.parse(event.newValue || '{}'));
+        renderAppearance();
+      } catch { }
+    }
+  });
+
 
   /* ── 面板关闭键：全应用单点保证（2026-10-09 用户要求）─────────────────────────
      要求原话是"全应用的这种面板都可关闭常驻，大纲除外"。为什么不在每个构造点各加一个：
@@ -2778,126 +2990,40 @@ export function installExtras(deps) {
     });
   }
   function openMore(anchor) {
-    openPop(anchor, (p) => {
-      p.classList.add('mp-pop-keep');   // 阅读态里也允许显示（阅读配色住在菜单里）
-      const add = (label, fn, k) => { const d = document.createElement('div'); d.className = 'mp-pop-item'; d.innerHTML = `<span>${label}</span>${k ? `<span class="k">${k}</span>` : ''}`; d.onclick = () => { closePop(); fn(); }; p.appendChild(d); };
-      const sep = () => { const s = document.createElement('div'); s.className = 'mp-pop-sep'; p.appendChild(s); return s; };
-      const t = document.createElement('div'); t.className = 'mp-pop-title'; t.textContent = '更多'; p.appendChild(t);
-      /* 【入口收敛】格式不在这里各占一行：点「导出…」拉起**格式选择框**（先选格式 → 再选位置）。
-         工具栏上已有平行按钮的（双开/主题配色/表情符号/导出/快捷键设置）不在菜单里重复。
-         【2026-10-08 收编】「界面透明度」与「阅读模式」两件事从工具栏独立按钮**移到这里内联**：
-         用户要求工具栏只留高频动作，低频的调参进菜单；内联＝不用再开二级面板，
-         滑杆/数字口/三档配色都在菜单里直接给，且都显示**当前值**。 */
-      add('导出…', exportDialog, 'PDF / HTML / 文件夹 / 复制');
-      add('设置', settingsDialog, '');
-      /* 【快捷键设置的直达入口·2026-10-10 用户反馈"自定义快捷键找不到了"】改前只有一条路：
-         更多 → 设置 → 面板底部的「快捷键设置…」。工具栏上原来那个 ⌨ 图标在 2026-10-08
-         随"低频动作收进更多菜单"一起撤掉了 ⇒ 用户从界面上再也看不到"能改键"这件事。
-         这里补一个**同名直达项**（设置面板里那颗按钮保留，两条路都能到，同一份实现）。 */
-      add('快捷键设置…', shortcutDialog, '点键位直接改');
-      /* 【2026-10-09 收编】两件事从工具栏槽位收进这里：
-         · 「重新加载」原来是置灰的 is-todo 死按钮（toolbar.js 的 NOT_YET），这次**连上行一起接上**了
-           （壳侧 file:reload：重读磁盘、不 pushRecent、脏文档先确认且默认取消）；
-         · 「从浏览器打开」= 图片的另一种**取回方式**（主进程代取），与「图片」按钮共用同一条插入路径
-           ⇒ 全应用不再需要任何"选文件还是从浏览器"的二选一对话框。 */
-      add('重新加载', reloadDoc, '从磁盘重读当前文件');
-      add('从浏览器打开…', openImageFromUrl, '按网址取图');
-      /* 【task-17】图片的两条批量命令（对整篇生效，各一次撤销；外链一律不动） */
-      add('内联全部图片', inlineAllImages, '本地路径 → data URI');
-      add('抽出到 assets', extractImagesToAssets, 'data URI → assets/ 相对路径');
-      p.appendChild(sep());
-
-      /* ── 界面透明度（内联；与「设置 → 界面透明度」同一组 token / 同一份存储）── */
-      const tt = document.createElement('div'); tt.className = 'mp-pop-title'; tt.textContent = '界面透明度'; p.appendChild(tt);
-      const firstOf = (s) => s.items[0];
-      const curOf = (s) => surfaceSaved(s.key, firstOf(s).id, firstOf(s).def);
-      const allSame = (s) => s.items.every((it) => surfaceSaved(s.key, it.id, it.def) === curOf(s));
-      const rowLabel = document.createElement('div'); rowLabel.className = 'mp-pop-item';
-      rowLabel.innerHTML = `<span>整体不透明度</span><span class="k" data-mp-alpha-val>${curOf(SURFACES[0])}%</span>`;
-      p.appendChild(rowLabel);
-      const row = document.createElement('div'); row.className = 'mp-pop-item';
-      row.style.cssText = 'gap:8px';
-      const rng = document.createElement('input');
-      rng.type = 'range'; rng.min = '0'; rng.max = '100'; rng.step = '1';
-      rng.value = String(curOf(SURFACES[0]));
-      rng.setAttribute('aria-label', '界面不透明度（百分比）');
-      rng.style.cssText = 'flex:1 1 auto;min-width:120px;accent-color:var(--mp-primary)';
-      const num = document.createElement('input');
-      num.type = 'text'; num.inputMode = 'numeric'; num.value = String(curOf(SURFACES[0]));
-      num.setAttribute('aria-label', '界面不透明度数字口（回车生效）');
-      num.style.cssText = 'width:44px;text-align:right;background:var(--mp-codeBg);color:var(--mp-fg);border:1px solid var(--mp-border);border-radius:4px;padding:1px 5px;font:11px var(--mp-font-mono)';
-      const pct = document.createElement('span'); pct.className = 'k'; pct.textContent = '%';
-      row.append(rng, num, pct);
-      p.appendChild(row);
-      const hint = document.createElement('div'); hint.className = 'mp-pop-title';
-      hint.textContent = '工具岛 / 公式框 / 大纲面板同值；逐项微调在「设置」里';
-      hint.style.cssText = 'padding:0 10px 4px;font-size:11px;opacity:.75';
-      p.appendChild(hint);
-      /* 【交互】滑杆拖动 = 即时生效；数字口 = 键入 + **回车**生效（Esc 还原、失焦提交）；
-         两条路都写同一个 localStorage 键（`mp-surfaces`），与「设置」面板是同源读写。 */
-      const pushSurfaces = () => { try { localStorage.setItem('mp-surfaces', JSON.stringify(st)); } catch { } applySurfaces(); };
-      let st = surfaceStore();
-      const setAll = (v) => {
-        const val = Math.max(0, Math.min(100, Math.round(Number(v))));
-        if (!Number.isFinite(val)) return null;
-        st = surfaceStore();
-        /* 【第二波·FS-1 缺陷·2026-10-10】原来把 0–100 **无差别写进每一项** —— 连"背景模糊"
-           （合法区间 0–24px，见 SURFACES 的 min/max）也写 ⇒ 越界值 + 面板滑杆顶格与标签自相矛盾
-           + 跨重启不自愈。修成：只作用于**不透明度类**项（id 以 alpha 结尾：alpha / tbalpha /
-           ctxalpha），且各自按自己的 min/max 钳制；非透明度项一个字节都不动。 */
-        for (const s of SURFACES) {
-          st[s.key] = st[s.key] || {};
-          for (const it of s.items) {
-            if (!/alpha$/.test(String(it.id))) continue;
-            const lo = Number.isFinite(it.min) ? it.min : 0;
-            const hi = Number.isFinite(it.max) ? it.max : 100;
-            st[s.key][it.id] = Math.max(lo, Math.min(hi, val));
-          }
-        }
-        pushSurfaces();
-        rng.value = String(val); num.value = String(val);
-        const lab = p.querySelector('[data-mp-alpha-val]'); if (lab) lab.textContent = val + '%';
-        return val;
+    openPop(anchor, p => {
+      p.classList.add('mp-pop-keep');
+      const heading = label => { const el = document.createElement('div'); el.className = 'mp-pop-title'; el.textContent = label; p.appendChild(el); };
+      const add = (label, fn, hint = '') => {
+        const el = document.createElement('div'); el.className = 'mp-pop-item'; el.tabIndex = 0; el.setAttribute('role','menuitem');
+        el.innerHTML = `<span>${label}</span><span class="k">${hint}</span>`;
+        el.onclick = () => { closePop(); fn(); };
+        el.onkeydown = event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); el.click(); } };
+        p.appendChild(el);
       };
-      rng.addEventListener('input', () => setAll(rng.value));
-      rng.addEventListener('mousedown', (e) => e.stopPropagation());
-      rng.addEventListener('click', (e) => e.stopPropagation());
-      num.addEventListener('mousedown', (e) => e.stopPropagation());
-      num.addEventListener('click', (e) => e.stopPropagation());
-      num.addEventListener('keydown', (e) => {
-        e.stopPropagation();
-        if (e.key === 'Enter') { e.preventDefault(); const v = setAll(num.value); if (v == null) num.value = String(curOf(SURFACES[0])); num.blur(); }
-        else if (e.key === 'Escape') { e.preventDefault(); num.value = String(curOf(SURFACES[0])); num.blur(); }
-      });
-      num.addEventListener('blur', () => { const v = setAll(num.value); if (v == null) num.value = String(curOf(SURFACES[0])); });
-
-      /* ── 阅读模式（内联；三档配色 + 进入/退出；与「更多 → 设置」里的阅读面板同源）── */
-      p.appendChild(sep());
-      const rt = document.createElement('div'); rt.className = 'mp-pop-title'; rt.textContent = '阅读模式'; p.appendChild(rt);
-      const curPal = readingPalette();
-      for (const pal of READING_PALETTES) {
-        const d = document.createElement('div'); d.className = 'mp-pop-item';
-        d.dataset.mpRp = pal.id;
-        d.innerHTML = `<span>${pal.name}</span><span class="k">${pal.id === curPal ? '当前' : ''}</span>`;
-        d.onclick = () => {
-          try { localStorage.setItem('mp-reading-palette', pal.id); } catch { }
-          if (!readingOn()) toggleReading(true); else applyReading();
-          /* 【菜单要在阅读态里也能重开】`anchor` 是**闭包引用**（不是快照），
-             切档后阅读态可能刚好被打开 ⇒ 锚点那一下 rect 全 0；openPop 已做"锚点不可见就退右上角"，
-             这里再补一层：DOM 里取**活的** more 按钮当锚点，避免用到已被移除的旧节点。 */
-          closePop();
-          const live = document.querySelector('.mp-toolbar .mp-tb-item[data-mp-id="more"]') || anchor;
-          openMore(live);          // 重开菜单显示新的当前档
-        };
-        p.appendChild(d);
+      heading('文档');
+      add('导出…', exportDialog, 'PDF / HTML / 复制');
+      add('重新加载', reloadDoc, '从磁盘重读');
+      add('图片操作…', () => openImageActions(anchor), '网址 / 批量转换');
+      heading('外观与设置');
+      add('主题…', () => settingsDialog('theme'), userThemeName() ? 'CSS 已导入' : '配色 / 导入 CSS');
+      add('字体…', () => settingsDialog('fonts'), '正文 / 标题 / 斜体');
+      add('页面与缩放…', () => settingsDialog('layout'));
+      add('界面与大纲…', () => settingsDialog('interface'), '透明度 / 停靠');
+      add('设置', () => settingsDialog('general'), '启动 / 保存 / 更多');
+      add('快捷键设置…', shortcutDialog);
+      heading('阅读');
+      add(readingOn() ? '退出阅读模式' : '进入阅读模式', () => toggleReading(!readingOn()), 'Esc 退出');
+      add('阅读配色与排版…', readingPaletteDialog, '跟随主题 / 米色 / 淡绿');
+      heading('帮助'); add('帮助', help); add('关于', about);
+    });
+  }
+  function openImageActions(anchor) {
+    openPop(anchor, p => {
+      const title = document.createElement('div'); title.className = 'mp-pop-title'; title.textContent = '图片操作'; p.appendChild(title);
+      for (const [label, action] of [['从网址插入图片…',openImageFromUrl],['内联全部图片',inlineAllImages],['抽出到 assets',extractImagesToAssets],['图片保存设置…',()=>settingsDialog('images')]]) {
+        const el = document.createElement('div'); el.className = 'mp-pop-item'; el.textContent = label; el.tabIndex=0; el.setAttribute('role','menuitem');
+        el.onclick=()=>{closePop();action();}; el.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();el.click();}};p.appendChild(el);
       }
-      /* 阅读档的"当前"标记存在内存里（`readingPalette()` 读 localStorage）；
-         菜单每次都重新构建 ⇒ 上面这个循环天然显示最新值。 */
-      add(readingOn() ? '退出阅读模式' : '进入阅读模式', () => toggleReading(!readingOn()), '阅读态会隐藏工具栏，Esc 可退出');
-
-      p.appendChild(sep());
-      add('帮助', help, '');
-      add('关于', about, '');
     });
   }
   function insertText(text) {
@@ -3235,11 +3361,12 @@ export function installExtras(deps) {
 
   /** 把壳侧给的**绝对路径**读成 File/Blob（与粘贴同形状）⇒ 汇入唯一插入路径。
    *  壳侧 file:readBase64 返回 { ok, base64, bytes, mime, path }。 */
-  async function imageFileFromPath(p) {
+  async function imageFileFromPath(p, current = () => true) {
     const h = window.mpHost;
     if (!h || typeof h.readFileBase64 !== 'function') { toast('读取图片需要桌面版'); return null; }
     let r = null;
-    try { r = await h.readFileBase64(p); } catch (e) { toast('读取图片失败：' + ((e && e.message) || e)); return null; }
+    try { r = await h.readFileBase64(p); } catch (e) { if (current()) toast('读取图片失败：' + ((e && e.message) || e)); return null; }
+    if (!current()) return null;
     if (!r || r.ok === false || !r.base64) { toast('读取图片失败：' + ((r && r.error) || p)); return null; }
     const mime = r.mime || 'image/png';
     const bin = atob(r.base64);
@@ -3250,21 +3377,37 @@ export function installExtras(deps) {
     catch (e) { const b = new Blob([buf], { type: mime }); b.name = name; return b; }
   }
 
+  function imageRequestOrigin() {
+    const v = getView(), engine = window.mpEngine, ticket = engine?.commands?.capture();
+    if (!v || !ticket) { toast('请先完成当前输入，再插入图片'); return null; }
+    // Dialog focus and typing change intent serials. Preserve this document's
+    // identity while allowing normal edits and the existing insertion behavior.
+    return () => getView() === v && window.mpEngine === engine && engine.commands.valid(ticket, { source: false, intent: false });
+  }
+  const imageRequestCanceled = () => toast('插入位置或文档已变化，图片插入已取消');
+
   /** 【C2·单一语义】图片按钮只做一件事：弹**原生文件选择器**（壳侧 image:pick 现成，壳零改动）。
    *  取回的每张都走 insertImageFile ⇒ 策略 / assets 回落 / 字节守卫与粘贴**完全同源**。
    *  ⚠️ 本函数是 async，但**调用点必须保持同步**（见 toolbarClick 的 case 'upload' 注释）。 */
   async function pickAndInsertImages() {
     const h = window.mpHost;
     if (!h || typeof h.pickImages !== 'function') { toast('插入图片需要桌面版'); return; }
-    const r = await h.pickImages({ multiple: true });
+    const current = imageRequestOrigin();
+    if (!current) return;
+    let r;
+    try { r = await h.pickImages({ multiple: true }); }
+    catch (error) { if (current()) toast('读取图片失败：' + (error?.message || error)); else imageRequestCanceled(); return; }
+    if (!current()) { imageRequestCanceled(); return; }
     if (!r || r.canceled) return;
     const list = (r.files || []).filter(Boolean);
     if (!list.length) return;
     let ok = 0;
     for (const p of list) {
-      const f = await imageFileFromPath(p);
+      const f = await imageFileFromPath(p, current);
+      if (!current()) { imageRequestCanceled(); return; }
       if (!f) continue;
       await insertImageFile(f, list.length, 'input.upload');
+      if (!current()) { imageRequestCanceled(); return; }
       ok++;
     }
     if (!ok) toast('没有可插入的图片');
@@ -3273,7 +3416,10 @@ export function installExtras(deps) {
   /** 「从浏览器打开」：弹地址输入 → **主进程代取**（渲染进程零网络）→ 取回后走同一条插入路径。
    *  【为什么不再需要"二选一"对话框】取回方式不同（选文件 / 按 URL 取），**插入路径只有一个**。 */
   async function openImageFromUrl() {
+    const current = imageRequestOrigin();
+    if (!current) return;
     const url = await promptLine({ title: '从浏览器打开图片', placeholder: 'https://…/image.png', okText: '获取' });
+    if (!current()) { imageRequestCanceled(); return; }
     if (url == null) return;                      // 取消（与"确认了空串"不同：空串在下面被拦住）
     const u = String(url).trim();
     if (!u) { toast('请输入图片地址'); return; }
@@ -3281,10 +3427,12 @@ export function installExtras(deps) {
     const h = window.mpHost;
     if (!h || typeof h.downloadImageToCache !== 'function') { toast('该功能需要桌面版'); return; }
     let r = null;
-    try { r = await h.downloadImageToCache({ url: u }); } catch (e) { toast('获取图片失败：' + ((e && e.message) || e)); return; }
+    try { r = await h.downloadImageToCache({ url: u }); } catch (e) { if (current()) toast('获取图片失败：' + ((e && e.message) || e)); else imageRequestCanceled(); return; }
+    if (!current()) { imageRequestCanceled(); return; }
     if (!r || r.ok === false) { toast('获取图片失败：' + ((r && r.error) || '未知错误')); return; }
     const src = r.absPath || r.cachePath;
-    const f = src ? await imageFileFromPath(src) : null;
+    const f = src ? await imageFileFromPath(src, current) : null;
+    if (!current()) { imageRequestCanceled(); return; }
     if (!f) { toast('获取图片失败：宿主未返回可用路径'); return; }
     await insertImageFile(f, 1, 'input.download');
   }
@@ -3394,7 +3542,7 @@ export function installExtras(deps) {
 
   // Windows HTML clipboard context may surround the selected fragment with
   // whitespace. Read its DOM comment boundaries without trimming its text.
-  function clipboardFragmentText(doc) {
+  function clipboardFragment(doc) {
     const walker = doc.createTreeWalker(doc, NodeFilter.SHOW_COMMENT);
     let start = null, node;
     while ((node = walker.nextNode())) {
@@ -3402,26 +3550,37 @@ export function installExtras(deps) {
       else if (start && node.data.trim() === 'EndFragment') {
         const range = doc.createRange();
         range.setStartAfter(start); range.setEndBefore(node);
-        return range.cloneContents().textContent || '';
+        const enclosingSource = start.parentElement?.closest('[data-markpilot-source="markdown"]');
+        return { node: range.cloneContents(), source: !!enclosingSource?.contains(node) };
       }
     }
-    return doc.body.textContent || '';
+    return { node: doc.body, source: false };
   }
+  const clipboardFragmentText = doc => clipboardFragment(doc).node.textContent || '';
   function onDocPaste(event) {
     const cd = event.clipboardData; if (!cd) return;
-    /* ★【task-13】位图分支**必须在最前面**：位图粘贴时 text/plain 通常为空，
-       走到后面的 return（"不抢默认"）会被吞掉 ⇒ 表现就是"粘了完全没反应"。 */
-    {
-      const picked = pickClipboardImage(cd);
-      if (picked.file) { pasteImageFile(event, picked.file, picked.n); return; }
-    }
+    const v = getView(), active = document.activeElement;
+    const target = event.composedPath?.()[0] || event.target;
+    const inEditor = v && v.hasFocus && v.contentDOM.contains(active) && v.contentDOM.contains(target);
+    const cell = active?.closest?.('.mp-cell-overlay-text');
+    if (!inEditor && !(cell && cell.contains(target))) return;
     const plain = cd.getData('text/plain') || '';
     const html = cd.getData('text/html') || '';
     let htmlDoc = null;
     if (html) { try { htmlDoc = new DOMParser().parseFromString(html, 'text/html'); } catch { /* 完整纯文本回退 */ } }
+    const fragment = htmlDoc ? clipboardFragment(htmlDoc) : null;
+    const sourceClipboard = plain !== '' && !!fragment && (fragment.source || !!fragment.node.querySelector('[data-markpilot-source="markdown"]'));
     const htmlHasTable = !!htmlDoc?.body.querySelector('table');
+    // A bitmap may be an additional representation of a whole text fragment.
+    // Even whitespace-only plain text owns its paste. HTML containing prose or
+    // a table keeps the rich-text route; an image-only fragment uses the bitmap.
+    const htmlHasText = htmlHasTable || !!htmlDoc && !!clipboardFragmentText(htmlDoc).trim();
+    if (!plain && !htmlHasText) {
+      const picked = pickClipboardImage(cd);
+      if (picked.file) { pasteImageFile(event, picked.file, picked.n); return; }
+    }
     const bare = plain.replace(/\r?\n$/, '');
-    const multi = bare.indexOf('\n') >= 0;
+    const multi = bare.indexOf('\n') >= 0 || sourceClipboard && /[\r\n]/.test(plain);
     const el = document.activeElement;
     const inCell = !!(el && el.classList && el.classList.contains('mp-cell-overlay-text'));
     if (inCell) {
@@ -3429,6 +3588,11 @@ export function installExtras(deps) {
       if (multi || htmlHasTable) {
         event.preventDefault();
         toast(multi ? '格内不支持多行粘贴（会把表格切开）—— 请粘到表格外' : '格内不能放表格');
+        return;
+      }
+      if (sourceClipboard) {
+        event.preventDefault();
+        document.execCommand('insertText', false, plain);
         return;
       }
       // Literal pipes stay visible in the DOM; the cell codec encodes the source.
@@ -3443,7 +3607,6 @@ export function installExtras(deps) {
       }
       return;   // 其余：交回默认（单值粘贴行为不变）
     }
-    const v = getView();
     if (!v || !el || !v.contentDOM.contains(el)) return;
     /* 【第二波·code-fence 缺陷·2026-10-10】代码块内粘贴 TSV / 表格片段会被下面的"建表启发式"
        改写成 Markdown 表（实测 CF-5b：Δ58、插入片段变成 `| name | value |…`、随后 4 行
@@ -3487,9 +3650,9 @@ export function installExtras(deps) {
     const plainBare = String(plain || '').replace(/\r\n?/g, '\n').trim();
     const linesNonEmpty = plainBare ? plainBare.split('\n').filter((l) => l.trim()) : [];
     const plainIsTableOnly = linesNonEmpty.length > 0 && linesNonEmpty.every((l) => /\t/.test(l) || /^\s*\|/.test(l));
-    const rows = tableFromPlain(plain);
-    const convertHtml = !!htmlDoc && (htmlHasTable || !plainIsTableOnly);
-    if (!convertHtml && !rows) return;
+    const rows = sourceClipboard ? null : tableFromPlain(plain);
+    const convertHtml = !sourceClipboard && !!htmlDoc && (htmlHasTable || !plainIsTableOnly);
+    if (!convertHtml && !rows && !sourceClipboard) return;
     /* 【P0-4·2026-10-10 由"表格日常"普查查出（剪贴板可用后复验为真缺陷）】
        ① 光标停在**表格行内**（但没有格覆盖层，例如点表格左侧空白 / 表头行）时，多行 TSV 会走
           普通块插入 ⇒ **原表被劈开**：实测管道数 `[4,4,4,4,4]` 变成 `[4,4,8,4,4,4]`，
@@ -3514,6 +3677,7 @@ export function installExtras(deps) {
       toast('格内不支持多行粘贴（会把表格切开）—— 请粘到表格外');
       return;
     }
+    if (sourceClipboard) return; // CM owns exact plain source, selection and history.
     let text;
     if (convertHtml) {
       try { text = htmlRichToMd(htmlDoc.body); }
@@ -3708,7 +3872,8 @@ export function installExtras(deps) {
     toolbarClick, applyPalette, toggleOutline, exportHtml, exportFolder, copyRich, copyTable, tableOp, setAlign, alignAt, about, help, shortcutDialog, rebindKeys, PALETTES,
     /* 【Typora 社区主题】安装/移除/读数：`installTyporaThemeFromText` 是**核心**（对话框与探针同源），
        `installTyporaTheme` 走壳层选文件；`userThemeInfo` 供设置面板与取证读当前状态。 */
-    installTyporaTheme, installTyporaThemeFromText, removeTyporaTheme, userThemeInfo,
+    installTyporaTheme, installTyporaThemeFromText, removeTyporaTheme, userThemeInfo, refreshAppearance,
+    setFontPreference, fontPreferences: () => ({ ...fontPreferences }), settingsDialog,
     /* 【图片命令导出·2026-10-10】对齐/缩放/范围解析：探针与后续的自定义百分比输入都用这两个。 */
     setImageAlignAt, setImageScaleAt, imageRangeAt,
     /* 【N1/B-1 同源出口】引擎侧（覆盖层 Ctrl+C、整表选区 Ctrl+C）取**同一个** TSV/HTML 构造器；

@@ -179,8 +179,8 @@ async function inspectStagedHtml(htmlFile) {
   // 闸门的**本意**是"我们没把文档里的本地图片内联成 base64"（v2.3.3 的崩法）。
   // 所以只在"一张相对路径的图都没有、却有一堆 data: 图"时判失败；
   // 用户在 markdown 里自己写的少数 data: 图属合法用法，只上报、不拦截。
-  if (dataImages > 0 && relImages === 0) {
-    reasons.push(`HTML 里 ${dataImages} 处 data: 图片且 0 处 assets/ 相对路径——图片被内联了（正是要避免的做法）`);
+  if (dataImages > 0) {
+    reasons.push(`HTML 里仍有 ${dataImages} 处内联图片未写入导出目录`);
   }
   return {
     ok: reasons.length === 0, bytes: st.size, relImages, dataImages, remoteImages,

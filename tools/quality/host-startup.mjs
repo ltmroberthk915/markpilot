@@ -106,7 +106,8 @@ function fixture({holdReady = false, holdPath = false, themeReady = false} = {})
   function register() {
     window.handler.on('open', ({content}) => {
       text = content; calls.push({kind: 'open', text});
-      window.mpEngine = {focus() {}, getValue: () => text};
+      window.mpEngine = {focus() {}, getValue: () => text,
+        checkpointDocument: () => { const previous=text;let active=true;return {commit(){if(!active)return false;active=false;return true;},rollback(){if(!active)return false;active=false;text=previous;return true;}}; }};
     }).on('setValue', value => {
       if (window.mpEngine) { text = value; calls.push({kind: 'setValue', text}); }
     }).on('replaceDocument', value => {

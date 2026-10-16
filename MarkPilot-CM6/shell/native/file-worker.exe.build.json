@@ -1,0 +1,10 @@
+{
+  "file": "shell\\native\\file-worker.exe",
+  "bytes": 19968,
+  "sha256": "49d1b860c778393a096d2aa38b13f6b565011d48e7d4a4866aadc9521e9caf95",
+  "inputs": {
+    "source": "fe41411e00d4e93b5642ed4e79a269e98915a990723127cdc29f3b212c9f61b7",
+    "compiler": "46809206887326d2d24db1eff1f3064de972c3451abe766b49111450a5e08e00",
+    "script": "f7b96b72882b9f835d92d0273a2f1aa121addfef626b4b6d1ba45dc342c3a959"
+  }
+}
