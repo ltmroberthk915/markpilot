@@ -1,3 +1,9 @@
+## MarkPilot 3.5.2 · Windows
+
+大纲直接显示标题中的公式。Ctrl+Shift+E 插入行内公式，Ctrl+Shift+M 插入块公式，Ctrl+Shift+Q 切换引用，Ctrl+Shift+K 插入代码块；插入后可直接在内容位置输入。
+
+**[下载安装版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.2/markpilot-Setup-3.5.2.exe)** · **[下载便携版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.2/markpilot-3.5.2-portable.exe)** · [更新说明](docs/RELEASE-3.5.2.md)
+
 ## MarkPilot 3.5.1 · Windows
 
 表格编辑与撤销重做更连贯，大纲跳转随页面缩放对齐，组字过程与保存协调处理。源码分屏采用增量同步，减少超长文档输入时的整篇重建。

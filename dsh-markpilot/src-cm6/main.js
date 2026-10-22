@@ -2692,11 +2692,13 @@ function ensureCellOverlay() {
         return;
       }
     }
-    /* 【task-2 ⑧·格内 Ctrl+Shift+E ＝ 行内公式】表外这个组合键仍是「导出 HTML」（DEFAULT_KEYS.export），
-       格内接管、表外一字不动（下面 return 只在 cellEdit 为真时生效）。
-       改前格内按它是**死键**（CM 的 keymap 挂 contentDOM，覆盖层上的按键它收不到；实测 docGrew=0）。
-       插入走覆盖层自己的 execCommand（与格内粘贴同一条路径），插完把光标放进两个 $ 之间。 */
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "e" || e.key === "E") && cellEdit) {
+    /* 格内沿用行内公式命令；块级快捷键与工具栏共用拒绝边界。 */
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && e.shiftKey && /^[mqk]$/i.test(e.key) && cellEdit) {
+      e.preventDefault();
+      window.mpExtras?.toast?.('表格内不支持块级格式——请先把光标移到表格外');
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && e.shiftKey && (e.key === "e" || e.key === "E") && cellEdit) {
       e.preventDefault();
       let picked = "";
       try { const s = window.getSelection(); if (s && !s.isCollapsed) picked = String(s); } catch (err) { picked = ""; }

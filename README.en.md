@@ -1,3 +1,9 @@
+## MarkPilot 3.5.2 for Windows
+
+The outline displays inline math in headings. Use Ctrl+Shift+E for inline math, Ctrl+Shift+M for block math, Ctrl+Shift+Q for quotes, and Ctrl+Shift+K for code blocks, with the caret ready for input.
+
+**[Download installer](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.2/markpilot-Setup-3.5.2.exe)** · **[Download portable](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.2/markpilot-3.5.2-portable.exe)** · [Release notes](docs/RELEASE-3.5.2.md)
+
 ## MarkPilot 3.5.1 for Windows
 
 More consistent table editing and undo/redo, outline navigation that follows page zoom, and coordinated saving during composition. The split source pane uses incremental updates to avoid rebuilding the entire source view on each edit.

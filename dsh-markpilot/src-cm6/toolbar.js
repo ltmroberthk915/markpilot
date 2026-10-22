@@ -405,6 +405,7 @@ const ACTIONS = {
   outdent: (v) => indentLines(v, -1),
   line: (v) => insertBlock(v, "---\n"),
   code: (v) => insertBlock(v, "```\n\n```\n"),
+  "block-math": (v) => insertBlock(v, "$$\n\n$$\n"),
   table: (v) => insertBlock(v, "| 列一 | 列二 |\n| --- | --- |\n| 内容 | 内容 |\n"),
   "insert-before": (v) => insertBlankLine(v, true),
   "insert-after": (v) => insertBlankLine(v, false),

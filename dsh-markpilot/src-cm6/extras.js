@@ -15,7 +15,7 @@ import { SearchQuery, getSearchQuery, setSearchQuery } from '@codemirror/search'
 import { reserveImageInsertion, captureImageDocument } from './image-insertion.js';
 import { mathSourcePosition } from './math-source-map.js';
 import { collectImageRefs, decodeImageAttribute } from './resource-images.js';
-import { renderInline } from './inline-format.js';
+import { renderInline, renderInlineSegment } from './inline-format.js';
 import { FONT_ROLES, normalizeFontPreferences, fontPreferenceCss } from './font-preferences.cjs';
 import { planDataImages } from './data-images.cjs';
 import { selectedLines } from './selection-lines.js';
@@ -486,13 +486,16 @@ export function installExtras(deps) {
    *  对策见 rebindKeys：本表改用 `Prec.high`，与 tableKeys / zoomKeys 同级。 */
   const DEFAULT_KEYS = {
     bold: 'Mod-b', italic: 'Mod-i', underline: 'Mod-u', strike: 'Alt-Shift-5',
-    code: 'Mod-e', quote: 'Mod-/', list: 'Mod-l', save: 'Mod-s', outline: 'Mod-Shift-o', export: 'Mod-Shift-e',
+    code: 'Mod-e', inlineMath: 'Mod-Shift-e', blockMath: 'Mod-Shift-m', codeBlock: 'Mod-Shift-k',
+    quote: 'Mod-Shift-q', list: 'Mod-l', save: 'Mod-s', outline: 'Mod-Shift-o', export: '',
   };
   const ACTIONS = {
     /* 行内格式全部走 toolbar.js 的同一个 wrap（唯一实现；落点规则与工具栏按钮逐字节一致）。 */
     bold: (v) => deps.wrapInline(v, '**'), italic: (v) => deps.wrapInline(v, '*'),
     underline: (v) => deps.wrapInline(v, '<u>', '</u>'), strike: (v) => deps.wrapInline(v, '~~'),
     code: (v) => deps.wrapInline(v, '`'),
+    inlineMath: (v) => deps.wrapInline(v, '$'),
+    blockMath: (v) => TOOLBAR_ACTIONS['block-math'](v), codeBlock: (v) => TOOLBAR_ACTIONS.code(v),
     quote: (v) => toggleLinePrefix(v, '> '), list: (v) => toggleLinePrefix(v, '- '),
     /* 【Ctrl+S·2026-10-10 普查实测】改前调 window.mpHost.__save —— 这个函数**全仓从未定义**，
        于是页面内 Ctrl+S 是空转（真正落盘的是 500ms 自动保存）。现在走壳层已有的 file:save 通道
@@ -516,7 +519,28 @@ export function installExtras(deps) {
     },
     outline: () => toggleOutline(), export: () => exportHtml(),
   };
-  function keyConfig() { try { return { ...DEFAULT_KEYS, ...JSON.parse(localStorage.getItem('mp-keys') || '{}') }; } catch { return { ...DEFAULT_KEYS }; } }
+  function keyConfig() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('mp-keys') || '{}');
+      if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return { ...DEFAULT_KEYS };
+      const cfg = { ...DEFAULT_KEYS, ...saved };
+      if (!localStorage.getItem('mp-key-defaults-352')) {
+        const next = { inlineMath: 'Mod-Shift-e', blockMath: 'Mod-Shift-m', quote: 'Mod-Shift-q', codeBlock: 'Mod-Shift-k' };
+        // Compare only the four new combinations; leave unrelated spellings intact.
+        const claimed = (combo) => {
+          const parts = String(combo || '').toLowerCase().split('-'), key = parts.pop();
+          return /^[emqk]$/.test(key) && parts.some(p => /^(s|shift)$/.test(p))
+            && parts.some(p => /^(mod|c|ctrl|control)$/.test(p))
+            && parts.every(p => /^(mod|c|ctrl|control|s|shift)$/.test(p));
+        };
+        for (const [action, combo] of Object.entries(cfg)) if (!(action in next) && claimed(combo)) cfg[action] = '';
+        Object.assign(cfg, next);
+        // A failed write must never leave a completed migration marker.
+        try { localStorage.setItem('mp-keys', JSON.stringify(cfg)); localStorage.setItem('mp-key-defaults-352', '1'); } catch { }
+      }
+      return cfg;
+    } catch { return { ...DEFAULT_KEYS }; }
+  }
   function setKey(action, combo) { const c = keyConfig(); c[action] = combo; try { localStorage.setItem('mp-keys', JSON.stringify(c)); } catch { } rebindKeys(); }
   const comboOf = (e) => {
     const parts = []; if (e.ctrlKey || e.metaKey) parts.push('Mod'); if (e.shiftKey) parts.push('Shift'); if (e.altKey) parts.push('Alt');
@@ -603,11 +627,56 @@ export function installExtras(deps) {
     return true;
   }
 
+  /* ── 大纲条目公式显示（浮层/左右停靠同一条路径）──────────────────────────
+   * 只在 pane 构建时渲染（打开瞬间 / 既有 150ms 去抖重建），正文按键零新增扫描。
+   * 复用 renderInlineSegment：非公式文本一律走它的 escapeText；不传 link/image 选项
+   * ⇒ 链接/图片按字面源码显示，不生成 <a>/<img>、不发出任何请求；公式经
+   * deps.renderMathHTML(tex,false)（**运行时读取**：初始 applyOutlineMode 早于下方
+   * mathApi const 的任何路径都不引用下方 const，规避 TDZ；engine 自带 LRU，输出与
+   * 编辑面同一份 KaTeX HTML/CSS，不新增 KaTeX 依赖）。
+   * 返回 null ⇒ 整条退回 textContent 原文本；任一公式失败（非法 TeX/引擎未就绪）⇒
+   * 该式按源码字面回退且**不缓存**，下次重建自然重试。缓存上限 64 条 / 256KiB
+   * （单条 >64KiB 只显示不缓存），超长标题在 headings() 处已退回 80 截断原文本。 */
+  const OUTLINE_MATH_MAX_CHARS = 2048;
+  const OUTLINE_MATH_CACHE_ITEMS = 64, OUTLINE_MATH_CACHE_BYTES = 256 * 1024, OUTLINE_MATH_ENTRY_BYTES = 64 * 1024;
+  const outlineMathCache = new Map();
+  let outlineMathBytes = 0, outlineMathHits = 0, outlineMathMisses = 0;
+  function outlineItemHtml(text) {
+    const hit = outlineMathCache.get(text);
+    if (hit != null) { outlineMathCache.delete(text); outlineMathCache.set(text, hit); outlineMathHits++; return hit; }
+    outlineMathMisses++;
+    const render = typeof deps.renderMathHTML === 'function' ? deps.renderMathHTML : null;
+    if (!render) return null;                                    // 引擎未就绪：退原文本，不缓存
+    let mathFailed = false, html;
+    try {
+      html = renderInlineSegment(text, {
+        math: (tex) => {
+          const out = render(String(tex), false);                 // 单/双 $ 一律行内口径（条目是单行）
+          if (out == null || out.includes('class="katex-error"')) { mathFailed = true; return null; }    // renderInlineSegment 自身回退为转义源码
+          return '<span class="mp-outline-math">' + out.replace(/ data-typora-source-(?:start|end)="[^"]*"/g, '') + '</span>';
+        },
+      });
+    } catch { return null; }
+    if (!mathFailed && html != null && 2 * (text.length + html.length) <= OUTLINE_MATH_ENTRY_BYTES) {
+      outlineMathCache.set(text, html); outlineMathBytes += 2 * (text.length + html.length);
+      for (const k of outlineMathCache.keys()) {                  // Map 迭代序＝插入序＝最旧先出
+        if (outlineMathBytes <= OUTLINE_MATH_CACHE_BYTES && outlineMathCache.size <= OUTLINE_MATH_CACHE_ITEMS) break;
+        outlineMathBytes -= 2 * (k.length + outlineMathCache.get(k).length); outlineMathCache.delete(k);
+      }
+    }
+    return html;
+  }
   /* ── 大纲：点条目滚到该标题，**顶部留出工具栏高度**（v2.3.3 的教训：别把目标顶到视口最上方被工具栏挡住） ── */
   function headings() {
     const v = getView(); if (!v) return [];
     const f = v.state.field(lineStylesField, false);
-    return (f && f.headings ? f.headings : []).map((h) => ({ from: h.from, level: h.level, text: v.state.doc.lineAt(h.from).text.replace(/^#{1,6}\s*/, '').slice(0, 80) }));
+    /* 【大纲公式显示】无 $ 标题维持原 80 字符口径不变；含 $ 标题取整行源码（≤ OUTLINE_MATH_MAX_CHARS），
+       超限按无公式处理退回 80 截断——避免把 $…$ 从中间截断成裸 $ 文本。 */
+    return (f && f.headings ? f.headings : []).map((h) => {
+      const raw = v.state.doc.lineAt(h.from).text.replace(/^#{1,6}\s*/, '');
+      const math = raw.length <= OUTLINE_MATH_MAX_CHARS && raw.includes('$');
+      return { from: h.from, level: h.level, math, text: math ? raw : raw.slice(0, 80) };
+    });
   }
   const headingMeasureKey = {};
   function gotoHeading(from) {
@@ -659,7 +728,8 @@ export function installExtras(deps) {
     else for (const x of hs) {
       const d = document.createElement('div');
       d.className = 'mp-outline-item h' + x.level;
-      d.textContent = x.text || '(空标题)';
+      const mh = x.math ? outlineItemHtml(x.text) : null;
+      if (mh != null) d.innerHTML = mh; else d.textContent = x.text || '(空标题)';   // 失败/待引擎 ⇒ 退原文本
       d.onclick = () => { gotoHeading(x.from); markActiveDock(); };
       dockEl.appendChild(d);
     }
@@ -686,7 +756,8 @@ export function installExtras(deps) {
     for (const x of hs) {
       const d = document.createElement('div');
       d.className = 'mp-outline-item h' + x.level;
-      d.textContent = x.text || '(空标题)';
+      const mh = x.math ? outlineItemHtml(x.text) : null;
+      if (mh != null) d.innerHTML = mh; else d.textContent = x.text || '(空标题)';   // 失败/待引擎 ⇒ 退原文本
       d.onclick = () => { gotoHeading(x.from); markActive(); };
       outlineEl.appendChild(d);
     }
@@ -3170,7 +3241,7 @@ export function installExtras(deps) {
   }
   async function help() {
     const cfg = keyConfig();
-    const rows = Object.entries(cfg).map(([a, c]) => `<tr><td>${({ bold: '加粗', italic: '斜体', underline: '下划线', strike: '删除线', code: '行内代码', quote: '引用', list: '无序列表', save: '保存', outline: '大纲', export: '导出 HTML' })[a] || a}</td><td><span class="mp-key">${c.replace('Mod', 'Ctrl')}</span></td></tr>`).join('');
+    const rows = Object.entries(cfg).map(([a, c]) => `<tr><td>${({ bold: '加粗', italic: '斜体', underline: '下划线', strike: '删除线', code: '行内代码', inlineMath: '行内公式', blockMath: '块公式', codeBlock: '代码块', quote: '引用', list: '无序列表', save: '保存', outline: '大纲', export: '导出 HTML' })[a] || a}</td><td><span class="mp-key">${c.replace('Mod', 'Ctrl')}</span></td></tr>`).join('');
     dialog('帮助 · 快捷键', `
       <p class="k">快捷键可在「更多 → 快捷键设置」里点键位直接改。</p>
       <table>${rows}</table>
@@ -3180,7 +3251,7 @@ export function installExtras(deps) {
   }
   function shortcutDialog() {
     const cfg = keyConfig();
-    const names = { bold: '加粗', italic: '斜体', underline: '下划线', strike: '删除线', code: '行内代码', quote: '引用', list: '无序列表', save: '保存文件', outline: '大纲面板', export: '导出 HTML' };
+    const names = { bold: '加粗', italic: '斜体', underline: '下划线', strike: '删除线', code: '行内代码', inlineMath: '行内公式', blockMath: '块公式', codeBlock: '代码块', quote: '引用', list: '无序列表', save: '保存文件', outline: '大纲面板', export: '导出 HTML' };
     dialog('快捷键设置', `<p class="k">点右侧键位后按下新组合键（Esc 取消，退格恢复默认）。</p><table id="mp-keys">` +
       Object.entries(cfg).map(([a, c]) => `<tr><td>${names[a] || a}</td><td><span class="mp-key" data-a="${a}">${showCombo(c)}</span></td></tr>`).join('') + '</table>');
     const lifecycle = panelLifecycles.get(dlgEl);
@@ -4582,6 +4653,8 @@ export function installExtras(deps) {
       })] : [])],
     toast, /* 【#38】块级命令的表内拒绝提示与引擎其他提示同一条通道（toolbar.js 调用） */
     toolbarClick, applyPalette, toggleOutline, refreshOutline, exportHtml, exportFolder, copyRich, copyTable, tableOp, setAlign, alignAt, about, help, shortcutDialog, rebindKeys, PALETTES,
+    /* 【大纲公式显示】只读取证通道（mathCssStat 同款范式）：缓存真实命中/未命中与占用，探针读它，不另造状态。 */
+    outlineMathStat: () => ({ items: outlineMathCache.size, bytes: outlineMathBytes, hits: outlineMathHits, misses: outlineMathMisses }),
     /* 【Typora 社区主题】安装/移除/读数：`installTyporaThemeFromText` 是**核心**（对话框与探针同源），
        `installTyporaTheme` 走壳层选文件；`userThemeInfo` 供设置面板与取证读当前状态。 */
     installTyporaTheme, installTyporaThemeFromText, removeTyporaTheme, userThemeInfo, refreshAppearance,
