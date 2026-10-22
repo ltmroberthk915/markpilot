@@ -420,7 +420,27 @@ function copyCurrentFilePath(W = activeWindow()) {
     }
     return 'no-path';
   }
+  /* 菜单直写没有渲染复制事件：用同一 begin/commit core 显式 begin 一次；
+     native Edit 菜单的 role:copy/cut 由 preload capture 覆盖，不在这里二次 begin。 */
+  const wc = W && !W.isDestroyed() ? W.webContents : null;
+  const begun = beginClipboardIntentCore(wc, 'copy');
+  if (!begun.ok) { dbg('menu:copy-path:begin-failed', begun.error); return `error:${begun.error}`; }
+  const op = openTransactions.get(wc.id);
+  if (op && op.phase === 'adopted') {
+    /* 同步直写不能 await renderer 结算：terminal canceled 并退休同 token，
+       防止 rollback 令一个已经返回 canceled 的 token 复活。 */
+    consumeClipboardIntent(wc, begun.token);
+    dbg('menu:copy-path:canceled-adopted');
+    return 'canceled';
+  }
+  if (!clipboardIntentCurrent(wc, begun.token)) {
+    /* already-returned-canceled 终断：Current 失败即消费捕获同 token，事后 restore 同 docId 也不能复活。 */
+    consumeClipboardIntent(wc, begun.token);
+    dbg('menu:copy-path:canceled');
+    return 'canceled';
+  }
   try {
+    if (!consumeClipboardIntent(wc, begun.token)) { dbg('menu:copy-path:canceled'); return 'canceled'; }
     clipboard.writeText(m.path);
     dbg('menu:copy-path', m.path);
     return m.path;
@@ -815,6 +835,7 @@ function createWindow(session = state) {   // 【文件多开·第 3 步·3a】�
      ② 用关窗前捕获的 id 注销会话 —— webContents 销毁后取不到 id，会话会泄漏（实测 sessionsLeft 停在 2）。 */
   try { if (!win || win.isDestroyed()) { const alive = BrowserWindow.getAllWindows().filter((x) => !x.isDestroyed()); win = alive.length ? alive[0] : win; } } catch { }
   try { if (__wcId != null) sessions.delete(__wcId); else unregisterSession(W.webContents); } catch { }
+  try { retireClipboardIntentFor(W.webContents); } catch { }
 });
   } catch (e) { dbg("session:register-failed", String((e && e.message) || e)); }
 
@@ -842,7 +863,11 @@ function createWindow(session = state) {   // 【文件多开·第 3 步·3a】�
     state.renderGoneCount = (state.renderGoneCount || 0) + 1;
     state.lastRenderGone = { at: Date.now(), reason: details && details.reason, exitCode: details && details.exitCode, title: (() => { try { return W.getTitle(); } catch { return null; } })() };
     dbg('win:render-process-gone', state.lastRenderGone);
+    try { retireClipboardIntentFor(W.webContents); } catch { }
   });
+  /* copy intent：每个 WebContents 挂一次 did-start-navigation —— 主框架非同文档导航退休起源意图，
+     同文档/子框架不退休（见 clipboardIntentOnNavigation 的 legacy/details 双形态解析）。 */
+  clipboardIntentOnNavigation(W);
   W.on('responsive', () => {
     if (!state.unresponsiveAt) return;
     const ms = Date.now() - state.unresponsiveAt;
@@ -957,7 +982,32 @@ const ipcChannels = new Set();
 function handle(channel, handler) {
   if (ipcChannels.has(channel)) throw new Error(`IPC 通道重复注册：${channel}`);
   ipcChannels.add(channel);
-  ipcMain.handle(channel, handler);
+  let registered = handler;
+  if (channel === 'clipboard:writeImage' && process.env.MP_TEST_HOOKS === '1') {
+    let imageSerial = 0;
+    registered = function (...args) {
+      const seq = ++imageSerial;
+      const trace = (kind, result) => {
+        try {
+          const detail = { seq };
+          if (kind === 'settled') {
+            const own = name => result && (typeof result === 'object' || typeof result === 'function') ? Object.getOwnPropertyDescriptor(result, name)?.value : undefined;
+            kind = own('ok') === true ? 'committed' : own('canceled') === true || own('status') === 'canceled' ? 'canceled' : 'failed';
+            if (kind === 'committed') {
+              for (const name of ['width', 'height']) { const value = own(name); if (Number.isSafeInteger(value) && value > 0) detail[name] = value; }
+            }
+          }
+          dbg('clipboardImage:' + kind, detail);
+        } catch { /* Diagnostics must preserve the original result/error. */ }
+      };
+      trace('entry');
+      let pending;
+      try { pending = Reflect.apply(handler, this, args); }
+      catch (error) { trace('failed'); throw error; }
+      return Promise.resolve(pending).then(result => { trace('settled', result); return result; }, error => { trace('failed'); throw error; });
+    };
+  }
+  ipcMain.handle(channel, registered);
 }
 handle('app:info', () => ({ name: 'MarkPilot', version: app.getVersion(), platform: process.platform, versions: process.versions }));
 // 健康读数：实测脚本用 CDP 从渲染进程读「无响应」次数/累计时长（不靠截图猜）
@@ -1545,15 +1595,38 @@ async function imgForClipboard(sender, source) {
     return image;
   } finally { clearTimeout(timer); }
 }
-handle('clipboard:writeImage', async (e, payload = {}) => {
+handle('clipboard:writeImage', async (e, payload = {}, token) => {
   try {
+    const requestFrame = e.senderFrame;
+    /* 入口：identity + 实际事件 frame（subframe 不写、不消费主 frame A），随后 await exact adoptedGate；
+       等待前不用 docId 判死 origin。 */
+    if (!clipboardIntentIdentity(e.sender, token)) return clipboardIntentCanceled();
+    if (!clipboardIntentFrameOk(e.sender, requestFrame)) return clipboardIntentRejectFrame(e.sender, requestFrame, token);
+    if ((await adoptedGate(e.sender, token)) !== 'proceed') return clipboardIntentCanceled();
+    if (!clipboardIntentFrameOk(e.sender, requestFrame)) return clipboardIntentRejectFrame(e.sender, requestFrame, token);
+    if (!clipboardIntentCurrent(e.sender, token)) return clipboardIntentTerminate(e.sender, token);
+    /* 结算后才捕获 origin docPath：adopted 期间不会拿临时 candidate 目录解析同名相对图；
+       rollback 后仍按 origin 目录读图。 */
     const docPath = sessionOf(e.sender).filePath;
     const source = await imgSourceBytes(payload.src, docPath);
+    /* source await 后：先验 frame/identity（不先 return source error）→ gate settle → frame+fullCurrent */
+    if (!clipboardIntentIdentity(e.sender, token)) return clipboardIntentCanceled();
+    if (!clipboardIntentFrameOk(e.sender, requestFrame)) return clipboardIntentRejectFrame(e.sender, requestFrame, token);
+    if (e.sender.isDestroyed()) return clipboardIntentCanceled();
+    if ((await adoptedGate(e.sender, token)) !== 'proceed') return clipboardIntentCanceled();
+    if (!clipboardIntentFrameOk(e.sender, requestFrame)) return clipboardIntentRejectFrame(e.sender, requestFrame, token);
+    if (!clipboardIntentCurrent(e.sender, token)) return clipboardIntentTerminate(e.sender, token);
     if (!source.ok) return source;
-    if (e.sender.isDestroyed()) return { ok: false, canceled: true };
     const img = await imgForClipboard(e.sender, source);
-    if (e.sender.isDestroyed()) return { ok: false, canceled: true };
+    /* 解码后同样 settle + fullCurrent，再到同步 consume/writeImage（相邻无 await；178 decoder/budget 原样保留） */
+    if (!clipboardIntentIdentity(e.sender, token)) return clipboardIntentCanceled();
+    if (!clipboardIntentFrameOk(e.sender, requestFrame)) return clipboardIntentRejectFrame(e.sender, requestFrame, token);
+    if (e.sender.isDestroyed()) return clipboardIntentCanceled();
+    if ((await adoptedGate(e.sender, token)) !== 'proceed') return clipboardIntentCanceled();
+    if (!clipboardIntentFrameOk(e.sender, requestFrame)) return clipboardIntentRejectFrame(e.sender, requestFrame, token);
+    if (!clipboardIntentCurrent(e.sender, token)) return clipboardIntentTerminate(e.sender, token);
     if (!img || img.isEmpty()) return { ok: false, error: "bad-image" };
+    if (!consumeClipboardIntent(e.sender, token)) return clipboardIntentCanceled();
     clipboard.writeImage(img);
     const size = img.getSize();
     return { ok: true, width: size.width, height: size.height };
@@ -1575,19 +1648,218 @@ handle('image:saveAs', async (e, payload = {}) => {
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
 let clipboardWriteSerial = 0;
-handle('clipboard:write', async (_e, p) => {
+/* ── copy intent（host178v2）：应用全局唯一最新意图 ─────────────────────────────
+ * 一个 app 级 latest：不透明 UUID token + 单调诊断序号 epoch，绑定 begin 时刻的
+ * exact sender + sender.mainFrame + 已注册 session 对象 + 其 documentId。
+ * begin 严格只认裸 'copy'|'cut'（非法 begin 不换 epoch/token、不退休旧 A）；
+ * commit 只收第三参 token 字符串、绝不 mint；validate+consume+OS 写盘相邻、其间无 await；
+ * 写盘抛错 = failed 而非 success；一次事件各分支共享同一 token，commit 不再推进 epoch。 */
+const clipboardIntent = { epoch: 0, token: null, kind: null, sender: null, mainFrame: null, session: null, documentId: null, consumed: false };
+function clipboardWindowOf(sender) {
+  if (!sender || sender.isDestroyed()) return null;
+  const W = BrowserWindow.fromWebContents(sender);
+  return W && !W.isDestroyed() && W.webContents === sender ? W : null;
+}
+/* identity：只验 token 存在/未消费/未换主 —— 不含 docId。adopted 期间 documentId
+ * 是临时 candidate，任何提前用存储 docId 判死的检查都会让 rollback 可提交的 origin A 白死。 */
+function clipboardIntentIdentity(sender, token) {
+  const I = clipboardIntent;
+  return typeof token === 'string' && !!token && I.token === token && !I.consumed && I.sender === sender;
+}
+/* frame 门禁（B2）：实际事件 frame 必须 === 当前 mainFrame === begin 时捕获的 frame。
+ * subframe 即使知道 token 也不写、也不消费主 frame A。 */
+function clipboardIntentFrameOk(sender, frame) {
+  const I = clipboardIntent;
+  return !!sender && !!frame && frame === sender.mainFrame && frame === I.mainFrame;
+}
+/* current：最终写盘前的全量校验 —— token/sender/窗口/session 对象/documentId/mainFrame。
+ * mainFrame 与 begin 时捕获的对象比较（非同文导航后 webContents.mainFrame 是新实例 ⇒ 必不相等），
+ * 不是 sender.mainFrame !== sender.mainFrame 这类恒假比较。 */
+function clipboardIntentCurrent(sender, token) {
+  const I = clipboardIntent;
+  if (!clipboardIntentIdentity(sender, token)) return false;
+  if (!clipboardWindowOf(sender)) return false;
+  if (!sender.mainFrame || (typeof sender.mainFrame.isDestroyed === 'function' && sender.mainFrame.isDestroyed())) return false;
+  if (I.mainFrame !== sender.mainFrame) return false;
+  const S = sessions.get(sender.id);
+  if (!S || S !== I.session) return false;
+  if (S.documentId !== I.documentId) return false;
+  return true;
+}
+/* begin core：严格只认 'copy'|'cut'，非法 kind 直接拒绝且不动 state；随后完整校验发起者，
+ * 全部通过才替换 latest（epoch+1 使旧 A 自动失效）。 */
+function beginClipboardIntentCore(wc, kind) {
+  if (kind !== 'copy' && kind !== 'cut') return { ok: false, error: 'bad-kind' };
+  if (!wc || wc.isDestroyed()) return { ok: false, error: 'sender-closed' };
+  const W = BrowserWindow.fromWebContents(wc);
+  if (!W || W.isDestroyed() || W.webContents !== wc) return { ok: false, error: 'window-owner-missing' };
+  const S = sessions.get(wc.id); if (!S) return { ok: false, error: 'session-unregistered' };
+  if (!wc.mainFrame) return { ok: false, error: 'non-main-frame' };
+  clipboardIntent.epoch++;
+  clipboardIntent.token = crypto.randomUUID();
+  clipboardIntent.kind = kind;
+  clipboardIntent.sender = wc;
+  clipboardIntent.mainFrame = wc.mainFrame;
+  clipboardIntent.session = S;
+  clipboardIntent.documentId = S.documentId;
+  clipboardIntent.consumed = false;
+  return { ok: true, token: clipboardIntent.token, epoch: clipboardIntent.epoch };
+}
+/* consume：只消费 captured 与 current 是同一个的 token；stale A 的取消绝不能吞掉当前 B。 */
+function consumeClipboardIntent(sender, token) {
+  const I = clipboardIntent;
+  if (!clipboardIntentIdentity(sender, token)) return false;
+  I.consumed = true;
+  return true;
+}
+function retireClipboardIntentFor(wc) {
+  const I = clipboardIntent;
+  if (wc && I.sender === wc) I.consumed = true;
+}
+/* adopted gate：异步 writer 最终提交时若 open 处于 adopted（documentId 已是临时 candidate），
+ * 先 await 那一个 exact op.done，再交回全量校验判当前 token/session/doc/frame ——
+ * finish ⇒ docId 已切换 ⇒ canceled；rollback ⇒ origin 还原 ⇒ 可提交。不在等待前用存储 docId 判死。 */
+async function adoptedGate(sender, token) {
+  const op = openTransactions.get(sender.id);
+  if (!op || op.phase !== 'adopted') return 'proceed';
+  if (!clipboardIntentIdentity(sender, token)) return 'canceled';
+  await op.done;
+  return 'proceed';
+}
+function clipboardIntentCanceled() { return { ok: false, canceled: true, status: 'canceled' }; }
+/* already-returned-canceled 终断：Current 全量失败（token 仍是 current 的合法 origin）时
+ * 消费捕获同 token 再返回 canceled —— 事后手动 restore 同 docId 也不能令已返回 canceled 的 token 复活；
+ * identity 已失败（stale）时 consume 自动不生效、不会伤 B；子 frame 门禁走普通 canceled、不消费 A。 */
+function clipboardIntentTerminate(sender, token) {
+  consumeClipboardIntent(sender, token);
+  return clipboardIntentCanceled();
+}
+/* A foreign event cannot retire A. The original captured frame that has become invalid
+ * is terminal: consume only the matching identity, never a newer B. */
+function clipboardIntentRejectFrame(sender, frame, token) {
+  if (clipboardIntentIdentity(sender, token) && frame && frame === clipboardIntent.mainFrame)
+    return clipboardIntentTerminate(sender, token);
+  return clipboardIntentCanceled();
+}
+/* begin IPC（wire178：通道 clipboard:beginIntent，payload 为裸 'copy'|'cut' 字符串，
+ * 返回 {ok,token,epoch}）：preload capture / 显式命令共用。native Edit 菜单 role:copy/cut
+ * 由 capture 覆盖，不在这里二次 begin。 */
+ipcMain.on('clipboard:beginIntent', (event, kind) => {
+  const reject = (error) => { try { event.returnValue = { ok: false, error }; } catch { } };
   try {
+    if (!event || !event.sender || event.sender.isDestroyed()) return reject('sender-closed');
+    if (!event.senderFrame || event.senderFrame !== event.sender.mainFrame) return reject('begin-non-main-frame');
+    event.returnValue = beginClipboardIntentCore(event.sender, kind);
+  } catch (e) { reject(String((e && e.message) || e)); }
+});
+/* 主框架非同文档导航 ⇒ 退休起源意图；同文档(hash/history)/子框架不退休。
+ * Electron33 实际 legacy 形态 (url, isInPlace, isMainFrame, …)，现代 details 对象仅在其出现时使用。 */
+function clipboardIntentOnNavigation(W) {
+  W.webContents.on('did-start-navigation', (_e, ...args) => {
+    let isMainFrame = false, isSameDocument = false;
+    if (args.length && args[0] && typeof args[0] === 'object') { isMainFrame = !!args[0].isMainFrame; isSameDocument = !!args[0].isSameDocument; }
+    else { isSameDocument = !!args[1]; isMainFrame = !!args[2]; }
+    if (isMainFrame && !isSameDocument) retireClipboardIntentFor(W.webContents);
+  });
+}
+const CLIPBOARD_IMAGE_SYNC_MAX_BYTES = 48 * 1024 * 1024;
+const CLIPBOARD_IMAGE_SYNC_MAX_PIXELS = 64000000;
+ipcMain.on('clipboard:writeImageSync', (event, payload = {}, token) => {
+  const reject = (error) => { try { event.returnValue = { ok: false, error }; } catch { } };
+  try {
+    if (!event || !event.sender || event.sender.isDestroyed()) return reject('sender-closed');
+    const W = BrowserWindow.fromWebContents(event.sender);
+    if (!W || W.isDestroyed() || W.webContents !== event.sender) return reject('window-owner-missing');
+    if (!sessions.has(event.sender.id)) return reject('session-unregistered');
+    const rejectCanceled = () => { try { event.returnValue = { ok: false, canceled: true, status: 'canceled' }; } catch { } };
+    const payloadToken = typeof token === 'string' ? token : null;
+    if (!event.senderFrame || event.senderFrame !== event.sender.mainFrame) {
+      const r = clipboardIntentRejectFrame(event.sender, event.senderFrame, payloadToken);
+      try { event.returnValue = r; } catch { }
+      return;
+    }
+    if (!clipboardIntentIdentity(event.sender, payloadToken)) return rejectCanceled();
+    const adoptedOp = openTransactions.get(event.sender.id);
+    if (adoptedOp && adoptedOp.phase === 'adopted') {
+      /* 同步桥不能 await renderer 结算：terminal canceled 并退休同 token，
+         防止 rollback 令一个已经返回 canceled 的 token 复活；不消费当前 B。 */
+      consumeClipboardIntent(event.sender, payloadToken);
+      return rejectCanceled();
+    }
+    if (!clipboardIntentCurrent(event.sender, payloadToken)) {
+      /* already-returned-canceled 终断：Current 失败即消费捕获同 token（sync 无 await，identity 刚验过）。 */
+      consumeClipboardIntent(event.sender, payloadToken);
+      return rejectCanceled();
+    }
+    if (!payload || typeof payload !== 'object') return reject('bad-payload');
+    if (payload.url !== undefined || payload.dataUrl !== undefined || payload.path !== undefined) return reject('external-image-string-not-accepted');
+    if (typeof payload.text !== 'string' || typeof payload.html !== 'string') return reject('bad-text-html');
+    if (typeof payload.mime !== 'string' || !/^image\//i.test(payload.mime) || /svg/i.test(payload.mime)) return reject('bad-mime');
+    const b = payload.bytes;
+    if (!b || !ArrayBuffer.isView(b) || !(Buffer.isBuffer(b) || b instanceof Uint8Array) || b instanceof DataView) return reject('bad-bytes-type');
+    if (!Number.isInteger(b.byteOffset) || !Number.isInteger(b.byteLength) || b.byteOffset < 0 || b.byteLength <= 0 || b.byteOffset + b.byteLength > b.buffer.byteLength) return reject('bad-bytes-range');
+    let rasterBuf = null;
+    if (payload.raster !== undefined) {
+      const r = payload.raster;
+      if (!r || typeof r !== 'object') return reject('bad-raster');
+      if (r.mime !== 'image/png') return reject('bad-raster-mime');
+      const rb = r.bytes;
+      if (!rb || !ArrayBuffer.isView(rb) || !(Buffer.isBuffer(rb) || rb instanceof Uint8Array) || rb instanceof DataView) return reject('bad-raster-bytes-type');
+      if (!Number.isInteger(rb.byteOffset) || !Number.isInteger(rb.byteLength) || rb.byteOffset < 0 || rb.byteLength < 8 || rb.byteOffset + rb.byteLength > rb.buffer.byteLength) return reject('bad-raster-bytes-range');
+      const png = Buffer.from(rb.buffer, rb.byteOffset, rb.byteLength);
+      if (png.length < 8 || png[0] !== 0x89 || png[1] !== 0x50 || png[2] !== 0x4e || png[3] !== 0x47 || png[4] !== 0x0d || png[5] !== 0x0a || png[6] !== 0x1a || png[7] !== 0x0a) return reject('bad-raster-magic');
+      rasterBuf = png;
+    }
+    const textHtmlBytes = Buffer.byteLength(payload.text, 'utf8') + Buffer.byteLength(payload.html, 'utf8');
+    if (textHtmlBytes > CLIPBOARD_IMAGE_SYNC_MAX_BYTES) return reject('text-html-too-large');
+    const encoded = textHtmlBytes + b.byteLength + (rasterBuf ? rasterBuf.byteLength : 0);
+    if (encoded > CLIPBOARD_IMAGE_SYNC_MAX_BYTES) return reject('payload-too-large');
+    const buf = Buffer.from(b.buffer, b.byteOffset, b.byteLength);
+    let image = nativeImage.createFromBuffer(buf);
+    if (image.isEmpty() && rasterBuf) image = nativeImage.createFromBuffer(rasterBuf);
+    if (image.isEmpty()) return reject('bad-image');
+    const size = image.getSize();
+    if (!size.width || !size.height || size.width * size.height > CLIPBOARD_IMAGE_SYNC_MAX_PIXELS || size.width > 32768 || size.height > 32768) return reject('image-too-large');
+    if (!consumeClipboardIntent(event.sender, payloadToken)) return rejectCanceled();
+    clipboard.write(payload.html ? { text: payload.text, html: payload.html, image } : { text: payload.text, image });
+    event.returnValue = { ok: true, width: size.width, height: size.height };
+  } catch (e) { reject(String((e && e.message) || e)); }
+});
+handle('clipboard:write', async (_e, p, token) => {
+  const requestFrame = _e.senderFrame;
+  const seq = ++clipboardWriteSerial;
+  const canceled = () => { dbg('clipboardWrite:canceled', { seq }); return { ok: false, canceled: true, status: 'canceled' }; };
+  const terminate = () => { const r = clipboardIntentTerminate(_e.sender, token); dbg('clipboardWrite:canceled', { seq }); return r; };
+  const failed = (e) => { dbg('clipboardWrite:failed', { seq, error: String((e && e.message) || e) }); return { ok: false, failed: true, status: 'failed', error: String((e && e.message) || e) }; };
+  try {
+    /* 入口 identity + 实际事件 frame（不含 docId）：adopted 期间存储 docId 是临时 candidate，不能提前判死；
+       新 B 已换主或 subframe 时立即失效，不等待 open 结算也不 mint、不消费 A。 */
+    if (!clipboardIntentIdentity(_e.sender, token)) return canceled();
+    if (!clipboardIntentFrameOk(_e.sender, requestFrame)) { const r = clipboardIntentRejectFrame(_e.sender, requestFrame, token); dbg('clipboardWrite:canceled', { seq }); return r; }
+    if ((await adoptedGate(_e.sender, token)) !== 'proceed') return canceled();
+    if (!clipboardIntentFrameOk(_e.sender, requestFrame)) { const r = clipboardIntentRejectFrame(_e.sender, requestFrame, token); dbg('clipboardWrite:canceled', { seq }); return r; }
+    if (!clipboardIntentCurrent(_e.sender, token)) return terminate();
     const text = String((p && p.text) || '');
     const html = (p && p.html) ? String(p.html) : '';
     if (!text && !html) return { ok: false, error: "empty" };
     const delay = Number(process.env.MP_TEST_CLIPBOARD_DELAY_MS);
     if (process.env.MP_TEST_HOOKS === '1' && Number.isFinite(delay) && delay > 0 && delay <= 5000) {
-      dbg('clipboardWrite:start', { seq: ++clipboardWriteSerial, ms: delay });
+      dbg('clipboardWrite:start', { seq, ms: delay });
       await new Promise(resolve => setTimeout(resolve, delay));
+      /* delay 之后必须再次 identity+frame → gate settle → frame+全量校验 current：期间新 B 可能已 begin。 */
+      if (!clipboardIntentIdentity(_e.sender, token)) return canceled();
+      if (!clipboardIntentFrameOk(_e.sender, requestFrame)) { const r = clipboardIntentRejectFrame(_e.sender, requestFrame, token); dbg('clipboardWrite:canceled', { seq }); return r; }
+      if ((await adoptedGate(_e.sender, token)) !== 'proceed') return canceled();
+      if (!clipboardIntentFrameOk(_e.sender, requestFrame)) { const r = clipboardIntentRejectFrame(_e.sender, requestFrame, token); dbg('clipboardWrite:canceled', { seq }); return r; }
+      if (!clipboardIntentCurrent(_e.sender, token)) return terminate();
     }
+    /* validate+consume+写盘相邻，之间无 await；消费的是 captured/current 同一个 token（不会吞 B）。
+       写盘抛错 = failed 而非 success（consume 先于同步写）。 */
+    if (!consumeClipboardIntent(_e.sender, token)) return canceled();
     if (html) clipboard.write({ text, html }); else clipboard.writeText(text);
+    dbg('clipboardWrite:committed', { seq, bytes: text.length, hasHtml: !!html });
     return { ok: true, bytes: text.length, hasHtml: !!html };
-  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+  } catch (e) { return failed(e); }
 });
 handle('shell:showItem', (_e, p) => {
   try {

@@ -61,10 +61,11 @@ export function reserveImageInsertion(view) {
   const ranges = view.state.selection.ranges;
   if (ranges.length !== 1 || !view.state.field(imageInsertions, false)) return null;
   const id = {}, range = ranges[0];
+  const headAtStart = range.head === range.from;
   view.dispatch({ effects: reserveTicket.of({ id, from: range.from, to: range.to }), annotations: Transaction.addToHistory.of(false) });
   const current = () => {
     const ticket = view.state.field(imageInsertions, false)?.tickets.find(item => item.id === id);
-    return ticket ? { from: ticket.from, to: ticket.to } : null;
+    return ticket ? { from: ticket.from, to: ticket.to, head: headAtStart ? ticket.from : ticket.to } : null;
   };
   return {
     current,

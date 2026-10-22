@@ -8,6 +8,8 @@
 import { EditorSelection, Prec } from "@codemirror/state";
 import { EditorView, ViewPlugin, Decoration, WidgetType, keymap } from "@codemirror/view";
 import { codeBlockAt } from './markdown-context.js';
+import { insertNewlineContinueMarkup } from "@codemirror/lang-markdown";
+import { insertNewlineAndIndent } from "@codemirror/commands";
 
 const BULLET_RE = /^(\s*)([-*+]|\d+[.)])\s+/;
 const CHECK_RE = /^(\s*)([-*+])\s+\[([ xX])\]/;
@@ -70,13 +72,10 @@ function listContext(state, pos = state.selection.main.from) {
   return { line, indent: m[1], bullet: m[2], markerEnd: m[0].length };
 }
 
-/** Enter：列表项内续项；空项退出列表。 */
-function enterContinueList(view) {
-  const state = view.state;
-  const contexts = state.selection.ranges.map(r => listContext(state, r.from));
-  if (contexts.some((ctx, i) => !ctx || state.selection.ranges[i].from < ctx.line.from + ctx.markerEnd)) return false;
-  const spec = state.changeByRange(r => {
-  const { line, indent, bullet, markerEnd } = listContext(state, r.from);
+/** Enter：列表项内续项；空项退出列表。多光标异构（列表+非列表）逐 range 分派（SB5）。 */
+/** 列表项内续项（单 range 变换，原 changeByRange 体逐字搬入，ctx 已算好）。 */
+function continueListRange(state, r, ctx) {
+  const { line, indent, bullet, markerEnd } = ctx;
   /* 【P1-4·补·2026-10-10】空**任务**项（`- [ ] `）也要算空项：原来只把 marker 之后的**原始**文本
      trim 一下就判空，而 `- [ ] ` 之后是 `"[ ] "` ⇒ trim 得 `"[ ]"` ≠ 空 ⇒ 落进"续项"分支，
      空任务项回车永远退不出列表（普查 T10 实测：`- 甲\n- [ ] ` + Enter ⇒ 又续出一行 `- [ ] `）。 */
@@ -102,36 +101,97 @@ function enterContinueList(view) {
     changes: { from: head, to: r.to, insert },
     range: EditorSelection.cursor(head + insert.length),
   };
+}
+/** 非列表 range：临时单选区 state（filter:false，不 view.dispatch）委托官方 insertNewlineContinueMarkup →
+ *  insertNewlineAndIndent；取 captured.newSelection.main。官方不 handled 或未捕获 ⇒ 返回 null（整条让位，不自造兜底）。 */
+function newlineForRange(state, range) {
+  const single = state.update({ selection: EditorSelection.create([range]), filter: false }).state;
+  for (const command of [insertNewlineContinueMarkup, insertNewlineAndIndent]) {
+    let captured = null;
+    if (!command({ state: single, dispatch: tr => { captured = tr; } })) continue;
+    // A filter may rewrite input and attach effects. Do not drop those effects or commit a partial command.
+    if (!captured || captured.effects.length || captured.newSelection.ranges.length !== 1) return null;
+    return { changes: captured.changes, range: captured.newSelection.main };
+  }
+  return null;
+}
+function conflictingNewlinePlans(state, plans) {
+  const spans = [];
+  plans.forEach((plan, owner) => state.changes(plan.changes).iterChanges((from, to) => spans.push({ from, to, owner })));
+  spans.sort((a, b) => a.from - b.from || a.to - b.to);
+  for (let i = 0; i < spans.length; i++) {
+    for (let j = i + 1; j < spans.length && spans[j].from <= spans[i].to; j++) {
+      if (spans[i].owner !== spans[j].owner) return true;
+    }
+  }
+  return false;
+}
+function enterContinueList(view) {
+  const state = view.state;
+  const ranges = state.selection.ranges;
+  const eligible = ranges.map(r => {
+    const ctx = listContext(state, r.from);
+    return !!ctx && r.from >= ctx.line.from + ctx.markerEnd;
   });
+  // 零 eligible（单/多光标全非列表）→ 原让位（return false）。
+  if (!eligible.some(Boolean)) return false;
+  // 全 eligible（含单列表光标）→ 原列表逻辑（零回归）。
+  if (eligible.every(Boolean)) {
+    const spec = state.changeByRange(r => continueListRange(state, r, listContext(state, r.from)));
+    view.dispatch({ ...spec, userEvent: 'input.list', scrollIntoView: true });
+    return true;
+  }
+  // 混态（eligible>=1 且 ineligible>=1）：新路径。
+  if (state.readOnly || view.composing) return false;
+  let spec;
+  try {
+    const plans = ranges.map(r => {
+      const ctx = listContext(state, r.from);
+      return ctx && r.from >= ctx.line.from + ctx.markerEnd
+        ? continueListRange(state, r, ctx) : newlineForRange(state, r);
+    });
+    if (plans.some(p => p === null) || conflictingNewlinePlans(state, plans)) return false;
+    let pi = 0;
+    spec = state.changeByRange(() => plans[pi++]);
+  } catch (error) {
+    console.warn('[list] mixed Enter declined', error);
+    return false;
+  }
   view.dispatch({ ...spec, userEvent: 'input.list', scrollIntoView: true });
   return true;
 }
 
-/** Tab：列表项整体缩进两空位。 */
+/** Tab：列表项整体缩进两空位。
+ *  【#42·2026-10-18 实测缺陷 NX3】多光标下同样要吃键：逐光标按各自行缩进，CM6 自动映射多选区；
+ *  任一光标不在列表项 ⇒ 维持原行为（让位给代码块/表格/焦点遍历）。 */
 function tabIndentList(view) {
-  if (view.state.selection.ranges.length !== 1 || !view.state.selection.main.empty) return false;
-  const ctx = listContext(view.state);
-  if (!ctx) return false;
-  const head = view.state.selection.main.head;
-  view.dispatch({
-    changes: { from: ctx.line.from, to: ctx.line.from, insert: "  " },
-    selection: EditorSelection.cursor(head + 2),
-  });
+  const ranges = view.state.selection.ranges;
+  if (!ranges.length || ranges.some((r) => !r.empty)) return false;
+  const changes = [], seen = new Set();
+  for (const r of ranges) {
+    const ctx = listContext(view.state, r.head);
+    if (!ctx) return false;
+    if (seen.has(ctx.line.from)) continue;
+    seen.add(ctx.line.from);
+    changes.push({ from: ctx.line.from, to: ctx.line.from, insert: "  " });
+  }
+  view.dispatch({ changes });
   return true;
 }
 
-/** Shift-Tab：反缩进（最多去两空位）。 */
+/** Shift-Tab：反缩进（最多去两空位）。多光标同口径（#42）。 */
 function shiftTabOutdentList(view) {
-  if (view.state.selection.ranges.length !== 1 || !view.state.selection.main.empty) return false;
-  const ctx = listContext(view.state);
-  if (!ctx) return false;
-  const cut = ctx.line.text.startsWith("  ") ? 2 : ctx.line.text.startsWith(" ") ? 1 : 0;
-  if (cut === 0) return false;
-  const head = view.state.selection.main.head;
-  view.dispatch({
-    changes: { from: ctx.line.from, to: ctx.line.from + cut },
-    selection: EditorSelection.cursor(Math.max(ctx.line.from, head - cut)),
-  });
+  const ranges = view.state.selection.ranges;
+  if (!ranges.length || ranges.some((r) => !r.empty)) return false;
+  const changes = [];
+  for (const r of ranges) {
+    const ctx = listContext(view.state, r.head);
+    if (!ctx) return false;
+    const cut = ctx.line.text.startsWith("  ") ? 2 : ctx.line.text.startsWith(" ") ? 1 : 0;
+    if (cut) changes.push({ from: ctx.line.from, to: ctx.line.from + cut, insert: "" });
+  }
+  if (!changes.length) return false;
+  view.dispatch({ changes });
   return true;
 }
 

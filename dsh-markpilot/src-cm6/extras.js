@@ -9,7 +9,7 @@
    三处（渲染层 scanTables / 源码键位 tableBlockOf / 本模块的行列命令与复制）不同源，
    就会出现"渲染成表了、命令说不在表内"。 */
 import { tableLead, withTableLead, isFenceAt, isSeparatorBody, tableSpanOf } from "./tables.js";
-import { codeBlockAt, quoteLead, scanFenceLines, codeBody } from './markdown-context.js';
+import { codeBlockAt, quoteLead, scanFenceLines, codeBody, inFrontMatter, listMarkerOf } from './markdown-context.js';
 import { EditorSelection } from '@codemirror/state';
 import { SearchQuery, getSearchQuery, setSearchQuery } from '@codemirror/search';
 import { reserveImageInsertion, captureImageDocument } from './image-insertion.js';
@@ -357,12 +357,17 @@ export function installExtras(deps) {
   /** 【剪贴板写入·2026-10-10】三级：壳层 clipboard.write → navigator.clipboard → textarea+execCommand。
       为什么要壳层那一级：渲染进程的 navigator.clipboard 需要手势/权限，实测"点菜单项"这条路会失败，
       而失败是**静默**的（剪贴板留着旧内容，用户粘出来是上一个东西）。 */
-  async function writeClip(payload) {
+  async function writeClip(payload, token) {
     const text = String((payload && payload.text) || "");
     const html = (payload && payload.html) ? String(payload.html) : "";
     const h = window.mpHost;
+    if (h && typeof h.beginClipboardIntent === "function") {
+      if (typeof h.writeClipboard !== "function") return false;
+      try { const r = await h.writeClipboard({ text, html }, token); return !!(r && r.ok === true); }
+      catch { return false; }
+    }
     if (h && typeof h.writeClipboard === "function") {
-      try { const r = await h.writeClipboard({ text, html }); if (r && r.ok) return true; } catch { /* 落到下一级 */ }
+      try { const r = await h.writeClipboard({ text, html }); if (r && r.ok) return true; } catch { /* legacy browser compatibility */ }
     }
     try {
       const item = html
@@ -527,7 +532,10 @@ export function installExtras(deps) {
     // the shared asyncMarkdown guard before executing that action.
     const v = getView(); if (!v || !deps.keyCompartment) return;
     const cfg = keyConfig();
-    const bindings = Object.entries(cfg).filter(([a, c]) => ACTIONS[a] && c).map(([a, c]) => ({ key: c, run: (view) => { const fn = ACTIONS[a]; if (!fn) return false; return window.mpEngine.commands.run(() => fn(view)) !== false; }, preventDefault: true }));
+    /* 【#46·2026-10-18 实测缺陷 M5】拒收无修饰键的组合（除 F1-F24）：高优先级 keymap 带
+       preventDefault，录成单字母后该字母在正文被全局吞掉；同时中和旧版已落盘脏键位（升级自愈）。 */
+    const usableCombo = (c) => /(^|-)Mod(-|$)|(^|-)Alt(-|$)/.test(c) || /^F([1-9]|1[0-9]|2[0-4])$/.test(c);
+    const bindings = Object.entries(cfg).filter(([a, c]) => ACTIONS[a] && c && usableCombo(c)).map(([a, c]) => ({ key: c, run: (view) => { const fn = ACTIONS[a]; if (!fn) return false; return window.mpEngine.commands.run(() => fn(view)) !== false; }, preventDefault: true }));
     /* 【必须 Prec.high·2026-10-10 实测】默认优先级的 keymap 会被 basicSetup 的 defaultKeymap
        （`Mod-i` = selectParentSyntax）与语言 keymap 抢先；用 high 之后本表排在最前，
        与 tableKeys / zoomKeys 同级且**注册更早** ⇒ 只有它们的显式键位能覆盖这里，逐字节可控。 */
@@ -541,13 +549,57 @@ export function installExtras(deps) {
   function toggleLinePrefix(view, prefix) {
     const r = view.state.selection.main;
     const { first: a, last: b } = selectedLines(view.state.doc, r);
+    /* 【#38·2026-10-18 实测缺陷 N3】块级前缀（Ctrl+/ 引用、Ctrl+L 列表）不许写进表行：
+       光标停在表行边界时会得到 "> | a1 | a2 |" 或 "- | a1 | a2 |"，把表行顶出表格。
+       与工具栏 blockInTable、粘贴守卫同一口径：拒绝并提示。
+       【#41·2026-10-18 NX1】同一族守卫补齐围栏与 front-matter（代码行会得到 "- const a = 1;"，
+       围栏行被加 "> " 前缀后整块塌掉；YAML 序言区同样不许写块级前缀）。 */
+    {
+      const docText = view.state.doc.toString();
+      for (let n = a; n <= b; n++) {
+        const line = view.state.doc.line(n);
+        if (tableSpanOf(view.state, n)) {
+          toast('表格内不支持块级格式——请先把光标移到表格外');
+          return true;
+        }
+        if (codeBlockAt(view.state, line.from)) {
+          toast('代码块内不支持块级格式——请先把光标移到代码块外');
+          return true;
+        }
+        if (inFrontMatter(docText, line.from)) {
+          toast('文档头部信息区不支持块级格式——请移到正文再操作');
+          return true;
+        }
+      }
+    }
     const changes = [];
+    let allInsert = true;
     for (let n = a; n <= b; n++) {
       const line = view.state.doc.line(n);
-      if (line.text.startsWith(prefix)) changes.push({ from: line.from, to: line.from + prefix.length, insert: '' });
-      else changes.push({ from: line.from, insert: prefix });
+      /* 【#45·2026-10-18 实测缺陷 M2+M3】与工具栏 linePrefix 同源：引用前缀按整行判 toggle，
+         列表前缀落在 "> " 与缩进之后，并先剥掉已有的列表标记（引用行 / 引用+列表行 / 缩进项）。 */
+      if (prefix === '> ') {
+        if (line.text.startsWith('> ')) { allInsert = false; changes.push({ from: line.from, to: line.from + 2, insert: '' }); }
+        else changes.push({ from: line.from, insert: '> ' });
+        continue;
+      }
+      const lead = quoteLead(line.text);
+      const indent = /^[ \t]*/.exec(line.text.slice(lead.off))[0].length;
+      const at = line.from + lead.off + indent;
+      const body = line.text.slice(lead.off + indent);
+      const existing = listMarkerOf(body);
+      if (body.startsWith(prefix)) { allInsert = false; changes.push({ from: at, to: at + prefix.length, insert: '' }); }
+      else if (existing) { allInsert = false; changes.push({ from: at, to: at + existing.len, insert: prefix }); }
+      else changes.push({ from: at, insert: prefix });
     }
-    view.dispatch({ changes });
+    /* 【对齐工具栏 `linePrefix`·2026-10-17 实测缺陷】改前这条 Ctrl+/（引用）与 Ctrl+L（列表）
+       是**第二套**行前缀实现：① 事务没有 userEvent ⇒ 与紧随其后的键入并入同一撤销组
+       （实测"键入 xyz → Ctrl+/ → 一次 Ctrl+Z"把 xyz 一起撤掉，应只撤前缀）；
+       ② 折叠光标插入前缀后光标不动 ⇒ 落点停在前缀**之前**（再打字得到 `引用> `，文字落到
+       引用容器外面，屏幕上看着像没进引用）。工具栏那条两处都对 ⇒ 这里按同口径补齐。 */
+    const anchor = (allInsert && r.empty) ? r.head + prefix.length : undefined;
+    view.dispatch({ changes, ...(anchor == null ? {} : { selection: { anchor } }), userEvent: 'input.format', scrollIntoView: true });
+    view.focus();
     return true;
   }
 
@@ -561,12 +613,16 @@ export function installExtras(deps) {
   function gotoHeading(from) {
     const v = getView(), commands = window.mpEngine?.commands, ticket = commands?.capture();
     if (!v || commands && !ticket) return;
-    v.dispatch({ selection: { anchor: from }, scrollIntoView: false, userEvent: 'select.pointer' });
+    /* 【#47·2026-10-18 实测缺陷 NX2】大纲是打开瞬间的快照：换到更短文档后旧条目的 from 越界，
+       直接 dispatch 会抛 RangeError（Selection points outside of document）⇒ 点击无反应、焦点留在大纲。
+       落点一律钳进文档范围（文档变更后的条目刷新见 refreshOutline，正常不会走到钳制分支）。 */
+    const pos = Math.max(0, Math.min(Number(from) || 0, v.state.doc.length));
+    v.dispatch({ selection: { anchor: pos }, scrollIntoView: false, userEvent: 'select.pointer' });
     v.focus();
     const target = v.state.selection, current = () => (!commands || commands.valid(ticket)) && v.state.selection.eq(target);
     const off = typeof scrollOffset === 'function' ? scrollOffset() : 48;
     v.requestMeasure({ key: headingMeasureKey,
-      read: () => current() ? Math.max(0,v.lineBlockAt(from).top-off) : null,
+      read: () => current() ? Math.max(0,(v.lineBlockAt(pos).top-off)/v.scaleY) : null,
       write: top => { if (top !== null && current()) v.scrollDOM.scrollTop = top; },
     });
   }
@@ -645,6 +701,23 @@ export function installExtras(deps) {
       hs.forEach((x, i) => { if (x.from <= pos) idx = i; });
       items.forEach((el, i) => el.classList.toggle('active', i === idx));
     }
+  }
+
+  /* 【#47·2026-10-18 实测缺陷 NX2】大纲打开期间文档一变（改名/增删标题/换文档）就重建条目：
+     改前只在打开瞬间取一次 headings()，陈旧条目按旧 from 跳转 ⇒ 改名后点它落到别的行，
+     换到更短文档后越界 dispatch 直接抛 RangeError。浮层/停靠两种外壳都重建。 */
+  let outlineRefreshTimer = 0;
+  function refreshOutline() {
+    if (!outlineEl && !dockEl) return;
+    try {
+      if (outlineEl) { outlineEl.remove(); outlineEl = null; toggleOutline(); }
+      else if (dockEl) {
+        const v = getView(); const box = v && v.dom.parentElement;
+        dockEl.remove(); dockEl = null;
+        if (box) box.classList.remove('mp-dock-host');
+        toggleOutlineDock();
+      }
+    } catch { /* 重建失败保持旧面板：宁可陈旧也不把面板弄丢 */ }
   }
 
   /* ── 导出：HTML（下载）与「导出为文件夹（图片外链）」 ─────────────────────
@@ -883,23 +956,213 @@ export function installExtras(deps) {
   }
   /** 正文分块生成器：边扫边吐块，调用方拿到一块就能写走（不攒整篇）
    *  【公式排版】opts.math=true 时块级公式走 KaTeX display（复用引擎 renderMathHTML）：
-   *   · 单行 `$$…$$`、整行 `$$` 围栏对、`$$content…content$$` 跨行三种形态都排；
-   *   · 闭合判据与引擎 scanMathSpans 同口径（围栏形态认整行 `$$`，带内容形态认行尾 `$$`）；
+   *   · 单行 `$$…$$`、整行 `$$` 围栏对、`$$content…content$$` 跨行、`$\begin{…}` 跨行单 `$`（#55）都排；
+   *   · 闭合判据与引擎 scanMathSpans 对齐（围栏形态认整行 `$$`，带内容形态认行尾 `$$`；不再有 40 行窗口）；
    *   · 兜底纪律不变：只有**看得到闭合行**才进块模式（否则一个孤立 $$ 会把后面整段吞进 <pre>）；
    *   · 单个公式的 TeX 源码最多攒 MATH_TEX_MAX 字符（超限退回 <pre> 文本），块级缓存与整篇无关。 */
   const MATH_TEX_MAX = 32 * 1024;
   function* mdBodyChunks(md, opts = {}) {
-    const { srcMap = null, chunkChars = CHUNK_CHARS, math = false, mermaidSvgs = null } = opts;
-    const lines = md.split('\n'), codeStarts = new Map(scanFenceLines(lines).map(b => [b.startLine - 1, b]));
-    let buf = [], size = 0, list = null;
+    const { srcMap = null, chunkChars = CHUNK_CHARS, math = false, mermaidSvgs = null, nested = false } = opts;
+    /* 【#54】导出正文剥离文档开头的 YAML front-matter（与编辑面同口径；Typora/常规导出链都不把元数据
+       当正文）。判据与 markdown-context.inFrontMatter 同一正则；不匹配则原样输出。 */
+    const frontMatter = nested ? null : /^\uFEFF?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(md);
+    const bodyMd = frontMatter ? md.slice(frontMatter[0].length) : md;
+    const lines = bodyMd.split('\n'), codeStarts = new Map(scanFenceLines(lines).map(b => [b.startLine - 1, b]));
+    let buf = [], size = 0;
     const take = () => { if (!buf.length) return null; const s = buf.join('\n') + '\n'; buf = []; size = 0; return s; };
     const push = s => { buf.push(s); size += s.length + 1; };
-    const closeList = () => { if (list) { push(`</${list}>`); list = null; } };
+    /* 【嵌套列表·导出】CommonMark 内容列口径的容器栈（局部改动；inlineMd/math/图片/转义链一律不动）：
+       · 父项内容列 C = marker 缩进列 I + marker 宽 W + marker 后 1..4 空格列 N（10. ⇒ W=3、C 至少 4）；
+       · 子项 marker 缩进 >= C 才嵌进父 LI；不足则同层（同 bullet / 同 ordered 定界符）或开新表；
+       · 退出当前层看**父容器当前项的内容列** stack[-2].contentCol，而不是 top 首次 marker 的绝对 indent
+         （否则 `- a /     - b /    - c` 会把 b、c 拆成两个 childUL；首 root marker 缩进 1 再写 0 也会拆 root）；
+       · 缩进按真实 tabstop（每 4 列）计；marker 后 gap 的 tabstop 从 I+W 起算，不回到列 0；
+       · <li> 延迟闭合（closeItem），让子列表留在父 LI 内部；closeTop 先关当前 LI，再 pop、再关 tag。 */
+    const listStack = [];
+    const colOf = (s, start = 0) => { let c = start; for (const ch of s) { if (ch === '\t') c += 4 - (c % 4); else c += 1; } return c; };
+    const closeItem = () => { const top = listStack[listStack.length - 1]; if (top && top.liOpen) { push('</li>'); top.liOpen = false; } };
+    const closeTop = () => { const top = listStack[listStack.length - 1]; if (!top) return; closeItem(); listStack.pop(); push(`</${top.tag}>`); };
+    const closeList = () => { while (listStack.length) closeTop(); };
+    const openContainer = (tag, kind, indent, contentCol, start) => {
+      push(tag === 'ol' ? `<ol start="${start}">` : '<ul>');
+      listStack.push({ tag, kind, indent, contentCol, liOpen: false });
+    };
+    const openLi = (head) => { push(head); listStack[listStack.length - 1].liOpen = true; };
+    const openItem = (ordered, marker, indentText, gapText, head) => {
+      const tag = ordered ? 'ol' : 'ul', kind = ordered ? marker.slice(-1) : marker;
+      const I = colOf(indentText), W = marker.length;
+      const gap = gapText ? colOf(gapText, I + W) - (I + W) : 0; // empty marker: default content col
+      const N = gap >= 1 && gap <= 4 ? gap : 1;                  // empty marker -> N=1; >4 ->1
+      const C = I + W + N, start = parseInt(marker, 10);
+      while (listStack.length > 1 && I < listStack[listStack.length - 2].contentCol) closeTop();
+      if (!listStack.length) { openContainer(tag, kind, I, C, start); openLi(head); return; }
+      const top = listStack[listStack.length - 1];
+      if (I >= top.contentCol) { openContainer(tag, kind, I, C, start); openLi(head); return; }  // 子容器：父 LI 不闭合
+      closeItem();
+      const at = listStack[listStack.length - 1];
+      if (at.kind === kind && at.tag === tag) { at.contentCol = C; openLi(head); }
+      else { closeTop(); openContainer(tag, kind, I, C, start); openLi(head); }
+    };
+    const itemRe = /^([ \t]*)([-*+]|\d{1,9}[.)])(?:([ \t]+)(.*)|[ \t]*)$/;
+    const isHrLine = (s) => /^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$/.test(s);
+    const itemOf = (s) => isHrLine(s) ? null : itemRe.exec(s);
+    const stripIndentCols = (s, cols) => {
+      let i = 0, col = 0;
+      while (i < s.length && col < cols) {
+        const ch = s[i];
+        if (ch === ' ') { if (col < cols) { col++; i++; continue; } break; }
+        if (ch === '\t') {
+          const adv = 4 - (col % 4);
+          if (col + adv <= cols) { col += adv; i++; continue; }
+          const residual = adv - (cols - col);
+          return ' '.repeat(residual) + s.slice(i + 1);
+        }
+        break;
+      }
+      return s.slice(i);
+    };
+    const collectIndentedLeaf = (start, contentCol) => {
+      const block = []; let end = start;
+      while (end < lines.length) {
+        const s = lines[end];
+        if (!s.trim()) { block.push(stripIndentCols(s, contentCol)); end++; continue; }
+        const ind = colOf(/^[ \t]*/.exec(s)[0]);
+        if (ind < contentCol) break;
+        block.push(stripIndentCols(s, contentCol));
+        end++;
+      }
+      return { block, end };
+    };
     const blockHtml = tex => math ? mathBlockHtml(tex) : `<pre class="mp-math">${esc(tex)}</pre>`;
     const isMathClose = s => /^\s*\$\$\s*$/.test(s);
     const cellsOf = line => line.slice(tableLead(line).off).trim().replace(/^\||\|$/g, '').split(/(?<!\\)\|/).map(c => c.trim());
+    /* 【#53】表格行判据补齐单列表（TBL-7 合法形态）：旧 rowText 要求剥掉首尾管道后**中间还有管道**，
+       `| a |` 恒为 false ⇒ 单列表被导出成裸管道文本。现在只要求该行含管道，列数交给 cellsOf。 */
+    const tableRowCells = (t) => {
+      const lead = tableLead(t), body = t.slice(lead.off);
+      if (!body.includes('|')) return null;
+      const cells = cellsOf(t);
+      return cells.length ? cells : null;
+    };
+    /* 【#55】块公式闭合行预计算：旧实现只向后看 40 行 ⇒ >40 行块整块退化；逐开后扫到文末在最坏
+       文档上是 O(n²)。这里倒序一遍算出"每个位置之后最近的闭合行"（围栏形态与带内容形态各一份），
+       并把围栏代码块当作屏障（跨代码块的公式不许合并）。O(n) 一次，与文档大小线性。 */
+    const nLines = lines.length;
+    const nextFenceClose = new Int32Array(nLines).fill(-1);
+    const nextTailClose = new Int32Array(nLines).fill(-1);
+    {
+      let fence = -1, tail = -1;
+      for (let k = nLines - 1; k >= 0; k--) {
+        if (codeStarts.has(k)) { fence = -1; tail = -1; }
+        else {
+          if (isMathClose(lines[k])) fence = k;
+          if (/\$\$\s*$/.test(lines[k])) tail = k;
+        }
+        nextFenceClose[k] = fence;
+        nextTailClose[k] = tail;
+      }
+    }
+    /* 【#65】引用容器内层渲染：列表/标题/嵌套引用/任务列表按块结构输出（旧实现把每条引用行
+       一律当 `<blockquote>行内文本</blockquote>`，`> - 甲`、`> ## 标题`、`> > 内层` 全退化成字面文本）。 */
+    const renderQuoteInner = (innerLines) => {
+      const closeInner = () => closeList();
+      for (let qi = 0; qi < innerLines.length; qi++) {
+        const raw = innerLines[qi];
+        const nested = /^>\s?(.*)$/.exec(raw);
+        if (nested) {
+          closeInner();
+          const group = [nested[1]];
+          while (qi + 1 < innerLines.length && /^>/.test(innerLines[qi + 1])) group.push(innerLines[++qi].replace(/^>\s?/, ''));
+          push('<blockquote>'); renderQuoteInner(group); push('</blockquote>');
+          continue;
+        }
+        const h = /^ {0,3}(#{1,6})(?:[ \t]+(.*)|$)/.exec(raw);
+        const item = /^(\s*)([-*+]|\d{1,9}[.)])(\s+)(.*)$/.exec(raw);
+        if (item) {
+          const ordered = /^\d/.test(item[2]);
+          const task = /^\[([ xX])\]\s+(.*)$/.exec(item[4]);
+          if (task) {
+            const checked = task[1].toLowerCase() === 'x';
+            openItem(ordered, item[2], item[1], item[3], `<li class="mp-task-item"><input type="checkbox" disabled${checked ? ' checked' : ''}> `);
+            push(inlineMd(task[2], srcMap, math));
+          } else {
+            openItem(ordered, item[2], item[1], item[3], '<li>');
+            push(inlineMd(item[4], srcMap, math));
+          }
+        } else if (h) {
+          closeInner();
+          push(`<h${h[1].length}>${inlineMd(h[2] || '', srcMap, math)}</h${h[1].length}>`);
+        } else if (!raw.trim()) {
+          closeInner();
+        } else {
+          closeInner();
+          push(`<p>${inlineMd(raw, srcMap, math)}</p>`);
+        }
+      }
+      closeInner();
+    };
+    let pendingBlank = [];
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i], code = codeStarts.get(i);
+      const item = itemOf(line);
+      const leadWhite = /^[ \t]*/.exec(line)[0];
+      if (!line.trim()) {
+        if (listStack.length) { pendingBlank.push(''); continue; }
+        push(''); continue;
+      }
+      if (pendingBlank.length) {
+        const top = listStack[listStack.length - 1];
+        const stays = !!top && (!!item || colOf(leadWhite) >= top.contentCol);
+        if (!stays) { closeList(); for (const b of pendingBlank) push(b); pendingBlank = []; }
+        else if (item) pendingBlank = [];
+      }
+      const top = listStack[listStack.length - 1];
+      if (top && !item && colOf(leadWhite) >= top.contentCol) {
+        const leaf = collectIndentedLeaf(i, top.contentCol);
+        const block = pendingBlank.concat(leaf.block); pendingBlank = [];
+        const outer = take(); if (outer) yield outer;
+        yield* mdBodyChunks(block.join('\n'), { ...opts, nested: true });
+        i = leaf.end - 1;
+        continue;
+      }
+      if (item && code && code.prefix && code.prefix.some((p) => p.kind === 'list')) {
+        const ordered = /^\d/.test(item[2]);
+        openItem(ordered, item[2], item[1], item[3] || '', '<li>');
+        const contentCol = listStack[listStack.length - 1].contentCol;
+        const contentStart = (item[1] || '').length + item[2].length + (item[3] || '').length;
+        const childLines = [line.slice(contentStart)];
+        let k = i + 1;
+        while (k < lines.length) {
+          const s = lines[k];
+          if (!s.trim()) { childLines.push(stripIndentCols(s, contentCol)); k++; continue; }
+          if (colOf(/^[ \t]*/.exec(s)[0]) < contentCol) break;
+          childLines.push(stripIndentCols(s, contentCol));
+          k++;
+        }
+        const outer = take(); if (outer) yield outer;
+        yield* mdBodyChunks(childLines.join('\n'), { ...opts, nested: true });
+        i = k - 1;
+        continue;
+      }
+      const q = quoteLead(line, 1);
+      if (q.depth) {
+        closeList();
+        const group = [];
+        let k = i;
+        while (k < lines.length) {
+          const qk = quoteLead(lines[k], 1);
+          if (!qk.depth) break;
+          group.push(lines[k].slice(qk.off));
+          k++;
+        }
+        const outer = take(); if (outer) yield outer;
+        push('<blockquote>');
+        const open = take(); if (open) yield open;
+        yield* mdBodyChunks(group.join('\n'), { ...opts, nested: true });
+        push('</blockquote>');
+        i = k - 1;
+        continue;
+      }
       if (code) {
         closeList();
         const last = code.closeFrom == null ? code.endLine : code.endLine - 1;
@@ -921,8 +1184,8 @@ export function installExtras(deps) {
         i = code.endLine - 1;
       } else {
         const lead = tableLead(line), next = lines[i + 1];
-        const header = rowText(line) ? cellsOf(line) : null;
-        const isTable = header?.length > 1 && next != null && !codeStarts.has(i + 1) &&
+        const header = tableRowCells(line);
+        const isTable = !!header && next != null && !codeStarts.has(i + 1) &&
           tableLead(next).q === lead.q && isSeparatorBody(next.slice(tableLead(next).off));
         if (isTable) {
           closeList();
@@ -933,7 +1196,7 @@ export function installExtras(deps) {
           if (lead.q) push('<blockquote>');
           push('<table><thead>' + rowHtml(header, 'th') + '</thead><tbody>');
           i += 1;
-          while (i + 1 < lines.length && !codeStarts.has(i + 1) && rowText(lines[i + 1]) && tableLead(lines[i + 1]).q === lead.q) {
+          while (i + 1 < lines.length && !codeStarts.has(i + 1) && tableRowCells(lines[i + 1]) && tableLead(lines[i + 1]).q === lead.q) {
             push(rowHtml(cellsOf(lines[++i]), 'td'));
             if (size >= chunkChars) { const chunk = take(); if (chunk) yield chunk; }
           }
@@ -945,11 +1208,7 @@ export function installExtras(deps) {
           if (single) push(blockHtml(single[1].trim()));
           else {
             const rest = line.slice(/^\s*\$\$/.exec(line)[0].length), tail = !!rest.trim();
-            let close = -1;
-            for (let k = i + 1; k < Math.min(lines.length, i + 40); k++) {
-              if (codeStarts.has(k)) break;
-              if (tail ? /\$\$\s*$/.test(lines[k]) : isMathClose(lines[k])) { close = k; break; }
-            }
+            const close = tail ? nextTailClose[i + 1] : nextFenceClose[i + 1];
             if (close < 0) push(`<p>${inlineMd(line, srcMap, math)}</p>`);
             else {
               const parts = [rest, ...lines.slice(i + 1, close)];
@@ -959,20 +1218,50 @@ export function installExtras(deps) {
               i = close;
             }
           }
+        } else if (/^[ \t]*\$\\begin\{/.test(line)) {
+          /* 【#55 臂 2】单 `$` 跨行块：引擎已支持（`$\begin{…}` 开、以 `$` 结尾的行合），导出侧补齐。 */
+          closeList();
+          const open = line.slice(line.indexOf('$'));
+          const sameLine = open.lastIndexOf('$');
+          if (sameLine > 0 && /^\s*$/.test(open.slice(sameLine + 1))) {
+            push(blockHtml(open.slice(1, sameLine).trim()));
+          } else {
+            let close = -1;
+            for (let k = i + 1; k < lines.length; k++) {
+              if (codeStarts.has(k)) break;
+              if (/[$][ \t]*$/.test(lines[k])) { close = k; break; }
+            }
+            if (close < 0) push(`<p>${inlineMd(line, srcMap, math)}</p>`);
+            else {
+              const parts = [open.slice(1)];
+              for (let k = i + 1; k < close; k++) parts.push(lines[k]);
+              parts.push(lines[close].replace(/\$[ \t]*$/, ''));
+              const tex = parts.join('\n');
+              push(tex.length > MATH_TEX_MAX ? `<pre class="mp-math">${esc(tex)}</pre>` : blockHtml(tex));
+              i = close;
+            }
+          }
         } else {
           const h = /^ {0,3}(#{1,6})(?:[ \t]+(.*)|$)/.exec(line);
-          const item = /^\s*([-*+]|\d{1,9}[.)])\s+(.*)$/.exec(line);
+          const content = item && item[4] != null ? item[4] : '';
           if (item) {
-            const ordered = /^\d/.test(item[1]), tag = ordered ? 'ol' : 'ul';
-            if (list !== tag) { closeList(); push(ordered ? `<ol start="${parseInt(item[1], 10)}">` : '<ul>'); list = tag; }
-            push(`<li>${inlineMd(item[2], srcMap, math)}</li>`);
+            const ordered = /^\d/.test(item[2]);
+            /* 【#63】任务列表：`- [ ]` / `- [x]` 导出为禁用的复选框（Typora/常规导出链语义），
+               不能把 `[ ]` 当字面文本留给读者。 */
+            const task = /^\[([ xX])\]\s+(.*)$/.exec(content);
+            if (task) {
+              const checked = task[1].toLowerCase() === 'x';
+              openItem(ordered, item[2], item[1], item[3] || '', `<li class="mp-task-item"><input type="checkbox" disabled${checked ? ' checked' : ''}> `);
+              push(inlineMd(task[2], srcMap, math));
+            } else {
+              openItem(ordered, item[2], item[1], item[3] || '', '<li>');
+              push(inlineMd(content, srcMap, math));
+            }
           } else {
             closeList();
             if (h) push(`<h${h[1].length}>${inlineMd(h[2] || '', srcMap, math)}</h${h[1].length}>`);
             else {
-              const quote = /^>\s?(.*)$/.exec(line);
-              if (quote) push(`<blockquote>${inlineMd(quote[1], srcMap, math)}</blockquote>`);
-              else if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) push('<hr>');
+              if (isHrLine(line)) push('<hr>');
               else if (!line.trim()) push('');
               else push(`<p>${inlineMd(line, srcMap, math)}</p>`);
             }
@@ -982,6 +1271,7 @@ export function installExtras(deps) {
       if (size >= chunkChars) { const chunk = take(); if (chunk) yield chunk; }
     }
     closeList();
+    for (const b of pendingBlank) push(b);
     const chunk = take(); if (chunk) yield chunk;
   }
   function mdToHtml(md, opts) { let out = ''; for (const c of mdBodyChunks(md, opts)) out += c; return out; }
@@ -993,18 +1283,41 @@ export function installExtras(deps) {
     return !!(h && typeof h.exportPickFolder === 'function' && typeof h.exportBeginHtml === 'function'
       && typeof h.exportAppendHtml === 'function' && typeof h.exportFinishHtml === 'function');
   };
+  /* 【EX-5】pickFolder 响应按固定顺序分类：
+     ① 显式 canceled===true → 静默取消（优先，即使同时带 error）；
+     ② 空字符串 → 取消（唯一例外：沿用旧实现 (p && …) || null 对 '' 返回 null 的取消语义；
+        这不是“只有显式 canceled 才静默”的规则，必须在此写明）；
+     ③ ok===false 或真实 error → 失败（不再看 dir/path，避免 {ok:false,error:'denied',dir:'C:/stale'} 被当成功）；
+     ④ dir/path 必须是非空 string 才算成功（{dir:{}} 这类非字符串一律失败）；
+     ⑤ 其余 → 失败（no-response / no-dir / pick-folder-failed）。
+     旧成功形态 string / {dir} / {path}（无 ok）继续成功。 */
   const pickDir = async (defaultPath) => {
-    try {
-      const p = await window.mpHost.exportPickFolder({ defaultPath: defaultPath || undefined });
-      return (p && (p.dir || p.path || (typeof p === 'string' ? p : null))) || null;
-    } catch { return null; }
+    let p;
+    try { p = await window.mpHost.exportPickFolder({ defaultPath: defaultPath || undefined }); }
+    catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+    if (p === '') return { ok: false, canceled: true };
+    if (typeof p === 'string') return { ok: true, dir: p };
+    if (!p) return { ok: false, error: 'pick-folder-no-response' };
+    if (p.canceled === true) return { ok: false, canceled: true };
+    if (p.ok === false || p.error) return { ok: false, error: typeof p.error === 'string' && p.error ? p.error : 'pick-folder-failed' };
+    const dir = typeof p.dir === 'string' && p.dir ? p.dir : (typeof p.path === 'string' && p.path ? p.path : null);
+    if (dir) return { ok: true, dir };
+    return { ok: false, error: 'pick-folder-no-dir' };
   };
 
   async function exportHtml() {
     const v = getView(); if (!v) return { ok: false };
     const md = v.state.doc.toString(), directory = window.__mpDocDir || null;
     let dir = null;
-    if (canDiskExport()) { dir = await pickDir(); if (!dir) return { ok: false, canceled: true }; }   // 让用户选存哪儿
+    if (canDiskExport()) {   // 让用户选存哪儿
+      const pick = await pickDir();
+      if (!pick.ok) {
+        if (pick.canceled) return { ok: false, canceled: true };
+        toast(`导出失败：${pick.error || '无法选择文件夹'}`);
+        return { ok: false, error: pick.error || 'pick-folder-failed' };
+      }
+      dir = pick.dir;
+    }
     toast('正在导出…');
     const title = mdTitle(md);
     const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -1206,6 +1519,7 @@ export function installExtras(deps) {
   let lastExport = null;
   /** 复制为知乎/微信格式：clipboard 写 text/html（全内联样式），粘进知乎编辑器即为富文本 */
   async function copyRich() {
+    const richToken = window.mpHost && typeof window.mpHost.beginClipboardIntent === 'function' ? window.mpHost.beginClipboardIntent('copy') : null;
     const v = getView(); if (!v) return;
     const md = v.state.doc.toString();
     const inlineCss = (html) => html
@@ -1233,6 +1547,12 @@ export function installExtras(deps) {
       html = inlineCss(mdToHtml(md, { mermaidSvgs: mermaidStat?.svgs }));
     } catch (e) { toast('复制失败：' + (e?.message || e)); return false; }
     finally { mermaidStat?.svgs?.clear(); }
+    const hostRich = window.mpHost;
+    if (hostRich && typeof hostRich.beginClipboardIntent === 'function') {
+      const ok = await writeClip({ text: md, html }, richToken);
+      toast(ok ? '已复制富文本（可直接粘到知乎/公众号编辑器）' : '复制失败：剪贴板不可用');
+      return ok;
+    }
     try {
       await navigator.clipboard.write([new ClipboardItem({
         'text/html': new Blob([html], { type: 'text/html' }),
@@ -1320,9 +1640,14 @@ export function installExtras(deps) {
   }
   function tableOperation(op, target) {
     const v = getView();
+    /* 【TBL-5】行/列/整表层级下键盘命令不带 target ⇒ 改前用 selection.main.head 反推列号：
+       行级选区是整行，head 落在行尾 ⇒ 列号＝列数（越界）⇒ splice 越界静默无效（删列/移列），
+       插列落到最右，而 toast 照样报成功。表级选择状态记着用户点过的那一格 ⇒ 有它就按它取行/列。 */
+    const selLevel = target == null ? ((deps.tableSelect && deps.tableSelect.sel) ? deps.tableSelect.sel() : null) : null;
+    const levelPos = selLevel && Number.isFinite(selLevel.rowFrom) ? selLevel.rowFrom : null;
     // Only the invoking menu can supply a target. Keyboard commands use the
     // current selection after the command context has committed the cell owner.
-    const pos = target != null ? target : v.state.selection.main.head;
+    const pos = target != null ? target : (levelPos != null ? levelPos : v.state.selection.main.head);
     const cur = tableAt(pos);
     if (!cur) { toast('光标不在表格内'); return false; }
     const { fromLine, toLine, lead } = cur;
@@ -1330,10 +1655,16 @@ export function installExtras(deps) {
     const rowIdx = v.state.doc.lineAt(pos).number - fromLine;
     const cells = rows.map(splitRow);
     const colIdx = (() => {
+      /* 【TBL-5】表级选择状态优先：行级选区下 head 在行尾，反推列号＝列数（越界、静默无效）。 */
+      if (selLevel && Number.isFinite(selLevel.col)) {
+        const width = cells[0] ? cells[0].length : 1;
+        return Math.min(Math.max(0, selLevel.col), Math.max(0, width - 1));
+      }
       const line = v.state.doc.lineAt(pos);
       /* 【引用区表格】先剥引用前缀：`> | a | b |` 里 `> ` 后面那根管道不是格边界，
          不剥会把列号数大一（插列插到错位置）。 */
-      const before = line.text.slice(0, pos - line.from).replace(/^[ \t]*(?:>[ \t]?)+/, '');
+      const rawBefore = line.text.slice(0, pos - line.from);
+      const before = rawBefore.slice(tableLead(rawBefore).off);
       /* 【A4b】与渲染/切分同一口径：裸管道会把 `a\|b` 数成两格，导致 col-left 插到行尾。 */
       return Math.max(0, before.replace(/^\s*\|/, '').split(/(?<!\\)\|/).length - 1);
     })();
@@ -1452,7 +1783,8 @@ export function installExtras(deps) {
       i++;
     }
     if (t.slice(segStart).trim()) ranges.push([segStart, t.length]);
-    const before = v.state.doc.lineAt(pos).text.slice(0, pos - v.state.doc.lineAt(pos).from).replace(/^[ \t]*(?:>[ \t]?)+/, '');
+    const rawBefore = v.state.doc.lineAt(pos).text.slice(0, pos - v.state.doc.lineAt(pos).from);
+    const before = rawBefore.slice(tableLead(rawBefore).off);
     const col = Math.max(0, before.replace(/^\s*\|/, '').split(/(?<!\\)\|/).length - 1);
     const r = ranges[col];
     if (!r) { toast('这一列不在表里'); return false; }
@@ -1479,7 +1811,8 @@ export function installExtras(deps) {
     if (!sepRow) return { ok: false };
     const cells = splitRow(sepRow.text);
     const line = v.state.doc.lineAt(pos != null ? pos : v.state.selection.main.head);
-    const before = line.text.slice(0, (pos != null ? pos : v.state.selection.main.head) - line.from).replace(/^[ \t]*(?:>[ \t]?)+/, '');
+    const rawBefore = line.text.slice(0, (pos != null ? pos : v.state.selection.main.head) - line.from);
+    const before = rawBefore.slice(tableLead(rawBefore).off);
     const col = Math.max(0, before.replace(/^\s*\|/, '').split(/(?<!\\)\|/).length - 1);
     const core = String(cells[col] || '').trim();
     const hasL = core.startsWith(':'), hasR = core.length > 1 && core.endsWith(':');
@@ -1546,6 +1879,12 @@ export function installExtras(deps) {
   function onDocContextMenu(event) {
     const v = getView();
     if (!v) return;
+    /* 【#44·2026-10-18 实测缺陷 M1】阅读模式是真只读：右键菜单里的命令走**程序化 dispatch**，
+       EditorState.readOnly 拦不住（#26 立论原文）；而正文/图片菜单的类名带 mp-pop-keep，
+       被阅读态隐藏规则豁免 ⇒ 菜单可见，点「标题/加粗/剪切」直接改稿/删稿（focused-64 实测
+       阅读态点「标题」得到 "# 正文第一段内容"，readOnly 仍为 true）。阅读态一律放行给浏览器
+       原生菜单（只读/复制可用），不再弹编辑菜单。 */
+    if (document.documentElement.dataset.mpReading === '1') return;
     const target = event.target, source = window.mpSplit?._slave?.();
     const cell = target?.closest?.('.mp-cell-overlay-text');
     const inCell = cell?.isConnected && cell === document.querySelector('.mp-cell-overlay-text');
@@ -1627,7 +1966,19 @@ export function installExtras(deps) {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') closePop(); });
   /* 【Esc 关弹层·2026-10-10 普查实测】原来 Esc 关不掉「更多」等弹层（只有点外面/滚动才关）。
      菜单开着时 Esc 优先关菜单，并且不再往下传（否则会顺手退出阅读模式）。 */
+  /* 【#64】IME 组字期间按 Esc 只应取消候选/组字，**不能顺手关掉查找面板/弹层**（实测：查找框里
+     组字中按 Esc ⇒ 面板被 document capture 的 Esc 处理器直接关掉，查询内容丢失）。用一个全局
+     组字标志挡住这条捕获链；compositionend 之后再按 Esc 才关面板。 */
+  let docImeComposing = false;
+  document.addEventListener('compositionstart', () => { docImeComposing = true; }, true);
+  document.addEventListener('compositionend', () => { docImeComposing = false; }, true);
   const closePopOnEsc = (e) => {
+    if (e.isComposing || e.keyCode === 229 || docImeComposing) {
+      /* 组字中的 Esc 归输入法：只打断后续（CM6 查找面板自己的 Escape 键位也会关面板），
+         不 preventDefault（预置默认＝取消组字）。 */
+      try { e.stopImmediatePropagation(); } catch { /* 合成事件 */ }
+      return;
+    }
     if (e.key !== 'Escape' && e.keyCode !== 27) return;
     const font = e.target;
     if (font?.matches?.('[data-font-role]') && font.value !== fontPreferences[font.dataset.fontRole]) {
@@ -1743,8 +2094,9 @@ export function installExtras(deps) {
     title("图片");
     add("复制图片", () => {
       const hp = window.mpHost;
+      const imgToken = hp && typeof hp.beginClipboardIntent === 'function' ? hp.beginClipboardIntent('copy') : null;
       if (!hp || typeof hp.writeImage !== "function") { toast("当前宿主不支持复制图片"); return; }
-      Promise.resolve(hp.writeImage(src)).then((r) => toast(r && r.ok ? `已复制图片（${r.width}×${r.height}）` : "复制图片失败：" + ((r && r.error) || "未知"))).catch(() => { });
+      Promise.resolve(hp.writeImage(src, imgToken)).then((r) => toast(r && r.ok ? ('已复制图片（' + r.width + '×' + r.height + '）') : "复制图片失败：" + ((r && r.error) || "未知"))).catch(() => { });
     });
     add("另存为图片…", () => {
       const hp = window.mpHost;
@@ -1780,7 +2132,7 @@ export function installExtras(deps) {
       };
       const go = document.getElementById("mp-scale-go"); if (go) go.onclick = apply;
       const inp0 = document.getElementById("mp-scale-in");
-      if (inp0) { inp0.onkeydown = (e) => { if (e.key === "Enter") apply(); }; inp0.focus(); inp0.select && inp0.select(); }
+      if (inp0) { inp0.onkeydown = (e) => { if (e.isComposing || e.keyCode === 229) return; if (e.key === "Enter") apply(); }; inp0.focus(); inp0.select && inp0.select(); }
     });
     add('编辑图片地址…', () => {
       const current = imageRangeAt(imgInfo.pos);
@@ -1792,7 +2144,7 @@ export function installExtras(deps) {
       input.placeholder = inline ? '输入新的图片地址以替换内联图片' : '图片地址';
       const apply = () => { if (!owner()) return; const src = input.value.trim(); if (src && rewriteImageAt(imgInfo.pos, a => { a.src = src; })) closeDlg(); };
       document.getElementById('mp-image-url-go').onclick = apply;
-      input.onkeydown = e => { if (e.key === 'Enter') apply(); };
+      input.onkeydown = e => { if (e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter') apply(); };
       input.focus(); input.select();
     });
     sep();
@@ -1858,20 +2210,22 @@ export function installExtras(deps) {
        改成读 CM 选区 → 走壳层剪贴板（与表格复制同一条 writeClip）。 */
     const selSource = selection => { try { const v = getView(); return selection.ranges.filter(r=>!r.empty).map(r=>v.state.sliceDoc(r.from,r.to)).join(v.state.lineBreak); } catch { return ""; } };
     add("剪切", async () => {
+      const cutToken = window.mpHost && typeof window.mpHost.beginClipboardIntent === 'function' ? window.mpHost.beginClipboardIntent('cut') : null;
       const ticket = commands?.capture(), v = getView(), selection = ticket?.selection || v?.state.selection;
       const text = selection && selSource(selection);
       if (!text) { toast("没有选中内容"); return; }
-      if (!(await writeClip({text}))) { toast("剪切失败：剪贴板不可用"); return; }
+      if (!(await writeClip({text}, cutToken))) { toast("剪切失败：剪贴板不可用"); return; }
       if (!ticket || !commands.valid(ticket) || !v.state.selection.eq(selection)) { toast("选区已改变，已复制原选区，本次未剪切"); return; }
       v.dispatch({...v.state.replaceSelection(""),userEvent:'delete.cut'});
       commands.resume(ticket);
     }, "Ctrl+X");
     add("复制", async () => {
+      const copyToken = window.mpHost && typeof window.mpHost.beginClipboardIntent === 'function' ? window.mpHost.beginClipboardIntent('copy') : null;
       const ticket = commands?.capture(), selection = ticket?.selection || getView()?.state.selection;
       const text = selection && selSource(selection);
       if (!text) { toast("没有选中内容"); return; }
-      const ok = await writeClip({text}); toast(ok ? "已复制" : "复制失败：剪贴板不可用");
-      if (ticket) commands.resume(ticket);
+      const ok = await writeClip({text}, copyToken); toast(ok ? "已复制" : "复制失败：剪贴板不可用");
+      if (ticket && ok) commands.resume(ticket);
     }, "Ctrl+C");
     add("粘贴", () => {
     /* 【第二波·右键粘贴缺陷·2026-10-10（两族独立命中）】原来直接调 hp.paste()：菜单项在 mousedown
@@ -2019,24 +2373,26 @@ export function installExtras(deps) {
     return { rowCells, aligns };
   }
   async function copyTable(target = null) {
+    const tableToken = window.mpHost && typeof window.mpHost.beginClipboardIntent === 'function' ? window.mpHost.beginClipboardIntent('copy') : null;
     const v = getView();
     const pos = target != null ? target : v.state.selection.main.head;
     const cur = tableAt(pos);
     if (!cur) { toast('光标不在表格内'); return; }
     const args = tableClipArgs(cur);
     const { tsv, html } = tableClipPayload(args.rowCells, args.aligns);
-    if (await writeClip({ text: tsv, html })) toast('已复制表格（Excel/Word 可直接粘成表格）');
+    if (await writeClip({ text: tsv, html }, tableToken)) toast('已复制表格（Excel/Word 可直接粘成表格）');
     else toast('复制表格失败：剪贴板不可用');
   }
   /** 【B-1 配套】显式命令：整表按**文档源码**（markdown）写剪贴板 —— ③ 折中里给"要源码"的场合留的出口。
    *  显式菜单目标或当前 CM 选区，与 copyTable/tableOp 同一套。 */
   async function copyTableSource(target = null) {
+    const srcToken = window.mpHost && typeof window.mpHost.beginClipboardIntent === 'function' ? window.mpHost.beginClipboardIntent('copy') : null;
     const v = getView();
     const pos = target != null ? target : v.state.selection.main.head;
     const cur = tableAt(pos);
     if (!cur) { toast('光标不在表格内'); return false; }
     const text = cur.rows.map((r) => r.text).join('\n');
-    if (await writeClip({ text })) { toast('已复制表格源码（Markdown）'); return true; }
+    if (await writeClip({ text }, srcToken)) { toast('已复制表格源码（Markdown）'); return true; }
     toast('复制失败'); return false;
   }
 
@@ -2328,6 +2684,13 @@ export function installExtras(deps) {
   // 启动即把保存过的表面参数写回 :root。**必须放在 SURFACES / surfaceStore 这些 const 之后**：
   // 函数声明会提升，但它引用的 const 在暂时性死区里，调用早了就是 "Cannot access 'x' before initialization"。
   applySurfaces();
+  /* 【C15·跨窗表面直播】远端窗口写 mp-surfaces 后，本窗经 storage 事件收到
+   * 同一份值。只复用既有 applySurfaces()：其读取侧钳制/自愈与未知键保留
+   * 全部保持（surfaceStore 展开回写，不重置 UI）；不新增解析器/CSS setter/
+   * 缓存，不广播 reading/zoom/其它偏好，不触碰 foreign 窗口。 */
+  window.addEventListener('storage', event => {
+    if (event.key === 'mp-surfaces' || event.key === null) applySurfaces();
+  });
   applyOutlineMode();   // 大纲展示形式（浮层/左停靠/右停靠）启动即按保存值应用
 
   /* ── Typora 社区主题（用户自带 CSS）·2026-10-09 ──────────────────────────────
@@ -2731,6 +3094,8 @@ export function installExtras(deps) {
     if (pill) pill.textContent = on ? '退出 Esc' : '';
     if (pill) pill.title = on ? `退出阅读模式（当前配色：${pal.name}）` : '';
     if (on) applyTypography();
+    /* 【真只读·2026-10-17】阅读模式在引擎侧同时置只读（D-01：此前仅有 CSS，键入会静默改稿）。 */
+    try { window.mpEngine?.setReadingMode?.(on); } catch { /* 引擎未就绪 */ }
   }
   function toggleReading(force) {
     const next = typeof force === 'boolean' ? force : !readingOn();
@@ -2773,7 +3138,11 @@ export function installExtras(deps) {
     document.body.appendChild(cluster);
     applyTypography();
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && readingOn()) { toggleReading(false); e.preventDefault(); }
+      /* 【#35·2026-10-18 实测缺陷】Esc 出口判据必须读**本窗口**的阅读态（dataset），
+         不能读跨窗口共享的 localStorage 偏好：另一窗口按 Esc 会把全局键写成 '0'，
+         本窗口仍停在阅读态（dataset='1'/readOnly=true），却从此按 Esc 无反应（focused-51 实测）。
+         全局键只负责"新窗口启动时继承偏好"（applyReading 在 boot 时读一次）。 */
+      if (e.key === 'Escape' && document.documentElement.dataset.mpReading === '1') { toggleReading(false); e.preventDefault(); }
     }, true);
     applyReading();
   })();
@@ -2837,7 +3206,18 @@ export function installExtras(deps) {
             return;                                    // 不摘监听、不落定
           }
           if (e.key === 'Backspace') { setKey(el.dataset.a, DEFAULT_KEYS[el.dataset.a]); el.textContent = showCombo(DEFAULT_KEYS[el.dataset.a]); }
-          else { const combo = comboOf(e); setKey(el.dataset.a, combo); el.textContent = showCombo(combo); }
+          else {
+            const combo = comboOf(e);
+            /* 【#46·2026-10-18 实测缺陷 M5】① 无 Ctrl/Alt 的纯字符键落定后会被高优先级 keymap
+               全局吞掉（实测录 bold=b 后正文打 b 得到 "****"）；② 与别的动作重复的组合会静默
+               压掉那个动作（同键位两条绑定，对象序靠前的一条永久生效）⇒ 两种都当场拒绝并要求重录。 */
+            const hasMod = e.ctrlKey || e.metaKey || e.altKey;
+            const isFn = /^F([1-9]|1[0-9]|2[0-4])$/.test(combo);
+            if (!hasMod && !isFn) { toast('快捷键需要 Ctrl / Alt 等修饰键（纯字母会吞掉正文输入）'); return; }
+            const dup = Object.entries(keyConfig()).find(([a, c]) => a !== el.dataset.a && c === combo);
+            if (dup) { toast('该组合键已绑定「' + (names[dup[0]] || dup[0]) + '」，请换一个'); return; }
+            setKey(el.dataset.a, combo); el.textContent = showCombo(combo);
+          }
           finish();
         };
         lifecycle.cleanup.add(finish); lifecycle.recording = finish;
@@ -3029,7 +3409,12 @@ export function installExtras(deps) {
   function insertText(text) {
     const v = getView(); if (!v) return;
     const r = v.state.selection.main;
-    v.dispatch({ changes: { from: r.from, to: r.to, insert: text }, selection: { anchor: r.from + text.length } });
+    /* 【#36·2026-10-18 实测缺陷】原事务没有 userEvent ⇒ tableSelInputGuard 的门禁
+       「!(isUserEvent("input") || isUserEvent("delete"))」直接放行，行级/整表级选择下
+       一个表情会把**整行/整表源码**替换掉（focused-52：| a1 | a2 | → 😀，表被劈开）。
+       补 input.emoji：既进守卫的 input 族（与键入同语义、落进格内容起点），
+       又不匹配历史的 joinable 正则（input.type|delete）⇒ 撤销仍是单独一组（CAND-5 口径）。 */
+    v.dispatch({ changes: { from: r.from, to: r.to, insert: text }, selection: { anchor: r.from + text.length }, userEvent: 'input.emoji' });
     v.focus();
   }
 
@@ -3044,16 +3429,58 @@ export function installExtras(deps) {
     if (child.nodeType !== 1) return '';
     const tag = child.tagName;
     if (tag === 'BR') return ' ';
+    /* 【#48·2026-10-18 实测缺陷 NX4】网页富文本里的段内图片：改前白名单没有 IMG 分支，
+       <img> 落到 return inner（IMG 无子文本）⇒ 图片在粘贴时**静默消失**（实测 HTML
+       <p>前<img src=… alt=图>后</p> 粘出 "前后"，只剩 alt 文本都没有）。按 Markdown 图片语法还原。 */
+    if (tag === 'IMG') {
+      const src = child.getAttribute('src') || '';
+      if (!src) return '';
+      const alt = (child.getAttribute('alt') || '').replace(/[\[\]]/g, '');
+      return '![' + alt + '](' + src + ')';
+    }
     const inner = htmlInlineToMd(child);
     const mark = INLINE_MARKS[tag];
     if (mark) return mark + inner + mark;
-    if (tag === 'A') return '[' + inner + '](' + (child.getAttribute('href') || '') + ')';
+    if (tag === 'A') return '[' + inner + '](' + anchorDestination(child.getAttribute('href') || '') + ')';
     return inner;
   }
   function htmlInlineToMd(node) {
     return [...node.childNodes].map(htmlInlineNodeToMd).join('');
   }
   const HTML_BLOCKS = 'h1,h2,h3,h4,h5,h6,p,div,section,article,main,aside,header,footer,figure,figcaption,address,ul,ol,li,blockquote,hr,pre,table,dl,dt,dd';
+  function anchorDestination(href) {
+    let depth = 0, underflow = false;
+    for (let i = 0; i < href.length; i++) {
+      const code = href.charCodeAt(i);
+      if (code === 92) { i++; continue; }
+      if (code === 40) depth++;
+      else if (code === 41) { if (depth === 0) { underflow = true; break; } depth--; }
+    }
+    return (/\s/.test(href) || underflow || depth !== 0) && !/[<>\r\n]/.test(href) ? '<' + href + '>' : href;
+  }
+  function blockAnchorSegments(a) {
+    const segments = []; let inline = [];
+    const flush = () => {
+      if (inline.some(n => n.nodeType === 1 || (n.nodeType === 3 && n.nodeValue.trim()))) segments.push({ nodes: inline });
+      inline = [];
+    };
+    for (const n of a.childNodes) {
+      if (n.nodeType === 8) continue;
+      if (n.nodeType === 1 && (n.tagName === 'P' || n.tagName === 'DIV') && !n.querySelector(HTML_BLOCKS)) { flush(); segments.push({ block: n }); continue; }
+      if (n.nodeType === 1 && (n.matches(HTML_BLOCKS) || n.querySelector(HTML_BLOCKS))) return null;
+      if (n.nodeType === 1 || n.nodeType === 3) inline.push(n);
+      else return null;
+    }
+    flush();
+    return segments.length && segments.some(s => s.block) ? segments : null;
+  }
+  function blockAnchorMd(a, href) {
+    const segments = blockAnchorSegments(a);
+    if (!segments) return null;
+    const dest = anchorDestination(href);
+    return segments.map(s => (s.block ? htmlInlineToMd(s.block) : s.nodes.map(htmlInlineNodeToMd).join('')).trim())
+      .filter(label => label.length > 0).map(label => '[' + label + '](' + dest + ')').join('\n\n');
+  }
   /* 一个 DOM 按 childNodes 顺序转换；表格在原位置输出，包装层和裸文本也保序。 */
   function htmlRichToMd(body) {
     const blocks = []; let inline = '';
@@ -3069,14 +3496,100 @@ export function installExtras(deps) {
       else if (/^H[1-6]$/.test(T)) blocks.push('#'.repeat(Number(T[1])) + ' ' + htmlInlineToMd(el).trim());
       else if (T === 'UL' || T === 'OL') {
         const items = [...el.children].filter(c => c.tagName === 'LI');
-        blocks.push(items.map((li, i) => {
-          const marker = T === 'OL' ? (i + 1) + '. ' : '- ';
-          return marker + htmlRichToMd(li).replace(/\n/g, '\n' + ' '.repeat(marker.length));
-        }).join('\n'));
+        const startsBlock = (li) => {
+          for (const node of li.childNodes) {
+            if (node.nodeType === 3) { if (node.nodeValue.trim()) return false; continue; }
+            if (node.nodeType === 8) continue;
+            if (node.nodeType !== 1) continue;
+            if (node.matches(HTML_BLOCKS) || node.querySelector(HTML_BLOCKS)) return true;
+            if (!htmlInlineNodeToMd(node).trim()) continue; // empty inline wrappers contribute no prefix
+            return false;
+          }
+          return false;
+        };
+        const formatItem = (li, marker, kind) => {
+          const content = htmlRichToMd(li);
+          if (!content) return marker.trimEnd();
+          if (kind === 'native') {
+            if (startsBlock(li)) {
+              return marker.trimEnd() + '\n' + content.split('\n').map((line) => ' '.repeat(marker.length) + line).join('\n');
+            }
+            return marker + content.replace(/\n/g, '\n' + ' '.repeat(marker.length));
+          }
+          if (startsBlock(li) || content.includes('\n')) {
+            return marker.trimEnd() + '\n\n' + content.split('\n').map((line) => '> ' + line).join('\n');
+          }
+          return marker + content;
+        };
+        if (T === 'UL') {
+          blocks.push(items.map((li) => formatItem(li, '- ', 'native')).join('\n'));
+        } else {
+          const parseAttr = (raw) => {
+            if (raw == null) return null;
+            const m = /^[\t\n\f\r ]*([+-]?)([0-9]+)/.exec(String(raw));
+            if (!m) return null;
+            const d = m[2].replace(/^0+/, '');
+            if (!d) return '0';
+            return (m[1] === '-' ? '-' : '') + d;
+          };
+          const isNeg = (s) => s[0] === '-';
+          const mag = (s) => isNeg(s) ? s.slice(1) : s;
+          const inc = (d) => {
+            const a = d.split(''); let i = a.length - 1;
+            while (i >= 0) { if (a[i] !== '9') { a[i] = String(Number(a[i]) + 1); return a.join(''); } a[i] = '0'; i--; }
+            return '1' + a.join('');
+          };
+          const dec = (d) => {
+            const a = d.split(''); let i = a.length - 1;
+            while (i >= 0) { if (a[i] !== '0') { a[i] = String(Number(a[i]) - 1); const out = a.join('').replace(/^0+/, ''); return out || '0'; } a[i] = '9'; i--; }
+            return '0';
+          };
+          const step = (s, delta) => {
+            const n = isNeg(s), d = mag(s);
+            if (delta > 0) return n ? (dec(d) === '0' ? '0' : '-' + dec(d)) : inc(d);
+            return n ? '-' + inc(d) : (d === '0' ? '-1' : dec(d));
+          };
+          const reversed = el.hasAttribute('reversed');
+          const nums = [];
+          let cur = parseAttr(el.getAttribute('start'));
+          if (cur == null) cur = reversed ? String(items.length) : '1';
+          const delta = reversed ? -1 : 1;
+          for (const li of items) {
+            const v = parseAttr(li.getAttribute('value'));
+            if (v != null) cur = v;
+            nums.push(cur);
+            cur = step(cur, delta);
+          }
+          const native = !reversed && nums.length > 0 && nums.every((s) => !isNeg(s) && mag(s).length <= 9)
+            && nums.every((s, i) => i === 0 || s === step(nums[i - 1], 1));
+          if (native) {
+            blocks.push(items.map((li, i) => formatItem(li, nums[i] + '. ', 'native')).join('\n'));
+          } else {
+            blocks.push(items.map((li, i) => formatItem(li, nums[i] + String.fromCharCode(92) + '. ', 'fallback')).join('\n\n'));
+          }
+        }
       } else if (T === 'BLOCKQUOTE') blocks.push(htmlRichToMd(el).split('\n').map(line => '> ' + line).join('\n'));
       else if (T === 'HR') blocks.push('---');
-      else if (T === 'PRE') blocks.push('```\n' + String(el.textContent || '').replace(/\s+$/, '') + '\n```');
-      else blocks.push(htmlRichToMd(el));
+      else if (T === 'PRE') {
+        const codeEl = [...el.children].find(c => c.tagName === 'CODE');
+        const classes = [...(el.classList || []), ...(codeEl ? codeEl.classList : [])];
+        let lang = '';
+        for (const cls of classes) {
+          const m = /^(?:language|lang)-([^\s`]+)$/u.exec(cls);
+          if (m) { lang = m[1]; break; }
+        }
+        const text = String(el.textContent || '');
+        let run = 0, maxRun = 0;
+        for (const ch of text) { if (ch === '`') { run++; if (run > maxRun) maxRun = run; } else run = 0; }
+        const fence = '`'.repeat(Math.max(3, maxRun + 1));
+        const suffix = text === '' ? '' : (text.endsWith('\n') ? '' : '\n');
+        blocks.push(fence + lang + '\n' + text + suffix + fence);
+      }
+      else if (T === 'A') {
+        const href = el.getAttribute('href') || '';
+        const blockMd = blockAnchorMd(el, href);
+        blocks.push(blockMd == null ? htmlRichToMd(el) : blockMd);
+      } else blocks.push(htmlRichToMd(el));
     }
     flush();
     return blocks.filter((b) => b.length).join('\n\n');
@@ -3106,7 +3619,8 @@ export function installExtras(deps) {
     return null;
   }
   function rowsToMdTable(rows) {
-    const cols = Math.max(...rows.map((r) => r.length));
+    /* IN-C7：13 万行 TSV 用展开参数会抛 Maximum call stack size exceeded，改 reduce。 */
+    const cols = rows.reduce((m, r) => Math.max(m, r.length), 0);
     const pad = (r) => { const c = r.slice(); while (c.length < cols) c.push(''); return c; };
     const line = (cs) => '| ' + cs.map((c) => String(c).replace(/\|/g, '\\|')).join(' | ') + ' |';
     const head = pad(rows[0]);
@@ -3119,13 +3633,6 @@ export function installExtras(deps) {
        · 宽容：键名大小写不敏感、冒号两侧允许多余空白、值可带引号；
        · 未知值 ⇒ 回落 `inline`，**不报错**；
        · **只读不写**（默认不往文档里写 front-matter，与 D 口径一致）。 */
-  /** 【task-13】光标是否落在**开头那段 front-matter 块**内（与 imageModeOf 同一套正则，口径一致）。 */
-  function inFrontMatter(doc, pos) {
-    const m = /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(String(doc || ""));
-    if (!m) return false;
-    return typeof pos === "number" && pos <= m[0].length;
-  }
-
   /** 【task-17】图片策略的**全局偏好**。与 front-matter 的关系（唯一判定顺序，别在别处再判一次）：
    *  **文档 front-matter 写了 `mp-image-mode` ⇒ 以文档为准**；没写 ⇒ 看这份偏好；偏好也没有 ⇒ `assets`。
    *  键名与 front-matter 同名（`mp-image-mode`），便于用户理解"这是同一件事的两个层级"。
@@ -3206,24 +3713,60 @@ export function installExtras(deps) {
    *  @param total 来源张数（>1 时提示"已插入第 1 张"）
    *  @param userEvent 撤销栈里的动作名 —— **必须与实际来源一致**（用户在撤销提示里看得见）：
    *                   粘贴 "input.paste" / 选文件 "input.upload" / 从浏览器 "input.download" */
-  async function insertImageFile(file, total = 1, userEvent = "input.paste") {
+  async function insertImageFile(file, total = 1, userEvent = "input.paste", reserved = null) {
+    /* 【外部预留票据·2026-10-17 实测缺陷】"从网址插入图片"要等下载（实测 2.5s），改前占票发生在
+       下载**之后** ⇒ 用户在这段时间里选中一段正文，图片就把那段正文替换掉（实测 ALPHA 消失）。
+       允许调用方在发起请求时就占票、并把票传进来；任何提前返回都要把这张票撤回（否则留下幽灵插入位）。 */
+    const abandonReserved = () => { if (reserved) { try { reserved.cancel(); } catch { /* 忽略 */ } } };
     const el = document.activeElement;
     const inCell = !!(el && el.classList && el.classList.contains("mp-cell-overlay-text"));
-    if (inCell) { toast("格内不能放图片，请粘到表格外"); return; }   // 明确拒绝，绝不静默
+    if (inCell) { abandonReserved(); toast("格内不能放图片，请粘到表格外"); return; }   // 明确拒绝，绝不静默
+    /* 【#39·2026-10-18 实测缺陷 N5】位图粘贴分支在文本 inTableAt 守卫之前就 return（见 onDocPaste），
+       而本函数只拦"格覆盖层内"：光标停在表行边界（无覆盖层）时粘截图，实测得到
+       ![](assets/pasted-image.png)| a1 | a2 | —— 行首管道被顶掉、该行不再是表行。
+       与"格内不能放图片"同一句拒绝（单元格/表行都不支持块级图片）。 */
+    {
+      const v0 = getView();
+      if (v0 && tableSpanOf(v0.state, v0.state.doc.lineAt(v0.state.selection.main.head).number)) {
+        abandonReserved();
+        toast("格内不能放图片，请粘到表格外");
+        return;
+      }
+    }
     /* 【front-matter 保护】光标在文档头部信息区（开头那段 --- 块）内 ⇒ 明确拒绝：
        否则会把 ![]() 插进 YAML、把闭合的 --- 挤到行尾，**破坏文档结构**。
        与"格内拒绝"同族：宁可明确拒绝，也不静默破坏。此处已在函数入口 preventDefault，故不会漏进默认行为。 */
     {
       const v0 = getView();
       if (v0 && inFrontMatter(v0.state.doc.toString(), v0.state.selection.main.head)) {
+        abandonReserved();
         toast("光标在文档头部信息区，请移到正文再粘贴");
         return;
       }
     }
+    /* 图片是块级对象：reserved 有效时用原 ticket 的 mapped head 作为语境；
+       无 reserved 时只按 single-range 当前 head。multi 保持 reserveImageInsertion 原拒绝。 */
+    {
+      const v0 = getView();
+      if (v0) {
+        const reservedInfo = reserved && typeof reserved.current === 'function' ? reserved.current() : null;
+        let sourceHead = null;
+        if (reserved) {
+          if (reservedInfo) sourceHead = reservedInfo.head;
+        } else if (v0.state.selection.ranges.length === 1) {
+          sourceHead = v0.state.selection.main.head;
+        }
+        if (sourceHead != null) {
+          if (codeBlockAt(v0.state, sourceHead)) { abandonReserved(); toast("代码块内不能粘贴图片"); return; }
+          const spans = v0.state.field(mathSpansField, false)?.spans || [];
+          if (spans.some((s) => sourceHead >= s.from && (sourceHead < s.to || (s.display && sourceHead === s.to)))) { abandonReserved(); toast("公式内不能粘贴图片"); return; }
+        }
+      }
+    }
     const v = getView();
-    if (!v) { toast("当前无法插入图片"); return; }
-    const ticket = reserveImageInsertion(v);
-    if (!ticket) { toast('请只选择一个插入位置再粘贴图片'); return; }
+    if (!v) { abandonReserved(); toast("当前无法插入图片"); return; }
+    const ticket = reserved || reserveImageInsertion(v);
+    if (!ticket) { abandonReserved(); toast('请只选择一个插入位置再粘贴图片'); return; }
     const mode = imageModeOf(v.state.doc.toString());
     const host = window.mpHost;
     const originRequest = host && typeof host.docInfo === 'function'
@@ -3331,6 +3874,10 @@ export function installExtras(deps) {
       const done = (val) => { settle(val); closePanel(panel, true); };
       dlgEl.querySelector('[data-ok]').onclick = () => done(inp.value);
       inp.addEventListener('keydown', (ev) => {
+        /* 【#50·2026-10-18 实测缺陷 M4】IME 组字中的 Enter/Esc 只负责上屏/取消候选，不能当提交：
+           改前不查 isComposing ⇒ 实测组字 "ni" 时按回车上屏直接关框并把半截 "ni" 当地址提交
+           （toast「请输入 http(s) 开头的图片地址」，组字结果丢失）。与搜索框同一口径。 */
+        if (ev.isComposing || ev.keyCode === 229) return;
         if (ev.key === 'Enter') { ev.preventDefault(); done(inp.value); }
         else if (ev.key === 'Escape') { ev.preventDefault(); done(null); }   // dialog() 没有全局 Esc，这里自带
       });
@@ -3426,15 +3973,21 @@ export function installExtras(deps) {
     if (!/^https?:\/\//i.test(u)) { toast('请输入 http(s) 开头的图片地址'); return; }
     const h = window.mpHost;
     if (!h || typeof h.downloadImageToCache !== 'function') { toast('该功能需要桌面版'); return; }
+    /* 【发起时就占票·2026-10-17 实测缺陷】下载是异步的（实测 2.5s）；改前占票在下载完成后才发生
+       ⇒ 用户在等待期间选中的一段正文会被 `![](...)` 顶掉并随自动保存落盘（实测 `ALPHA` 消失）。
+       这里在**第一个 await 之前**按"用户刚按下获取时的选区"占票；下载/读文件失败一律撤票。 */
+    const vNow = getView();
+    const reserved = vNow ? reserveImageInsertion(vNow) : null;
+    if (!reserved) { toast('请只选择一个插入位置再插入图片'); return; }
     let r = null;
-    try { r = await h.downloadImageToCache({ url: u }); } catch (e) { if (current()) toast('获取图片失败：' + ((e && e.message) || e)); else imageRequestCanceled(); return; }
-    if (!current()) { imageRequestCanceled(); return; }
-    if (!r || r.ok === false) { toast('获取图片失败：' + ((r && r.error) || '未知错误')); return; }
+    try { r = await h.downloadImageToCache({ url: u }); } catch (e) { reserved.cancel(); if (current()) toast('获取图片失败：' + ((e && e.message) || e)); else imageRequestCanceled(); return; }
+    if (!current()) { reserved.cancel(); imageRequestCanceled(); return; }
+    if (!r || r.ok === false) { reserved.cancel(); toast('获取图片失败：' + ((r && r.error) || '未知错误')); return; }
     const src = r.absPath || r.cachePath;
     const f = src ? await imageFileFromPath(src, current) : null;
-    if (!current()) { imageRequestCanceled(); return; }
-    if (!f) { toast('获取图片失败：宿主未返回可用路径'); return; }
-    await insertImageFile(f, 1, 'input.download');
+    if (!current()) { reserved.cancel(); imageRequestCanceled(); return; }
+    if (!f) { reserved.cancel(); toast('获取图片失败：宿主未返回可用路径'); return; }
+    await insertImageFile(f, 1, 'input.download', reserved);
   }
 
   /* ── task-17：图片策略的两条**批量**命令 ────────────────────────────────────────
@@ -3557,6 +4110,44 @@ export function installExtras(deps) {
     return { node: doc.body, source: false };
   }
   const clipboardFragmentText = doc => clipboardFragment(doc).node.textContent || '';
+  // Preserve the selected single value; TABLE may belong only to CF_HTML context.
+  function singleCellHtmlValue(htmlDoc, fragment) {
+    const root = fragment?.node || htmlDoc?.body;
+    if (!root) return null;
+    const tables = root.querySelectorAll('table');
+    if (tables.length > 1 || root.querySelector('caption,tfoot')) return null;
+    const allCells = root.querySelectorAll('td,th');
+    const allRows = root.querySelectorAll('tr');
+    if (allCells.length > 1 || allRows.length > 1) return null;
+    if (allRows.length && (!allCells.length || !allRows[0].contains(allCells[0]))) return null;
+    let cell;
+    if (tables.length) {
+      const table = tables[0];
+      if (table.rows.length !== 1 || table.rows[0].cells.length !== 1) return null;
+      cell = table.rows[0].cells[0];
+    } else {
+      if (root === htmlDoc.body) return null;
+      const cells = root.querySelectorAll('td,th');
+      if (cells.length > 1 || root.querySelectorAll('tr').length > 1) return null;
+      cell = cells[0] || root;
+    }
+    for (const attr of ['rowspan', 'colspan']) {
+      const raw = cell.getAttribute?.(attr);
+      if (raw != null && Number(raw) !== 1) return null;
+    }
+    if (cell !== root) {
+      const outside = root.cloneNode(true);
+      outside.querySelector('td,th').remove();
+      if ((outside.textContent || '').trim()) return null;
+      const wrappers = new Set(['DIV', 'SPAN', 'TABLE', 'TBODY', 'THEAD', 'TR', 'COLGROUP', 'COL']);
+      for (const el of outside.querySelectorAll('*')) if (!wrappers.has(el.tagName)) return null;
+    }
+    const safe = new Set(['B', 'STRONG', 'I', 'EM', 'CODE', 'DEL', 'S', 'A', 'SPAN']);
+    for (const el of cell.querySelectorAll('*')) if (!safe.has(el.tagName)) return null;
+    const text = htmlInlineToMd(cell).trim();
+    const cellText = String(cell.textContent || '').replace(/\s+/g, ' ').trim();
+    return { text, cellText };
+  }
   function onDocPaste(event) {
     const cd = event.clipboardData; if (!cd) return;
     const v = getView(), active = document.activeElement;
@@ -3584,14 +4175,34 @@ export function installExtras(deps) {
     const el = document.activeElement;
     const inCell = !!(el && el.classList && el.classList.contains('mp-cell-overlay-text'));
     if (inCell) {
-      /* ① 多行 / 表格：**拒绝**（这正是"表格被切开、焦点掉 BODY"的止血点） */
-      if (multi || htmlHasTable) {
+      /* ① 多行先拒绝；② 1x1 HTML 单 cell 解包；③ 其余表格仍拒绝。 */
+      if (multi) {
         event.preventDefault();
-        toast(multi ? '格内不支持多行粘贴（会把表格切开）—— 请粘到表格外' : '格内不能放表格');
+        toast('格内不支持多行粘贴（会把表格切开）—— 请粘到表格外');
+        return;
+      }
+      if (htmlHasTable) {
+        if (!sourceClipboard) {
+          const single = singleCellHtmlValue(htmlDoc, fragment);
+          if (single) {
+            const plainText = String(bare || '').replace(/\s+/g, ' ').trim();
+            const accepted = !(single.text === '' && plainText !== '') && (!plainText || single.cellText === plainText);
+            if (accepted) {
+              event.preventDefault();
+              if (!single.text) return;                 // empty + empty: no-op, no forceInputType
+              el.__mpCellForceInputType = 'insertFromPaste';
+              document.execCommand('insertText', false, single.text);
+              return;
+            }
+          }
+        }
+        event.preventDefault();
+        toast('格内不能放表格');
         return;
       }
       if (sourceClipboard) {
         event.preventDefault();
+        el.__mpCellForceInputType = 'insertFromPaste';   /* #60：转换粘贴单独成撤销组 */
         document.execCommand('insertText', false, plain);
         return;
       }
@@ -3601,6 +4212,7 @@ export function installExtras(deps) {
         const md = htmlInlineToMd(htmlDoc.body);
         if (md != null && md.replace(/\s+/g, ' ').trim() && md.trim() !== bare.trim()) {
           event.preventDefault();
+          el.__mpCellForceInputType = 'insertFromPaste';   /* #60：HTML→MD 转换粘贴单独成撤销组 */
           document.execCommand('insertText', false, md.trim());
           return;
         }
@@ -3636,7 +4248,12 @@ export function installExtras(deps) {
     const inMathBody = mathSpans.some(span => {
       const from = mathSourcePosition(span, 0);
       const to = mathSourcePosition(span, span.tex.length);
-      return v.state.selection.ranges.every(range => range.from >= from && range.to <= to);
+      const ranges = v.state.selection.ranges;
+      const inBody = ranges.every(range => range.from >= from && range.to <= to);
+      /* 定界符行也算 TeX（MTH-04）：$ 行尾粘多行 TSV，旧守卫只认 body，实测表格被写进公式源码、
+         块公式被切开。整段 span（含定界符）一律按 TeX 字面处理，不做表格/富文本转换。 */
+      const inSpan = ranges.every(range => range.from >= span.from && range.to <= span.to);
+      return inBody || inSpan;
     });
     if (inMathBody) {
       if (plain || !htmlDoc) return; // Native CM paste owns text and history.
@@ -3660,17 +4277,13 @@ export function installExtras(deps) {
           没判光标是否在表格里 ⇒ 这里补上：**与格内一致，拒绝并给同一句提示**。
        ② 插入新表时不做块级前后换行 ⇒ 末行会把正文行剩余文字吞进表格（实测
           `| T4 | T5 | T6 |前置段落。`，屏幕上那句正文消失）⇒ 光标不在行首/行尾时各补一个换行。 */
+    /* 【单一实现·2026-10-17 实测缺陷】改前这里自造了一套判据（`trim().startsWith('|') && endsWith('|')`）✗
+       ⇒ **带引用前缀**的表（`> | a | b |`）与**省略外侧管道**的表（`a | b` / `--- | ---`）都不算"在表里"
+       ⇒ 守卫整条不执行 ⇒ 多行粘贴把原表劈成两半（实测引用区表格粘 2×2 TSV：原表被拆成
+       `> | ` 孤立行 + 文末半张表，数据行错位）。本模块早就 import 了 tables.js 的 `tableSpanOf`，
+       这里必须用**同一函数**（与渲染层/键位层同源），不再自己数管道。 */
     const inTableAt = (state) => {
-      try {
-        const isPipe = (i) => { const t = state.doc.line(i).text.trim(); return t.startsWith('|') && t.endsWith('|'); };
-        const n = state.doc.lineAt(state.selection.main.head).number;
-        if (!isPipe(n)) return false;
-        let a = n; let b = n;
-        while (a > 1 && isPipe(a - 1)) a--;
-        while (b < state.doc.lines && isPipe(b + 1)) b++;
-        for (let i = a; i <= b; i++) if (/^\|(\s*:?-{2,}:?\s*\|)+$/.test(state.doc.line(i).text.trim())) return true;
-        return false;
-      } catch { return false; }
+      try { return !!tableSpanOf(state, state.doc.lineAt(state.selection.main.head).number); } catch { return false; }
     };
     if (inTableAt(v.state) && (multi || htmlHasTable)) {
       event.preventDefault();
@@ -3689,11 +4302,37 @@ export function installExtras(deps) {
     const sel = v.state.selection.main;
     const doc = v.state.doc;
     const blockPaste = !!rows || !!htmlDoc?.body.querySelector(HTML_BLOCKS);
-    const headNl = blockPaste && sel.from > 0 && doc.lineAt(sel.from).from !== sel.from ? '\n' : '';
-    const tailNl = blockPaste && sel.to < doc.length && doc.lineAt(sel.to).to !== sel.to ? '\n' : '';
-    const ins = headNl + text + tailNl;
+    /* 【#40·2026-10-18 实测缺陷 N4】分隔行判据只看"光标在本行首/尾"，不看**相邻行是不是表行**：
+       紧贴表格下方行首粘 TSV 时 headNl='' ⇒ 新表直接接在旧表最后一行后；紧贴表格上方行尾时 tailNl=''
+       ⇒ 新表直接顶在旧表头前。两种都被渲染成**一张表**（实测 1 表 2 分隔 5 行，分隔行成中段数据行）。
+       相邻行是表行时补一个换行隔开。 */
+    /* 【#49·2026-10-18 实测缺陷 NX6】多光标粘贴：改前只认 selection.main 并硬设单锚点 ⇒ 两处光标
+       粘富文本/TSV 时只有主光标落稿、其余光标被吞（实测 before=2 ⇒ after=1）。这里逐落点写同一份
+       内容（每处仍按 #40 的邻行表判据补换行），一次事务 + 多光标恢复；极端重叠时退回单光标路径。 */
+    const nlFor = (r) => {
+      const headLine = doc.lineAt(r.from);
+      const tailLine = doc.lineAt(r.to);
+      const prevTableRow = r.empty && headLine.from === r.from && headLine.number > 1 && !!tableSpanOf(v.state, headLine.number - 1);
+      const nextTableRow = r.empty && tailLine.to === r.to && tailLine.number < doc.lines && !!tableSpanOf(v.state, tailLine.number + 1);
+      const headNl = blockPaste && r.from > 0 && (headLine.from !== r.from || prevTableRow) ? '\n' : '';
+      const tailNl = blockPaste && r.to < doc.length && (tailLine.to !== r.to || nextTableRow) ? '\n' : '';
+      return headNl + text + tailNl;
+    };
+    const allRanges = v.state.selection.ranges;
+    if (allRanges.length > 1) {
+      try {
+        const insList = allRanges.map(nlFor);
+        const tr = v.state.update({ changes: allRanges.map((r, i) => ({ from: r.from, to: r.to, insert: insList[i] })), userEvent: 'input.paste' });
+        const carets = allRanges.map((r, i) => EditorSelection.cursor(tr.changes.mapPos(r.from, -1) + insList[i].length));
+        v.dispatch(tr);
+        v.dispatch({ selection: EditorSelection.create(carets, allRanges.mainIndex) });
+        toast(convertHtml ? '已粘贴富文本' : '已建成 ' + rows.length + ' 行 × ' + rows.reduce((m, r) => Math.max(m, r.length), 0) + ' 列');
+        return;
+      } catch { /* 相邻落点等极端重叠 ⇒ 退回下面的单光标路径 */ }
+    }
+    const ins = nlFor(sel);
     v.dispatch({ changes: { from: sel.from, to: sel.to, insert: ins }, selection: { anchor: sel.from + ins.length }, userEvent: 'input.paste' });
-    toast(convertHtml ? '已粘贴富文本' : '已建成 ' + rows.length + ' 行 × ' + Math.max(...rows.map((r) => r.length)) + ' 列');
+    toast(convertHtml ? '已粘贴富文本' : '已建成 ' + rows.length + ' 行 × ' + rows.reduce((m, r) => Math.max(m, r.length), 0) + ' 列');
   }
   /* 【Ctrl+Shift+V＝原样（纯文本）粘贴·2026-10-10 由普查查出】普查实测它与 Ctrl+V **逐项相同**
      （同样 27 字符 / 3 个 TAB / 同样被改写成表）⇒ 用户想要"原样粘贴"时没有任何出路。
@@ -3735,11 +4374,77 @@ export function installExtras(deps) {
     }), { scrollIntoView: true, userEvent: 'input' });
     return true;
   };
+  /* 【#42·2026-10-18 实测缺陷 NX3】多光标下代码块 Tab 不许让位给焦点遍历：
+     所有光标都在代码块内 ⇒ 逐个缩进/反缩进（CM6 自动映射多选区）；任一光标不在围栏 ⇒ 维持原行为。 */
+  const fenceIndentMulti = (view, outdent, ranges) => {
+    const st = view.state;
+    if (!ranges.every((r) => inCodeFence(st, r.head))) return false;
+    const changes = [];
+    if (ranges.some((r) => !r.empty)) {
+      const lines = new Set();
+      for (const r of ranges) {
+        const first = st.doc.lineAt(r.from), last = st.doc.lineAt(r.to);
+        for (let n = first.number; n <= last.number; n++) lines.add(n);
+      }
+      for (const n of [...lines].sort((a, b) => a - b)) {
+        const line = st.doc.line(n);
+        const depth = codeBlockAt(st, line.from)?.depth ?? 0;
+        const off = quoteLead(line.text, depth).off;
+        if (outdent) {
+          const body = line.text.slice(off);
+          const strip = body.startsWith('  ') ? 2 : (body.startsWith(' ') ? 1 : 0);
+          if (strip) changes.push({ from: line.from + off, to: line.from + off + strip, insert: '' });
+        } else changes.push({ from: line.from + off, insert: '  ' });
+      }
+      if (!changes.length) return true;
+    } else if (outdent) {
+      for (const r of ranges) {
+        const line = st.doc.lineAt(r.from);
+        const off = quoteLead(line.text, codeBlockAt(st, r.from)?.depth ?? 0).off;
+        const body = line.text.slice(off);
+        const strip = body.startsWith('  ') ? 2 : (body.startsWith(' ') ? 1 : 0);
+        if (strip) changes.push({ from: line.from + off, to: line.from + off + strip, insert: '' });
+      }
+      if (!changes.length) return true;
+    } else {
+      for (const r of ranges) changes.push({ from: r.from, insert: '  ' });
+    }
+    try { view.dispatch(st.update({ changes, userEvent: 'input.indent' })); } catch { return false; }
+    return true;
+  };
   const fenceIndent = (view, outdent) => {
     const st = view.state;
-    if (st.selection.ranges.length !== 1) return false;
+    if (st.selection.ranges.length !== 1) return fenceIndentMulti(view, outdent, st.selection.ranges);
     if (!inCodeFence(st, st.selection.main.head)) return false;      // 不在代码块 ⇒ 让位给列表/表格/默认行为
     const r = st.selection.main;
+    /* 【有选区＝整段缩进/反缩进·2026-10-17 实测缺陷】改前非空选区直接走
+       `{from:r.from, to:r.to, insert:'  '}` ⇒ **选中两行代码按 Tab，两行被两个空格替换**：
+       实测夹具 ```js\nconst a = 1;\nconst b = 2;\n``` 选中两行按 Tab ⇒ 正文变成 ```js\nc  ;\n```，
+       用户选中的代码整段消失（只能 Ctrl+Z 找回）。空选区（折叠光标）路径本来就是对的。
+       这里对有选区按**行首**插/剥两空格（引用前缀之后），选区用 ChangeSet.mapPos 映射。 */
+    if (!r.empty) {
+      const depth = codeBlockAt(st, r.from)?.depth ?? 0;
+      const changes = [];
+      const first = st.doc.lineAt(r.from), last = st.doc.lineAt(r.to);
+      for (let n = first.number; n <= last.number; n++) {
+        const line = st.doc.line(n);
+        const off = quoteLead(line.text, depth).off;
+        if (outdent) {
+          const body = line.text.slice(off);
+          const strip = body.startsWith('  ') ? 2 : (body.startsWith(' ') ? 1 : 0);
+          if (strip) changes.push({ from: line.from + off, to: line.from + off + strip, insert: '' });
+        } else {
+          changes.push({ from: line.from + off, insert: '  ' });
+        }
+      }
+      if (!changes.length) return true;                              // 反向但都顶格 ⇒ 吃掉按键
+      try {
+        const tr = st.update({ changes, userEvent: 'input.indent' });
+        view.dispatch(tr);
+        view.dispatch({ selection: EditorSelection.range(tr.changes.mapPos(r.anchor, 1), tr.changes.mapPos(r.head, 1)) });
+      } catch { return false; }
+      return true;
+    }
     if (outdent) {
       const line = st.doc.lineAt(r.from);
       const off = quoteLead(line.text, codeBlockAt(st, r.from).depth).off;
@@ -3813,15 +4518,15 @@ export function installExtras(deps) {
     try { window.__tabSel = (window.__tabSel || 0) + 1; } catch { /* 忽略 */ }
     try {
       const tr = view.state.update({ changes, userEvent: 'input.indent' });
-      /* 选区整体平移：行首插入会让 from/to 右移，逐行累加插入量 ✓ */
-      let addFrom = 0, addTo = 0;
-      for (const c of changes) {
-        const n = outdent ? 0 : 2;
-        if (c.from <= r.from) addFrom += n - (c.to - c.from);
-        if (c.from <= r.to) addTo += n - (c.to - c.from);
-      }
+      /* 【用引擎映射·2026-10-17 实测缺陷】改前这里手算 `addFrom/addTo`：
+         · 缩进分支的 changes 只有 `{from, insert}`、**没有 `to`** ⇒ `c.to - c.from` 是 NaN
+           ⇒ 第二条 dispatch 的选区是 NaN（异常被下面的 catch 吞掉，命令"看起来成功"）；
+         · 反缩进分支把"行首删除"也当成"整体左移 2" ⇒ 选区起点被抬进**上一行**：
+           实测 `- 项目一 /   continuation A /   continuation B` 从续行行首选到行尾按 Shift+Tab，
+           anchor 6 → 4（选中文本变成 `一\ncontinuation A…`，后续键入会吃掉上一行末字）。
+         一律改用 ChangeSet.mapPos(…, 1)：插入 ⇒ 落在前缀之后；删除 ⇒ 留在删除处。 */
       view.dispatch(tr);
-      view.dispatch({ selection: { anchor: Math.max(0, r.from + addFrom), head: Math.max(0, r.to + addTo) } });
+      view.dispatch({ selection: EditorSelection.range(tr.changes.mapPos(r.anchor, 1), tr.changes.mapPos(r.head, 1)) });
     } catch { return false; }
     return true;
   };
@@ -3868,8 +4573,15 @@ export function installExtras(deps) {
   });
 
   return {
-    extension: [tableKeys, codeFenceKeys, tabPolicyKeys, toolbarScrollMargins],
-    toolbarClick, applyPalette, toggleOutline, exportHtml, exportFolder, copyRich, copyTable, tableOp, setAlign, alignAt, about, help, shortcutDialog, rebindKeys, PALETTES,
+    extension: [tableKeys, codeFenceKeys, tabPolicyKeys, toolbarScrollMargins,
+      /* 【#47·2026-10-18 NX2】文档变更后 150ms 去抖重建已打开的大纲；未打开时零开销。 */
+      ...(deps.EditorView?.updateListener ? [deps.EditorView.updateListener.of((u) => {
+        if (!u.docChanged || (!outlineEl && !dockEl)) return;
+        clearTimeout(outlineRefreshTimer);
+        outlineRefreshTimer = setTimeout(refreshOutline, 150);
+      })] : [])],
+    toast, /* 【#38】块级命令的表内拒绝提示与引擎其他提示同一条通道（toolbar.js 调用） */
+    toolbarClick, applyPalette, toggleOutline, refreshOutline, exportHtml, exportFolder, copyRich, copyTable, tableOp, setAlign, alignAt, about, help, shortcutDialog, rebindKeys, PALETTES,
     /* 【Typora 社区主题】安装/移除/读数：`installTyporaThemeFromText` 是**核心**（对话框与探针同源），
        `installTyporaTheme` 走壳层选文件；`userThemeInfo` 供设置面板与取证读当前状态。 */
     installTyporaTheme, installTyporaThemeFromText, removeTyporaTheme, userThemeInfo, refreshAppearance,

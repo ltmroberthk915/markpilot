@@ -2,14 +2,14 @@
  *
  * 为什么是"同一份文档"而不是"两套文档"：
  *   · md 是唯一真源 —— 零 doc↔md 转换层、零块锚表（v2.3.3 的锚表在 167k 就要 336ms/次）；
- *   · 两个视图共享同一个 `Text`（CM6 的 Text 是不可变持久结构，`EditorState.create({doc})`
- *     只是**引用**它，不做拷贝）⇒ 两个视图的 pos 坐标系逐位相同，不存在"渲染坐标↔源码坐标"换算误差；
+ *   · 主视图是唯一权威文档；初开/回退可共享不可变 Text，正常编辑按实际组合 ChangeSet
+ *     更新从视图的派生 Text。两边 UTF-16 内容一致、pos 坐标逐位相同；引用同一性仅作诊断；
  *   · 从视图没有历史扩展 ⇒ 不存在第二套撤销栈（比 v2.3.3 好）。
  *
  * 四条能效约束（缺一条就会破坏当前架构，落地前必须逐条验）：
  *   ① 从视图**最小扩展集**：不带数学/表格/行内标记那套装饰 ⇒ 不重复跑每键 4 次全文扫描；
- *   ② 状态同步用 `slave.setState(...)` 转发，**不是**再 dispatch 事务
- *      ⇒ 不二次记账、不回环（从视图无 updateListener ⇒ 主视图 updateListener 不会被自己触发）；
+ *   ② 正常同步用从视图自身 state 的公开增量 update；断链/替换用 setState 回退，
+ *      不转发主事务、选择和 effects；从视图无本地 dispatch、历史和 updateListener，不回写主文档；
  *   ③ **分屏关闭时零成本**：mirror() 第一行就返回（"不开就没有开销"，不是"开了稍微贵点"）；
  *   ④ 滚动同步**不依赖 rAF 存活**（事件驱动 + driver 标记 + 预期滚动登记 + visibilitychange 复位）
  *      ⇒ 最小化/遮挡恢复后不脱节；对齐用**内容坐标**（posAtCoords → lineBlockAt）⇒ 与缩放无关；
@@ -22,8 +22,8 @@
  *   `this.plugins = this.state.facet(viewPlugin)...`）——给了 `state` 时 `extensions` 被整条忽略。
  *   照字面写，从视图会把主视图的装饰（KaTeX 公式、表格、标题、行内标记）**再渲染一遍**，且
  *   `EditorView.editable.of(false)` 失效（从视图变成可编辑、编辑后走空 dispatch）。
- *   故这里改为：从视图持有**自己的最小 state**，文档对象取自主视图（`master.state.doc`，同一 Text），
- *   同步仍是 `slave.setState(...)` 转发（约束②不变），关闭零成本与内容坐标对齐照旧。
+ *   从视图持有自己的最小只读 state。C16 使用派生 Text 的公开增量更新，
+ *   初开/断链/文档替换保留全量回退；关闭零成本与内容坐标对齐照旧。
  */
 import { EditorView } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
@@ -32,7 +32,7 @@ const ANCHOR_RATIO = 0.30;   // 取主视图视口 30% 高度处的像素锚（M
 
 export function installSplit(deps) {
   const { getView, focusSelection } = deps;
-  let pane = null, slave = null, driver = null, expectedScroll = -1, expectedMasterScroll = -1, hlLine = null, slaveDoc = null, correctTimer = null;
+  let pane = null, slave = null, driver = null, expectedScroll = -1, expectedMasterScroll = -1, hlLine = null, slaveDoc = null, slaveLocalDoc = null, correctTimer = null;
 
   const isOpen = () => !!slave;
 
@@ -41,6 +41,68 @@ export function installSplit(deps) {
     return EditorState.create({
       doc,
       extensions: [EditorState.readOnly.of(true), EditorView.editable.of(false), EditorView.lineWrapping],
+    });
+  }
+
+  // A mirrored source view is an output while its two CM height maps settle.
+  // Every stage is bounded; a newer input retires it before it can realign.
+  let mirrorPending = null, mirrorInputElement = null;
+  const mirrorMeasureKeys = [{}, {}, {}, {}];
+  const mirrorInputTypes = ['wheel', 'pointerdown', 'keydown', 'focusin'];
+  function retireMirror(ticket = mirrorPending) {
+    if (!ticket) return;
+    ticket.active = false;
+    if (mirrorPending === ticket) mirrorPending = null;
+  }
+  function ownsMirror(ticket) {
+    return !!ticket && ticket.active && mirrorPending === ticket &&
+      getView() === ticket.master && slave === ticket.source && slaveDoc === ticket.masterDoc && slaveLocalDoc === ticket.localDoc &&
+      ticket.master.state.doc === ticket.masterDoc && ticket.source.state.doc === ticket.localDoc &&
+      deps.intentSerial?.() === ticket.serial && ticket.master.dom.isConnected && ticket.source.dom.isConnected;
+  }
+  function sourceTakesOver(event) {
+    if (!event.isTrusted) return;
+    retireMirror();
+    if (correctTimer) { correctTimer.clear(); correctTimer = null; }
+    expectedScroll = expectedMasterScroll = -1;
+  }
+  function bindMirrorInput() {
+    mirrorInputElement = slave.dom;
+    for (const type of mirrorInputTypes) mirrorInputElement.addEventListener(type, sourceTakesOver, { capture: true, passive: true });
+  }
+  function unbindMirrorInput() {
+    if (mirrorInputElement) for (const type of mirrorInputTypes) mirrorInputElement.removeEventListener(type, sourceTakesOver, true);
+    mirrorInputElement = null;
+    retireMirror();
+  }
+  function afterMirrorMeasure(ticket, target, stage, next) {
+    target.requestMeasure({ key: mirrorMeasureKeys[stage],
+      read: () => ownsMirror(ticket),
+      write(ok) {
+        if (!ok || !ownsMirror(ticket)) { retireMirror(ticket); return; }
+        queueMicrotask(() => {
+          if (!ownsMirror(ticket)) { retireMirror(ticket); return; }
+          try { next(); } catch (error) { retireMirror(ticket); console.error('[split] mirror settlement', error); }
+        });
+      },
+    });
+  }
+  function settleMirror(ticket) {
+    afterMirrorMeasure(ticket, ticket.source, 0, () => {
+      // Reading the master anchor can synchronously flush its measure. Queue an
+      // explicit master tail first, so rollback's viewport microtask runs first.
+      afterMirrorMeasure(ticket, ticket.master, 1, () => {
+        alignSlaveToMaster();
+        afterMirrorMeasure(ticket, ticket.source, 2, () => {
+          alignSlaveToMaster();
+          // The last alignment itself requests a source measure. Finish that
+          // tail before registering its delivered scroll echo and releasing it.
+          afterMirrorMeasure(ticket, ticket.source, 3, () => {
+            expectedScroll = ticket.source.scrollDOM.scrollTop;
+            retireMirror(ticket);
+          });
+        });
+      });
     });
   }
 
@@ -62,9 +124,13 @@ export function installSplit(deps) {
     slave = new EditorView({
       state: sourceState(slaveDoc),      // ① 最小扩展集 + 同一 Text 引用
       parent: pane,
-      dispatch: () => { },               // 从视图只接受 setState，不接受本地分发
+      dispatch: () => { },               // 从视图由镜像 API 更新，禁止本地分发
     });
+    /* 【C16】双引用：slaveDoc=上次成功镜像的 master Text；slaveLocalDoc=同次成功后
+       实际 source.state.doc。初开两者同根；增量后 local 是同 changes 派生的只读根。 */
+    slaveLocalDoc = slave.state.doc;
     slave.dom.classList.add('mp-split-source');
+    bindMirrorInput();
 
     // ④-1 滚动：事件驱动，不用 rAF；用 driver 标记 + 预期值登记防回环
     a.scrollDOM.addEventListener('scroll', onMasterScroll, { passive: true });
@@ -94,6 +160,7 @@ export function installSplit(deps) {
   }
 
   function close() {
+    unbindMirrorInput();
     const a = getView();
     if (a) { a.scrollDOM.removeEventListener('scroll', onMasterScroll); a.dom.removeEventListener('mousedown', onMasterClick, true); }
     document.removeEventListener('visibilitychange', onVisibility);
@@ -101,19 +168,116 @@ export function installSplit(deps) {
     if (pane) { pane.remove(); pane = null; }
     const hostEl = a && (a.dom.parentElement || document.body);
     if (hostEl) hostEl.classList.remove('mp-split-on');
-    hlLine = null; driver = null; slaveDoc = null;
+    hlLine = null; driver = null; slaveDoc = null; slaveLocalDoc = null;
+    expectedScroll = expectedMasterScroll = -1;
     if (correctTimer) { correctTimer.clear(); correctTimer = null; }
     return true;
   }
 
   const toggle = () => (isOpen() ? close() : open());
 
-  /* ── ② 状态镜像：主视图每次更新后由宿主调用；关闭时**第一行返回**（约束③） ── */
-  function mirror(state) {
+  /* 【C16】真实文档同步时使高亮派生态失效：仅当存在标记时清当前已有 marker，
+     随后清缓存；无高亮的热路径不做任何 DOM 查询。 */
+  function retireHighlightOnDocSync() {
+    if (hlLine === null) return;
+    hlLine = null;
+    for (const el of slave.dom.querySelectorAll('.cm-line[data-mp-hl]')) el.removeAttribute('data-mp-hl');
+  }
+  /* 写入资格与自动对齐资格分开：source intent 可以取消对齐，但同 owner 的内容仍须同步。
+     before 双缓存同时阻止已经完成并退役的新一代镜像被旧调用覆盖。 */
+  function mirrorWriteCurrent(ticket) {
+    return !!ticket && getView() === ticket.master && slave === ticket.source &&
+      ticket.master.state.doc === ticket.masterDoc &&
+      (ticket.source.state === ticket.beforeState || ticket.source.state === ticket.plannedState) &&
+      slaveDoc === ticket.beforeMasterDoc && slaveLocalDoc === ticket.beforeLocalDoc &&
+      (mirrorPending === ticket || (!ticket.active && mirrorPending === null)) &&
+      ticket.master.dom.isConnected && ticket.source.dom.isConnected;
+  }
+  /* 原增量错误只允许一次 full；full 自己只关闭仍归本次写入所有的 pane。 */
+  function mirrorFallback(state, master, ticket, error) {
+    const owned = mirrorWriteCurrent(ticket);
+    const realign = ticket.active && mirrorPending === ticket && deps.intentSerial?.() === ticket.serial;
+    retireMirror(ticket);
+    if (owned) {
+      try { if (mirrorFull(state, master, ticket, realign)) return; }
+      catch (fallbackError) { throw error; }
+    }
+    throw error;
+  }
+  /* ── ② 状态镜像：主视图每次更新后由宿主调用；关闭时**第一行返回**（约束③） ──
+     【C16·公开增量】delta 仅由正常 !suppressChange 且分屏打开的 updateListener 传入；
+     setValue/rollback/replaceDocument 不带 delta，保持整 state 路线。 */
+  function mirror(state, delta) {
     if (!slave) return;
-    if (state.doc === slaveDoc) return;   // 纯选区/几何更新（Text 对象未变）⇒ 零工作
-    slaveDoc = state.doc;
-    slave.setState(sourceState(state.doc));   // 同一 Text 引用 ⇒ 单源、无二次事务、不回环
+    const master = getView(); if (!master) return;
+    const source = slave;
+    /* 陈旧入参先于任何退役拒绝。 */
+    if (state.doc !== master.state.doc) return;
+    if (state.doc === slaveDoc && source.state.doc === slaveLocalDoc) return;
+    const incremental = !!(delta && delta.from === slaveDoc && state.doc !== slaveDoc
+      && source.state.doc === slaveLocalDoc
+      && delta.changes && !delta.changes.empty
+      && delta.changes.newLength === state.doc.length
+      && delta.changes.length === delta.from.length);
+    if (incremental) {
+      retireMirror();
+      if (correctTimer) { correctTimer.clear(); correctTimer = null; }
+      expectedScroll = expectedMasterScroll = -1;
+      retireHighlightOnDocSync();
+      const ticket = mirrorPending = { active: true, master, source, masterDoc: state.doc, localDoc: null,
+        beforeMasterDoc: slaveDoc, beforeLocalDoc: slaveLocalDoc, beforeState: source.state, plannedState: null, serial: deps.intentSerial?.() };
+      const startState = ticket.beforeState;
+      try {
+        const tr = startState.update({ changes: delta.changes, selection: { anchor: 0 } });
+        if (!mirrorWriteCurrent(ticket)) { retireMirror(ticket); return; }
+        if (source.state !== startState) throw new Error('split source state changed during mirror preparation');
+        ticket.plannedState = tr.state; ticket.localDoc = ticket.plannedState.doc; /* 真实计划 state/local 在 view 写入之前登记 */
+        if (!mirrorWriteCurrent(ticket) || source.state !== startState) { retireMirror(ticket); return; }
+        source.update([tr]);
+        if (!mirrorWriteCurrent(ticket)) { retireMirror(ticket); return; }
+        if (source.state.doc !== ticket.localDoc) throw new Error('split incremental mirror did not install its planned document');
+      } catch (error) { return mirrorFallback(state, master, ticket, error); }
+      slaveDoc = ticket.masterDoc; slaveLocalDoc = ticket.localDoc;
+      if (ownsMirror(ticket)) {
+        try { settleMirror(ticket); } catch (error) { retireMirror(ticket); throw error; }
+      } else { retireMirror(ticket); }
+      return;
+    }
+    mirrorFull(state, master);
+  }
+  function mirrorFull(state, master, prior = null, realign = true) {
+    if (prior && !mirrorWriteCurrent(prior)) return false;
+    const source = prior ? prior.source : slave;
+    if (!source || getView() !== master || master.state.doc !== state.doc) return false;
+    retireMirror(prior || mirrorPending);
+    if (correctTimer) { correctTimer.clear(); correctTimer = null; }
+    expectedScroll = expectedMasterScroll = -1;
+    retireHighlightOnDocSync();
+    const serial = deps.intentSerial?.();
+    const ticket = mirrorPending = { active: realign && (!prior || serial === prior.serial), master, source,
+      masterDoc: state.doc, localDoc: null, beforeMasterDoc: slaveDoc, beforeLocalDoc: slaveLocalDoc, beforeState: source.state, plannedState: null, serial };
+    try {
+      const fresh = sourceState(state.doc);
+      if (!mirrorWriteCurrent(ticket)) { retireMirror(ticket); return false; }
+      ticket.plannedState = fresh; ticket.localDoc = fresh.doc; /* setState 前绑定实际计划 state/local */
+      if (!mirrorWriteCurrent(ticket)) { retireMirror(ticket); return false; }
+      source.setState(fresh);
+      if (!mirrorWriteCurrent(ticket)) { retireMirror(ticket); return false; }
+      if (source.state.doc !== ticket.localDoc) throw new Error('split full mirror did not install its planned document');
+    } catch (error) {
+      const owned = mirrorWriteCurrent(ticket);
+      retireMirror(ticket);
+      if (owned) {
+        slaveDoc = null; slaveLocalDoc = null;
+        try { close(); } catch { /* 已尝试退役本 owned pane，原同步错误继续上抛 */ }
+      }
+      throw error;
+    }
+    slaveDoc = ticket.masterDoc; slaveLocalDoc = ticket.localDoc;
+    if (ownsMirror(ticket)) {
+      try { settleMirror(ticket); } catch (error) { retireMirror(ticket); throw error; }
+    } else { retireMirror(ticket); }
+    return true;
   }
 
   /* ── ④ 滚动对齐：内容坐标像素锚 ──
@@ -194,14 +358,21 @@ export function installSplit(deps) {
       yNow = b.top + mapOffset(view) + (frac > 0 ? frac * b.height : 0);
     }
     const target = Math.max(0, sc.scrollTop + (yNow - sc.clientHeight * ANCHOR_RATIO));
-    if (Math.abs(sc.scrollTop - target) > 1) { sc.scrollTop = target; view.requestMeasure(); return target; }
+    const before = sc.scrollTop;
+    if (Math.abs(before - target) > 1) {
+      sc.scrollTop = target;
+      const actual = sc.scrollTop;
+      view.requestMeasure();
+      return Math.abs(actual - before) > 1 ? actual : -1;
+    }
     return -1;
   }
   function onMasterScroll() {
     if (!slave || driver) return;
     const a = getView(); if (!a) return;
-    // 程序化滚动回声：本函数上一步刚把主视图赋到 expectedMasterScroll，浏览器随后补发的 scroll 事件吞掉
-    if (expectedMasterScroll >= 0 && Math.abs(a.scrollDOM.scrollTop - expectedMasterScroll) <= 1) return;
+    const expected = expectedMasterScroll; expectedMasterScroll = -1; // 一次回声：读到即清
+    // 程序化滚动回声：仅吞本次登记值；不匹配就是真实驱动
+    if (expected >= 0 && Math.abs(a.scrollDOM.scrollTop - expected) <= 1) return;
     driver = 'master';
     alignSlaveToMaster();
     driver = null;
@@ -215,11 +386,15 @@ export function installSplit(deps) {
     const frac = fracAt(slave, ap.y, ap.pos, ap.scale);
     const t = scrollViewToAnchor(a, ap.pos, frac);
     if (t >= 0) expectedMasterScroll = t;   // 登记主视图预期位置，吞掉它随后补发的 scroll 回声（防两侧乒乓）
-    expectedScroll = Math.max(0, slave.scrollDOM.scrollTop);
   }
   function onSlaveScroll() {
     if (!slave || driver) return;
-    if (expectedScroll >= 0 && Math.abs(slave.scrollDOM.scrollTop - expectedScroll) <= 1) return; // 程序化滚动回声：吞掉
+    if (mirrorPending) {
+      if (ownsMirror(mirrorPending)) { expectedScroll = -1; return; }
+      retireMirror();
+    }
+    const expected = expectedScroll; expectedScroll = -1; // 一次回声：读到即清
+    if (expected >= 0 && Math.abs(slave.scrollDOM.scrollTop - expected) <= 1) return; // 程序化滚动回声：吞掉
     if (!getView()) return;
     driver = 'slave';
     syncFromSlave();
@@ -232,12 +407,16 @@ export function installSplit(deps) {
   const correctionKey = {};
   function scheduleCorrect(fn) {
     correctTimer?.clear();
-    const master=getView(),source=slave,doc=master?.state.doc,serial=deps.intentSerial?.();
+    const master=getView(),source=slave,doc=master?.state.doc,serial=deps.intentSerial?.(),localDoc=source?source.state.doc:null;
     if(!master||!source)return;
     const ticket={active:true,clear(){this.active=false;}};correctTimer=ticket;
     master.requestMeasure({key:correctionKey,
-      read:()=>ticket.active&&slave===source&&master.state.doc===doc&&deps.intentSerial?.()===serial,
-      write(ok){ticket.active=false;if(correctTimer===ticket)correctTimer=null;if(ok)try{fn();}catch{/* pane retired */}}
+      read:()=>ticket.active&&correctTimer===ticket&&getView()===master&&slave===source&&master.state.doc===doc&&source.state.doc===localDoc&&deps.intentSerial?.()===serial,
+      write(ok){
+        const current=ok&&ticket.active&&correctTimer===ticket&&getView()===master&&slave===source&&master.state.doc===doc&&source.state.doc===localDoc&&deps.intentSerial?.()===serial;
+        ticket.active=false;if(correctTimer===ticket)correctTimer=null;
+        if(current)try{fn();}catch{/* pane retired */}
+      }
     });
   }
   function alignSlaveToMaster(posHint, yHint) {
@@ -268,14 +447,28 @@ export function installSplit(deps) {
   function highlightSlave(pos) {
     if (!slave) return;
     const line = slave.state.doc.lineAt(pos);
-    if (hlLine === line.from) return;
-    hlLine = line.from;
+    /* 【C13·镜像后同线高亮失效】slave.setState 镜像时整体重建从视图 DOM，旧标记
+     * 元素随之退役；hlLine 缓存只有在「当前 slave DOM 上确实挂着已连接的
+     * data-mp-hl 元素、且 posAtDOM 仍把它反查回目标行」时才允许快速返回。
+     * 缺失/退役/错行/反查抛错都落到原有的清标记+视口内查找路径。 */
+    if (hlLine === line.from) {
+      const marks = slave.dom.querySelectorAll('.cm-line[data-mp-hl]');
+      const el = marks.length === 1 ? marks[0] : null;
+      let cp = null;
+      if (el && el.isConnected && slave.dom.contains(el)) {
+        try { cp = slave.posAtDOM(el); } catch { cp = null; }
+      }
+      if (cp != null && cp >= line.from && cp <= line.to) return;
+    }
+    /* 只有真实匹配的当前行被标记后才写缓存；重试前先清空，视口外/查找失败
+     * 不会把脏值留给下一次点击。 */
+    hlLine = null;
     const lines = slave.dom.querySelectorAll('.cm-line');
     for (const el of lines) el.removeAttribute('data-mp-hl');
     for (const el of lines) {
       let p = null;
       try { p = slave.posAtDOM(el); } catch { p = null; }
-      if (p != null && p >= line.from && p <= line.to) { el.setAttribute('data-mp-hl', '1'); return; }
+      if (p != null && p >= line.from && p <= line.to) { el.setAttribute('data-mp-hl', '1'); hlLine = line.from; return; }
     }
   }
 

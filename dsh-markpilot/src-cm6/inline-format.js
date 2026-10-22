@@ -1,4 +1,4 @@
-import { parser, Strikethrough } from '@lezer/markdown';
+import { parser, Strikethrough, InlineContext } from '@lezer/markdown';
 import { inlineImageAtoms } from './resource-images.js';
 
 // One source-only projection for cells and HTML exits. The editor continues to
@@ -10,6 +10,18 @@ const inlineParser = parser.configure([Strikethrough, {
     'BulletList', 'OrderedList', 'ATXHeading', 'HTMLBlock', 'SetextHeading', 'LinkReference'],
   defineNodes: ['Underline', 'UnderlineMark', 'SourceMath', 'SourceImage'],
   parseInline: [{
+    name: 'SourceLiteralLinkText', before: 'LinkEnd',
+    parse(cx, next, pos) {
+      if (next !== 93 || cx.char(pos + 1) === 40) return -1;
+      const link = cx.findOpeningDelimiter(InlineContext.linkStart);
+      if (link == null) return -1;
+      const image = cx.findOpeningDelimiter(InlineContext.imageStart);
+      if (image != null && image > link) return -1;
+      const content = cx.takeContent(link);
+      for (const child of content) cx.addElement(child);
+      return pos + 1;
+    },
+  }, {
     name: 'SourceImage', before: 'HTMLTag',
     parse(cx, next, pos) {
       if (next !== 33 && next !== 60) return -1;
@@ -60,6 +72,26 @@ function treeOf(source) {
     }
   }
   return tree;
+}
+
+export function inlineLinkSpans(source) {
+  const s = String(source ?? '');
+  if (!s.includes('[')) return [];
+  const out = [];
+  const skip = new Set(['Image', 'SourceImage', 'InlineCode', 'SourceMath']);
+  const stack = [treeOf(s).topNode];
+  while (stack.length) {
+    const node = stack.pop();
+    for (let child = node.firstChild; child; child = child.nextSibling) {
+      if (child.name === 'Link') {
+        if (s[child.from] !== '[') continue;
+        const url = child.getChild('URL'), marks = child.getChildren('LinkMark');
+        if (url && marks.length >= 2) out.push({ from: child.from, to: child.to,
+          hides: [[child.from, marks[0].to], [marks[1].from, child.to]] });
+      } else if (!skip.has(child.name)) stack.push(child);
+    }
+  }
+  return out.sort((a, b) => a.from - b.from);
 }
 
 export function renderInlineSegment(value, options = {}) {

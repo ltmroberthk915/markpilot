@@ -43,11 +43,11 @@ import { createCommandContext, applySourceHistory } from './command-context.js';
 import { editPlan, inlineCodeRanges, rangesTouching } from './edit-plan.js';
 import { installToolbar, wrap as wrapInline, TOOLBAR_ACTIONS } from "./toolbar.js";
 import { installExtras } from "./extras.js";
-import { renderInline } from './inline-format.js';
+import { renderInline, inlineLinkSpans } from './inline-format.js';
 import { fileUrlOfPath, resolveImageSource, hasImageCandidate } from './image-path.js';
 import { imageInsertions, cancelImageInsertions } from './image-insertion.js';
 import { mappedMathSource, mathSourcePosition } from './math-source-map.js';
-import { mappedCellSource, cellSourceOffset, cellTextOffset, cellTextChange } from './cell-source-map.js';
+import { mappedCellSource, cellSourceOffset, cellTextOffset, cellTextChange, encodeCellText } from './cell-source-map.js';
 import { installSplit } from "./splitview.js";
 import { editorFontVarsCss, editorHeadingsCss, editorContentMetricsCss, editorKaiRuleCss, editorKaiStyle, exportTypoCss } from "./typography.js";
 
@@ -749,6 +749,10 @@ function buildStatusBar() {
     mpZoomTo(v, true);
   };
   inp.addEventListener("keydown", (e) => {
+    /* 【#50·2026-10-18 实测缺陷 M4】IME 组字中的 Enter/Esc 是"上屏/取消候选"，不是提交：
+       改前不查 isComposing ⇒ 用中文/数字输入法按回车上屏时提前提交（实测组字 "12" 叠进 100
+       得到 12100、回车直接提交成 300% 并 blur）。与搜索框（extras.js:165）同口径。 */
+    if (e.isComposing || e.keyCode === 229) return;
     // 只认 Enter / Esc；其余按键留给浏览器（不改文档、不冒泡到编辑器快捷键）
     if (e.key === "Enter") { e.preventDefault(); commit(); inp.blur(); }
     else if (e.key === "Escape") { e.preventDefault(); inp.value = String(mpPref("zoom")); inp.blur(); }
@@ -865,6 +869,12 @@ const imgBaseField = StateField.define({
   create: () => 0,
   update(v, tr) { for (const e of tr.effects) if (e.is(imgBaseBump)) return v + 1; return v; },
 });
+/** Preview-only generation; never reuse imgBaseBump (it changes region/session/math context). */
+const imgPreviewBump = StateEffect.define();
+const imgPreviewField = StateField.define({
+  create: () => 0,
+  update(v, tr) { for (const e of tr.effects) if (e.is(imgPreviewBump)) return v + 1; return v; },
+});
 function mpApplyHostDocDir() {
   try {
     const dir = (typeof window.__mpDocDir === "string" && window.__mpDocDir) ? window.__mpDocDir : "";
@@ -874,6 +884,7 @@ function mpApplyHostDocDir() {
       mpImgLoadState.clear(); mpImgTries.clear();
       view.dispatch({ effects: [imgBaseBump.of(null), cancelImageInsertions.of(null)] });
       view.requestMeasure();
+      prefetchSelectionImages(view); scheduleImgPrefetch(view);
     }
   } catch (e) { console.error("[mp] 文档目录同步失败：", e); }
 }
@@ -1096,6 +1107,11 @@ const mathSpansField = StateField.define({
 });
 
 function scanMathSpans(doc, blocks = scanFencedBlocks(doc), structure = scanStructuralContext(doc)) {
+  let hasDollar = false;
+  for (const t of doc.iterLines()) {
+    if (t.includes("$")) { hasDollar = true; break; }
+  }
+  if (!hasDollar) return [];
   const spans = [];
   const fenceGroups = [[]];
   let fences = fenceGroups[0];
@@ -1105,12 +1121,15 @@ function scanMathSpans(doc, blocks = scanFencedBlocks(doc), structure = scanStru
   let openSingleFrom = 0;
   /** 行内 `$…$` 扫描（与主路径同口径） */
   function pushInline(line) {
-    const re = /(^|[^\\$])\$([^$\n]+)\$/g;
+    const re = /(^|[^\\$])\$((?:\\[^\n]|[^$\n\\])+?)\$/g;
     const code = inlineCodeRanges(line.text);
     let m;
     while ((m = re.exec(line.text))) {
       const start = line.from + m.index + m[1].length;
       if (code.some(([a,b]) => start < line.from+b && start+m[2].length+2 > line.from+a)) continue;
+      /* 【#29·2026-10-17】内容 trim 后为空（美元符加空格再加美元符）不算公式：
+         否则被换成空 widget，那几个字符从屏幕上消失、也点不中。与格内/导出扫描器口径一致。 */
+      if (!m[2].trim()) continue;
       spans.push({ from: start, to: start + m[2].length + 2, tex: m[2], display: false, texFrom: start + 1 });
     }
   }
@@ -1124,13 +1143,17 @@ function scanMathSpans(doc, blocks = scanFencedBlocks(doc), structure = scanStru
     }
     // ① 已开启跨行形态：本行只要「以 $$ 收尾」就闭合（含整行只有 $$ 的情况，允许尾随空白）
     /* 【单 $ 跨多行·引用区】各行的 `> ` 前缀要剥掉再拼 tex，否则 KaTeX 会吃到 '>'。 */
-    const qm = /^[ \t]*(?:>[ \t]?)+/.exec(t);
-    const qOff = structuralContextAt(structure,line.from)?.lead ?? (qm ? qm[0].length : 0);
+    /* 前缀判据唯一化（#15/TBL-3）。 */
+    const qOff = structuralContextAt(structure,line.from)?.lead ?? tableLead(t).off;
     const qText = t.slice(qOff);
     if (openSingle) {
       const body = qText;
-      if (body.endsWith("$")) {
-        openSingle.parts.push({ text: body.slice(0, -1), from: line.from + qOff });
+      /* 空行＝段落边界（MTH-01：跨行单 $ 不许跨段落吞并）。 */
+      if (!body.trim()) { openSingle = null; continue; }
+      /* 闭合判据与 $ 形态同源：容忍 $ 后的行尾空白（实测 b$ 带尾随空格此前永不闭合）。 */
+      const closeAt = body.search(/[$][ \t]*$/);
+      if (closeAt >= 0) {
+        openSingle.parts.push({ text: body.slice(0, closeAt), from: line.from + qOff });
         const source = mappedMathSource(openSingle.parts);
         openSingle = null;
         if (source.tex) spans.push({ from: openSingleFrom, to: line.to, ...source, display: true });
@@ -1161,7 +1184,8 @@ function scanMathSpans(doc, blocks = scanFencedBlocks(doc), structure = scanStru
       const cm = /\$\$\s*$/.exec(t);
       if (cm) {
         const texEnd = line.from + cm.index;
-        const raw = doc.sliceString(openDollar.texFrom, texEnd);
+        let raw = doc.sliceString(openDollar.texFrom, texEnd);
+        if (openDollar.quoted) raw = raw.split("\n").map((l) => l.replace(/^[ \t]*(?:>[ \t]?)+/, "")).join("\n");
         const lead = raw.length - raw.trimStart().length;
         spans.length = tentativeFrom; // 区内"临时行内 span"作废（会与块级 replace 装饰重叠→CM6 抛错）
         if (raw.trim()) spans.push({ from: openDollar.from, to: texEnd + 2, tex: raw.trim(), display: true, texFrom: openDollar.texFrom + lead });
@@ -1192,11 +1216,14 @@ function scanMathSpans(doc, blocks = scanFencedBlocks(doc), structure = scanStru
     //     …\end{aligned}$$
     //   旧扫描只认「整行 $$」围栏对与「单行 $$…$$」——这种形态两条都不沾，整段当普通文本
     //   （实机取证：第 4675–4678 行 katex=0/mathSpan=0，而紧邻段落的行内公式 katex=6）。
-    const om = /^\s*\$\$(?=\S)/.exec(t);
+    /* MTH-02/03：引用前缀与 $ 后空白两种合法跨行写法都要开口。 */
+    const om = /^\s*\$\$(?=\s*\S)/.exec(qText);
     if (om) {
-      const rest = t.slice(om[0].length);
-      if (!rest.endsWith("$$")) {
-        openDollar = { from: line.from, texFrom: line.from + om[0].length };
+      const rest = qText.slice(om[0].length);
+      /* 【#28 实测缺陷·2026-10-17】本行已有第二对 $ 时不是跨行开口（如 \`$x$ 正文\`）：
+         否则扫描会一路吞到下一个以 $ 结尾的行，把正文和后续块公式一起变成 katex-error。 */
+      if (!/\$[$]/.test(rest) && !rest.trimEnd().endsWith("$")) {
+        openDollar = { from: line.from, texFrom: line.from + qOff + om[0].length, quoted: qOff > 0 };
         tentativeFrom = spans.length;
         continue;
       }
@@ -1212,6 +1239,8 @@ function scanMathSpans(doc, blocks = scanFencedBlocks(doc), structure = scanStru
         const start = line.from + m2.index;
         if (inlineCodeRanges(t).some(([a,b]) => m2.index < b && m2.index+m2[0].length > a)) continue;
         const lead = m2[1].length - m2[1].trimStart().length;
+        /* 【#29 第二处·2026-10-17】trim 后为空就不成公式（同 pushInline 口径）。 */
+        if (!m2[1].trim()) continue;
         spans.push({ from: start, to: start + m2[0].length, tex: m2[1].trim(), display: false, texFrom: start + 2 + lead });
       }
     }
@@ -1222,11 +1251,11 @@ function scanMathSpans(doc, blocks = scanFencedBlocks(doc), structure = scanStru
     if (b.n - a.n < 1) continue;
     const raw0 = doc.sliceString(doc.line(a.n).to + 1, doc.line(b.n).from);
     /* 引用区里的块：逐行剥掉 `> ` 前缀再拼 tex（前缀长度按每行自己算，兼容 `> > ` 与 `>\t`）。 */
-    const quoted = !!(a.qOff || b.qOff) || /^[ \t]*(?:>[ \t]?)+\S/.test(raw0);
+    const quoted = !!(a.qOff || b.qOff) || tableLead(raw0).off > 0;
     const parts = [];
     for (let n = a.n + 1; n < b.n; n++) {
       const line = doc.line(n);
-      const prefix = structuralContextAt(structure,line.from)?.lead ?? (quoted ? /^[ \t]*(?:>[ \t]?)+/.exec(line.text)?.[0].length ?? 0 : 0);
+      const prefix = structuralContextAt(structure,line.from)?.lead ?? (quoted ? tableLead(line.text).off : 0);
       parts.push({ text: line.text.slice(prefix), from: line.from + prefix });
     }
     spans.push({ from: a.from, to: b.to, ...mappedMathSource(parts, a.to + 1), display: true });
@@ -1680,16 +1709,17 @@ function scanLineStyles(doc, blocks = scanFencedBlocks(doc), structure = null) {
   const codeLines = [];  // 【代码块行号】{ line, n }——**内容行**（不含围栏符本身），n 从 1 起、每块重数
   let codeN = 0;         // 当前代码块的计数（进块清 0，出块也清 0 ⇒ 每个块各自从 1 开始）
   let mathPending = false; // 正在一个 `$$…` 待闭合块内（居中稳定用，见下）
-  for (let i = 1; i <= doc.lines; i++) {
-    const line = doc.line(i);
-    const t = line.text;
-    const code = blockAt(blocks, line.from);
+  let from = 0;
+  for (const t of doc.iterLines()) {
+    const code = blockAt(blocks, from);
     if (code) {
+      const line = doc.lineAt(from);
       const qClass = code.depth ? ' mp-quote mp-quote-d' + Math.min(3, code.depth) : '';
       styled.push({ line, cls: 'mp-code' + qClass });
       if (line.from === code.from || line.from === code.closeFrom) { fenceLines.push(line); codeN = 0; }
       else { codeLines.push({ line, n: ++codeN }); }
       mathPending = false;
+      from += t.length + 1;
       continue;
     }
     // 【居中稳定·2026-10-07】块公式**围栏行/待闭合行**也挂 mp-math-src：
@@ -1699,33 +1729,35 @@ function scanLineStyles(doc, blocks = scanFencedBlocks(doc), structure = null) {
     // 不新增全文扫描（性能纪律）。
     const tt = t.trim();
     if (mathPending) {
-      styled.push({ line, cls: "mp-math-src" });
+      styled.push({ line: doc.lineAt(from), cls: "mp-math-src" });
       // 收尾行 或 **空行** → 结束待闭合态（否则一个手滑的 `$$` 会把其后全文都居中；
       // 真正已闭合的多行块由 buildBlockMath 按 span 逐行居中，不依赖这里）
       if (tt === "" || (tt.endsWith("$$") && tt.length >= 2)) mathPending = false;
     } else if (/^\s*\$\$/.test(t) && !/^\s*\$\$.*\$\$\s*$/.test(t)) {
-      styled.push({ line, cls: "mp-math-src" });
+      styled.push({ line: doc.lineAt(from), cls: "mp-math-src" });
       mathPending = true;
     } else if (/^\s*\$\$/.test(t)) {
       // 只有**行首**就是 $$ 的行才居中（`$$x$$`、`$$…` 开围栏）。
       // 【2026-10-07 紧急修正】原判据还含 `endsWith("$$")` ⇒ 正文段落只要行尾出现
       // `$$s$$` 就整行居中（用户实测：一整段「终章底本…（见附录 A）。$$s$$」全被居中）＝重大衰退。
       // 行尾收尾的围栏行由"待闭合态/已识别 span"覆盖，不需要靠 endsWith 兜。
-      styled.push({ line, cls: "mp-math-src" });
+      styled.push({ line: doc.lineAt(from), cls: "mp-math-src" });
     }
     const hm = /^( {0,3})(#{1,6})([ \t]+|$)/.exec(t);
     if (hm) {
-      headings.push({ from: line.from + hm[1].length, to: line.from + hm[1].length + hm[2].length + (hm[3] ? 1 : 0), level: hm[2].length });
-      styled.push({ line, cls: 'mp-h' + hm[2].length });
+      headings.push({ from: from + hm[1].length, to: from + hm[1].length + hm[2].length + (hm[3] ? 1 : 0), level: hm[2].length });
+      styled.push({ line: doc.lineAt(from), cls: 'mp-h' + hm[2].length });
+      from += t.length + 1;
       continue;
     }
-    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(t)) { hrs.push(line); continue; }
-    const semanticDepth = structure ? containerContext(doc,line.from,null,0,structure).depth : quoteLead(t).depth;
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(t)) { hrs.push(doc.lineAt(from)); from += t.length + 1; continue; }
+    const semanticDepth = structure ? structuralContextAt(structure, from).path.filter(p => p.kind === 'quote').length : quoteLead(t).depth;
     if (semanticDepth) {
       // 【A7-D4】嵌套引用分级：> 计数→d1/d2/d3+（缩进递进；竖线由主类画一条）
       const depth = Math.min(3, semanticDepth);
-      styled.push({ line, cls: "mp-quote mp-quote-d" + Math.max(1, depth) });
+      styled.push({ line: doc.lineAt(from), cls: "mp-quote mp-quote-d" + Math.max(1, depth) });
     }
+    from += t.length + 1;
   }
   return { headings, styled, hrs, fenceLines, codeLines };
 }
@@ -1736,15 +1768,12 @@ function mapLineStyles(value, tr) {
     styled: value.styled.map(s => ({ ...s, line: line(s.line) })),
     hrs: value.hrs.map(line), fenceLines: value.fenceLines.map(line),
     codeLines: value.codeLines.map(c => ({ ...c, line: line(c.line) })),
-    tables: value.tables.map(t => ({ ...t, from: map(t.from), to: map(t.to),
-      headerBlock: { ...t.headerBlock, from: map(t.headerBlock.from), to: map(t.headerBlock.to) },
-      rows: t.rows.map(r => ({ ...r, from: map(r.from), to: map(r.to) })) })),
   };
 }
 const lineStylesField = StateField.define({
   create(state) {
     const blocks = state.field(markdownContext).blocks;
-    return { ...scanLineStyles(state.doc, blocks,state.field(markdownContext)), tables: scanTables(state.doc, blocks) };
+    return scanLineStyles(state.doc, blocks, state.field(markdownContext));
   },
   update(value, tr) {
     if (!tr.docChanged) return value;
@@ -1752,10 +1781,81 @@ const lineStylesField = StateField.define({
     let touched = context.rebuilt || !tr.state.field(editPlan);
     tr.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
       if (touched) return;
-      if (/[`|#>$~*_\-\n\r]/.test(tr.startState.doc.sliceString(fromA, toA)) || /[`|#>$~*_\-\n\r]/.test(inserted.toString()) ||
-          value.tables.some(t => fromA <= t.to && toA >= t.from)) touched = true;
+      if (/[`|#>$~*_\-\n\r]/.test(tr.startState.doc.sliceString(fromA, toA)) || /[`|#>$~*_\-\n\r]/.test(inserted.toString())) touched = true;
     });
-    return touched ? { ...scanLineStyles(tr.state.doc, context.blocks,context), tables: scanTables(tr.state.doc, context.blocks) } : mapLineStyles(value, tr);
+    return touched ? scanLineStyles(tr.state.doc, context.blocks, context) : mapLineStyles(value, tr);
+  },
+});
+
+/* ── 表数据层（从 lineStylesField 拆出的窄字段）──
+ *  tableDecorations 依赖 tableDataField、activeCell/tableSelection 与窄 separator 展示状态。
+ *  create 只在初始化时 scanTables 一次；update 只在 docChanged 时执行。
+ *  touched 集合：markdownContext.rebuilt / 无 editPlan / 结构字符 / 与任一表范围相交 /
+ *  **变更触达的 old/new 行可能是表行或表分隔行**（有限行局部 guard，见下）。
+ *  非结构且不触表：无表位移返回原 tables 数组（身份稳定）；表位移则映射 table.from/to、
+ *  headerBlock.from/to 与每个 rows[].from/to，并做位置校验；校验失败返回 null → 调用方
+ *  安全全量重扫。本字段绝不读 regionIndexField。
+ *  局部 guard 只决定“是否重扫”，不是 parser：actual scanTables 仍是唯一渲染判据。 */
+function isPotentialTableLine(text) {
+  const raw = String(text == null ? '' : text);
+  if (raw.includes('|')) return true;
+  return isSeparatorBody(raw.slice(tableLead(raw).off));
+}
+function locallyTouchesTableSurface(doc, from, to) {
+  const len = doc.length;
+  const first = doc.lineAt(Math.max(0, Math.min(from, len))).number;
+  const last = doc.lineAt(Math.max(0, Math.min(to, len))).number;
+  for (let n = first; n <= last; n++) if (isPotentialTableLine(doc.line(n).text)) return true;
+  return false;
+}
+function mapTables(tables, tr) {
+  const map = p => tr.changes.mapPos(p, 1);
+  let shifted = false;
+  const next = [];
+  for (const t of tables) {
+    const from = map(t.from), to = map(t.to);
+    if (from === t.from && to === t.to && typeof tr.changes.touchesRange === 'function' && tr.changes.touchesRange(t.from, t.to) === false) { next.push(t); continue; }
+    const hFrom = map(t.headerBlock.from), hTo = map(t.headerBlock.to);
+    const rows = t.rows.map(r => ({ ...r, from: map(r.from), to: map(r.to) }));
+    const rowsSame = rows.length === t.rows.length && rows.every((r, i) => r.from === t.rows[i].from && r.to === t.rows[i].to);
+    if (from === t.from && to === t.to && hFrom === t.headerBlock.from && hTo === t.headerBlock.to && rowsSame) { next.push(t); continue; }
+    shifted = true;
+    next.push({ ...t, from, to, headerBlock: { ...t.headerBlock, from: hFrom, to: hTo }, rows });
+  }
+  if (!shifted) return tables;
+  /* map-validation-start: safe rescan fallback; never trust a shifted map blindly. */
+  const len = tr.state.doc.length; let prevTo = -1;
+  for (const t of next) {
+    if (!(Number.isInteger(t.from) && Number.isInteger(t.to) && t.from >= 0 && t.to <= len && t.from <= t.to)) return null;
+    if (!t.headerBlock || t.headerBlock.from !== t.from || !Number.isInteger(t.headerBlock.to) || t.headerBlock.from > t.headerBlock.to || t.headerBlock.to > t.to) return null;
+    if (t.from < prevTo) return null;
+    let prev = t.headerBlock.to;
+    for (const r of t.rows) {
+      if (!(Number.isInteger(r.from) && Number.isInteger(r.to) && r.from >= prev && r.to >= r.from && r.to <= t.to)) return null;
+      prev = r.to;
+    }
+    if (t.to !== (t.rows.length ? t.rows[t.rows.length - 1].to : t.headerBlock.to)) return null;
+    prevTo = t.to;
+  }
+  /* map-validation-end */
+  return next;
+}
+const tableDataField = StateField.define({
+  create(state) { return scanTables(state.doc, state.field(markdownContext).blocks); },
+  update(tables, tr) {
+    if (!tr.docChanged) return tables;
+    const context = tr.state.field(markdownContext);
+    let touched = context.rebuilt || !tr.state.field(editPlan);
+    tr.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
+      if (touched) return;
+      if (/[`|#>$~*_\-\n\r]/.test(tr.startState.doc.sliceString(fromA, toA)) || /[`|#>$~*_\-\n\r]/.test(inserted.toString()) ||
+          tables.some(t => fromA <= t.to && toA >= t.from) ||
+          locallyTouchesTableSurface(tr.startState.doc, fromA, toA) ||
+          locallyTouchesTableSurface(tr.state.doc, fromB, toB)) touched = true;
+    });
+    if (touched) return scanTables(tr.state.doc, context.blocks);
+    const mapped = mapTables(tables, tr);
+    return mapped === null ? scanTables(tr.state.doc, context.blocks) : mapped;
   },
 });
 
@@ -1788,19 +1888,24 @@ function tablePrefix(t) {
   return tableLead(t);
 }
 function scanTables(doc, blocks = scanFencedBlocks(doc)) {
+  let hasPipe = false;
+  for (const t of doc.iterLines()) {
+    if (t.includes("|")) { hasPipe = true; break; }
+  }
+  if (!hasPipe) return [];
   const tables = [];
   /* 分隔行判据与 tables.js / 扩展包**同源**（含 en/em dash，见 tables.js 的说明）。 */
   const isSep = (t) => isSeparatorBody(t);
   let i = 1;
   while (i <= doc.lines) {
-    const code = blockAt(blocks, doc.line(i).from);
-    if (code) { i = code.endLine + 1; continue; }
     const line1 = doc.line(i);
+    const code = blockAt(blocks, line1.from);
+    if (code) { i = code.endLine + 1; continue; }
     const p1 = tablePrefix(line1.text);
     const header = parseTableRow(line1.text, p1.off);
-    const line2 = i + 1 <= doc.lines ? doc.line(i + 1) : null;
+    const line2 = header && header.cells.length > 0 && i + 1 <= doc.lines ? doc.line(i + 1) : null;
     const p2 = line2 ? tablePrefix(line2.text) : null;
-    if (header && header.cells.length > 1 && line2 && !blockAt(blocks, line2.from) && p2.q === p1.q && isSep(line2.text.slice(p2.off))) {
+    if (header && header.cells.length > 0 && line2 && !blockAt(blocks, line2.from) && p2.q === p1.q && isSep(line2.text.slice(p2.off))) {   // 单列表合法（TBL-7）
       const cols = header.cells.length;
       /* 【β2·对齐数据层】分隔行**本来就在手上**（line2）⇒ 顺手派生每列对齐，不新增扫描。
          SEP_ALIGN：`:…:`⇒center、`…:`⇒right、`:…`⇒left、`---`⇒null（未标注）。
@@ -1857,8 +1962,7 @@ function cellRangesOf(line) {
   /* 【引用区表格】首格区间必须从**引用前缀之后**起算：`> | a | b |` 若从 0 起算，
      第 0 格的源码区间就是 `> `（渲染出来首列印着引用记号、点格落位也偏）。
      ⚠ 前缀宽度只在这里算一次（调用方不要再传 skip，否则会与这里叠加——实测首格跑出 `>`）。 */
-  const m = /^[ \t]*(?:>[ \t]?)+/.exec(text);
-  const start = m ? m[0].length : 0;
+  const start = tableLead(text).off;
   const p = /^\s*\|/.exec(text.slice(start));
   let i = start + (p ? p[0].length : 0);
   const ranges = [];
@@ -2350,8 +2454,17 @@ function syncCellSelection(edit) {
 /** 编辑面 → 源码镜像：源表示之间的最小 diff，DOM 下标不当作源下标。 */
 function syncCellEdit(edit) {
   if (!view || !cellEdit) return;
+  /* 【#26 第二道门】只读态下覆盖层任何 DOM 变化都不许镜像进源码（含程序化 execCommand）。 */
+  if (view.state.readOnly) return;
   const newText = edit.textContent || '';
   const source = view.state.doc.sliceString(cellEdit.from, cellEdit.to);
+  /* 【#62-U2R-3】覆盖层打开期间文档可能被**其它路径**改写（典型：位图粘贴异步 commit 插到表格上方
+     ⇒ 表格整体右移）。旧代码直接把镜像文本写回 `cellEdit.from/to` ⇒ 覆写到错误区间（实测把表头
+     写成 `a1 Z1 | H2 |`，数据破坏）。区间映射在 update 监听器里做；这里再兜一道：区间内容已不是
+     上次镜像的文本 ⇒ 不写，改为"源码 → 编辑面"重同步，等映射修复后再键入。 */
+  /* 比较必须用"格源码 → DOM 文本"映射后的形态：cellEdit.text 是 DOM 文本（`a|b`），
+     而源码里字面管道是转义形态（`a\\|b`）——直接比 raw source 会把所有含管道的格误判成"陈旧"。 */
+  if (cellEdit.text != null && mappedCellSource(source).text !== cellEdit.text) { resyncCellEdit(edit); return; }
   const change = cellTextChange(source, newText);
   if (!change) { syncCellSelection(edit); updateCellSizer(edit); scheduleCellOverlay(true); return; }
   const dom = cellDOMSelection(edit), mapped = mappedCellSource(change.source);
@@ -2360,9 +2473,20 @@ function syncCellEdit(edit) {
     anchor: from + cellSourceOffset(mapped, dom.anchor),
     head: from + cellSourceOffset(mapped, dom.head),
   } : undefined;
-  const inputType = edit.__mpCellInputType || '';
+  /* 【#60】execCommand('insertText') 在 Chromium 里可能**不触发 beforeinput**（实测只出 input）⇒
+     强制来源标记不能只在 beforeinput 里消费，这里同步读一次并立刻清掉。 */
+  const inputType = edit.__mpCellForceInputType || edit.__mpCellInputType || '';
+  edit.__mpCellForceInputType = '';
+  /* 【#60】覆盖层里「会被转换的粘贴 / 公式 / <br>」都走 execCommand('insertText')，beforeinput 只会
+     报 insertText ⇒ 旧映射把这些操作记成 input.type，与紧邻键入并成同一撤销组（一次 Ctrl+Z 把打的字
+     也撤掉；表外正文同类操作是独立组）。这里支持三个来源标记，由发起 execCommand 的代码预先设置。 */
+  const userEvent = inputType.startsWith('delete') ? 'delete'
+    : inputType === 'insertFromPaste' ? 'input.paste'
+      : inputType === '__format' ? 'input.format'
+        : inputType === '__linebreak' ? 'input.linebreak'
+          : 'input.type';
   view.dispatch({ changes: { from: from + change.from, to: from + change.to, insert: change.insert },
-    selection, userEvent: inputType.startsWith('delete') ? 'delete' : inputType === 'insertFromPaste' ? 'input.paste' : 'input.type' });
+    selection, userEvent });
   cellEdit.text = newText;
   cellEdit.to = from + change.source.length;
   /* 【A7-(b)】这里原先每次输入都刷一次格内预览（含一次 cellHTML 渲染比较）。已按决定删除：
@@ -2379,10 +2503,10 @@ function resyncCellEdit(edit) {
   let ranges = line && line.from === active.rowFrom ? cellRangesOf(line) : [];
   let range = ranges[active?.col];
   const containsSelection = r => view.state.selection.ranges.length === 1 && r && sel.from >= r[0] && sel.to <= r[1];
-  if (!containsSelection(range) || (line && isSeparatorBody(tableLead(line.text).body))) {
+  if (!containsSelection(range) || (line && isSeparatorBody(line.text.slice(tableLead(line.text).off)))) {
     line = view.state.doc.lineAt(sel.head);
     ranges = cellRangesOf(line);
-    const col = tableContaining(view.state, sel.head) && !isSeparatorBody(tableLead(line.text).body)
+    const col = tableContaining(view.state, sel.head) && !isSeparatorBody(line.text.slice(tableLead(line.text).off))
       ? ranges.findIndex(containsSelection) : -1;
     range = col < 0 ? null : ranges[col];
     if (range) {
@@ -2407,15 +2531,23 @@ function cellHistory(edit, command) {
   return historyCommand(command);
 }
 function historyCommand(command) {
-  return commands.run(() => {
-    cancelPendingImageInsertions(view);
+  const target = view, serial = commands.serial();
+  let appliedState = null;
+  const handled = commands.run(() => {
+    cancelPendingImageInsertions(target);
     // CM history otherwise derives Redo's selection by mapping the pre-input
     // range. A reversed replacement maps to a nonempty range over the new text.
     // Remember the actual current selection in the existing history at Undo's
     // command boundary, without splitting continuous typing into new groups.
-    applySourceHistory(view, command === redo ? 'redo' : 'undo');
+    if (applySourceHistory(target, command === redo ? 'redo' : 'undo') === true) appliedState = target.state;
     return true;
   });
+  if (appliedState && view === target && target.state === appliedState &&
+      commands.serial() === serial && document.hasFocus() && target.hasFocus &&
+      target.dom.isConnected && !cellComposing && !target.composing) {
+    activateSourceCellSelection(target);
+  }
+  return handled;
 }
 function cancelPendingImageInsertions(editor) {
   if (editor.state.field(imageInsertions).tickets.length) {
@@ -2496,7 +2628,8 @@ function ensureCellOverlay() {
     if (e.inputType === 'historyUndo' || e.inputType === 'historyRedo') {
       e.preventDefault(); cellHistory(div, e.inputType === 'historyUndo' ? undo : redo); return;
     }
-    div.__mpCellInputType = e.inputType;
+    div.__mpCellInputType = div.__mpCellForceInputType || e.inputType;
+    div.__mpCellForceInputType = '';
     if (!cellComposing) syncCellSelection(div);
   });
   div.addEventListener("input", () => {
@@ -2567,6 +2700,7 @@ function ensureCellOverlay() {
       e.preventDefault();
       let picked = "";
       try { const s = window.getSelection(); if (s && !s.isCollapsed) picked = String(s); } catch (err) { picked = ""; }
+      div.__mpCellForceInputType = "__format";   /* #60：公式插入单独成撤销组 */
       document.execCommand("insertText", false, "$" + picked + "$");
       if (!picked) { try { window.getSelection().modify("move", "backward", "character"); } catch (err) { } }
       syncCellEdit(div);
@@ -2581,6 +2715,31 @@ function ensureCellOverlay() {
       e.preventDefault();
       cycleTableSelection();
       return;
+    }
+    /* 【格内格式键·2026-10-17 实测缺陷 TBL-4】改前这里没有 B/I/U 分支 ⇒ 落到 contenteditable 原生
+       格式化：覆盖层 DOM 变成 <b> a2 </b>，而**源码一字不改**，Esc 后再点回该格 textContent 由源码
+       重播种 ⇒ 加粗凭空消失（Ctrl+Z 也只撤掉 DOM 的粗体）。现在与表外**同一条命令**
+       （TOOLBAR_ACTIONS → wrapSource），并先把 CM 选区按"去掉格内填充空白"收窄：
+       格源码是「空格 a2 空格」，整格选中直接包会得到 ** a2 **（markdown 不认，屏幕上反而是字面星号）。 */
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && cellEdit && view) {
+      const fmt = /^b$/i.test(e.key) ? "bold" : /^i$/i.test(e.key) ? "italic" : /^u$/i.test(e.key) ? "underline" : null;
+      if (fmt) {
+        e.preventDefault();
+        /* DOM 与 CM 两份选区必须**同时**收窄：只改 CM 的话，commands.run 的 flushOwner →
+           syncCellEdit → syncCellSelection 会按 DOM 把整格选区写回来（实测得到 ** a2 **a2 ——
+           包裹文本插在前面、原文本没被替换，正是 #22 第二版失败的那个形态）。 */
+        const mapped = mappedCellSource(view.state.doc.sliceString(cellEdit.from, cellEdit.to));
+        const sel = view.state.selection.main;
+        const text = view.state.sliceDoc(sel.from, sel.to);
+        const from = sel.from + (text.length - text.trimStart().length);
+        const to = Math.max(from, sel.to - (text.length - text.trimEnd().length));
+        if (from !== sel.from || to !== sel.to) {
+          setCellDOMSelection(div, cellTextOffset(mapped, from - cellEdit.from), cellTextOffset(mapped, to - cellEdit.from));
+          syncCellSelection(div);
+        }
+        try { TOOLBAR_ACTIONS[fmt](view); } catch (err) { console.error("[mp] 格内格式键失败：", err); }
+        return;
+      }
     }
     if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === "e" || e.key === "E")) {
       e.preventDefault();
@@ -2631,6 +2790,7 @@ function ensureCellOverlay() {
       if (!view || !cellEdit) return;
       if (e.shiftKey) {
         let ok = false;
+        div.__mpCellForceInputType = "__linebreak";   /* #60：<br> 插入单独成撤销组 */
         try { ok = document.execCommand("insertText", false, "<br>"); } catch { ok = false; }
         if (!ok) {
           const sel = getSelection();
@@ -2769,10 +2929,11 @@ function deactivateCellOverlay() {
 // Search and split navigation share the exact codec mapping and one history.
 function activateSourceCellSelection(inputView) {
   if (view !== inputView) return false;
+  if (inputView.state.readOnly) return false; // CAND-S1: reading mode keeps the source click non-editing
   const state = inputView.state, sel = state.selection.main;
   if (state.selection.ranges.length !== 1 || !tableContaining(state, sel.head)) return false;
   const line = state.doc.lineAt(sel.head);
-  if (isSeparatorBody(tableLead(line.text).body)) return false;
+  if (isSeparatorBody(line.text.slice(tableLead(line.text).off))) return false;
   const ranges = cellRangesOf(line);
   const col = ranges.findIndex(range => sel.from >= range[0] && sel.to <= range[1]);
   if (col < 0) return false;
@@ -2840,8 +3001,8 @@ const setTableSel = StateEffect.define(); // { kind, rowFrom, col } | null
 const tableSelectionField = StateField.define({
   create: () => null,
   update(value, tr) {
-    let v = value;
-    for (const e of tr.effects) if (e.is(setTableSel)) v = e.value;
+    let v = value, explicit = false;
+    for (const e of tr.effects) if (e.is(setTableSel)) { v = e.value; explicit = true; }
     if (!v) return null;
     if (tr.docChanged) {
       const rowFrom = tr.changes.mapPos(v.rowFrom, 1);
@@ -2849,10 +3010,28 @@ const tableSelectionField = StateField.define({
       if (!tables.some((t) => rowFrom >= t.from && rowFrom <= t.to)) return null;   // 表没了/变形 ⇒ 收场
       v = { ...v, rowFrom };
     }
+    /* 【#34·2026-10-18 实测缺陷】表级状态只由 setTableSel 清除，而"点表外正文"只改选区 ⇒
+       field 残留，tableSelInputGuard 会把表外键入按记住的格搬回格内：
+       实测行级选择后点段落打 X，字符落进 | Xa1 | a2 |、正文不变（focused-48）。
+       修法：没有显式 setTableSel 的选区变化，必须仍与该层级应有的选区逐字一致，否则收场。 */
+    if (!explicit && tr.selection) {
+      const line = tr.state.doc.lineAt(v.rowFrom);
+      const ranges = cellRangesOf(line);
+      const r = ranges[Math.max(0, Math.min(v.col, ranges.length - 1))];
+      let want = null;
+      if (v.kind === "row") want = { from: line.from, to: line.to };
+      else if (v.kind === "cell" || v.kind === "col") want = r ? { from: r[0], to: r[1] } : null;
+      else if (v.kind === "table") {
+        const tb = tableTablesOf(tr.state).find((t) => v.rowFrom >= t.from && v.rowFrom <= t.to);
+        want = tb ? { from: tb.from, to: tb.to } : null;
+      }
+      const sel = tr.selection.main;
+      if (!want || sel.from !== want.from || sel.to !== want.to) return null;
+    }
     return v;
   },
 });
-function tableTablesOf(state) { try { return state.field(lineStylesField).tables || []; } catch { return []; } }
+function tableTablesOf(state) { try { return state.field(tableDataField) || []; } catch { return []; } }
 
 /** 当前表目标：**活动格优先**（点格不落 CM 选区 —— 只看选区会落到文首），否则看 CM 选区。 */
 function tableTargetOf(state) {
@@ -2941,7 +3120,25 @@ function cycleTableSelection() {
  *  （不然一个看不见的按键会插到 line.from 上、把表行结构改掉 —— `REVIEW-BETA.md` §3.5）。 */
 const tableSelInputGuard = EditorState.transactionFilter.of((tr) => {
   const cur = tr.startState.field(tableSelectionField, false);
-  if (!cur || !tr.docChanged || !tr.isUserEvent("input")) return tr;
+  /* 【#12 收窄·2026-10-17】守卫只承行/列/整表层级：格级选区下的替换是正常编辑，放行后行数才不会被改写掉。 */
+  if (!cur || cur.kind === 'cell' || !tr.docChanged) return tr;
+  /* 退格/删除也必须走本守卫（见下面的 deleted 分支）：delete.selection 不属于 input 事件族。 */
+  /* 【表格命令不许被当键入改写·2026-10-17 实测缺陷 TBL-5b】rewriteTable / 删除表格 / 设对齐的事务
+     都带 userEvent:'input.table'，而 isUserEvent("input") 对它**为真** ⇒ 行/列层级下任何表格命令
+     都被本守卫"把输入搬进该格"整体改写：实测 Ctrl+Enter 插行得到 8 行、3 条分隔行 ——
+     整张新表被塞进那条行级选区，后面的原表还在（文档被写坏）。
+     同理 input.format：格内 Ctrl+B 的包裹事务也被改写成"在格内容起点插入 **a2**"，于是原文本没被
+     替换、文档变成 **a2**a2。命令自己已经给出正确终态（含选区），守卫只承键入与删除。 */
+  /* 【#37·2026-10-18 实测缺陷 N1】查找面板的 Replace / Replace-All 用 userEvent:'input.replace'
+     （isUserEvent("input") 对它为真）⇒ 行级/整表级选择下整笔替换事务被守卫搬成
+     "把 N 个替换文本串成一条插进格首"：实测 2 处 foo 一个都没被替换、格变成 | ZZZZa1 | a2 |。
+     替换命令自己给出正确 changes（与表格命令同族），放行；选区收场由 #34 的选区一致性检查兜住。 */
+  if (tr.isUserEvent("input.table") || tr.isUserEvent("input.format") || tr.isUserEvent("input.replace")) return tr;
+  if (!(tr.isUserEvent("input") || tr.isUserEvent("delete"))) return tr;
+  /* 【#36·2026-10-18】改写事务必须继承原 userEvent：命令族（input.emoji / input.paste 等）
+     不能被改写成 input.type —— 否则会和紧邻键入并进同一撤销组（CAND-5 已验"表情单独一组"）；
+     原生键入的 userEvent 本来就是 input.type，语义完全不变。 */
+  const srcEvent = tr.annotation(Transaction.userEvent) || "input.type";
   let at = tr.startState.selection.main.head;
   try {
     const line = tr.startState.doc.lineAt(cur.rowFrom);
@@ -2949,7 +3146,23 @@ const tableSelInputGuard = EditorState.transactionFilter.of((tr) => {
     const r = ranges[Math.max(0, Math.min(cur.col, ranges.length - 1))];
     if (r) { const seg = line.text.slice(r[0] - line.from, r[1] - line.from); at = r[0] + (seg.length - seg.trimStart().length); }
   } catch { /* 算不出来就用原 head */ }
-  return [{ selection: EditorSelection.cursor(at), effects: setTableSel.of(null) }, tr];
+  /* 【改写而不是只折叠·2026-10-17 实测缺陷】旧实现返回数组 [「{selection, effects}」, tr]：
+     CM6 把后一个 spec 的 changes 按绝对位置合进来 ⇒ 实测“表格行级选区 + 键入”**既没删掉选区、
+     也没落在格内**：字符被插到表格**下方**的新行里（#12）。
+     现在按本函数注释的既定契约自己发一次事务。 */
+  let inserted = "", deleted = false;
+  tr.changes.iterChanges((fromA, toA, _fromB, _toB, ins) => { inserted += ins.toString(); if (toA > fromA) deleted = true; });
+  if (inserted) {
+    return { changes: { from: at, insert: inserted }, selection: EditorSelection.cursor(at + inserted.length), effects: setTableSel.of(null), userEvent: srcEvent };
+  }
+  if (deleted) {
+    /* 【退格/删除同样不能毁表·2026-10-17 实测缺陷】改前门禁只认 input* 事件族，而 CM6 对
+       "退格删掉一个非空选区"发的是 delete.selection ⇒ 守卫完全绕过：实测行级选区 30..41
+       按 Backspace/Delete，整行数据被删掉、表被切成两段（TBL-2，S2 数据丢失）。
+       口径与 Ctrl+X 的 row-delete 守卫一致：不删源码，只把表级状态收场、光标回到该格内容起点。 */
+    return { selection: EditorSelection.cursor(at), effects: setTableSel.of(null) };
+  }
+  return { selection: EditorSelection.cursor(at), effects: setTableSel.of(null) };
 });
 
 /** 行层级的剪切判定：选区**正好是某一条完整表行**（[line.from, line.to]）且在表块里。 */
@@ -2975,10 +3188,70 @@ function tableRowWidgetFor(state,tb,block,isHeader,region) {
   return new TableRowWidget(isHeader ? tb.headerBlock.cells : block.cells, tb.widths, isHeader, ranges, block.from, activeCol,
     tb.headerBlock.qDepth || 0, block.lead || 0, tb.weights || null, selKey, tb.aligns || null, region, tableRowGeometry(state,tb,block,isHeader,region));
 }
-const tableDecorations = EditorView.decorations.compute([lineStylesField, activeCellField, tableSelectionField], (state) => {
+// Native source ranges need real DOM text at every table-block endpoint without a cell/table owner.
+function sourceTableBlockRange(state, previous = null) {
+  if (state.readOnly || state.field(activeCellField, false) || state.field(tableSelectionField, false) ||
+      state.selection.ranges.length !== 1) return null;
+  const tables = state.field(tableDataField);
+  if (!tables.length) return null;
+  const sel = state.selection.main;
+  // scanTables and mapTables retain ordered, disjoint table and row source ranges.
+  let lo = 0, hi = tables.length;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (tables[mid].to < sel.from) lo = mid + 1;
+    else hi = mid;
+  }
+  const firstTable = lo;
+  if (firstTable === tables.length || tables[firstTable].from > sel.to) return null;
+  lo = firstTable; hi = tables.length;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (tables[mid].from <= sel.to) lo = mid + 1;
+    else hi = mid;
+  }
+  const lastTable = lo - 1;
+  const blockAt = (table, index) => index ? table.rows[index - 1] : table.headerBlock;
+  const first = tables[firstTable], last = tables[lastTable];
+  lo = 0; hi = first.rows.length + 1;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (blockAt(first, mid).to < sel.from) lo = mid + 1;
+    else hi = mid;
+  }
+  const firstIndex = lo;
+  if (firstIndex > first.rows.length) return null;
+  const firstBlock = blockAt(first, firstIndex);
+  lo = 0; hi = last.rows.length + 1;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (blockAt(last, mid).from <= sel.to) lo = mid + 1;
+    else hi = mid;
+  }
+  const lastIndex = lo - 1;
+  if (lastIndex < 0 || (firstTable === lastTable && firstIndex > lastIndex)) return null;
+  const lastBlock = blockAt(last, lastIndex);
+  if (firstBlock.from > lastBlock.to || firstBlock.to < sel.from || firstBlock.from > sel.to ||
+      lastBlock.to < sel.from || lastBlock.from > sel.to) return null;
+  if (previous && previous.from === firstBlock.from && previous.to === lastBlock.to) return previous;
+  return { from: firstBlock.from, to: lastBlock.to };
+}
+const tableSourceRangeField = StateField.define({
+  create(state) { return sourceTableBlockRange(state); },
+  update(value, tr) {
+    if (!tr.docChanged && !tr.selection && tr.startState.readOnly === tr.state.readOnly &&
+        tr.startState.field(activeCellField) === tr.state.field(activeCellField) &&
+        tr.startState.field(tableSelectionField) === tr.state.field(tableSelectionField) &&
+        tr.startState.field(tableDataField) === tr.state.field(tableDataField)) return value;
+    return sourceTableBlockRange(tr.state, value);
+  },
+});
+const tableDecorations = EditorView.decorations.compute([tableDataField, activeCellField, tableSelectionField, tableSourceRangeField], (state) => {
   const out = [];
-  for (const tb of state.field(lineStylesField).tables) {
+  const source = state.field(tableSourceRangeField);
+  for (const tb of state.field(tableDataField)) {
     const mk = (block, isHeader) => {
+      if (source && block.from >= source.from && block.to <= source.to) return;
       const widget = tableRowWidgetFor(state,tb,block,isHeader,regionAt(state.field(regionIndexField),block.from,'table'));
       if (!widget) return;
       out.push(Decoration.replace({
@@ -2991,10 +3264,62 @@ const tableDecorations = EditorView.decorations.compute([lineStylesField, active
   }
   return Decoration.set(out, true);
 });
-/** 点单元格 → 激活格内编辑（行源码永不露出；覆盖层在 body 上） */
+/** 点单元格 → 激活格内编辑（覆盖层在 body 上；无格归属的原生表格范围显示对应源码） */
+let mpDropSource = null;
+/* C14【限定能力·非通用框架】owned native-text 拖源记录与只读校验：
+ * 仅由真实 trusted 非空 dragstart 绑定同视图源（view/doc 引用/epoch/区间/精确源文本）；
+ * readonly、dragend、Escape 取消一律清空；drop 各分支运行前一次性消费清空。
+ * 判定 move 只看：同 view、同一 doc 引用、epoch 一致、区间在界、当前源文本逐字相等、
+ * RAW 载荷逐字相等、实际 effectAllowed 枚举允许 move，且按实际公开
+ * EditorView.dragMovesSelection facet 语义（默认 mac !altKey / 其它 !ctrlKey，
+ * 实际平台探测）——绝不读捕获相 dropEffect，绝不写 DataTransfer MIME/effect，
+ * 不触 CM 私有 inputState，不加新 observer/timer/重扫/历史改写；
+ * CM 自身 dragstart/dragend 机制保持原生。缺失/过期/外部/不可读一概不删旧源。 */
+function mpDropBind(view) {
+  const s = view.state.selection.main;
+  if (view.state.readOnly || s.empty) { mpDropSource = null; return null; }
+  let epoch = null;
+  try { const ri = view.state.field(regionIndexField, false); epoch = ri && Number.isFinite(ri.epoch) ? ri.epoch : null; } catch { epoch = null; }
+  mpDropSource = { view, doc: view.state.doc, epoch, from: s.from, to: s.to, text: view.state.sliceDoc(s.from, s.to) };
+  return mpDropSource;
+}
+function mpDropMoveCheck(view, event, rec, rawPayload) {
+  const checks = {
+    recordBound: !!rec,
+    sameView: !!(rec && rec.view === view),
+    sameDoc: !!(rec && view.state.doc === rec.doc),
+    epochStable: (() => { if (!rec) return false; if (rec.epoch == null) return false; try { const ri = view.state.field(regionIndexField, false); const now = ri && Number.isFinite(ri.epoch) ? ri.epoch : null; return now === rec.epoch; } catch { return false; } })(),
+    rangeInBounds: !!(rec && rec.from >= 0 && rec.to > rec.from && rec.to <= view.state.doc.length),
+    sourceTextExact: !!(rec && view.state.sliceDoc(rec.from, rec.to) === rec.text),
+    rawPayloadExact: typeof rawPayload === 'string' && !!rec && rawPayload === rec.text,
+    effectAllowsMove: (() => { try { const ea = event.dataTransfer && event.dataTransfer.effectAllowed; return ea === 'move' || ea === 'copyMove' || ea === 'linkMove' || ea === 'all'; } catch { return false; } })(),
+    dragMovesSelection: (() => { try { const facet = view.state.facet(EditorView.dragMovesSelection); if (facet && facet.length) return !!facet[0](event); const mac = /Mac|iPhone|iPad|iPod/.test(String(navigator.platform || navigator.userAgent || '')); return mac ? !event.altKey : !event.ctrlKey; } catch { return false; } })(),
+  };
+  const valid = checks.recordBound && checks.sameView && checks.sameDoc && checks.epochStable && checks.rangeInBounds && checks.sourceTextExact && checks.rawPayloadExact && checks.effectAllowsMove;
+  return { valid, move: valid && checks.dragMovesSelection, checks };
+}
+function mpDropClear() { mpDropSource = null; }
 const tableCellClick = EditorView.domEventHandlers({
   mousedown(event, view) {
-    const cell = event.target && event.target.closest ? event.target.closest(".mp-row th[data-mp-row], .mp-row td[data-mp-row]") : null;
+    /* 【阅读态不许改稿·2026-10-17 实测缺陷 #26】覆盖层挂在 body 上、改稿走 view.dispatch，
+       EditorState.readOnly 只拦输入级命令、**不拦程序化 dispatch** ⇒ 阅读态点一格照样能打字改稿
+       （实测 len 50→52）。这里与 syncCellEdit 双保险：入口不开、写口不写。 */
+    if (view.state.readOnly) return false;
+    let cell = event.target && event.target.closest ? event.target.closest(".mp-row th[data-mp-row], .mp-row td[data-mp-row]") : null;
+    /* 【#66】点在表格**左/右边缘**（与某行同一水平带、距最近格 ≤24px）也归到该格：
+       否则 CM6 把 caret 放进块 widget 的源码行、而 DOM 选区落在 widget 边界 ⇒ 随后键入
+       （西文与 IME 都实测）被写到**表格之后**的新行（行级数据错位）。 */
+    if (!cell) {
+      const NEAR_X = 24, NEAR_Y = 10;
+      let best = null, bestD = Infinity;
+      for (const c of document.querySelectorAll(".mp-row th[data-mp-row], .mp-row td[data-mp-row]")) {
+        const b = c.getBoundingClientRect();
+        const dx = Math.max(b.left - event.clientX, 0, event.clientX - b.right);
+        const dy = Math.max(b.top - event.clientY, 0, event.clientY - b.bottom);
+        if (dx <= NEAR_X && dy <= NEAR_Y) { const d = dy * 4 + dx; if (d < bestD) { bestD = d; best = c; } }
+      }
+      cell = best;
+    }
     if (!cell) return false;
     const rowFrom = Number(cell.dataset.mpRow);
     const col = Number(cell.dataset.mpCol);
@@ -3015,6 +3340,137 @@ const tableCellClick = EditorView.domEventHandlers({
     // the rendered cell may have been detached by the active-cell transaction.
     activateCellOverlay(rowFrom, realCol, ranges.length, r[0], r[1], undefined, false, undefined,
       { x: event.clientX, y: event.clientY });
+    return true;
+  },
+  /* 【#33·2026-10-17 实测缺陷】文本拖到渲染表格上时，CM6 的 drop 在块级 widget 上只能取到**块边界**位置
+     ⇒ 落点被钳到表行行首，插入的字符还会把行首管道挤掉（实测 | a1 | a2 | → 源| a1 | a2 |，表结构损坏）。
+     这里按指针命中的格（data-mp-row / data-mp-col）算出该格的源码区间，把拖入文本插进**该格内容末尾**；
+     起拖区间在 dragstart 记住（C14：完整 owned 记录），经 mpDropMoveCheck 校验为 move 时一并删除。
+     【C14·2026-10-22 实测缺陷（root r3 qualified RED）】同视图真实 MOVE 被当 copy：块分支只插入不删源
+     （拖三字 原文仍在、caret 48≠45、Undo 只回插入选区 4..7、Redo 重复）；格分支读**捕获相**
+     dropEffect（实测 none）而最终 dragend 才是 move。删除资格改为只读校验 + 实际公开
+     EditorView.dragMovesSelection 语义，绝不写 DataTransfer。 */
+  dragstart(event, view) {
+    if (!event.isTrusted || view.state.readOnly) { mpDropSource = null; return false; }
+    mpDropBind(view);
+    return false;
+  },
+  dragend() { mpDropClear(); return false; },
+  keydown(event) { if (event.key === 'Escape') mpDropClear(); return false; },
+  drop(event, view) {
+    if (view.state.readOnly) { mpDropSource = null; return false; }
+    /* C14：owned 记录在所有分支之前**一次性消费并清空**——过期/外部/已取消的记录
+     * 在本 drop 后续任何分支里都不可能再触发删源。 */
+    const src = mpDropSource; mpDropSource = null;
+    /* 【#33 紧邻边界·2026-10-17】目标不能只认"正好命中的格"：拖到行的 padding / 格间隙 / 行容器上时
+       指针在表格里、target 却不是 td（实测会把 b1 行劈成 | b1 源文本尾巴 + | b2 |）。这里退一步按几何取最近的格。 */
+    let cell = event.target && event.target.closest ? event.target.closest(".mp-row th[data-mp-row], .mp-row td[data-mp-row]") : null;
+    if (!cell && event.target && event.target.closest && event.target.closest(".mp-table-wrap")) {
+      let best = null, bestD = Infinity;
+      for (const c of document.querySelectorAll(".mp-row th[data-mp-row], .mp-row td[data-mp-row]")) {
+        const b = c.getBoundingClientRect();
+        const dx = Math.max(b.left - event.clientX, 0, event.clientX - b.right);
+        const dy = Math.max(b.top - event.clientY, 0, event.clientY - b.bottom);
+        const d = dx * dx + dy * dy;
+        if (d < bestD) { bestD = d; best = c; }
+      }
+      cell = best;
+    }
+    /* 【#61】拖到**渲染块**（display 公式 / mermaid）上：CM6 原生 drop 只能取到块边界，
+       实测落在开围栏行首 ⇒ `三字$$` 把公式围栏挤坏、后续再配对吞正文。这里整块接管：把文本
+       作为**块后独立文本行**插入（围栏/代码块源码一字不动），光标放到插入文本尾。
+       【C14】经 mpDropMoveCheck 校验的同视图真实 MOVE：删源与插入选乘**同一事务**
+       （userEvent 'move.drop'，与 CM dropText 同语义），光标经实际 ChangeSet 映射到
+       插入文本末（冻结 M61：旧插入点 45 → 删源映射 42 → caret 45）。重叠形态按
+       预先登记的保守策略：安全消费、零文档改动、围栏不动、不做投机 copy。 */
+    if (!cell) {
+      const blockEl = event.target && event.target.closest
+        ? event.target.closest(".mp-cm6-math-block:not(.mp-cm6-math-live), .mp-mermaid") : null;
+      if (blockEl) {
+        let dtText = "";
+        try { dtText = event.dataTransfer ? (event.dataTransfer.getData("text/plain") || "") : ""; } catch { return false; }
+        const dtRaw = dtText;   /* C14：归一化前的精确 RAW 载荷，仅供 move 校验 */
+        dtText = dtText.replace(/\r?\n+/g, " ").trim();
+        if (!dtText) return false;
+        event.preventDefault();
+        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+        let block = null;
+        if (blockEl.classList.contains("mp-mermaid")) {
+          const blocks = view.state.field(mermaidBlocksField, false) || [];
+          block = blocks.find((b) => pos != null && b.from - 1 <= pos && pos <= b.to + 1) || null;
+        } else {
+          const spans = view.state.field(mathSpansField, false)?.spans || [];
+          const s = spans.find((s) => s.display && pos != null && s.from - 1 <= pos && pos <= s.to + 1);
+          block = s ? { from: s.from, to: s.to } : null;
+        }
+        if (!block) { view.focus(); return true; }
+        const closeLine = view.state.doc.lineAt(block.to);
+        const nextLine = closeLine.number < view.state.doc.lines ? view.state.doc.line(closeLine.number + 1) : null;
+        const blankNext = !!(nextLine && !nextLine.text.trim());
+        const insFrom = blankNext ? nextLine.from : closeLine.to;
+        const insText = blankNext ? dtText : "\n" + dtText;
+        const moveCheck = mpDropMoveCheck(view, event, src, dtRaw);
+        const srcOutsideBlock = !!(moveCheck.move && src && (src.to < block.from || src.from > block.to));
+        const insOutsideSrc = !!(moveCheck.move && src && (insFrom <= src.from || insFrom >= src.to));
+        if (moveCheck.move && !(srcOutsideBlock && insOutsideSrc)) {
+          /* 保守拒绝（预先登记，测试前决定）：源与受保护块重叠或插入点落在源内 ⇒
+           * 安全消费、零文档改动、围栏一字不动；反馈只走既有 extras toast 通道（存在才用）。 */
+          try { window.mpExtras && window.mpExtras.toast && window.mpExtras.toast("移动与块/源重叠，已保守拒绝"); } catch { /* 静默消费 */ }
+          return true;
+        }
+        const specs = [{ from: insFrom, insert: insText }];
+        if (moveCheck.move && src) specs.push({ from: src.from, to: src.to });
+        specs.sort((a, b) => a.from - b.from);
+        const changes = view.state.changes(specs);
+        const caret = changes.mapPos(insFrom, 1);
+        view.dispatch({ changes, selection: EditorSelection.cursor(caret), userEvent: moveCheck.move ? "move.drop" : "input.drop" });
+        view.focus();
+        return true;
+      }
+    }
+    if (!cell || !event.dataTransfer) return false;
+    const rowFrom = Number(cell.dataset.mpRow);
+    const col = Number(cell.dataset.mpCol);
+    if (!Number.isFinite(rowFrom) || !Number.isFinite(col)) return false;
+    let text = "";
+    try { text = event.dataTransfer.getData("text/plain") || ""; } catch { return false; }
+    const rawText = text;   /* C14：格内归一化/管道转义之前的精确 RAW 载荷，仅供 move 校验 */
+    /* 格内不能有换行：换行会把表行劈成两行（实测 | b1 … 换行 | b2 |）。 */
+    text = text.replace(/\r?\n+/g, " ");
+    /* 【#59】拖入文本里的 `|` 是**格内字面量**，必须按格源编码转义成 `\|`：裸管道会当场把表行劈成
+       多列（实测 `| a1 | a2 |b文字|`，表从 2 列变 3 列）。粘贴/覆盖层通道早已走 encodeCellText，拖放漏了。 */
+    text = encodeCellText(text);
+    const line = view.state.doc.lineAt(rowFrom);
+    const ranges = cellRangesOf(line);
+    if (!ranges.length) return false;
+    const r = ranges[Math.min(Math.max(0, col), ranges.length - 1)];
+    if (!r) return false;
+    event.preventDefault();
+    const specs = [{ from: r[1], insert: text }];
+    /* C14：删除资格改为共享只读校验（同视图/doc/epoch/界内/源文本/RAW 载荷逐字 +
+     * effectAllowed 允许 move + 实际 dragMovesSelection facet 语义）——实测捕获相
+     * dropEffect=none 而最终 dragend=move，旧口径把真实 MOVE 当 copy。Ctrl=copy 保持保源。 */
+    const moveCheck = mpDropMoveCheck(view, event, src, rawText);
+    const isMove = moveCheck.move;
+    if (isMove && src && (src.to <= r[1] || src.from >= r[1])) specs.push({ from: src.from, to: src.to });
+    specs.sort((a, b) => a.from - b.from);
+    const changes = view.state.changes(specs);
+    const caret = changes.mapPos(r[1], 1);
+    const tr = view.state.update({ changes, selection: EditorSelection.cursor(caret), userEvent: "input.table" });
+    view.dispatch(tr);
+    /* 【#57】收场选区必须用事务后的映射位置：旧写法 `anchor: r[1] + text.length` 在 move 形态下没扣掉
+       拖源删除量 ⇒ 文末表格末格抛 "Selection points outside of document"（整次拖放无效）、非末格 caret
+       右偏拖源长度（接着打字写进隔壁格）。另外表格行是 block widget，状态选区落在格内**没有可显示的
+       DOM caret**，键入会跑到表外 ⇒ 与点格/IME 同路径：立活动格并打开格覆盖层，caret 落在插入文本尾。 */
+    const newRowFrom = tr.changes.mapPos(rowFrom, 1);
+    const newLine = tr.state.doc.lineAt(newRowFrom);
+    const newRanges = cellRangesOf(newLine);
+    const nr = newRanges[Math.min(Math.max(0, col), newRanges.length - 1)];
+    view.dispatch({ effects: [setActiveCell.of({ rowFrom: newRowFrom, col }), setTableSel.of(null)] });
+    /* activateCellOverlay 自己会把焦点给覆盖层；**不要再 view.focus()** —— 覆盖层 blur 处理器
+       （cellEdit && !navigating ⇒ setActiveCell(null)+收起）会当场把刚开的输入框关掉（实测）。 */
+    if (nr) activateCellOverlay(newRowFrom, col, newRanges.length, nr[0], nr[1], Math.max(0, caret - nr[0]));
+    else view.focus();
     return true;
   },
 });
@@ -3068,6 +3524,7 @@ const lineClassDecorations = EditorView.decorations.compute([lineStylesField], (
  *  自动按它解析；壳层在装载文档时把目录经 `window.mpEngine.setDocPath()` 送进来。
  *  拿不到目录（未命名文档/插件宿主）时不动 base，退回应用目录（现状），并在 console 说明一次。 */
 let mpDocDir = "";
+let mpImgPreviewEpoch = 0;
 /** 入参可以是**文件路径**（`D:\docs\a.md`）也可以是**目录**（`D:/docs`、`D:/docs/`）——
  *  壳层两种都可能给，所以判据不能只看末尾有没有斜杠：
  *  ① 先统一成正斜杠；② 末尾是斜杠 ⇒ 已按目录处理；③ 否则看最后一段有没有扩展名，
@@ -3088,6 +3545,7 @@ function mpSetDocPath(filePath, isDirectory = false) {
     }
     if (dir === mpDocDir) return mpDocDir;
     mpDocDir = dir;
+    imgBlobInvalidate('docdir', null);
     let base = document.querySelector("base[data-mp-docbase]");
     if (dir) {
       if (!base) { base = document.createElement("base"); base.setAttribute("data-mp-docbase", "1"); document.head.insertBefore(base, document.head.firstChild); }
@@ -3119,11 +3577,13 @@ const mpImgTries = new Map();
 // Data URIs stay rendered and must not pin previous multi-megabyte documents here.
 const mpImgKey = (s) => s.length <= 512 ? mpImgSrc(s) : null;
 const MP_IMG_TIMEOUT_MS = 10000;
-function mpImgFailGuard(wrap, img, rawSrc, lease = null, loaded = null, previous = null) {
+function mpImgFailGuard(wrap, img, rawSrc, lease = null, loaded = null, previous = null, assetEpoch = mpImgPreviewEpoch) {
+  if (assetEpoch !== mpImgPreviewEpoch) return () => {};
   let done = false;
   let timer = 0;
   const settle = (state, reason) => {
     if (done) return;
+    if (assetEpoch !== mpImgPreviewEpoch) return;
     if (lease && !lease.valid(false)) return;
     done = true;
     if (timer) clearTimeout(timer);
@@ -3161,22 +3621,26 @@ function mpImgFailGuard(wrap, img, rawSrc, lease = null, loaded = null, previous
   const tries = (mpImgTries.get(key) || 0) + 1;
   if (key !== null) mpImgTries.set(key, tries);
   if (prev && prev !== "ok" && tries > 2) { wrap.classList.add("is-failed"); wrap.setAttribute("data-mp-img-state", prev); }
-  const remember = state => { if (key !== null) mpImgLoadState.set(key, state); };
-  const load = () => { if (lease && !lease.valid()) return; remember("ok"); settle("ok"); };
-  const error = () => { if (lease && !lease.valid()) return; remember("loading-failed"); settle("loading-failed", previous ? '图片加载失败，保留上一预览' : "图片加载失败"); };
+  const remember = state => { if (key !== null && assetEpoch === mpImgPreviewEpoch) mpImgLoadState.set(key, state); };
+  const load = () => { if (assetEpoch !== mpImgPreviewEpoch) return; if (lease && !lease.valid()) return; remember("ok"); settle("ok"); };
+  const error = () => { if (assetEpoch !== mpImgPreviewEpoch) return; if (lease && !lease.valid()) return; remember("loading-failed"); settle("loading-failed", previous ? '图片加载失败，保留上一预览' : "图片加载失败"); };
   img.addEventListener("load", load);
   img.addEventListener("error", error);
   const cleanup = () => { done = true; clearTimeout(timer); img.removeEventListener('load', load); img.removeEventListener('error', error); };
   lease?.cleanup(cleanup);
-  timer = setTimeout(() => { if (lease && !lease.valid()) return; remember("timeout"); settle("timeout", "加载超时（10s）"); }, MP_IMG_TIMEOUT_MS);
+  timer = setTimeout(() => { if (assetEpoch !== mpImgPreviewEpoch) return; if (lease && !lease.valid()) return; remember("timeout"); settle("timeout", "加载超时（10s）"); }, MP_IMG_TIMEOUT_MS);
   /* ⚠️ 不许用"同步读 img.complete"判失败：刚赋 src 时它可能已是 true 而 naturalWidth 仍为 0，
      会把**已缓存/正在加载**的图误标成失败；settle() 又是"首次落定即终局"，真正的 load 会被丢弃。
      实测后果：真 dev 引擎里图已 599×241 出图，却被 is-failed 的占位盖住（比原缺陷更糟）。
      ⇒ 只有 complete && naturalWidth>0 才算成功；其余一律交给 load/error/超时 三个事件。 */
-  if (img.complete && img.naturalWidth > 0) { remember("ok"); settle("ok"); }
-  else wrap.classList.add("is-loading");                    // 加载中也要可见（最小高度由 CSS 给）
+  if (assetEpoch === mpImgPreviewEpoch) {
+    if (img.complete && img.naturalWidth > 0) { remember("ok"); settle("ok"); }
+    else wrap.classList.add("is-loading");
+  }                    // 加载中也要可见（最小高度由 CSS 给）
   return cleanup;
 }
+
+const mpImgNodeEpoch = new WeakMap();
 
 class ImageWidget extends WidgetType {
   constructor(src, alt, title, width, height, align, region = null, retained = false) {
@@ -3186,12 +3650,14 @@ class ImageWidget extends WidgetType {
     this.align = align || "";                    // left / center / right（来自 data-typora-align，见 scanImageMarks）
     this.resolvedSrc = mpImgSrc(src);
     this.region = region; this.retained = retained;
+    this.assetEpoch = mpImgPreviewEpoch;
   }
   eq(o) {
     return o.src === this.src && o.resolvedSrc === this.resolvedSrc && o.alt === this.alt && o.title === this.title
       && o.width === this.width && o.height === this.height && o.align === this.align && o.retained === this.retained
       && o.region?.id === this.region?.id && o.region?.from === this.region?.from && o.region?.to === this.region?.to
-      && o.region?.revision === this.region?.revision && o.region?.contextVersion === this.region?.contextVersion;
+      && o.region?.revision === this.region?.revision && o.region?.contextVersion === this.region?.contextVersion
+      && o.assetEpoch === this.assetEpoch;
   }
   toDOM(inputView) {
     const wrap = document.createElement(this.retained ? 'div' : "span");
@@ -3199,6 +3665,9 @@ class ImageWidget extends WidgetType {
     return wrap;
   }
   updateDOM(wrap, inputView) {
+    // Restored EditorState may reuse an older Widget object. Each new DOM mount
+    // belongs to the current resource generation; callbacks capture this value.
+    const assetEpoch = mpImgPreviewEpoch;
     wrap.className = "mp-img" + (this.align ? " is-" + this.align : "") + (this.retained ? ' mp-img-retained' : '');
     const region = this.region && inputView.state.field(regionIndexField).byId.get(this.region.id);
     if (region) {
@@ -3209,7 +3678,10 @@ class ImageWidget extends WidgetType {
     const previous = wrap.querySelector('img:not(.mp-img-pending)');
     wrap.querySelector('.mp-img-pending')?.remove();
     const reused = region && rendererLifecycle.image(inputView, region.id, this.resolvedSrc);
-    let img = previous?.src === this.resolvedSrc ? previous : reused || document.createElement("img");
+    const previousEpochOk = !!previous && previous.src === this.resolvedSrc && mpImgNodeEpoch.get(previous) === assetEpoch;
+    const reusedEpochOk = !!reused && mpImgNodeEpoch.get(reused) === assetEpoch;
+    let img = previousEpochOk ? previous : reusedEpochOk ? reused : document.createElement("img");
+    mpImgNodeEpoch.set(img, assetEpoch);
     const retaining = previous && img !== previous && previous.complete && previous.naturalWidth > 0 ? previous : null;
     if (retaining) img.classList.add('mp-img-pending');
     img.alt = this.alt;
@@ -3229,9 +3701,9 @@ class ImageWidget extends WidgetType {
     if (img.parentNode !== wrap) wrap.appendChild(img);
     /* 【task-12 失败必可见】见 mpImgFailGuard：绝不允许"源码被遮住 + 图没出来"的空白态。 */
     mpImgFailGuard(wrap, img, this.src, lease, () => {
-      if (region) rendererLifecycle.rememberImage(inputView, region.id, resolvedSrc, img);
+      if (region && assetEpoch === mpImgPreviewEpoch) rendererLifecycle.rememberImage(inputView, region.id, resolvedSrc, img);
       inputView.requestMeasure();
-    }, retaining);
+    }, retaining, assetEpoch);
     return true;
   }
   destroy(dom) { rendererLifecycle.release(dom); }
@@ -3432,9 +3904,10 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
   const overlapsMath = (a, b) => rangesTouching(mathSpans, a, b).some(s => a < s.to && b > s.from);
   let cmtFrom = -1;        // 【HTML 注释】未闭合注释的**绝对起点**（-1＝不在注释里）
   let olCtx = null;        // 【有序列表】当前列表的计数上下文 { key, n }（key = 引用前缀+缩进+分隔符）
-  for (let i = 1; i <= doc.lines; i++) {
-    const line = doc.line(i);
-    const t = line.text;
+  let from = 0;
+  for (const t of doc.iterLines()) {
+    const line = { from, to: from + t.length, text: t };
+    from += t.length + 1;
     /* 【引用区前缀·唯一判据】所有"行首"假定一律先过 `tableLead()`（= tables.js 里那条唯一前缀正则，
      *  与表格 widget/命令/导出三处同源）。`qoff` ＝ 引用前缀（`>`、`> `、`> > `、`>\t` 等）的长度，
      *  `c` ＝ **去掉前缀后的内容**。改前这里全部直接拿 `t` 做行首判据 ⇒ 四类形态在引用区里全被前缀挡掉：
@@ -3512,11 +3985,12 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
     const huge = t.length > 20000;
     // 【A2-P0①补全】转义序列的「\」本身阅读态隐藏（vditor 语义：\* 显示为 *）
     for (let k = 1; !huge && k < t.length; k++) {
-      if (t[k - 1] === "\\" && "*~`[]()#_".includes(t[k]) && !overlapsMath(line.from + k - 1, line.from + k)) {
+      if (t[k - 1] === "\\" && "*~`[]()#_$".includes(t[k]) && !overlapsMath(line.from + k - 1, line.from + k)) {
         marks.push({ from: line.from + k - 1, to: line.from + k, hides: [[line.from + k - 1, line.from + k]] });
       }
     }
     const consumed = []; // 已占用区间（防止 bold/em/链接互相啃）
+    const pureFormats = new Set(); // parallel pure-format record identities only
     // 【A2-P0①】转义禁区：\X（X∈标记字符）不是标记——\*text\* 必须显示 *text*
     /* 【2026-10-09·按行成本】先做一次整行**原生** `indexOf("\\")`：整个函数里 `escapedAt` 会被
        每个候选调用一次，改前每次都要逐字符扫它自己的 [a,b) 区间（大图行上合计上千万次）。
@@ -3539,7 +4013,7 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
     const free = (a, b, nest) =>
       !consumed.some(([x, y]) => a < y && b > x && !(nest && a > x && b < y))
       && !overlapsMath(base + a, base + b) && !escapedAt(a, b);
-    const take = (a, b) => consumed.push([a, b]);
+    const take = (a, b) => { const record = [a, b]; consumed.push(record); return record; };
     /* 【图片】两条写法都替换成真图。**传 `c` 而不是 `line`**：`scanImageMarks` 内部 `base` 已含 `qoff`，
        它自己再拿整行扫就会把前缀算两遍（见该函数注释）——`free`/`take` 也按 `c` 的相对下标工作。 */
     /* 【1.17·行内代码优先】行内代码里的图片写法必须保持**字面**（Typora 口径：代码里一律原文）。
@@ -3559,7 +4033,7 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
     // 包裹件本身不替换内容（只 replace 两侧定界符），所以"**加粗里裹着行内公式**"不是冲突。
     // 旧判据拿整个 [a,b] 去测数学重叠 ⇒ `称为 $X$ **诱导的 $\sigma$-域（$\sigma$-field …）**。`
     // 这种最常见写法整对被拒 ⇒ 星号原样露出（实测：正文行 127）。
-    const scan = (re, width, hideTail, nest, openLen, closeLen) => {
+    const scan = (re, width, hideTail, nest, openLen, closeLen, pureFormat) => {
       if (huge) return;   // 【长行护栏】巨行只做图片扫描
       let m;
       re.lastIndex = 0;
@@ -3577,18 +4051,19 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
           : [[a, a + oL], [b - cL, b]];
         if (!hides.every(([x, y]) => x >= 0 && y > x && free(x, y, nest === true))) { re.lastIndex = m.index + 1; continue; }
         push(a, b, hides);
-        take(a, b);
+        const record = take(a, b);
+        if (pureFormat) pureFormats.add(record);
       }
     };
     scan(/`[^`\n]+`/g, 1);            // 行内代码
-    scan(/\*\*\*[^*\n]+\*\*\*/g, 3, false, true);   // 【A2-P0②】三连星＝粗斜体（先于粗体，防边星残留）
+    scan(/\*\*\*[^*\n]+\*\*\*/g, 3, false, true, undefined, undefined, 'strong');   // 三连星
     /* 【5.8·嵌套强调】粗体的内容类必须**允许内部单个星**（`**粗体里 *斜体* 缀**`）：
        改前是 `[^*\n]+` ⇒ 整对匹配不上 ⇒ 斜体正则从第二个星起匹配、把**内侧**两个星隐掉，
        结果外面留一对星（实测文本 `*粗体里 斜体 收尾*` 就是这么来的）。
        用 `(?:\*(?!\*)|[^*\n])+`：单个星可入内容，**双星仍然终止**匹配 ⇒ 不会跨段吞并两个独立粗体。 */
-    scan(/\*\*(?:\*(?!\*)|[^*\n])+\*\*/g, 2, false, true);      // 粗体（允许嵌套斜体；nest=true 见 free 注释）
-    scan(/__[^_\n]+__/g, 2);
-    scan(/~~[^~\n]+~~/g, 2);          // 删除线
+    scan(/\*\*(?:\*(?!\*)|[^*\n])+\*\*/g, 2, false, true, undefined, undefined, 'strong');      // strong
+    scan(/__[^_\n]+__/g, 2, false, false, undefined, undefined, 'strong');
+    scan(/~~[^~\n]+~~/g, 2, false, false, undefined, undefined, 'strike');          // strike
     /* 【下划线 `<u>…</u>`·2026-10-11 用户报障补齐】Typora 口径的下划线存的就是 `<u>…</u>`
        （Ctrl+U ✓，与 2.x 线同口径 ✓）。改前**根本没有这条规则** ✗ ⇒ 快捷键插进去的标签
        **原样显示**在屏幕上 ✗（实测：`行textContent="<u>前向词</u>"`、可见字形 `["u","u"]` ✗
@@ -3638,10 +4113,20 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
            自报区间 `data-mpu="3-10"` 与第 1 行的 `：2020年5` 正好对上 ✓ —— 靠这个自证一眼定案 ✓）。
            ⇒ 统一口径：**引擎里所有位置字段都是文档绝对坐标** ✓。 */
         mk.uInner = [base + innerFrom, base + innerTo];
-        take(a, b);
+        const uRecord = take(a, b);
+        pureFormats.add(uRecord);
       }
     }
-    scan(/\[[^\]\n]*\]\([^)\n]*\)/g, 0, true); // 链接
+    if (!huge) for (const span of inlineLinkSpans(c)) {
+      const blocked = consumed.some((rec) =>
+        span.hides.some(([a, b]) => a < rec[1] && b > rec[0]) &&
+        !(pureFormats.has(rec) && span.from > rec[0] && span.to < rec[1]));
+      const hideBlocked = span.hides.some(([a, b]) =>
+        inCodeSpan(a, b) || overlapsMath(base + a, base + b));
+      if (blocked || hideBlocked) continue;
+      push(span.from, span.to, span.hides);
+      take(span.from, span.to);
+    }
     /* 【尖括号自动链接 `<https://…>` / `<mailto:…>`】与链接同一观感：**两侧尖括号都隐去**、文字保留。
      *  只认带 scheme 的（`https:`/`http:`/`mailto:`/`ftp:`…）⇒ `<不是链接>` 保持字面。
      *  行内代码里的 `<https://x>` 不受影响：`scan(/`…`/)` 更早跑并 `take()` 占位，这里 `free()` 会拒。
@@ -3698,7 +4183,7 @@ const regionIndexField = createRegionIndex(state => {
     rows.push({ kind: diagram ? 'mermaid' : 'code', form: b.char,
       from: b.from, to: b.to, data: diagram || b, sourceOwned: !diagram, content: diagram?.src ?? null, context: context(b.from) });
   }
-  for (const t of state.field(lineStylesField).tables) rows.push({ kind: 'table', from: t.from, to: t.to,
+  for (const t of state.field(tableDataField)) rows.push({ kind: 'table', from: t.from, to: t.to,
     data: t, sourceOwned: true, content: null, context: context(t.from) });
   return rows;
 }, [imgBaseField]);
@@ -3754,7 +4239,8 @@ const imageSessionField = StateField.define({
   create: imageSessionDecorations,
   update(value, tr) {
     if (!tr.docChanged && tr.startState.field(regionSessionField) === tr.state.field(regionSessionField) &&
-        tr.startState.field(regionIndexField) === tr.state.field(regionIndexField)) return value;
+        tr.startState.field(regionIndexField) === tr.state.field(regionIndexField) &&
+        tr.startState.field(imgPreviewField) === tr.state.field(imgPreviewField)) return value;
     return imageSessionDecorations(tr.state);
   },
   provide: f => EditorView.decorations.from(f),
@@ -3787,9 +4273,9 @@ class QuoteMarkWidget extends WidgetType {
   }
   ignoreEvent() { return true; }
 }
-const inlineMarkDecorations = EditorView.decorations.compute(["selection", inlineMarksField, lineStylesField, imgBaseField, regionIndexField, regionSessionField], (state) => {
+const inlineMarkDecorations = EditorView.decorations.compute(["selection", inlineMarksField, tableDataField, imgBaseField, imgPreviewField, regionIndexField, regionSessionField], (state) => {
   const out = [];
-  const tables = state.field(lineStylesField, false)?.tables || [];
+  const tables = state.field(tableDataField, false) || [];
   const inTable = (pos) => tables.some((t) => pos >= t.from && pos <= t.to);   // 表格行走块级 widget，行内装饰必须让位
   for (const mark of state.field(inlineMarksField)) {
     const inSel = state.selection.ranges.some((r) => r.from <= mark.to && r.to >= mark.from);
@@ -4003,6 +4489,16 @@ window.addEventListener('storage', event => {
     applyFloatPreference(); mpPrefNotify(['floatAvoidance']);
   }
 });
+/* 【C15·跨窗 pageWidth 直播】D05 冻结政策要求已开窗实时同步：远端窗口写
+ * mp-pref-pageWidth 后，本窗经 storage 事件收到同一值。这里只做消费者——
+ * 复用既有 applyEnginePrefs()（写 token + 既有 rAF 版心调度，不新增计时器）
+ * 与既有 mpPrefNotify(['pageWidth']) 广播；绝不回写 storage（远端事件不会
+ * 触发 mpSetPref，本地回写会造成环）；不动 float 监听器与其它任何键。 */
+window.addEventListener('storage', event => {
+  if (event.key === 'mp-pref-pageWidth' || event.key === null) {
+    applyEnginePrefs(); mpPrefNotify(['pageWidth']);
+  }
+});
 function registerFloat(v, box, lease) {
   let entries=floatRegistry.get(v);if(!entries)floatRegistry.set(v,entries=new Map());
   floatViews.add(v);
@@ -4145,10 +4641,9 @@ function autoBreakCheck(v) {
   if (/^\s*([-*+]|\d+[.)])\s/.test(line.text)) return;
   if (!/^\s*\|/.test(line.text) && line.text.includes("|") && /^\s*\|.*\|\s*$/.test(line.text)) return;
   const styles = st.field(lineStylesField, false);
-  if (styles) {
-    if (styles.tables.some((t) => line.from >= t.from && line.from <= t.to)) return;
-    if (styles.styled.some((s) => s.line.from === line.from && (s.cls === "mp-code" || String(s.cls).startsWith("mp-quote")))) return;
-  }
+  const tables = st.field(tableDataField, false);
+  if (tables && tables.some((t) => line.from >= t.from && line.from <= t.to)) return;
+  if (styles && styles.styled.some((s) => s.line.from === line.from && (s.cls === "mp-code" || String(s.cls).startsWith("mp-quote")))) return;
   const fromOpen = line.from + open;
   // 尾随换行只在"闭合 $$ 之后不是行尾"时才插——否则会白送一个空行（原行尾已有换行）。
   const needTail = !(head >= st.doc.length || st.doc.sliceString(head, head + 1) === "\n");
@@ -4294,6 +4789,21 @@ const docSourceClipboard = EditorView.domEventHandlers({
     const st = view.state;
     const ranges = st.selection.ranges.filter((r) => !r.empty);
     if (!ranges.length) return false;
+    /* 【整表剪切·2026-10-17 实测缺陷 TBL-6】整表选区（Ctrl+A 递进到"整表"）下 Ctrl+X 与 Ctrl+C 两条口径：
+       复制给 TSV+<table>，剪切却落到原生路径给 markdown 源码；更糟的是原生删除被 tableSelInputGuard 按
+       "行级删除不许毁表"的口径拦下 ⇒ **一个字都没删**（实测：doc 一字不变、剪贴板已被换掉）。
+       这里与复制同源：同一份表格载荷 + 一次整块删除（userEvent:'input.table' 让守卫放行，撤销一步）。 */
+    const tablePayload = tableClipForSelection(st);
+    if (tablePayload) {
+      try { event.clipboardData?.setData("text/plain", tablePayload.tsv); } catch { /* 宿主禁止 */ }
+      try { event.clipboardData?.setData("text/html", tablePayload.html); } catch { /* 宿主禁止 */ }
+      event.preventDefault();
+      const cutRange = ranges[0];
+      try {
+        view.dispatch({ changes: { from: cutRange.from, to: cutRange.to, insert: "" }, selection: { anchor: cutRange.from }, effects: setTableSel.of(null), userEvent: "input.table" });
+      } catch (e) { console.error("[mp] 整表剪切失败：", e); }
+      return true;
+    }
     /* 【β1】行层级的选区是**整行源码**（[line.from, line.to]）：直接 replaceSelection("") 会把那一行
        变成空行 ⇒ scanTables 在这里 break ⇒ **表被切成"只剩表头 + 余下塌成源码"**（用户看见"我的表被切了"）。
        整行选区落在表块里时改走 tableOp('row-delete')（与右键菜单同一实现，守卫/提示一致）。 */
@@ -4320,51 +4830,156 @@ const docSourceClipboard = EditorView.domEventHandlers({
  *   · 本地相对路径走宿主桥读字节再 `new Blob`（懒加载进 bundle，失败就静默跳过）；
  *   · 只对"选区**完整包含**某个图片 mark"的情况补图片口味；纯文字选区一律不碰（交回既有处理器）。 */
 const IMG_BLOB_MAX = 48 * 1024 * 1024;      // 单张上限：超过不缓存（避免把整篇图灌进内存）
-const IMG_BLOB_KEEP = 8;                    // 缓存条数上限（LRU）
+/* 【缓存条数·2026-10-17 实测缺陷】改前 8 条：而预取也恰好"单轮最多 8 张、按文档顺序"⇒
+   一屏图超过 8 张时，第 9 张之后**永远进不了缓存**，选中它 Ctrl+C 拿不到位图口味（复制事件已被接管）。
+   条数上限只是内存护栏，真正的上限是下面的 48MB 总量；提到 32 后一次多选的多张图也留得住。 */
+const IMG_BLOB_KEEP = 32;                   // 缓存条数上限（LRU）
+const IMG_RASTER_MAX_PIXELS = 64000000;
+const IMG_RASTER_MAX_SIDE = 32768;
+const IMG_RASTER_TIMEOUT_MS = 10000;
+
 const imgBlobs = new Map();                 // src -> { blob, mime, name, bytes } | 'pending' | null(取不到)
 let imgBlobBytes = 0;
+let imgBlobEpoch = 0;
+let imgBlobToken = 0;
+let imgBlobEpochReason = '';
+const imgPending = new Map(); // key -> unique pending identity {epoch,token}; imgBlobs value stays 'pending'
 /** data URI → { mime, base64 }；不是 data URI 返回 null。 */
 function imgParseDataUri(src) {
   const m = /^data:([^;,]*)(;[^,]*)?,/.exec(src);
   if (!m) return null;
   return { mime: (m[1] || "").toLowerCase(), base64: /;base64/i.test(m[2] || "") };
 }
-function imgBlobTouch(src, rec) {
-  if (imgBlobs.has(src)) imgBlobs.delete(src);
-  imgBlobs.set(src, rec);
-  while (imgBlobs.size > IMG_BLOB_KEEP) {
-    const k = imgBlobs.keys().next().value;
-    const old = imgBlobs.get(k);
-    imgBlobs.delete(k);
-    if (old && old !== "pending" && old !== null && old.bytes) imgBlobBytes -= old.bytes;
+function imgBlobGet(src) {
+  const rec = imgBlobs.get(src);
+  if (rec === "pending" || rec === null) return rec;
+  return rec && rec.epoch === imgBlobEpoch ? rec : undefined;
+}
+function imgBlobCost(rec) {
+  if (!rec || rec === "pending" || rec === null || rec.state !== "ready") return 0;
+  return (rec.bytes || 0) + (rec.raster && rec.raster.data && typeof rec.raster.data.byteLength === "number" ? rec.raster.data.byteLength : 0);
+}
+function imgBlobDrop(src) {
+  if (!imgBlobs.has(src)) { imgPending.delete(src); imgRasterPrune(); return; }
+  const old = imgBlobs.get(src);
+  if (old !== "pending" && old !== null && old.state === "ready") imgBlobBytes -= imgBlobCost(old);
+  imgBlobs.delete(src);
+  imgPending.delete(src);
+  imgRasterPrune();
+}
+function imgBlobSet(src, value) {
+  if (value !== "pending" && value !== null && value.state === "ready" && imgBlobCost(value) > IMG_BLOB_MAX) return;
+  if (imgBlobs.has(src)) imgBlobDrop(src);
+  imgBlobs.set(src, value);
+  if (value !== "pending" && value !== null && value.state === "ready") imgBlobBytes += imgBlobCost(value);
+  while (imgBlobs.size > IMG_BLOB_KEEP) imgBlobDrop(imgBlobs.keys().next().value);
+  while (imgBlobBytes > IMG_BLOB_MAX && imgBlobs.size > 1) imgBlobDrop(imgBlobs.keys().next().value);
+}
+function imgBlobSetPending(src, pending) {
+  imgBlobSet(src, "pending");
+  imgPending.set(src, pending);
+}
+function imgBlobOwned(src, pending, epoch) {
+  return !!pending && pending.epoch === epoch && imgBlobEpoch === epoch
+    && imgPending.get(src) === pending && imgBlobs.get(src) === "pending";
+}
+function imgBlobCommit(src, pending, rec) {
+  if (!imgBlobOwned(src, pending, pending.epoch)) return false;
+  if (imgBlobCost(rec) > IMG_BLOB_MAX) return false;
+  imgBlobSet(src, rec);
+  imgPending.delete(src);
+  return true;
+}
+function imgBlobNull(src, pending) {
+  if (!imgBlobOwned(src, pending, pending.epoch)) return false;
+  imgBlobSet(src, null);
+  imgPending.delete(src);
+  return true;
+}
+function imgBlobInvalidate(reason, targetView) {
+  imgBlobEpoch++;
+  imgBlobs.clear();
+  imgPending.clear();
+  imgBlobBytes = 0;
+  imgBlobEpochReason = reason;
+  imgRasterPrune();
+  const refreshPreview = reason === 'replaceDocument' || reason === 'setValue' || reason === 'docdir';
+  if (refreshPreview) {
+    mpImgPreviewEpoch++;
+    mpImgLoadState.clear();
+    mpImgTries.clear();
+  }
+  if (targetView) {
+    try {
+      cancelImgPrefetch(targetView);
+      if (reason === 'replaceDocument' || reason === 'setValue') {
+        targetView.dispatch({ effects: [imgPreviewBump.of(null)], annotations: Transaction.addToHistory.of(false) });
+      }
+      prefetchSelectionImages(targetView);
+      scheduleImgPrefetch(targetView);
+    } catch { /* lifecycle must not throw */ }
   }
 }
+
 async function imgFetchLocal(src) {
-  /* 本地图（相对路径/绝对路径）两种取法：
-     ① 渲染进程是 `file://` 页面 ⇒ 直接 `fetch(相对路径)` 就能读到同目录文件；
-     ② 读不到（路径解析失败/插件 iframe 的 http 宿主）就退回宿主桥 `readFileBase64` 再转 Blob。 */
-  try {
-    const res = await fetch(src);
-    if (res && res.ok) { const b = await res.blob(); if (b && b.size) return b; }
-  } catch { /* 落到宿主桥 */ }
-  let abs = src;
-  try {
-    if (!/^[a-zA-Z]:[\\/]/.test(abs) && !abs.startsWith("/")) {      abs = new URL(src, document.baseURI).href;
-    }
-  } catch { /* 保持原样 */ }
-  let path = abs;
-  try { if (path.startsWith("file://")) path = decodeURIComponent(new URL(path).pathname).replace(/^\//, "").replace(/\//g, "\\"); } catch { /* 忽略 */ }
+  const value = typeof src === 'string' ? src : '';
+  if (!value) return null;
+  const BS = String.fromCharCode(92);
   const host = window.mpHost;
-  if (!host || typeof host.readFileBase64 !== "function") return null;
-  const r = await host.readFileBase64(path);
-  if (!r || !r.ok || !r.base64) return null;
-  const bin = atob(r.base64);
-  const buf = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-  const ext = (path.split(".").pop() || "").toLowerCase();
-  const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "gif" ? "image/gif"
-    : ext === "webp" ? "image/webp" : ext === "bmp" ? "image/bmp" : "image/png";
-  return new Blob([buf], { type: mime });
+  const hasHost = !!(host && typeof host.readFileBase64 === 'function');
+  let resolved = null;
+  try { resolved = new URL(value, document.baseURI); } catch { resolved = null; }
+  const httpLike = /^https?:/i.test(value) || !!(resolved && (resolved.protocol === 'http:' || resolved.protocol === 'https:'));
+  if (hasHost && httpLike) return null; // remote HTTP never becomes a local host read
+
+  const winAbs = value.length >= 3 && /^[A-Za-z]$/.test(value[0]) && value[1] === ':' && (value[2] === '/' || value[2] === BS);
+  const uncRaw = value.startsWith(BS + BS) || value.startsWith('//');
+  let localPath = null;
+  if (winAbs) localPath = value.split('/').join(BS);
+  else if (uncRaw) localPath = value.split('/').join(BS);
+  else if (resolved && resolved.protocol === 'file:') localPath = imgFileUrlPath(resolved);
+  else if (value.startsWith('/')) {
+    try { localPath = imgFileUrlPath(new URL(value, document.baseURI)); } catch { localPath = null; }
+  }
+
+  if (hasHost) {
+    // Desktop host first; host failure returns null and must not fall into fetch(file).
+    if (!localPath) return null;
+    let r = null;
+    try { r = await host.readFileBase64(localPath, { maxBytes: IMG_BLOB_MAX }); } catch { r = null; }
+    if (!r || r.ok !== true || typeof r.base64 !== 'string' || !r.base64) return null;
+    if (Number.isFinite(r.bytes) && r.bytes > IMG_BLOB_MAX) return null;
+    if (r.base64.length > Math.ceil(IMG_BLOB_MAX * 4 / 3) + 8) return null;
+    const bin = atob(r.base64);
+    const buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    const ext = (localPath.split('.').pop() || '').toLowerCase();
+    const extMime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'gif' ? 'image/gif'
+      : ext === 'webp' ? 'image/webp' : ext === 'bmp' ? 'image/bmp' : 'image/png';
+    const mime = (typeof r.mime === 'string' && /^image\//i.test(r.mime)) ? r.mime : extMime;
+    if (/svg/i.test(mime)) return null;
+    return new Blob([buf], { type: mime });
+  }
+
+  // Non-desktop fallback: keep prior fetch behavior; absolute HTTP still not newly prefetched.
+  if (/^https?:/i.test(value)) return null;
+  try {
+    const res = await fetch(value);
+    if (res && res.ok) { const b = await res.blob(); if (b && b.size) return b; }
+  } catch { /* no host bridge; preserve original fallback */ }
+  return null;
+}
+function imgToBackslash(s) {
+  return s.split('/').join(String.fromCharCode(92));
+}
+function imgFileUrlPath(u) {
+  let p;
+  try { p = decodeURIComponent(u.pathname || ''); } catch { return null; }
+  const BS = String.fromCharCode(92);
+  const host = String(u.hostname || '').toLowerCase();
+  if (host && host !== 'localhost') return BS + BS + u.hostname + imgToBackslash(p);
+  if (/^\/[A-Za-z]:/.test(p)) p = p.slice(1);
+  return imgToBackslash(p);
 }
 /** data URI → Blob，**不走 fetch**。
  *  【为什么不能用 fetch(dataURI)】独立桌面壳的 CSP 是 `connect-src 'none'`
@@ -4388,25 +5003,136 @@ function imgDataUriToBlob(src) {
     return { blob: new Blob([u8], { type: mime || "text/plain" }), mime };
   } catch { return null; }
 }
+const imgRasterQueue = [];
+let imgRasterActive = null;
+let imgRasterQueuedBytes = 0;
+let imgRasterQuarantine = null;
+function imgRasterReleaseQueued(job) {
+  imgRasterQueuedBytes = Math.max(0, imgRasterQueuedBytes - (job.blobBytes || 0));
+  job.queued = false; job.done = true; job.blob = null; job.owned = null; job.maxBytes = 0;
+  try { job.resolve(null); } catch { }
+}
+function imgRasterDrain() {
+  while (imgRasterQueue.length) imgRasterReleaseQueued(imgRasterQueue.shift());
+}
+function imgRasterPrune() {
+  for (let i = imgRasterQueue.length - 1; i >= 0; i--) {
+    const job = imgRasterQueue[i];
+    let ok = false; try { ok = job.owned ? job.owned() : false; } catch { ok = false; }
+    if (ok) continue;
+    imgRasterQueue.splice(i, 1); imgRasterReleaseQueued(job);
+  }
+  if (imgRasterActive) {
+    let ok = false; try { ok = imgRasterActive.owned ? imgRasterActive.owned() : false; } catch { ok = false; }
+    if (!ok) { try { imgRasterActive.cancel(); } catch { } }
+  }
+}
+function imgRasterPump() {
+  if (imgRasterQuarantine || imgRasterActive || imgRasterQueue.length === 0) return;
+  const job = imgRasterQueue.shift();
+  imgRasterQueuedBytes = Math.max(0, imgRasterQueuedBytes - (job.blobBytes || 0));
+  job.queued = false;
+  let ok = false; try { ok = job.owned ? job.owned() : false; } catch { ok = false; }
+  if (!ok) { job.done = true; job.blob = null; job.owned = null; job.maxBytes = 0; try { job.resolve(null); } catch { } imgRasterPump(); return; }
+  imgRasterActive = job;
+  const registerCancel = (cancel) => { job.cancel = cancel; };
+  imgPngRasterNow(job, registerCancel)
+    .then((v) => { try { job.resolve(v); } catch { } })
+    .catch(() => { try { job.resolve(null); } catch { } })
+    .finally(() => {
+      if (imgRasterActive !== job) return;
+      if (!job.phaseSettled && job.pendingPhase) {
+        const phase = job.pendingPhase;
+        imgRasterQuarantine = job;
+        imgRasterActive = null;
+        imgRasterDrain();
+        job.blob = null; job.owned = null; job.maxBytes = 0; job.pendingPhase = null;
+        phase.then(() => { }, () => { }).finally(() => {
+          if (imgRasterQuarantine === job) imgRasterQuarantine = null;
+          job.done = true; job.phaseSettled = true;
+          imgRasterPump();
+        });
+        return;
+      }
+      imgRasterActive = null;
+      job.done = true; job.blob = null; job.owned = null; job.maxBytes = 0; job.cancel = null;
+      imgRasterPump();
+    });
+}
+function imgPngRaster(blob, owned, maxBytes) {
+  let ok = false;
+  try { ok = !!blob && !!owned() && Number.isFinite(maxBytes) && maxBytes > 0 && Number.isFinite(blob.size) && blob.size > 0; } catch { ok = false; }
+  if (!ok) return Promise.resolve(null);
+  imgRasterPrune();
+  if (imgRasterQuarantine) return Promise.resolve(null);
+  if (imgRasterQueue.length >= IMG_BLOB_KEEP) return Promise.resolve(null);
+  const activeBytes = imgRasterActive && imgRasterActive.blob ? imgRasterActive.blob.size : 0;
+  if (activeBytes + imgRasterQueuedBytes + blob.size > IMG_BLOB_MAX) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const job = { blob, blobBytes: blob.size, owned, maxBytes, resolve, queued: true, done: false, cancel: null, pendingPhase: null, phaseSettled: true };
+    imgRasterQueue.push(job); imgRasterQueuedBytes += job.blobBytes;
+    imgRasterPump();
+  });
+}
+async function imgPngRasterNow(job, registerCancel) {
+  const blob = job.blob, owned = job.owned, maxBytes = job.maxBytes;
+  if (!blob || !owned() || !Number.isFinite(maxBytes) || maxBytes <= 0) return null;
+  let url = null, timer = 0, img = null, canvas = null;
+  let cancelReject = null;
+  const cancelPromise = new Promise((_, reject) => { cancelReject = reject; });
+  if (typeof registerCancel === "function") registerCancel(() => { try { cancelReject(new Error("raster cancel")); } catch { } });
+  const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('raster timeout')), IMG_RASTER_TIMEOUT_MS); });
+  const track = (p) => {
+    job.pendingPhase = p; job.phaseSettled = false;
+    p.then(() => { job.phaseSettled = true; }, () => { job.phaseSettled = true; });
+    return p;
+  };
+  try {
+    url = URL.createObjectURL(blob);
+    img = new Image(); img.src = url;
+    await Promise.race([track(img.decode()), timeout, cancelPromise]);
+    if (!owned()) return null;
+    const w = img.naturalWidth, h = img.naturalHeight;
+    if (!w || !h || w > IMG_RASTER_MAX_SIDE || h > IMG_RASTER_MAX_SIDE || w * h > IMG_RASTER_MAX_PIXELS) return null;
+    canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d'); if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, w, h);
+    if (!owned()) return null;
+    const encodeP = track(new Promise((resolve, reject) => canvas.toBlob((b) => b ? resolve(b) : reject(new Error('png encode failed')), 'image/png')));
+    const pngBlob = await Promise.race([encodeP, timeout, cancelPromise]);
+    if (!owned()) return null;
+    if (!pngBlob || pngBlob.size <= 0 || pngBlob.size > maxBytes) return null;
+    const abP = track(pngBlob.arrayBuffer());
+    const ab = await Promise.race([abP, timeout, cancelPromise]);
+    if (!owned()) return null;
+    return new Uint8Array(ab);
+  } catch { return null; }
+  finally {
+    if (timer) clearTimeout(timer);
+    try { if (url) URL.revokeObjectURL(url); } catch { }
+    try { if (img) img.src = ''; } catch { }
+    try { if (canvas) { canvas.width = 0; canvas.height = 0; } } catch { }
+  }
+}
+function imgCopyDiagMeta(u8, type, name) {
+  let h = 0;
+  for (let i = 0; i < u8.length; i++) h = ((h * 31) + u8[i]) >>> 0;
+  return { type, name, size: u8.length, hash: h.toString(16), head: [...u8.slice(0, 8)].join(",") };
+}
 /** 预取一张图的字节（幂等；同一个 src 只会有一个 in-flight）。 */
 function imgPrefetch(src) {
   if (!src || typeof src !== "string") return;
   src = mpImgSrc(src); // Resource ownership includes the captured document base.
   if (src.startsWith("http://") || src.startsWith("https://")) return;   // 网图不预取（离线取不到，也不该偷偷发请求）
-  /* 【滚动卡顿·2026-10-09 修复】改前 `imgBlobs.has(src)` 只挡住"已缓存/pending"两种，
-     而**判定为不可缓存（null，例如超过 IMG_BLOB_MAX 的大图）的结果没被记住** ⇒
-     每次视口变化都把那些大图的 base64 **重新解码一遍**再丢掉（8MB 文档里的巨图正是这一类）。
-     现在：null ⇒ 直接返回（不再重复解码）；pending ⇒ 也不重入。 */
-  /* 【滚动卡顿·2026-10-09 修复】改前 `imgBlobs.has(src)` 只挡住"已缓存/pending"两种，
-     而**判定为不可缓存（null，例如超过 IMG_BLOB_MAX 的大图）的结果没被记住** ⇒
-     每次视口变化都把那些大图的 base64 **重新解码一遍**再丢掉（8MB 文档里的巨图正是这一类）。
-     现在：null ⇒ 直接返回（不再重复解码）；pending ⇒ 也不重入。 */
-  if (imgBlobs.has(src)) {
-    const r = imgBlobs.get(src);
-    if (r && r !== "pending") imgBlobTouch(src, r);
+  const epoch = imgBlobEpoch;
+  const existing = imgBlobs.get(src);
+  if (existing === "pending" || existing === null) return;
+  if (existing && existing.epoch === epoch) {
+    if (existing.state === "ready") imgBlobSet(src, existing);
     return;
   }
-  imgBlobTouch(src, "pending");
+  const pending = { epoch, token: ++imgBlobToken };
+  imgBlobSetPending(src, pending);
   const data = imgParseDataUri(src);
   const run = async () => {
     let blob = null, mime = "";
@@ -4419,26 +5145,34 @@ function imgPrefetch(src) {
         mime = (blob && blob.type) || "";
       }
     } catch { blob = null; }
-    if (!blob || !blob.size) { imgBlobTouch(src, null); return; }
-    if (blob.size > IMG_BLOB_MAX) { imgBlobTouch(src, null); return; }     // 超大图不缓存（首屏优先）
+    if (!imgBlobOwned(src, pending, epoch)) return;
+    if (!blob || !blob.size) { imgBlobNull(src, pending); return; }
+    if (blob.size > IMG_BLOB_MAX) { imgBlobNull(src, pending); return; }     // 超大图不缓存（首屏优先）
     if (!/^image\//i.test(mime)) mime = blob.type && /^image\//i.test(blob.type) ? blob.type : "image/png";
-    if (/svg/i.test(mime)) { imgBlobTouch(src, null); return; }            // SVG 不是位图，不做图片口味
+    if (/svg/i.test(mime)) { imgBlobNull(src, pending); return; }            // SVG 不是位图，不做图片口味
     let name = "image";
-    if (data) name = "pasted-image";                       // data URI 没有文件名：给个语义名（不要拿 base64 当名字）
+    if (data) name = "pasted-image";
     else {
       try { const u = new URL(src, "file:///"); name = decodeURIComponent((u.pathname || "").split("/").pop() || "image").replace(/[^\w.\-]/g, "_").slice(0, 40) || "image"; }
       catch { /* 解析不了就用默认名 */ }
     }
     if (!/\.[a-z0-9]{2,5}$/i.test(name)) name += "." + (mime.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "");
-    const rec = { blob, mime, name, bytes: blob.size };
-    imgBlobBytes += blob.size;
-    imgBlobTouch(src, rec);
-    while (imgBlobBytes > IMG_BLOB_MAX && imgBlobs.size > 1) {              // 总量超限：淘汰最旧的
-      const k = imgBlobs.keys().next().value;
-      const old = imgBlobs.get(k);
-      imgBlobs.delete(k);
-      if (old && old !== "pending" && old !== null && old.bytes) imgBlobBytes -= old.bytes;
+    if (!imgBlobOwned(src, pending, epoch)) return;
+    let rawBytes = null;
+    try { rawBytes = new Uint8Array(await blob.arrayBuffer()); } catch { rawBytes = null; }
+    if (!imgBlobOwned(src, pending, epoch)) return;
+    if (!rawBytes || rawBytes.byteLength !== blob.size) { imgBlobNull(src, pending); return; }
+    let raster = null;
+    if (/^image\/(?:gif|webp|bmp)$/i.test(mime)) {
+      const png = await imgPngRaster(blob, () => imgBlobOwned(src, pending, epoch), IMG_BLOB_MAX - rawBytes.byteLength);
+      if (!imgBlobOwned(src, pending, epoch)) return;
+      if (png && png.byteLength > 0 && rawBytes.byteLength + png.byteLength <= IMG_BLOB_MAX) raster = { mime: "image/png", data: png };
     }
+    if (!imgBlobOwned(src, pending, epoch)) return;
+    if (rawBytes.byteLength + (raster ? raster.data.byteLength : 0) > IMG_BLOB_MAX) raster = null;
+    const rec = { epoch, token: pending.token, state: "ready", data: rawBytes, mime, name, bytes: rawBytes.byteLength,
+      raster, diag: imgCopyDiagMeta(rawBytes, mime, name) };
+    imgBlobCommit(src, pending, rec);
   };
   run();
 }
@@ -4453,6 +5187,17 @@ function imagesInSelection(state) {
   }
   return out;
 }
+/** 【选区优先预取·2026-10-17 实测缺陷】复制是**同步**事件、不能 await，所以图片必须在按下 Ctrl+C
+ *  之前就已经在 `imgBlobs` 里。改前只有"视口 ±20 行、单轮最多 8 张、按文档顺序"的惰性预取 ⇒
+ *  一屏 10 张图时第 9/10 张永远不会被取，选中它复制只剩 markdown 文本（实测 `imgs=1/added=0`）。
+ *  这里把"用户当前选中的图"单独拉出来、**立即**预取（不排队、不受 8 张预算限制）——
+ *  用户在选中一张图到按 Ctrl+C 之间通常有几百毫秒，足够把一张图解码进缓存。 */
+function prefetchSelectionImages(view) {
+  try {
+    const imgs = imagesInSelection(view.state);
+    for (const im of imgs) imgPrefetch(im.src);
+  } catch { /* 忽略 */ }
+}
 /** 选区/视口变化后预取（**停稳再做 + 空闲时段 + 只做视口附近**；纯文字文档零成本）。
  *  【滚动卡顿·2026-10-09 修复】改前：每次视口变化（滚轮每一格）都在 **requestAnimationFrame** 里
  *  遍历**全文**行内标记逐个预取 —— 8MB 含图文档上实测（长任务口径）6 次长任务 / 总阻塞 556ms / 最长 132ms
@@ -4462,11 +5207,20 @@ function imagesInSelection(state) {
  *  ③ 只做**可视行 ±20 行**、单轮最多 8 张：远处的图等滚过去再说。
  *  A/B（同尺子，24 格滚轮）：长任务 6→1、总阻塞 556→76ms、最长 132→76ms。 */
 function scheduleImgPrefetch(view) {
-  if (imgPrefetchTimer) return;
+  if (imgPrefetchOwner !== view) {
+    cancelImgPrefetch();
+    imgPrefetchOwner = view;
+  }
+  if (imgPrefetchTimer || imgPrefetchIdle) return;
+  const generation = ++imgPrefetchGeneration;
   imgPrefetchTimer = setTimeout(() => {
+    if (generation !== imgPrefetchGeneration || imgPrefetchOwner !== view) return; // stale timeout cannot touch new state
     imgPrefetchTimer = 0;
     const run = () => {
+      if (generation !== imgPrefetchGeneration || imgPrefetchOwner !== view) return;
+      imgPrefetchIdle = 0;
       try {
+        prefetchSelectionImages(view);
         const marks = view.state.field(inlineMarksField, false) || [];
         const doc = view.state.doc;
         const vp = view.viewport;
@@ -4482,69 +5236,112 @@ function scheduleImgPrefetch(view) {
         }
       } catch { /* 忽略 */ }
     };
-    if (typeof requestIdleCallback === "function") requestIdleCallback(run, { timeout: 600 });
-    else setTimeout(run, 0);
+    if (typeof requestIdleCallback === "function") imgPrefetchIdle = requestIdleCallback(run, { timeout: 600 });
+    else imgPrefetchIdle = setTimeout(run, 0);
   }, 140);
 }
-let imgPrefetchRaf = 0;
+function cancelImgPrefetch(view = null) {
+  if (view && imgPrefetchOwner && imgPrefetchOwner !== view) return;
+  imgPrefetchGeneration++;
+  if (imgPrefetchTimer) { clearTimeout(imgPrefetchTimer); imgPrefetchTimer = 0; }
+  if (imgPrefetchIdle) {
+    try { if (typeof cancelIdleCallback === "function") cancelIdleCallback(imgPrefetchIdle); else clearTimeout(imgPrefetchIdle); } catch { }
+    imgPrefetchIdle = 0;
+  }
+  if (!view) imgPrefetchOwner = null;
+}
 let imgPrefetchTimer = 0;
-
+let imgPrefetchIdle = 0;
+let imgPrefetchGeneration = 0;
+let imgPrefetchOwner = null;
 const imgPrefetchPlugin = ViewPlugin.fromClass(class {
   constructor(view) { this.view = view; scheduleImgPrefetch(view); }
-  update(u) { if (u.docChanged || u.selectionSet || u.viewportChanged) scheduleImgPrefetch(u.view); }
-  destroy() { if (imgPrefetchRaf) cancelAnimationFrame(imgPrefetchRaf); }
+  update(u) {
+    if (u.selectionSet) prefetchSelectionImages(u.view);     // 选中即取：复制前把缓存备好
+    if (u.docChanged || u.selectionSet || u.viewportChanged) scheduleImgPrefetch(u.view);
+  }
+  destroy() { cancelImgPrefetch(this.view); }
 });
 /** 取证计数：copy 处理器被调用的次数与分支（排障"复制没带上图"用；零成本，只在 copy 时自增）。
  *  `addedInfo` 记下**真正写进 clipboardData 的那一份**（type/size/前 8 字节 + 全字节简单哈希）——
  *  "字节是否与源一致"因此可以在**源侧**断言死，不依赖粘贴端（headless 的粘贴端拿不到字节）。 */
-const imgCopyDiag = { calls: 0, imgs: 0, added: 0, lastErr: null, addedInfo: null };
+const imgCopyDiag = { calls: 0, imgs: 0, added: 0, lastErr: null, addedInfo: null, transport: null, writeAttempts: 0, syncResult: null, generation: 0 };
 /** 图片口味填充器（**由 docSourceClipboard.copy 调用**，见那边的说明：两个 copy 处理器只会有第一个生效）。
  *  返回 true ＝ 已写入"含图片"的剪贴板载荷（调用方据此直接收工），false ＝ 让文字路径照旧走。 */
 function imgCopyFill(event, view) {
   imgCopyDiag.calls++;
+  ++imgCopyDiag.generation;
   const st = view.state;
   if (st.selection.main.empty) return false;
   const imgs = imagesInSelection(st);
   imgCopyDiag.imgs = imgs.length;
-  if (!imgs.length) return false;                       // 纯文字选区：原样交回文字路径
+  imgCopyDiag.added = 0;
+  imgCopyDiag.addedInfo = null;
+  imgCopyDiag.lastErr = null;
+  imgCopyDiag.transport = null;
+  imgCopyDiag.writeAttempts = 0;
+  imgCopyDiag.syncResult = null;
+  if (!imgs.length) return false;
   const cb = event.clipboardData;
   if (!cb) return false;
-  /* 文本口味保持"文档源码"（与 D8 口径一致：粘回编辑器仍是 markdown） */
   const ranges = st.selection.ranges.filter((r) => !r.empty);
   const text = ranges.map((r) => st.sliceDoc(r.from, r.to)).join("\n");
-  try { cb.setData("text/plain", text); } catch { /* 某些宿主禁止 */ }
-  /* 富文本目标：HTML 里带 <img>，Word/网页编辑器可直接取图 */
+  let htmlBody = "";
   try {
-    const html = text.split("\n").map((ln) => {
+    htmlBody = text.split("\n").map((ln) => {
       const esc = ln.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       return esc.replace(/!\[([^\]]*)\]\((<[^>]*>|[^)\s]+)(?:\s+["'][^"']*["'])?\)/g, (w0, alt, url) => {
         const u = String(url).replace(/^<|>$/g, "").replace(/"/g, "&quot;");
         return `<img src="${u}" alt="${String(alt).replace(/"/g, "&quot;")}">`;
       });
     }).join("<br>");
-    cb.setData("text/html", '<div data-markpilot-source="markdown">' + html + '</div>');
-  } catch { /* 忽略 */ }
-  /* 【关键】二进制图片口味：微信/DeepSeek 网页端只认这个。多图时先给第一张（微信一次一张），
-     其余仍在 HTML 里，粘到支持多图的目标（Word/网页编辑器）能拿到全部。 */
+  } catch { htmlBody = ""; }
+  const html = '<div data-markpilot-source="markdown">' + htmlBody + '</div>';
+  let chosen = null;
+  for (const im of imgs) {
+    const rec = imgBlobGet(mpImgSrc(im.src));
+    if (!rec || rec === "pending" || rec === null) { imgPrefetch(im.src); continue; }
+    if (rec.data instanceof Uint8Array && rec.data.byteLength === rec.bytes) { chosen = rec; break; }
+  }
+  const host = window.mpHost;
+  if (chosen && host && typeof host.writeClipboardImage === "function") {
+    imgCopyDiag.writeAttempts = 1;
+    try {
+      const payload = { text, html, mime: chosen.mime, name: chosen.name, bytes: chosen.data };
+      if (chosen.raster && chosen.raster.mime === "image/png" && chosen.raster.data instanceof Uint8Array) {
+        payload.raster = { mime: "image/png", bytes: chosen.raster.data };
+      }
+      const eventToken = host && typeof host.eventClipboardIntent === 'function' ? host.eventClipboardIntent('copy') : null;
+      const result = host.writeClipboardImage(payload, eventToken);
+      if (result && result.canceled) { imgCopyDiag.syncResult = { ok: false, canceled: true, status: 'canceled' }; imgCopyDiag.transport = 'native-sync-canceled'; event.preventDefault(); return true; }
+      if (!result || result.ok !== true) throw new Error((result && result.error) || "native-sync-failed");
+      imgCopyDiag.added = 1;
+      imgCopyDiag.transport = "native-sync";
+      imgCopyDiag.addedInfo = { ...chosen.diag, transport: "native-sync" };
+      imgCopyDiag.syncResult = { ok: true, width: result.width, height: result.height };
+      event.preventDefault();
+      return true; // clipboardData empty; native clipboard already has all flavors
+    } catch (err) {
+      imgCopyDiag.lastErr = String(err && err.message || err);
+      imgCopyDiag.transport = "native-sync-failed";
+      imgCopyDiag.syncResult = { ok: false, error: imgCopyDiag.lastErr };
+    }
+  }
+  try { cb.setData("text/plain", text); } catch { /* 某些宿主禁止 */ }
+  try { if (html) cb.setData("text/html", html); } catch { /* 忽略 */ }
   let added = 0;
   for (const im of imgs) {
-    const rec = imgBlobs.get(mpImgSrc(im.src));
+    const rec = imgBlobGet(mpImgSrc(im.src));
     if (!rec || rec === "pending" || rec === null) { imgPrefetch(im.src); continue; }
     try {
-      const file = new File([rec.blob], rec.name, { type: rec.mime });
+      const file = new File([rec.data], rec.name, { type: rec.mime });
       cb.items.add(file, rec.mime);
       added++;
       imgCopyDiag.added = added;
-      /* 源侧自证：把"写进去的那一份"的字节指纹记下来（异步算，不影响 copy 本身） */
-      try {
-        file.arrayBuffer().then((buf) => {
-          const u8 = new Uint8Array(buf);
-          let h = 0;
-          for (let i = 0; i < u8.length; i++) h = ((h * 31) + u8[i]) >>> 0;
-          imgCopyDiag.addedInfo = { type: file.type, name: file.name, size: file.size, hash: h.toString(16), head: [...u8.slice(0, 8)].join(",") };
-        }).catch(() => { });
-      } catch { /* 忽略 */ }
-      break;                                              // 微信只接受一张；先保证"粘出去是图"
+      imgCopyDiag.transport = "browser-file";
+      imgCopyDiag.lastErr = null;
+      imgCopyDiag.addedInfo = { ...rec.diag, transport: "browser-file" };
+      break;
     } catch (err) { imgCopyDiag.lastErr = String(err && err.message || err); console.error("[mp] 图片进剪贴板失败：", err); }
   }
   event.preventDefault();
@@ -4554,6 +5351,10 @@ function imgCopyFill(event, view) {
 /* 扩展包（更多菜单/大纲/导出/表格操作）与可重配 keymap 的挂载点：CM6 只允许在创建时给扩展，故用 Compartment 事后注入。 */
 const extrasCompartment = new Compartment();
 const keyCompartment = new Compartment();
+/* 【阅读模式只读·2026-10-17】阅读模式此前只是 CSS 面具（隐藏光标、收窄版心），编辑器本身仍可编辑
+   ⇒ 真机实测在阅读态点正文敲 ZZ，文档长度 17→19（静默改稿）。这里给它一个 Compartment 挂
+   readOnly + editable(false)，由 mpEngine.setReadingMode 切换。 */
+const readingCompartment = new Compartment();
 
 const clickToSource = EditorView.domEventHandlers({  mousedown(event, view) {
     const image = event.target?.closest?.('.mp-img[data-mp-region]');
@@ -5435,6 +6236,27 @@ const commands = createCommandContext({
 // A checkpoint owns the exact CM state, including history and region epoch.
 // Its lifetime is one synchronous turn, so a delayed reply cannot restore over
 // subsequent user input. Command intent serials and allocated epochs never rewind.
+const checkpointViewportMeasureKey = {};
+// Restore the checkpoint viewport after CM's whole measure tail (scroll-anchor
+// compensation runs after requestMeasure.write). One microtask, no dispatch/timer/align.
+function restoreViewportTail(target, ownedState, top, left) {
+  const revision = sourceRevision;
+  const serial = commands.serial();
+  const viewportSerial = viewportIntent.serial(target);
+  const valid = () => view === target && target.state === ownedState && sourceRevision === revision && commands.serial() === serial && viewportIntent.serial(target) === viewportSerial && target.dom.isConnected;
+  target.requestMeasure({
+    key: checkpointViewportMeasureKey,
+    read: valid,
+    write(ok) {
+      if (!ok || !valid()) return;
+      queueMicrotask(() => {
+        if (!valid()) return;
+        target.scrollDOM.scrollTop = top;
+        target.scrollDOM.scrollLeft = left;
+      });
+    },
+  });
+}
 function checkpointDocument() {
   const target = view, ticket = commands.capture();
   if (!target || !ticket) return null;
@@ -5448,13 +6270,15 @@ function checkpointDocument() {
       if (!active || view !== target) return false;
       active = false; commands.invalidate(); deactivateCellOverlay();
       const suppressed = suppressChange; suppressChange = true;
-      try { if (target.state !== state) target.setState(state); }
+      let rebuilt = false;
+      try { if (target.state !== state) { target.setState(state); rebuilt = true; } }
       finally { sourceRevision = revision; composingDirty = pendingComposition; suppressChange = suppressed; }
       target.scrollDOM.scrollTop = top; target.scrollDOM.scrollLeft = left;
       // Auxiliary view failures cannot prevent restoration of the source state.
       try { window.mpSplit?.mirror(state); } catch (error) { console.error('[document] mirror restore', error); }
       try { scheduleTableChrome(); positionTableBar(); } catch (error) { console.error('[document] chrome restore', error); }
       commands.resume(ticket, { intent: false });
+      if (rebuilt) restoreViewportTail(target, target.state, top, left);
       return true;
     },
   };
@@ -5479,6 +6303,11 @@ function checkpointDocument() {
 let tableBar = null;
 let tableBarKey = "";
 let tableBarVisible = false;
+/* 【C10】仅 source 活跃期间的几何失效缓存：保存 state.doc 的 Text 引用（不可变对象，
+   任何 docChanged 必换引用 ⇒ 同长替换/换行改高也能失效），不存整串 source、不存
+   hash/docLen/长度替代。source 结束（→null / 目标表消失 / 阅读态）即清回 null；
+   无 source 的普通热路径零比较、零扫描。 */
+let tableBarSourceText = null;
 /** 当前表 + 当前列对齐（只读；活动格优先 —— 点格不落 CM 选区）。 */
 function tableBarTarget() {
   if (!view) return null;
@@ -5601,9 +6430,21 @@ function withTableBarTarget(fn) {
   barAnchor = null;
   positionTableBar();
 }
-function positionTableBar() {
+function positionTableBar(ctx) {
   if (!view) return;
-  const t = tableBarTarget();
+  /* 【C10】内部上下文严判：仅当绑定当前 view、state 一致且确带 target 与**已读**
+     source 时复用（schedule 传入，避免第二次 field 读）。window resize 传进来的
+     Event 不满足 view/state 严判 ⇒ 整体走旧解析；绝不把 Event.target 当表格目标。 */
+  let t = null, source = null;
+  if (ctx && typeof ctx === "object" && ctx.view === view && ctx.state === view.state &&
+      Object.prototype.hasOwnProperty.call(ctx, "target") &&
+      Object.prototype.hasOwnProperty.call(ctx, "source") &&
+      ctx.target && ctx.target.table && ctx.source !== undefined) {
+    t = ctx.target; source = ctx.source;
+  } else {
+    t = tableBarTarget();
+    source = tableBarReadSource(t);
+  }
   if (!t || document.documentElement.dataset.mpReading === "1") { hideTableBar(); return; }
   const bar = ensureTableBar();
   const headFrom = t.table.headerBlock.from;
@@ -5640,6 +6481,34 @@ function positionTableBar() {
     }
   }
   if (!haveSeg) segs.push(wrap);
+  /* 【C10·源码行并入几何】仅当 source 与当前表闭端点相交才启用。只枚举当前
+     view.contentDOM 的 .cm-line；posAtDOM 捕获失败/位置不在“当前表 ∩ source 范围”
+     的不收；排除含/位于 .mp-table-wrap 的行（表 widget 自身），但不禁合法 inline
+     widget；只认有限正高的真实 rect。raw 行**只并 top/bottom**——绝不改 left/right
+     （超长 raw 行不得把工具条拉宽）。raw 节点并入 segs 后去重、按真实 DOM 顺序排序，
+     首末端点交给下方原 findLine（避免 widget-only 端点撞 60 guard）。生产循环不设
+     诊断的 8 行上限，覆盖当前表全部实际挂载的合格源码行。 */
+  if (source && source.from <= t.table.to && source.to >= t.table.from) {
+    const lo = Math.max(source.from, t.table.from), hi = Math.min(source.to, t.table.to);
+    const insideWrap = (el) => { if (el.querySelector(".mp-table-wrap")) return true; for (let a = el; a && a !== view.contentDOM; a = a.parentElement) if (a.classList && a.classList.contains("mp-table-wrap")) return true; return false; };
+    const rawNodes = [];
+    for (const el of view.contentDOM.querySelectorAll(".cm-line")) {
+      if (insideWrap(el)) continue;
+      let p = null;
+      try { p = view.posAtDOM(el, 0); } catch { continue; }
+      if (p == null || p < lo || p > hi) continue;
+      const r = el.getBoundingClientRect();
+      if (!Number.isFinite(r.top) || !Number.isFinite(r.bottom) || !(r.height > 0)) continue;
+      rawNodes.push(el);
+      tr.top = Math.min(tr.top, r.top);
+      tr.bottom = Math.max(tr.bottom, r.bottom);
+    }
+    if (rawNodes.length) {
+      const merged = Array.from(new Set(segs.concat(rawNodes)));
+      merged.sort((a, b) => (a === b ? 0 : (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1));
+      segs.length = 0; segs.push(...merged);
+    }
+  }
   /* 取"**表外**的正文行"：height > 0 且 posAtDOM 落在本表源码区间之外。
      不这么筛会取到**本表自己的行**（CM6 里表格源码行仍是 .cm-line、被 widget 折成零高且紧贴表格）
      ⇒ 间距恒 0 ⇒ 分支判断全废。只"跳过非 .cm-line"不够，实测反例已记。 */
@@ -5714,15 +6583,45 @@ function hideTableBar() {
   if (tableBar && tableBar.style.display !== "none") tableBar.style.display = "none";
   tableBarVisible = false;
 }
-/** 状态键（不含文档长度/内容哈希/时间）—— 变了才动 DOM，键不变时一个字节都不碰。 */
+/** 安全读 C8 source 范围：目标缺失/阅读态不读；仅当 C8 的 tableSourceRangeField
+ * 真实存在（typeof 守卫，C8-off 时该 const 已随其 hunk 逆撤而消失）才读，且用
+ * field(..., false)——未注册不抛错。读不到一律 null，绝不回退猜读 separator 字段。
+ * 与当前表按闭端点相交才由调用方启用；正常 cell/table owner 下 source=null 保持原行为。 */
+function tableBarReadSource(t) {
+  if (!t || !view || document.documentElement.dataset.mpReading === "1") return null;
+  try {
+    if (typeof tableSourceRangeField !== "undefined") {
+      const value = view.state.field(tableSourceRangeField, false);
+      if (value && Number.isFinite(value.from) && Number.isFinite(value.to) &&
+          value.from <= t.table.to && value.to >= t.table.from) return { from: value.from, to: value.to };
+    }
+  } catch { /* 读不到就按无 source 处理 */ }
+  return null;
+}
+/** 状态键（不含文档长度/内容哈希/时间）—— 变了才动 DOM，键不变时一个字节都不碰。
+ * 【C10】键尾追加 active-source 的 from/to；仅 source 活跃时做 O(1) 的 state.doc
+ * Text 引用比较——同长替换/换行改变几何也必须失效（docLen/hash/from-to 都不够）。
+ * source→null / 目标表消失 / 阅读态退出活跃 source 时：清 Text 引用，且**不得**
+ * 清完缓存又因旧 base 键相同提前 return —— 显式清 tableBarKey 强制走一次原定位/隐藏。
+ * 已读 source 经内部上下文传给 positionTableBar，避免第二读；目标表存在时至多一次
+ * 安全可选 field 读；t=null 普通热路径零 field 读、零扫描。 */
 function scheduleTableChrome() {
   if (!view) return;
   const t = tableBarTarget();
   const reading = document.documentElement.dataset.mpReading === "1";
-  const key = t ? [t.table.headerBlock.from, t.col, t.align || "", reading ? "r" : ""].join(":") : "none";
+  const source = reading ? null : tableBarReadSource(t);
+  const key = t ? [t.table.headerBlock.from, t.col, t.align || "", reading ? "r" : "",
+    source ? "s" + source.from + "-" + source.to : ""].join(":") : "none";
+  if (source) {
+    if (tableBarSourceText !== view.state.doc) tableBarKey = "";
+    tableBarSourceText = view.state.doc;
+  } else {
+    if (tableBarSourceText !== null) tableBarKey = "";
+    tableBarSourceText = null;
+  }
   if (key === tableBarKey) return;
   tableBarKey = key;
-  positionTableBar();
+  positionTableBar(t ? { target: t, source, view, state: view.state } : undefined);
 }
 function installTableBar(v) {
   ensureTableBar();
@@ -5754,6 +6653,7 @@ function boot(content) {
         mathCompletion(), // Open candidates have priority over structural Enter/Tab.
         asyncSyntax.extension, // Prepare native tree queries before basicSetup; math candidates stay first.
         basicSetup,
+        readingCompartment.of([]),          // 阅读模式：真只读（D-01）
         markdown({
           addKeymap: false,
           base: asyncSyntax.language,
@@ -5777,6 +6677,7 @@ function boot(content) {
         mathFencePointerSelection,
         headingDecorations, // 标题井号投影：光标入行显源码、离行隐藏
         lineStylesField, // 行级样式数据层（标题/围栏/引用，仅文档变化重扫）
+        tableDataField, // 表数据层（窄字段；非结构不触表时身份稳定 ⇒ 跳过整条 compute）
         lineClassDecorations, // 行类派生（mp-h1..h6/mp-code/mp-quote → telari 版式）
         mermaidBlocksField, // 【mermaid·2026-10-11】图表块数据层（仅文档变化且含结构字符时重扫）
         mermaidDecorations, // 【mermaid】块级投影：光标入块显源码、离块渲染图表
@@ -5795,14 +6696,16 @@ function boot(content) {
         imageInsertions,
         inlineMarkDecorations, // 行内标记投影：光标入段显源码、离段隐藏
         imgBaseField,          // 【图片】文档目录变化时踢一脚，让图片 widget 用新的 base 重建
+        imgPreviewField,       // 【图片】资源代次变化时让 retained/inline 图片重建
         imageAtomicRanges, // 【图片】长 data URI 的图当原子区间（方向键整块跳过）
-        tableDecorations, // 表格投影：全渲染态＋Excel 式格内编辑（行源码永不露出）
+        tableDecorations, // 表格投影：Excel 式格内编辑；无格归属的 separator 原生选区显示源码
         tableCellClick,
         searchCellFocus,
         extrasCompartment.of([]),
         keyCompartment.of(keymap.of([])),
         activeCellField, // 活动格状态（effect 驱动）
         tableSelectionField, // 【β1】选择层级（格/行/列/整表）—— 与活动格**解耦**（见 tableSelectionField 注释）
+        tableSourceRangeField, // 同一 separator 行的原生选区；null/相同块坐标保持身份
         tableSelInputGuard, // 【β1】行/列/整表层级下打字：先收场再放行（不许一个看不见的按键改表结构）
         listSemantics,
         tableKeys,
@@ -5836,24 +6739,188 @@ function boot(content) {
               else post("change", { len: u.state.doc.length, ...window.mpEngine?.documentSession() });
             }
           }
+          /* 【#62-U2R-3】覆盖层打开时文档被外部路径改写（位图粘贴异步 commit 等）⇒ 把镜像区间与
+             活动格位置跟着事务映射，否则下一次键入会写进旧区间（数据破坏，实测把表头写成
+             `a1 Z1 | H2 |`）。映射只动位置、不写文档；活动格效果用微任务派发，避免在 update 里重入。 */
+          if (u.docChanged && cellEdit) {
+            try {
+              const nf = u.changes.mapPos(cellEdit.from, 1);
+              const nt = u.changes.mapPos(cellEdit.to, -1);
+              if (nf !== cellEdit.from || nt !== cellEdit.to) { cellEdit.from = nf; cellEdit.to = nt; }
+              const active = u.state.field(activeCellField, false);
+              if (active) {
+                const nr = u.changes.mapPos(active.rowFrom, 1);
+                if (nr !== active.rowFrom) {
+                  const stamp = active;
+                  queueMicrotask(() => {
+                    try {
+                      if (!view) return;
+                      const cur = view.state.field(activeCellField, false);
+                      if (cur && cur === stamp) view.dispatch({ effects: setActiveCell.of({ rowFrom: nr, col: cur.col }) });
+                    } catch { /* 视图已换文档 */ }
+                  });
+                }
+              }
+            } catch { /* 映射失败不阻塞主流程 */ }
+          }
           // 双开（形态 B）状态转发：从视图只读镜像主视图文档。分屏关闭时 mirror() 第一行返回
           //（零成本）；开着时按 Text 对象同一性判脏，纯选区/几何更新不做任何工作。
           /* 【β2】表格工具栏状态键：**必须挂在 if 之外** —— 点格只 dispatch setActiveCell（不落选区、
              不改文档），那种事务的 selectionSet/docChanged 都是 false，挂在 if 里就等于"点格不出工具栏"。 */
           scheduleTableChrome();
-          window.mpSplit && window.mpSplit.mirror(u.state);
+          /* 【C16·公开增量】仅在正常（非 suppressChange 的 setValue 窗口之外）且分屏打开时，
+             把本次 ViewUpdate 实际组合出的 startState.doc+u.changes 增量交给 mirror；
+             关闭时零对象分配；setValue/rollback/replaceDocument 仍走无 delta 全量路径。 */
+          window.mpSplit && window.mpSplit.mirror(u.state, (suppressChange || !window.mpSplit.isOpen()) ? null : { from: u.startState.doc, changes: u.changes });
         }),
         themeVars,
         EditorView.lineWrapping,
         // Rich documents create expensive formula DOM outside the screen.
         // Keep a smaller buffer while preserving the visible and selected blocks.
-        EditorView.viewportMargin.compute(["doc", mathSpansField, lineStylesField], state =>
+        EditorView.viewportMargin.compute(["doc", mathSpansField, tableDataField], state =>
           state.doc.length > 50000 && (state.field(mathSpansField).spans.length > 128 ||
-            state.field(lineStylesField).tables.length > 16) ? 300 : 1000),
+            state.field(tableDataField).length > 16) ? 300 : 1000),
         tailSpace,
       ],
     }),
     parent: document.getElementById("editor"),
+  });
+  /* 【#51·2026-10-18 实测缺陷 N6】行/列/整表选择下开始 IME 组字：表行是 block widget，没有可承载
+     IME 焦点的文本 DOM；守卫把第一笔组字事务搬进格首后收掉表级状态，而 CM6 的组字观察器仍以
+     widget 边界为锚 ⇒ 第二笔组字起被插到表格下方的新行（实测 ni 进格、nihao/你好 跑到表外）。
+     方案：组字**开始**时把 CM/DOM 选区临时落到表格块之后的真实文本行（同时收掉表级选择），让 IME
+     在正常文本位置完成组字；compositionend 时把这段组字文本整体搬进目标格内容起点，并打开格覆盖层，
+     后续键入回到正常格内路径。 */
+  let imeTableRelocate = null;
+  function tableSafeTextPos(st, rowLine) {
+    /* 【C12·EDGE-A5-A2】表行判据改为**缓存表成员**：旧 `^\s*\|`（#58 后剥前缀版）仍把
+       无前导管道的真实表行（如 b1 行）当"非表行"，组字临时位落进表内 ⇒ 实测 destructively
+       劈表（f9c95e2f…：nolead-first 'nib1 | b2'，commit 'a1 | a2\n2'）。改用已有
+       tableTablesOf(st)（读一次缓存 tableDataField，不重扫不重解析）判 line.from ∈ 某表
+       [from,to]：头/分隔行/全部行、无前导管道行、引用前缀行一律是表行；相邻其他表的行
+       同样跳过。表缓存不可用/空 ⇒ 如实返回 null 放弃搬迁（无环境钩子、无新正则回退、
+       缓存分类不再需要 tableLead）。搜索顺序保持原样：向后从下一行取第一条**表外**真实
+       源码行的 line.from（**空行也算**）；向前取第一条表外行的 line.to（Math.max）；
+       都没有则 null。PURE_NO_NL 表外无行 ⇒ 继续 null，不造追加行。 */
+    try {
+      const tables = tableTablesOf(st);
+      if (!tables.length) return null;
+      const inAnyTable = (pos) => tables.some((t) => pos >= t.from && pos <= t.to);
+      if (!inAnyTable(rowLine.from)) return null;
+      let n = rowLine.number + 1;
+      while (n <= st.doc.lines) {
+        const line = st.doc.line(n);
+        if (inAnyTable(line.from)) { n++; continue; }
+        return line.from;
+      }
+      n = rowLine.number - 1;
+      while (n >= 1) {
+        const line = st.doc.line(n);
+        if (inAnyTable(line.from)) { n--; continue; }
+        return Math.max(line.from, line.to);
+      }
+    } catch { /* 落在异常上就放弃搬迁 */ }
+    return null;
+  }
+  /* 【#52·2026-10-18 实测缺陷 N6 变体】整表选择（四周 block widget）下，CM6 自己的 compositionstart
+     处理器会先把跨行 DOM 选区收成 caret（观测：document capture 时 kind=table/sel 4..53，到
+     view.dom 的组字处理器时已变成 kind=null/sel 32..32）⇒ #51 的搬迁判据拿不到表级状态。
+     因此改挂 **document capture**：在 CM6/浏览器处理组字之前先做搬迁。 */
+  document.addEventListener("compositionstart", (event) => {
+    if (!view) return;
+    const target = event.composedPath?.()[0] || event.target;
+    if (!view.contentDOM.contains(target)) return;
+    const cur = view.state.field(tableSelectionField, false);
+    if (!cur || cur.kind === 'cell' || imeTableRelocate) return;
+    try {
+      const st = view.state, rowLine = st.doc.lineAt(cur.rowFrom);
+      const ranges = cellRangesOf(rowLine);
+      const r = ranges[Math.max(0, Math.min(cur.col, ranges.length - 1))];
+      if (!r) return;
+      const safeFrom = tableSafeTextPos(st, rowLine);
+      if (safeFrom == null) return;
+      const seg = rowLine.text.slice(r[0] - rowLine.from, r[1] - rowLine.from);
+      const sel = st.selection.main;
+      const safeLine = st.doc.lineAt(safeFrom);
+      imeTableRelocate = { rowFrom: cur.rowFrom, col: cur.col, kind: cur.kind, cellAt: r[0] + (seg.length - seg.trimStart().length), safeFrom, selFrom: sel.from, selTo: sel.to, safeText: safeLine.text, safeRel: safeFrom - safeLine.from };
+      /* 先收表级状态、再把选区落到真实文本位置：CM6 的组字锚点因此不再是 widget 边界。 */
+      view.dispatch({ selection: EditorSelection.cursor(safeFrom), effects: [setTableSel.of(null), setActiveCell.of(null)], userEvent: 'select.pointer' });
+    } catch { imeTableRelocate = null; }
+  }, true);
+  /* #56：组字收尾也必须 document capture —— 实测取消/失焦时 compositionend 的 target 可能不在
+     contentDOM 内（Esc 取消形态 target 落到 body），挂在 view.dom 上会漏掉 ⇒ 残留与恢复都做不了。 */
+  document.addEventListener("compositionend", (event) => {
+    const ctx = imeTableRelocate;
+    if (!ctx || !view) return;
+    imeTableRelocate = null;
+    const text = event.data || '';
+    try {
+      const st = view.state;
+      const from = Math.min(ctx.safeFrom, st.doc.length);
+      const to = Math.min(from + text.length, st.doc.length);
+      const landed = text ? st.doc.sliceString(from, to) : '';
+      if (!text || landed !== text) {
+        /* 【#56】组字被取消（Esc/失焦/候选取消）时什么都不该发生：① 清掉已落在临时行上的组字残留
+           （实测 Esc 取消后 CM6 把 "ni" 留在表后新行）；② 把组字开始前搬走的表级选择与选区原样还回去。
+           两件事在同一笔事务里做，且**不进撤销栈**（取消的用户语义＝零操作）。 */
+        try {
+          const len = st.doc.length;
+          const line = st.doc.lineAt(Math.min(ctx.safeFrom, len));
+          const orig = ctx.safeText ?? '', cur = line.text;
+          let p = 0; const max = Math.min(orig.length, cur.length);
+          while (p < max && orig[p] === cur[p]) p++;
+          let s = 0;
+          while (s < Math.min(orig.length - p, cur.length - p) && orig[orig.length - 1 - s] === cur[cur.length - 1 - s]) s++;
+          const leftover = cur.slice(p, cur.length - s);
+          const at = Math.min(ctx.safeRel ?? 0, cur.length);
+          const delFrom = leftover && p === at ? line.from + p : -1;
+          const delTo = delFrom >= 0 ? delFrom + leftover.length : -1;
+          const a = Math.min(ctx.selFrom, len), b = Math.min(ctx.selTo, len);
+          const baseSel = EditorSelection.range(Math.min(a, b), Math.max(a, b));
+          const tr = view.state.update({
+            changes: delFrom >= 0 ? { from: delFrom, to: delTo, insert: '' } : undefined,
+            selection: delFrom >= 0
+              ? EditorSelection.range(
+                trPos(baseSel.from), trPos(baseSel.to))
+              : baseSel,
+            effects: [setTableSel.of({ kind: ctx.kind, rowFrom: Math.min(ctx.rowFrom, len), col: ctx.col }), setActiveCell.of(null)],
+            userEvent: 'select.pointer',
+            annotations: Transaction.addToHistory.of(false),
+          });
+          /* trPos：把原选区的端点映射过"删掉 leftover"这一笔（端点 >= delTo 的右移）。 */
+          function trPos(pos) {
+            if (delFrom < 0) return pos;
+            if (pos >= delTo) return pos - leftover.length;
+            if (pos <= delFrom) return pos;
+            return delFrom;
+          }
+          view.dispatch(tr);
+        } catch { /* 文档在组字期间被外部替换 ⇒ 不做恢复 */ }
+        return;   // 组字被取消 / 没落在临时行 ⇒ 不搬
+      }
+      const changes = ctx.cellAt >= from
+        ? [{ from: ctx.cellAt, insert: text }, { from, to, insert: '' }]
+        : [{ from, to, insert: '' }, { from: ctx.cellAt, insert: text }];
+      const tr = view.state.update({ changes, userEvent: 'input.type' });
+      view.dispatch(tr);
+      const rowFrom = tr.changes.mapPos(ctx.rowFrom, 1);
+      const line = tr.state.doc.lineAt(rowFrom);
+      const ranges = cellRangesOf(line);
+      const r = ranges[Math.max(0, Math.min(ctx.col, ranges.length - 1))];
+      if (!r) return;
+      const caret = tr.changes.mapPos(ctx.cellAt, 1);
+      const relocate = { rowFrom, col: ctx.col, cols: ranges.length, from: r[0], to: r[1], caret: Math.max(0, caret - r[0]) };
+      /* compositionend 里 CM6 仍在收尾（view.composing 尚未归零），立即开覆盖层会被同拍的状态更新收掉；
+         下一拍再开，用户看到的是组字提交后直接进入格内编辑。 */
+      setTimeout(() => {
+        try {
+          if (!view || view.state.doc !== tr.state.doc) return;
+          /* 覆盖层定位依赖 activeCellField（activeCellDOM 取不到就 display:none）⇒ 先立活动格再激活。 */
+          view.dispatch({ effects: setActiveCell.of({ rowFrom: relocate.rowFrom, col: relocate.col }) });
+          activateCellOverlay(relocate.rowFrom, relocate.col, relocate.cols, relocate.from, relocate.to, relocate.caret);
+        } catch (e) { console.warn('[mp] ime 组字搬迁后打开格覆盖层失败：', e); }
+      }, 0);
+    } catch { imeTableRelocate = null; }
   });
   // IME 组字收尾：组字期间挂起的 change 脏标在此一笔补发（丢一笔＝保存调度失联）。
   view.dom.addEventListener("compositionend", () => {
@@ -5876,6 +6943,7 @@ function boot(content) {
     if (e.target && e.target.closest && e.target.closest(".mp-toolbar")) return;   // 岛上滚轮不缩放
     e.preventDefault();
     mpZoomBy(e.deltaY < 0 ? MP_ZOOM_STEP : -MP_ZOOM_STEP);
+    scheduleCellOverlay();
   }, { passive: false, capture: true });
   // 版心/缩放随窗口尺寸变化重算（rAF 合并，无每键成本）
   try {
@@ -5893,6 +6961,10 @@ function boot(content) {
       const active = document.activeElement, edit = cellOverlay?.querySelector(".mp-cell-overlay-text");
       const inCell = !!cellEdit && active === edit;
       if (!inCell && (!view.hasFocus || !view.contentDOM.contains(active))) return false;
+      if (cellComposing || view.composing) {
+        try { window.mpExtras?.toast?.("请先完成输入，再撤销或重做"); } catch { /* Keep the composing history request handled. */ }
+        return true;
+      }
       cancelPendingImageInsertions(view);
       const command = cmd === "undo" ? undo : redo;
       historyCommand(command);
@@ -5903,7 +6975,7 @@ function boot(content) {
       const state = view.state, context = fresh ? scanStructuralContext(state.doc) : state.field(markdownContext), blocks = context.blocks;
       const math = fresh ? scanMathSpans(state.doc,blocks,context) : state.field(mathSpansField).spans;
       const inline = fresh ? scanInlineMarks(state.doc,math,blocks) : state.field(inlineMarksField);
-      const styles = fresh ? { ...scanLineStyles(state.doc,blocks,context), tables: scanTables(state.doc,blocks) } : state.field(lineStylesField);
+      const styles = fresh ? { ...scanLineStyles(state.doc,blocks,context), tables: scanTables(state.doc,blocks) } : { ...state.field(lineStylesField), tables: state.field(tableDataField) };
       return { blocks, math, inline, styles, mermaid: fresh ? scanMermaidBlocks(state.doc,blocks) : state.field(mermaidBlocksField) };
     },
     _view: () => view, // 调试/取证通道
@@ -5924,7 +6996,7 @@ function boot(content) {
     setPref: (id, v) => { mpSetPref(id, v); return mpPrefsAll(); },
     applyPrefs: () => { applyEnginePrefs(); return mpPrefsAll(); },
     /* 取证通道：图片 Blob 预取缓存（判据与排障用；只读快照，不给写入口） */
-    imageBlobCache: () => [...imgBlobs.entries()].map(([src, rec]) => ({ src: src.slice(0, 48), state: rec === 'pending' ? 'pending' : rec === null ? 'null' : 'ready', bytes: rec && rec.bytes || 0, mime: rec && rec.mime || null })),
+    imageBlobCache: () => [...imgBlobs.entries()].map(([src, rec]) => ({ src: src.slice(0, 48), state: rec === 'pending' ? 'pending' : rec === null ? 'null' : 'ready', bytes: rec && rec.bytes || 0, rasterBytes: rec && rec.raster && rec.raster.data ? rec.raster.data.byteLength : 0, retainedBytes: rec ? imgBlobCost(rec) : 0, mime: rec && rec.mime || null })),
     /* 取证通道：当前选区里"被完整包含"的图片（排障"复制没带上图"用） */
     imgCopyDiag: () => ({ ...imgCopyDiag }),
     /* 取证通道：覆盖层 Ctrl+C 的次数与分支（N1：格内复制到底写没写剪贴板） */
@@ -5978,6 +7050,16 @@ function boot(content) {
       const r = view.state.selection.main;
       return { anchor: r.anchor, head: r.head, selected: view.state.doc.sliceString(Math.min(r.anchor, r.head), Math.max(r.anchor, r.head)) };
     },
+    /* 阅读模式：真只读（readOnly + 不可编辑），选区与复制仍可用。 */
+    setReadingMode: (on) => {
+      if (!view) return false;
+      /* 【#26】进阅读态先收场活动格覆盖层：它是 body 级 contenteditable，不会跟着 readOnly 失效。 */
+      if (on) { try { deactivateCellOverlay(); } catch { /* 覆盖层可能还没建 */ } }
+      try {
+        view.dispatch({ effects: readingCompartment.reconfigure(on ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []) });
+        return true;
+      } catch { return false; }
+    },
     checkpointDocument,
     replaceDocument: (text) => {
       if (!view || cellComposing || view.composing) return false;
@@ -5986,9 +7068,13 @@ function boot(content) {
       try {
       const old = view.state;
       const state = EditorState.create({ doc: typeof text === 'string' ? text : '', extensions: documentExtensions });
+      /* 【CAND-2·2026-10-17】改前只搬 extras/key 两个 compartment，阅读位落回默认 [] ⇒ 阅读态下
+         打开另一个文档后 readOnly 归零、而 dataset.mpReading 仍是阅读态（CSS 继续藏光标）⇒ 键入静默改稿。
+         阅读位是**状态**，换文档必须原样搬过去。 */
       const fresh = state.update({ effects: [
         extrasCompartment.reconfigure(extrasCompartment.get(old) ?? []),
         keyCompartment.reconfigure(keyCompartment.get(old) ?? []),
+        readingCompartment.reconfigure(readingCompartment.get(old) ?? []),
       ] }).state;
       deactivateCellOverlay();
       inlineMathMetrics.clear();
@@ -6001,6 +7087,10 @@ function boot(content) {
       suppressChange = true;
       try { view.setState(fresh); }
       finally { suppressChange = false; }
+      /* 【#47·2026-10-18 实测缺陷 NX2】setState 是整状态替换，不会触发 updateListener ⇒ 换文档后
+         大纲仍是旧文档的条目（改短文档时点陈旧条目直接抛 Selection points outside of document）。
+         这里显式让扩展重建已打开的大纲。 */
+      try { window.mpExtras?.refreshOutline?.(); } catch { }
       commands.invalidate(); sourceRevision = 0;
       view.scrollDOM.scrollTop = view.scrollDOM.scrollLeft = 0;
       window.mpSplit && window.mpSplit.mirror(fresh);
@@ -6008,8 +7098,13 @@ function boot(content) {
       const active = document.activeElement;
       if (!active || active === document.body || active === document.documentElement ||
           view.contentDOM.contains(active) || cellOverlay?.contains(active)) view.focus();
-      checkpoint.commit(); return true;
-      } catch (error) { checkpoint.rollback(); throw error; }
+      checkpoint.commit();
+      imgBlobInvalidate('replaceDocument', view);
+      return true;
+      } catch (error) {
+        try { checkpoint.rollback(); } finally { imgBlobInvalidate('replaceDocument-failed', view); }
+        throw error;
+      }
     },
     setValue: (text, ticket = null) => {
       if (!view || cellComposing || view.composing) return false;
@@ -6034,7 +7129,7 @@ function boot(content) {
         let endCur = cur.length, endNew = text.length;
         while (endCur > start && endNew > start && cur.charCodeAt(endCur - 1) === text.charCodeAt(endNew - 1)) { endCur--; endNew--; }
         const insert = text.slice(start, endNew);
-        if (start === endCur && insert === "") return true;
+        if (start === endCur && insert === "") { imgBlobInvalidate('setValue', view); return true; }
         const sc0 = view.dom.closest(".cm-scroller") || view.scrollDOM;
         scrollTop = sc0 ? sc0.scrollTop : 0;
         /* 【★ 2026-10-09 修·数据丢失级】改前这笔 dispatch **不带 selection**，靠 CM6 原生位置映射。
@@ -6055,6 +7150,7 @@ function boot(content) {
         });
         // 视口还原（下一拍，等新高度就绪；最小 diff 高度扰动极小，纯稳态保险）
         viewportIntent.preserveScroll(view, ticket?.scrollTop ?? scrollTop);
+        imgBlobInvalidate('setValue', view);
         return true;
       } finally {
         suppressChange = false;
@@ -6071,6 +7167,8 @@ function boot(content) {
       return preferredEditorTheme();
     },
   };
+  /* 启动时按持久化偏好恢复阅读态（applyReading 在引擎就绪前调用时拿不到 view，故这里补一次）。 */
+  try { window.mpEngine.setReadingMode(localStorage.getItem('mp-reading') === '1'); } catch { /* 忽略 */ }
   commands.install();
   // 双开（形态 B）：主视图＝现在的即时渲染编辑面；从视图＝同一份文档的只读源码。  // 【扩展数组纪律】installSplit 不向主视图的扩展数组注入任何东西（它返回 {toggle,open,close,mirror,…}，
   // 从视图在 open() 时用**自己的最小 state**现场创建）——故这里不需要 Compartment，扩展数组结构零改动；
@@ -6102,7 +7200,9 @@ function boot(content) {
     },
     /* 【β1】表内 Ctrl+A 递进 / Ctrl+E 选格：实现只有一份（在 main.js，因为它持有活动格/覆盖层/装饰），
        extras.js 的 tableKeys 只是把键**分派**过来；表外返回 false ⇒ 原生全选 / 用户的"行内代码"照旧。 */
-    tableSelect: { cycle: () => cycleTableSelection(), selectCell: () => selectCellText() },
+    /* 【TBL-5】行列命令要能取"用户点过的那一格"：键盘路径不带 target，而行级选区下 head 天然落在
+       行尾（列号＝列数、越界），只有表级选择状态记着原来的列。只读口，不改任何状态。 */
+    tableSelect: { cycle: () => cycleTableSelection(), selectCell: () => selectCellText(), sel: () => (view ? view.state.field(tableSelectionField, false) : null) },
     lineStylesField, mathSpansField,
     renderMathHTML, // 导出里的公式排版复用引擎这一份（不重写渲染器）
     exportTypoCss,  // 导出件作者层样式＝排版唯一真源生成（与编辑面同表；见 typography.js）

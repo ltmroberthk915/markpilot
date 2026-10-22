@@ -1,3 +1,11 @@
+## MarkPilot 3.5.1 for Windows
+
+More consistent table editing and undo/redo, outline navigation that follows page zoom, and coordinated saving during composition. The split source pane uses incremental updates to avoid rebuilding the entire source view on each edit.
+
+Continuous composition in a split view can still add overhead on very long documents.
+
+**[Download installer](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.1/markpilot-Setup-3.5.1.exe)** · **[Download portable](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.1/markpilot-3.5.1-portable.exe)** · [Release notes](docs/RELEASE-3.5.1.md)
+
 # MarkPilot — AI-native Markdown editor for Windows, VS Code & Trae
 
 ## MarkPilot 3.4.0 for Windows

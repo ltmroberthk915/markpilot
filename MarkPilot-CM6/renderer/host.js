@@ -183,7 +183,10 @@ function checkpointRendererDocument() {
       active = false;
       // A failed source restoration must block saving; never attach an unknown
       // buffer to the previous file and describe it as a retained draft.
-      try { if (engine && !engine.rollback()) throw new Error('文档恢复事务已过期'); }
+      try {
+        publishDocDir(old.filePath);
+        if (engine && !engine.rollback()) throw new Error('文档恢复事务已过期');
+      }
       catch (error) { saveBlocked = true; lastSaveError = error.message; throw error; }
       ({ booted, documentId, revision, saveBlocked, filePath, lastSaveError, charCount, knownLen, observedSource, dirty } = old);
       publishDocDir(filePath); refreshTitle(); scheduleSave();
@@ -762,9 +765,16 @@ window.addEventListener('drop', async (e) => {
   if (!files || !files.length) return;              // 纯文本拖拽：放行（编辑器内部移动文字依赖它）
   e.preventDefault();
   e.stopPropagation();
+  if (files.length > 1) {
+    showBanner('一次只能拖入一个文档，请分次拖入');
+    return;
+  }
   const f = files[0];
   const p = window.mpHost.pathForFile(f);
-  if (!p) return;
+  if (!p) {
+    showBanner('无法读取拖入文件的路径，请使用打开文件');
+    return;
+  }
   const r = await window.mpHost.openDocument(p);
   if (!r?.ok && !r?.canceled) showBanner(r?.error || '打开失败');
 }, true);

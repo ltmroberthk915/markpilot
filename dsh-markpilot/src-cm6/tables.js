@@ -102,8 +102,14 @@ export function tableBlockOf(state, lineNumber) {
     const line = state.doc.line(n);
     if (codeBlockAt(state, line.from)) return null;
     const ld = tableLead(line.text);
-    return ld.q === base.q && line.text.slice(ld.off).includes("|") ? { text: line.text.slice(ld.off) } : null;
+    return ld.q === base.q && /(?<!\\)\|/.test(line.text.slice(ld.off)) ? { text: line.text.slice(ld.off) } : null;
   };
+  /* 【锚点行自己必须是表行·2026-10-17 实测缺陷】改前只向两侧扩块、**不校验 lineNumber 自己**：
+     表格紧邻的下一行（如 `| a | b |` 表后直接跟 `tail` 正文行）会被当成块成员 ⇒
+     `tableSpanOf` 认它为表内 ⇒ Enter 走"末条格行补行"分支，在**文末追加一张空行**
+     （实测 `tail` 那行按 Enter ⇒ 正文行不动、文末多出 `|  |  |`，光标跳走）。
+     渲染层 `scanTables` 要求该行含管道 ⇒ 键位层必须同口径：含 `|` 才算表行。 */
+  if (!rowOf(lineNumber)) return null;
   let a = lineNumber, b = lineNumber;
   while (a > 1 && rowOf(a - 1)) a--;
   while (b < state.doc.lines && rowOf(b + 1)) b++;
@@ -199,7 +205,7 @@ export function tableSpanOf(state, lineNumber) {
   if (lineNumber < headerNum || lineNumber > block.to) return null;
   const headerLine = state.doc.line(headerNum);
   const headerCells = cellRanges(headerLine);
-  if (headerCells.length < 2) return null;              // GFM：只有一格的"表"不存在
+  if (headerCells.length < 1) return null;              // GFM 单列表合法（TBL-7）
   return { block, headerNum, headerCells, cols: headerCells.length, lead: tableLead(headerLine.text).q };
 }
 
@@ -392,7 +398,12 @@ function exitTableDown(view) {
 /* 【A1 优先级】必须 `Prec.high`：`basicSetup` 的默认键位（`Enter`→insertNewlineAndIndent 无条件
  * return true、`Mod-[`→indentLess…）排在扩展数组更前面，**同优先级先到先得** —— 不提优先级，
  * 这里的 `Enter` 与 `Mod-[`/`Mod-]` 就是死绑定（对抗复核用 CM6 库源码确认）。 */
-export const tableKeys = Prec.high(keymap.of([
+/* 【Prec.highest·2026-10-17 实测缺陷】`Prec.high` 只能压过 basicSetup；**markdown 语言的
+ * `insertNewlineContinueMarkup`（自带 `Enter`）在同一个 high 层注册得比本表早** ⇒ 顶层表格
+ * Enter 能让位成功，但**引用区表格**（行首是 `> `）会被语言层当成"引用续行"抢先吃掉：
+ * 实测 `> | 1 | 2 |` 按 Enter 得到 `> | 1` + `> | 2 |`（整行被劈开、表格结构被破坏），
+ * 而顶层表格同键是"末行补空行"。同一结构两个答案 ⇒ 与 codeFenceKeys 同口径提到 highest。 */
+export const tableKeys = Prec.highest(keymap.of([
   /* 【β1】Tab / Shift+Tab 现在走同一个 applyTab（跨行 + 跳分隔行 + 末行补行 + 表头顶停住）。
      注意 shift: 必须显式给：CM6 只在给了 b.shift 时才注册 "Shift-<name>" 这条绑定
      （@codemirror/view/dist/index.js:9210-9211）—— Enter 少写 shift: 就是 Shift+Enter 劈表的根因。 */

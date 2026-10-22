@@ -16,8 +16,9 @@ export function createRegionSession(indexField) {
         current.selected=true;
         if(kind==='image')current.editing=r.id===image.imageId;
         else if(kind==='mermaid')current.editing=main.head>=r.from&&main.head<=r.to;
+        else if(kind==='math')current.editing ||= selection.head<r.to||(selection.head===r.to&&image.lastPointer===true);
         else current.editing ||= selection.head>=r.from&&selection.head<=r.to;
-        current.preview=kind==='math'&&main.head>=r.from&&main.head<=r.to || kind==='image'&&current.editing;
+        current.preview=kind==='math'&&(main.head<r.to||(main.head===r.to&&image.lastPointer===true)) || kind==='image'&&current.editing;
         presentation.set(r.id,current);
       }
     }
@@ -30,6 +31,8 @@ export function createRegionSession(indexField) {
     update(value, tr) {
       if(!tr.docChanged&&!tr.selection&&!tr.effects.some(e=>e.is(activateRegion)||e.is(retireRegion)||e.is(expandRegionPayload))&&tr.startState.field(indexField)===tr.state.field(indexField))return value;
       let next = value;
+      /* #31：记住这次事务的选择来源（点字形 = select.pointer），呈现判据据此分流。 */
+      next = { ...next, lastPointer: tr.isUserEvent("select.pointer") };
       for (const e of tr.effects) {
         if (e.is(activateRegion) && next.imageId !== e.value.id) next = { imageId: e.value.id, expanded: false };
         if (e.is(retireRegion) && (!e.value?.id || e.value.id === next.imageId)) next = { imageId: null, expanded: false };

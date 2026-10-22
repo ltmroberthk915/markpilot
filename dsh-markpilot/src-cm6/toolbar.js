@@ -16,9 +16,42 @@
 
 import { undo, redo } from "@codemirror/commands";
 import { openSearchPanel } from "@codemirror/search";
+import { EditorSelection } from "@codemirror/state";
 import { selectedLines } from './selection-lines.js';
+import { quoteLead, codeBlockAt, inFrontMatter, listMarkerOf } from './markdown-context.js';
+import { tableSpanOf } from './tables.js';
 
 const svg = (d, extra = "") => `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" ${extra}><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+/* 【#38·2026-10-18 实测缺陷 N3】块级命令不许写进表行：光标停在表行边界（无格覆盖层）时点
+   「标题」得到 "# | a1 | a2 |"（渲染层把 "# " 显示进第一格）；点「表格」/「插入行」会把
+   模板行并进原表或把表劈成两段。与粘贴守卫同一口径：拒绝并提示，不动文档。
+   【#41·2026-10-18 NX1】同一族守卫补齐围栏与 front-matter：光标在代码块里按 Ctrl+L/点「标题」
+   会把 "- " / "# " 写进代码行；落在围栏行上整块塌源码；在 YAML 序言区点「表格」会把模板写进
+   front-matter。判据用仓库现成的 codeBlockAt / inFrontMatter。 */
+function blockedBlockCommand(view) {
+  try {
+    const st = view.state, r = st.selection.main;
+    const { first, last } = selectedLines(st.doc, r);
+    const docText = st.doc.toString();
+    for (let i = first; i <= last; i++) {
+      const line = st.doc.line(i);
+      if (tableSpanOf(st, i)) {
+        window.mpExtras?.toast?.('表格内不支持块级格式——请先把光标移到表格外');
+        return true;
+      }
+      if (codeBlockAt(st, line.from)) {
+        window.mpExtras?.toast?.('代码块内不支持块级格式——请先把光标移到代码块外');
+        return true;
+      }
+      if (inFrontMatter(docText, line.from)) {
+        window.mpExtras?.toast?.('文档头部信息区不支持块级格式——请移到正文再操作');
+        return true;
+      }
+    }
+  } catch { /* 判不出来就按不拦：守卫自身不能把命令打崩 */ }
+  return false;
+}
 
 /** 未实现的按钮为什么没实现——悬停标注用（用户要求"置灰并标注"）。 */
 /** 由扩展包（extras.js）接管的按钮 id：判定"已实现"用静态集合，不看运行时的 window.mpExtras。
@@ -145,11 +178,69 @@ export function wrap(view, open, close = open) {
   return command ? command.run(() => wrapSource(view, open, close)) : wrapSource(view, open, close);
 }
 function wrapSource(view, open, close) {
-  if (view.state.selection.ranges.length !== 1) return false;
+  const ranges = view.state.selection.ranges;
+  if (ranges.length === 1) return wrapSingle(view, open, close);
+  return wrapMulti(view, open, close, ranges);
+}
+/* 【#43·2026-10-18 实测缺陷 NX3】多光标行内格式：每个选区单独规划"加/取消包裹"（与单光标同一套
+   toggle 语义），合并成一次事务；每处落点用 ChangeSet.mapPos 映射后加局部偏移 ——
+   空选区落在两个定界符之间，有选区落在内容那一侧（与单光标的方向口径一致）。 */
+function wrapPlan(doc, r, open, close) {
+  const sel = doc.sliceString(r.from, r.to);
+  const span = enclosingSpan(doc, r.from, r.to, open, close);
+  if (!span) {
+    const outer = open.length + close.length;
+    if (sel.length >= outer && sel.startsWith(open) && sel.endsWith(close) && !escapedAt(doc, r.from)) {
+      const innerFrom = r.from + open.length, innerTo = r.to - close.length;
+      return { changes: [{ from: r.from, to: innerFrom, insert: '' }, { from: innerTo, to: r.to, insert: '' }], caret: r.from, delta: 0 };
+    }
+  }
+  if (span && !span.esc) {
+    return { changes: [{ from: span.from, to: span.from + span.openLen, insert: '' }, { from: span.innerTo, to: span.to, insert: '' }], caret: span.from, delta: 0 };
+  }
+  const insert = open + sel + close;
+  const forward = r.empty ? true : r.anchor <= r.head;
+  return { changes: [{ from: r.from, to: r.to, insert }], caret: r.from, delta: forward ? open.length + sel.length : open.length };
+}
+function wrapMulti(view, open, close, ranges) {
+  const doc = view.state.doc;
+  const changes = [], plans = [];
+  for (const r of ranges) {
+    const p = wrapPlan(doc, r, open, close);
+    if (!p) return false;
+    changes.push(...p.changes);
+    plans.push(p);
+  }
+  let tr;
+  try { tr = view.state.update({ changes, userEvent: 'input.format', scrollIntoView: true }); } catch { return false; }
+  const carets = plans.map((p) => EditorSelection.cursor(tr.changes.mapPos(p.caret, -1) + p.delta));
+  view.dispatch(tr);
+  try { view.dispatch({ selection: EditorSelection.create(carets, ranges.mainIndex) }); } catch { /* 极端重叠时保序兜底 */ }
+  view.focus();
+  return true;
+}
+function wrapSingle(view, open, close) {
   const r = view.state.selection.main;
   const doc = view.state.doc;
   const sel = doc.sliceString(r.from, r.to);
   const span = enclosingSpan(doc, r.from, r.to, open, close);
+  /* 【选区把定界符一起选进去·2026-10-17 实测缺陷】选 `**beta**` 按 Ctrl+B 得到 `****beta****`：
+     `wrapDelimLen` 只看选区**外侧**（那里是空格）⇒ 认不出"已经加粗"，于是又包一层，留下退化标记
+     （斜体 `*beta*` 选整段按 Ctrl+I ⇒ `**beta**`：斜体反而变粗体）。Typora 手感是**取消**这层标记。
+     补一条：选区文本本身以 open 开头、以 close 结尾 ⇒ 只删这两个定界符，内容与撤销都正常。 */
+  if (!span) {
+    const outer = open.length + close.length;
+    if (sel.length >= outer && sel.startsWith(open) && sel.endsWith(close) && !escapedAt(doc, r.from)) {
+      const innerFrom = r.from + open.length, innerTo = r.to - close.length;
+      view.dispatch({
+        changes: [{ from: r.from, to: innerFrom, insert: '' }, { from: innerTo, to: r.to, insert: '' }],
+        selection: { anchor: innerFrom, head: innerFrom + Math.max(0, innerTo - innerFrom) },
+        userEvent: 'input.format', scrollIntoView: true,
+      });
+      view.focus();
+      return true;
+    }
+  }
   if (span && !span.esc) {
     /* 取消包裹：只删两侧定界符，中间的文本一个字节都不动。 */
     view.dispatch({
@@ -183,6 +274,7 @@ function wrapSource(view, open, close) {
  *  修法：插入前缀后把光标按**前缀长度**前移（删除前缀时不动光标，保持原有手感）。
  *  多行选区：每行加同样的前缀 ⇒ 列号偏移量都是 prefix.length，用同一个锚点即可。 */
 function linePrefix(view, prefix, ordered = false) {
+  if (blockedBlockCommand(view)) return;
   const st = view.state;
   const r = st.selection.main;
   const { first, last } = selectedLines(st.doc, r);
@@ -195,13 +287,39 @@ function linePrefix(view, prefix, ordered = false) {
     n++;
     /* 【普查实测·2026-10-10】有序列表传的是空前缀 ⇒ startsWith("") 恒真，永远走"删前缀"分支而 prefix 长度为 0 ⇒ 空操作。
      /* 空前缀一律视为"没有"，交给下面的 ordered 正则判定。 */
-    const has = (prefix ? line.text.startsWith(prefix) : false) || (ordered && /^\d+\.\s/.test(line.text));
+    /* 【引用容器·2026-10-17 实测缺陷】前缀必须插在 `> ` 之后：改前用 `line.from` 绝对行首，
+       `> t` 点「无序列表」得到 `- > t`、点「标题」得到 `# > t` —— 引用容器被顶掉，
+       屏幕上原来的引用块消失、内容变成普通行（两个按钮同一根因）。
+       `quoteLead` 是渲染层/表格层共用的同源函数，不在这里再抄一份正则。 */
+    const lead = quoteLead(line.text);
+    const indent = /^[ \t]*/.exec(line.text.slice(lead.off))[0].length;
+    const at = line.from + lead.off + indent;
+    const body = line.text.slice(lead.off + indent);
+    /* 【#45·2026-10-18 实测缺陷 M2+M3】行前缀家族两处归一：
+       ① 引用容器：前缀落在 "> " 之后（M2：引用行 Ctrl+L 得 "> - 文本" 而不是 "- > 文本"）；
+       ② 列表标记互转：目标是无序/有序/任务时，先剥掉 body 上已有的列表标记（M3：
+          "1. 项目" 点无序不再得到 "- 1. 项目"）；缩进行保留缩进（at 在缩进之后）。 */
+    if (prefix === '> ') {
+      if (line.text.startsWith('> ')) {
+        allInsert = false;
+        changes.push({ from: line.from, to: line.from + 2, insert: "" });
+      } else changes.push({ from: line.from, insert: '> ' });
+      continue;
+    }
+    const existing = listMarkerOf(body);
+    const marker = ordered ? (n + '. ') : prefix;
+    const listTarget = ordered || prefix === '- ' || prefix === '- [ ] ';
+    const has = (prefix ? body.startsWith(prefix) : false) || (ordered && !!existing && existing.kind === 'ordered');
     if (has) {
       allInsert = false;
-      const m = ordered && /^\d+\.\s/.test(line.text) ? /^\d+\.\s/.exec(line.text)[0] : prefix;
-      changes.push({ from: line.from, to: line.from + m.length, insert: "" });
+      const m = ordered && existing && existing.kind === 'ordered' ? /^\d+\.\s/.exec(body)[0] : prefix;
+      changes.push({ from: at, to: at + m.length, insert: "" });
+    } else if (listTarget && existing) {
+      /* 归一化＝替换不是纯插入：光标交给 CM6 自动映射（显式 anchor 会因文本变短越界） */
+      allInsert = false;
+      changes.push({ from: at, to: at + existing.len, insert: marker });
     } else {
-      changes.push({ from: line.from, insert: ordered ? `${n}. ` : prefix });
+      changes.push({ from: at, insert: marker });
     }
   }
   /* 有序列表的前缀长度按**首行**实际写入的串算（`1. ` 与 `12. ` 长度不同） */
@@ -212,12 +330,17 @@ function linePrefix(view, prefix, ordered = false) {
 }
 
 function headingCycle(view) {
+  if (blockedBlockCommand(view)) return;
   const st = view.state;
   const line = st.doc.lineAt(st.selection.main.head);
-  const m = /^(#{1,6})\s/.exec(line.text);
+  /* 【引用容器·2026-10-17 实测缺陷】标题标记必须落在 `> ` 之后（`> # t`）；
+     改前从绝对行首插到底 ⇒ `# > t`，引用块被顶掉，原来的引用内容变成普通标题行。 */
+  const off = quoteLead(line.text).off;
+  const body = line.text.slice(off);
+  const m = /^(#{1,6})\s/.exec(body);
   const next = !m ? "# " : m[1].length >= 6 ? "" : "#".repeat(m[1].length + 1) + " ";
-  const to = m ? line.from + m[0].length : line.from;
-  view.dispatch({ changes: { from: line.from, to, insert: next }, userEvent: "input.format" });
+  const to = m ? line.from + off + m[0].length : line.from + off;
+  view.dispatch({ changes: { from: line.from + off, to, insert: next }, userEvent: "input.format" });
   view.focus();
 }
 
@@ -238,6 +361,7 @@ function indentLines(view, delta) {
 }
 
 function insertBlock(view, text) {
+  if (blockedBlockCommand(view)) return;
   const st = view.state;
   const line = st.doc.lineAt(st.selection.main.head);
   const at = line.to;
@@ -256,6 +380,7 @@ function insertBlock(view, text) {
 }
 
 function insertBlankLine(view, before) {
+  if (blockedBlockCommand(view)) return;
   const st = view.state;
   const line = st.doc.lineAt(st.selection.main.head);
   const at = before ? line.from : line.to;

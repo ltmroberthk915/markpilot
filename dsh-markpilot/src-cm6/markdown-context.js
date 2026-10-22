@@ -179,3 +179,23 @@ export const markdownContext = StateField.define({
 
 export const codeBlockAt = (state, pos) => blockAt(state.field(markdownContext, false)?.blocks || [], pos);
 
+/** 【#41·2026-10-18】光标是否落在**开头那段 front-matter 块**内（与 imageModeOf 同一套正则，口径一致）。
+ *  块级命令（toolbar/extras）与图片插入共用这一份判据，避免前缀/模板写进 YAML。 */
+export function inFrontMatter(doc, pos) {
+  const m = /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(String(doc || ""));
+  if (!m) return false;
+  return typeof pos === "number" && pos <= m[0].length;
+}
+
+/** 【#45·2026-10-18】行首列表标记识别（任务 / 无序 / 有序），前缀命令互转时先剥旧标记。
+ *  返回 { len, kind }；没有标记返回 null。toolbar 的 linePrefix 与 extras 的 toggleLinePrefix 共用。 */
+export function listMarkerOf(text) {
+  let m = /^[-*+]\s\[[ xX]\]\s/.exec(text);
+  if (m) return { len: m[0].length, kind: 'task' };
+  m = /^[-*+]\s/.exec(text);
+  if (m) return { len: m[0].length, kind: 'bullet' };
+  m = /^\d+\.\s/.exec(text);
+  if (m) return { len: m[0].length, kind: 'ordered' };
+  return null;
+}
+

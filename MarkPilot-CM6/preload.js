@@ -2,6 +2,75 @@
 'use strict';
 const { contextBridge, ipcRenderer, webUtils, webFrame } = require('electron');
 
+/* MP_COPY_INTENT_BEGIN */
+const CLIPBOARD_DISPATCH_MAX = 32;
+const clipboardDispatchStack = [];
+let clipboardDispatchOverflow = false;
+let clipboardDispatchSweep = 0;
+function clipboardToken(value) {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+function beginClipboardIntent(kind) {
+  if (kind !== 'copy' && kind !== 'cut') return null;
+  let reply = null;
+  try { reply = ipcRenderer.sendSync('clipboard:beginIntent', kind); } catch { return null; }
+  if (!reply || typeof reply !== 'object' || reply.ok !== true) return null;
+  if (typeof reply.token !== 'string' || reply.token.length === 0) return null;
+  if (!Number.isInteger(reply.epoch) || reply.epoch <= 0) return null;
+  return reply.token;
+}
+function pruneClipboardDispatches() {
+  for (let i = clipboardDispatchStack.length - 1; i >= 0; i -= 1) {
+    const record = clipboardDispatchStack[i];
+    if (!record || !record.event || record.event.eventPhase === 0) clipboardDispatchStack.splice(i, 1);
+  }
+  if (clipboardDispatchStack.length === 0) clipboardDispatchOverflow = false;
+}
+function scheduleClipboardDispatchSweep() {
+  if (clipboardDispatchSweep) return;
+  clipboardDispatchSweep = setTimeout(() => {
+    clipboardDispatchSweep = 0;
+    pruneClipboardDispatches();
+  }, 0);
+}
+function captureClipboardDispatch(event, kind) {
+  pruneClipboardDispatches();
+  if (clipboardDispatchOverflow || clipboardDispatchStack.length >= CLIPBOARD_DISPATCH_MAX) {
+    clipboardDispatchOverflow = true;
+    if (event && event.isTrusted === true) {
+      try { event.preventDefault(); event.stopImmediatePropagation(); } catch { }
+    }
+    scheduleClipboardDispatchSweep();
+    return;
+  }
+  const trusted = !!(event && event.isTrusted === true);
+  let token = null;
+  let blocked = false;
+  if (trusted) {
+    token = beginClipboardIntent(kind);
+    if (!token) {
+      blocked = true;
+      try { event.preventDefault(); event.stopImmediatePropagation(); } catch { }
+    }
+  }
+  clipboardDispatchStack.push({ kind, trusted, token, blocked, event });
+  scheduleClipboardDispatchSweep();
+}
+function eventClipboardIntent(kind) {
+  pruneClipboardDispatches();
+  if (clipboardDispatchOverflow || clipboardDispatchStack.length === 0) return null;
+  const record = clipboardDispatchStack[clipboardDispatchStack.length - 1];
+  if (!record || !record.event || record.event.eventPhase === 0) { pruneClipboardDispatches(); return null; }
+  if (!record.trusted || record.kind !== kind || !record.token) return null;
+  return record.token;
+}
+function installClipboardCapture() {
+  if (typeof window === 'undefined' || !window.addEventListener) return;
+  window.addEventListener('copy', (event) => captureClipboardDispatch(event, 'copy'), true);
+  window.addEventListener('cut', (event) => captureClipboardDispatch(event, 'cut'), true);
+}
+installClipboardCapture();
+/* MP_COPY_INTENT_END */
 contextBridge.exposeInMainWorld('mpHost', {
   info: () => ipcRenderer.invoke('app:info'),
   health: () => ipcRenderer.invoke('app:health'),
@@ -39,7 +108,10 @@ contextBridge.exposeInMainWorld('mpHost', {
   /* 导出后的「打开所在文件夹」：打开资源管理器并选中该文件（壳层负责存在性回退）。 */
   showItem: (targetPath) => ipcRenderer.invoke('shell:showItem', targetPath),
   /* 剪贴板写入（主进程执行）：表格/富文本复制走这条，避免渲染进程手势/权限导致的静默失败。 */
-  writeClipboard: (payload) => ipcRenderer.invoke('clipboard:write', payload || {}),
+  writeClipboard: (payload, token) => ipcRenderer.invoke('clipboard:write', payload || {}, clipboardToken(token)),
+  writeClipboardImage: (payload, token) => ipcRenderer.sendSync('clipboard:writeImageSync', payload, clipboardToken(token)),
+  beginClipboardIntent,
+  eventClipboardIntent,
   /* 通用设置读写（壳层白名单）：设置面板的开关走这条。 */
   debugSessions: () => ipcRenderer.invoke('debug:sessions'),
   /* 【只读调试口·S4①·2026-10-10】主进程侧的原生主题真源（{source, dark}）—— 渲染侧的 matchMedia
@@ -52,7 +124,7 @@ contextBridge.exposeInMainWorld('mpHost', {
   settingGet: (key) => ipcRenderer.invoke('setting:get', key),
   settingSet: (key, value) => ipcRenderer.invoke('setting:set', { key, value }),
   /* 图片右键：图片进剪贴板 / 另存为（都在主进程做，渲染侧不碰文件系统）。 */
-  writeImage: (src) => ipcRenderer.invoke('clipboard:writeImage', { src }),
+  writeImage: (src, token) => ipcRenderer.invoke('clipboard:writeImage', { src }, clipboardToken(token)),
   /* 系统剪贴板里有没有位图：验收判定「复制图片」是否真的生效（渲染侧读不到位图口味）。 */
   clipboardHasImage: () => ipcRenderer.invoke('clipboard:hasImage'),
   saveImageAs: (payload) => ipcRenderer.invoke('image:saveAs', payload || {}),

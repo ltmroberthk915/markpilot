@@ -1,3 +1,11 @@
+## MarkPilot 3.5.1 · Windows
+
+表格编辑与撤销重做更连贯，大纲跳转随页面缩放对齐，组字过程与保存协调处理。源码分屏采用增量同步，减少超长文档输入时的整篇重建。
+
+超长文档分屏连续组字仍可能产生额外开销。
+
+**[下载安装版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.1/markpilot-Setup-3.5.1.exe)** · **[下载便携版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.1/markpilot-3.5.1-portable.exe)** · [更新说明](docs/RELEASE-3.5.1.md)
+
 **[English](README.en.md)** · 中文
 
 ## MarkPilot 3.4.0 · Windows
