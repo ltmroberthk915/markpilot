@@ -1,3 +1,9 @@
+## MarkPilot 3.5.4 · Windows
+
+Choose “Paste as plain text” (Ctrl+Shift+V) from the body context menu to keep text, tabs and line breaks. Table menus and row insertion in the split source pane follow the clicked content.
+
+**[Windows installer](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.4/markpilot-Setup-3.5.4.exe)** · **[Portable version](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.4/markpilot-3.5.4-portable.exe)** · [Release notes](docs/RELEASE-3.5.4.md)
+
 ## MarkPilot 3.5.3 · Windows
 
 Ordinary bold text keeps its complete double-star delimiters visible at the end of a line. Continuous editing in large, richly formatted documents is smoother.

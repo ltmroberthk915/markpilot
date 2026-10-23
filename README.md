@@ -1,3 +1,9 @@
+## MarkPilot 3.5.4 · Windows
+
+正文右键菜单加入“纯文本粘贴 Ctrl+Shift+V”，可直接粘贴文字、制表符与换行。源码分屏中的表格菜单和插行位置随点击内容正确定位。
+
+**[下载安装版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.4/markpilot-Setup-3.5.4.exe)** · **[下载便携版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.4/markpilot-3.5.4-portable.exe)** · [更新说明](docs/RELEASE-3.5.4.md)
+
 ## MarkPilot 3.5.3 · Windows
 
 普通双星号加粗文本在行尾保持完整源码标记，连续编辑更稳定；富格式长文档输入更顺畅。

@@ -1973,7 +1973,12 @@ export function installExtras(deps) {
     }
     // The 1px border fallback supplies its clicked position through the same
     // explicit target protocol as the cell hit and floating toolbar.
-    const hit = v.posAtCoords({ x: event.clientX, y: event.clientY });
+    const onSource = !!source?.scrollDOM.contains(target);
+    let hit = null;
+    if (onSource) {
+      try { hit = source.posAtCoords({ x: event.clientX, y: event.clientY }); } catch { return; }
+      if (hit == null || hit < 0 || hit > v.state.doc.length) return;
+    } else hit = v.posAtCoords({ x: event.clientX, y: event.clientY });
     const pos = hit == null ? v.state.selection.main.head : hit;
     const cur = tableAt(pos);
     if (cur) { event.preventDefault(); tableMenu(event, pos); return; }
@@ -2298,19 +2303,26 @@ export function installExtras(deps) {
       const ok = await writeClip({text}, copyToken); toast(ok ? "已复制" : "复制失败：剪贴板不可用");
       if (ticket && ok) commands.resume(ticket);
     }, "Ctrl+C");
-    add("粘贴", () => {
-    /* 【第二波·右键粘贴缺陷·2026-10-10（两族独立命中）】原来直接调 hp.paste()：菜单项在 mousedown
-       那一刻就把焦点挪到了 <body>（实测 focusout → ae=BODY），主进程 webContents.paste() 随后执行时
-       **没有插入目标** ⇒ 文字被静默丢弃，而它仍返回 {ok:true}（连失败提示都不给）。
-       紧邻的「全选」是先 v.focus() 再动手 —— 这里照做，并把 paste 放到焦点落回编辑面之后的下一拍。 */
-    const run = () => {
+    const pasteFromMenu = (plain = false) => {
+      const v = getView();
+      if (!v) return;
+      try { v.focus(); } catch { return; }
+      if (!document.hasFocus() || !v.hasFocus) return;
+      clearPlainMenuPaste();
+      plainPasteOnce = false;
+      const request = plain ? armPlainMenuPaste(v) : null;
+      const failed = () => { if (request) clearPlainMenuPaste(request); };
       const hp = window.mpHost;
-      if (hp && typeof hp.paste === "function") { Promise.resolve(hp.paste()).then((r) => { if (r && r.ok === false) toast("粘贴失败：" + (r.error || "未知")); }).catch(() => { }); }
-      else { try { document.execCommand("paste"); } catch { } }
+      if (hp && typeof hp.paste === "function") {
+        try { Promise.resolve(hp.paste()).then((r) => {
+          if (r && r.ok === false) { failed(); toast("粘贴失败：" + (r.error || "未知")); }
+        }).catch(failed); } catch { failed(); }
+      } else {
+        try { if (!document.execCommand("paste")) failed(); } catch { failed(); }
+      }
     };
-    try { const v = getView(); if (v) v.focus(); } catch { /* 落到直调 */ }
-    run();
-  }, "Ctrl+V");
+    add("粘贴", () => pasteFromMenu(), "Ctrl+V");
+    add("纯文本粘贴", () => pasteFromMenu(true), "Ctrl+Shift+V");
     add("全选", () => { try { const v = getView(); if (v) { v.focus(); v.dispatch({ selection: { anchor: 0, head: v.state.doc.length }, userEvent: 'select' }); } } catch { } }, "Ctrl+A");
     sep();
     /* 段落（与工具栏同一批命令） */
@@ -4409,11 +4421,39 @@ export function installExtras(deps) {
      （同样 27 字符 / 3 个 TAB / 同样被改写成表）⇒ 用户想要"原样粘贴"时没有任何出路。
      做法：按下 Ctrl+Shift+V 时置一次标志，**下一次粘贴不接管**（不 preventDefault、不改写），
      直接放行给浏览器默认 ⇒ 逐字落进文档（在代码块里尤其要紧）。标志用完即清，不影响后续粘贴。 */
-  let plainPasteOnce = false;
+  let plainPasteOnce = false, plainMenuPaste = null;
+  function clearPlainMenuPaste(request = plainMenuPaste) {
+    if (!request || plainMenuPaste !== request) return;
+    clearTimeout(request.timer);
+    document.removeEventListener('pointerdown', clearPlainMenuPasteOnIntent, true);
+    document.removeEventListener('keydown', clearPlainMenuPasteOnIntent, true);
+    window.removeEventListener('blur', clearPlainMenuPasteOnIntent);
+    document.removeEventListener('focusin', clearPlainMenuPasteOnFocus, true);
+    plainMenuPaste = null;
+  }
+  function armPlainMenuPaste(v) {
+    const request = { view: v, doc: v.state.doc, selection: v.state.selection, timer: null };
+    plainMenuPaste = request;
+    document.addEventListener('pointerdown', clearPlainMenuPasteOnIntent, true);
+    document.addEventListener('keydown', clearPlainMenuPasteOnIntent, true);
+    window.addEventListener('blur', clearPlainMenuPasteOnIntent);
+    document.addEventListener('focusin', clearPlainMenuPasteOnFocus, true);
+    request.timer = setTimeout(() => clearPlainMenuPaste(request), 2000);
+    return request;
+  }
+  function clearPlainMenuPasteOnIntent() { clearPlainMenuPaste(); }
+  function clearPlainMenuPasteOnFocus(e) {
+    if (plainMenuPaste && !plainMenuPaste.view.contentDOM.contains(e.target)) clearPlainMenuPaste();
+  }
   document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && String(e.key || '').toLowerCase() === 'v') plainPasteOnce = true;
   }, true);
   const onDocPasteGuarded = (event) => {
+    const request = plainMenuPaste;
+    clearPlainMenuPaste();
+    if (request && event.isTrusted && request.view === getView() &&
+        request.doc === request.view.state.doc && request.selection.eq(request.view.state.selection) &&
+        request.view.hasFocus && request.view.contentDOM.contains(event.target)) return;
     if (plainPasteOnce) { plainPasteOnce = false; return; }     // 原样粘贴：放行，不做任何改写
     return onDocPaste(event);
   };
