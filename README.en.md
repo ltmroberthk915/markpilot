@@ -1,3 +1,9 @@
+## MarkPilot 3.5.3 · Windows
+
+Ordinary bold text keeps its complete double-star delimiters visible at the end of a line. Continuous editing in large, richly formatted documents is smoother.
+
+**[Windows installer](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.3/markpilot-Setup-3.5.3.exe)** · **[Portable version](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.3/markpilot-3.5.3-portable.exe)** · [Release notes](docs/RELEASE-3.5.3.md)
+
 ## MarkPilot 3.5.2 for Windows
 
 The outline displays inline math in headings. Use Ctrl+Shift+E for inline math, Ctrl+Shift+M for block math, Ctrl+Shift+Q for quotes, and Ctrl+Shift+K for code blocks, with the caret ready for input.

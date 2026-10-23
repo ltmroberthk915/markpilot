@@ -1,3 +1,9 @@
+## MarkPilot 3.5.3 · Windows
+
+普通双星号加粗文本在行尾保持完整源码标记，连续编辑更稳定；富格式长文档输入更顺畅。
+
+**[下载安装版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.3/markpilot-Setup-3.5.3.exe)** · **[下载便携版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.3/markpilot-3.5.3-portable.exe)** · [更新说明](docs/RELEASE-3.5.3.md)
+
 ## MarkPilot 3.5.2 · Windows
 
 大纲直接显示标题中的公式。Ctrl+Shift+E 插入行内公式，Ctrl+Shift+M 插入块公式，Ctrl+Shift+Q 切换引用，Ctrl+Shift+K 插入代码块；插入后可直接在内容位置输入。

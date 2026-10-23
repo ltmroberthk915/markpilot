@@ -4013,9 +4013,9 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
        （实测：`![行内码图](data:…)` 被吃成 `!行内码图`，把清单 1.17 打红）。
        ⇒ `nest` 由调用点显式声明，默认 false（严格）。 */
     const free = (a, b, nest) =>
-      !consumed.some(([x, y]) => a < y && b > x && !(nest && a > x && b < y))
+      !consumed.some(([x, y, edge = 0]) => a < y && b > x && !(nest && a > x && b < y && a >= x + edge && b <= y - edge))
       && !overlapsMath(base + a, base + b) && !escapedAt(a, b);
-    const take = (a, b) => { const record = [a, b]; consumed.push(record); return record; };
+    const take = (a, b, edge = 0) => { const record = [a, b, edge]; consumed.push(record); return record; };
     /* 【图片】两条写法都替换成真图。**传 `c` 而不是 `line`**：`scanImageMarks` 内部 `base` 已含 `qoff`，
        它自己再拿整行扫就会把前缀算两遍（见该函数注释）——`free`/`take` 也按 `c` 的相对下标工作。 */
     /* 【1.17·行内代码优先】行内代码里的图片写法必须保持**字面**（Typora 口径：代码里一律原文）。
@@ -4053,7 +4053,10 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
           : [[a, a + oL], [b - cL, b]];
         if (!hides.every(([x, y]) => x >= 0 && y > x && free(x, y, nest === true))) { re.lastIndex = m.index + 1; continue; }
         push(a, b, hides);
-        const record = take(a, b);
+        // Preserve mixed star runs and code-line ownership; protect only plain double-star edges.
+        const strongEdge = pureFormat === 'strong' && width === 2 && c[a] === '*' && !codeSpans.length &&
+          c[a - 1] !== '*' && c[a + 2] !== '*' && c[b - 3] !== '*' && c[b] !== '*' ? 2 : 0;
+        const record = take(a, b, strongEdge);
         if (pureFormat) pureFormats.add(record);
       }
     };
