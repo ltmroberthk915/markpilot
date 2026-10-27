@@ -1,0 +1,124 @@
+name: Update winget manifest
+
+# Submits a winget-pkgs update PR when a stable GitHub release is published.
+# Requires a repository secret named WINGET_TOKEN:
+#   - GitHub classic PAT (fine-grained tokens are NOT supported by wingetcreate)
+#   - scope: public_repo
+#   - owner must be the account that should own the fork/PR (ltmroberthk915)
+# The token is passed via WINGET_CREATE_GITHUB_TOKEN, not on the command line.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Manifest version to publish, e.g. 3.5.9. Empty = latest release tag."
+        required: false
+        type: string
+      installer_url:
+        description: "Optional NSIS installer URL. Empty = markpilot-Setup-<version>.exe on that release."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.release != null && github.event.release.draft == false && github.event.release.prerelease == false) }}
+    runs-on: windows-latest
+    timeout-minutes: 30
+    concurrency:
+      group: winget-${{ github.event.release.tag_name || inputs.version || github.run_id }}
+      cancel-in-progress: false
+    env:
+      PACKAGE_ID: MarkPilot.MarkPilot
+      EVENT_NAME: ${{ github.event_name }}
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      INPUT_VERSION: ${{ inputs.version }}
+      INPUT_INSTALLER_URL: ${{ inputs.installer_url }}
+      GH_TOKEN: ${{ github.token }}
+      WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+
+    steps:
+      - name: Resolve version and installer URL
+        id: resolve
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = "$env:INPUT_VERSION".Trim()
+          $tag = "$env:RELEASE_TAG".Trim()
+          if (-not $version) {
+            if ($tag) {
+              $version = $tag -replace '^v', ''
+            } else {
+              $latest = gh release view --repo $env:GITHUB_REPOSITORY --json tagName | ConvertFrom-Json
+              $tag = $latest.tagName
+              $version = $tag -replace '^v', ''
+            }
+          }
+          if (-not $tag) { $tag = "v$version" }
+          if ($version -notmatch '^\d+(\.\d+){2,3}$') {
+            throw "Unsupported version '$version' (expected 2-4 numeric components, e.g. 3.5.9)"
+          }
+          $installer = "$env:INPUT_INSTALLER_URL".Trim()
+          if (-not $installer) {
+            $installer = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" --jq ".assets[] | select(.name == 'markpilot-Setup-$version.exe') | .browser_download_url" | Select-Object -First 1
+          }
+          if (-not $installer) {
+            throw "Release $tag has no markpilot-Setup-$version.exe asset"
+          }
+          if (-not $installer.StartsWith('https://')) {
+            throw "Installer URL must be https: $installer"
+          }
+          "VERSION=$version" >> $env:GITHUB_OUTPUT
+          "INSTALLER_URL=$installer" >> $env:GITHUB_OUTPUT
+          "TAG=$tag" >> $env:GITHUB_OUTPUT
+          Write-Host "version=$version tag=$tag"
+          Write-Host "installer=$installer"
+
+      - name: Check whether winget already has this version
+        id: check
+        shell: pwsh
+        run: |
+          $path = "manifests/m/MarkPilot/MarkPilot/${{ steps.resolve.outputs.VERSION }}"
+          gh api "repos/microsoft/winget-pkgs/contents/$path" --silent 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            "EXISTS=true" >> $env:GITHUB_OUTPUT
+            Write-Host "Already present in winget-pkgs: $path"
+          } else {
+            "EXISTS=false" >> $env:GITHUB_OUTPUT
+            Write-Host "Not present yet: $path"
+          }
+
+      - name: Check WINGET_TOKEN secret
+        if: steps.check.outputs.EXISTS != 'true'
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINGET_CREATE_GITHUB_TOKEN)) {
+            throw "Repository secret WINGET_TOKEN is missing. Add a classic PAT with the public_repo scope."
+          }
+
+      - name: Download and verify wingetcreate
+        if: steps.check.outputs.EXISTS != 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $env:RUNNER_TEMP 'wingetcreate.exe'
+          Invoke-WebRequest -Uri 'https://github.com/microsoft/winget-create/releases/download/v1.12.8.0/wingetcreate.exe' -OutFile $exe -UseBasicParsing
+          $sha = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          $expected = '8bd738851b524885410112678e3771b341c5c716de60fbbecb88ab0a363ed85d'
+          if ($sha -ne $expected) { throw "wingetcreate SHA256 mismatch: $sha" }
+          "WINGETCREATE_EXE=$exe" >> $env:GITHUB_ENV
+
+      - name: Submit winget update PR
+        if: steps.check.outputs.EXISTS != 'true'
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.resolve.outputs.VERSION }}
+          INSTALLER_URL: ${{ steps.resolve.outputs.INSTALLER_URL }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & $env:WINGETCREATE_EXE update $env:PACKAGE_ID --version $env:VERSION --urls $env:INSTALLER_URL --submit --no-open
+          if ($LASTEXITCODE -ne 0) { throw "wingetcreate failed with exit code $LASTEXITCODE" }
