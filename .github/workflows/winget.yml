@@ -124,5 +124,7 @@ jobs:
           INSTALLER_URL: ${{ steps.resolve.outputs.INSTALLER_URL }}
         run: |
           $ErrorActionPreference = 'Stop'
-          & $env:WINGETCREATE_EXE update $env:PACKAGE_ID --version $env:VERSION --urls $env:INSTALLER_URL --submit --no-open
+          # URL override syntax: <url>|<architecture>|<scope>|<display-version>
+          $urlArg = "$env:INSTALLER_URL|x64|user|$env:VERSION"
+          & $env:WINGETCREATE_EXE update $env:PACKAGE_ID --version $env:VERSION --urls $urlArg --submit --no-open
           if ($LASTEXITCODE -ne 0) { throw "wingetcreate failed with exit code $LASTEXITCODE" }
