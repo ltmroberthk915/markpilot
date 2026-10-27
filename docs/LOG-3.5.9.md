@@ -30,8 +30,10 @@
 
 ## GitHub Release
 
-- 发布提交：`TBD`；标签：`v3.5.9`；Release：`TBD`。
-- 附件：安装版、便携版、`SHA256SUMS.txt`，上传后以 GitHub 计算的 digest 复核。
+- 发布提交：`d1c92d8bd8fe4f7655058a9d5db07add801adda8`，父提交为已公开的 `ede3444`；提交树与远端交付提交 `2d009f3` 逐字节一致（tree `f16e5cbb1e62bcfe8fdbd631c4be36c66b910210`）。
+- 标签：`v3.5.9`（annotated，tag object `914f9f2296c321a5b4210a0fb940d86dcb616447`）。
+- Release：`https://github.com/ltmroberthk915/markpilot/releases/tag/v3.5.9`，已上传安装版、便携版与 `SHA256SUMS.txt`。
+- GitHub 计算的附件 digest 与本地一致：安装版 `cf691c707d29d946c9b4013f31d14d54d8841ca6a7d0db3ee06151d017598730`，便携版 `e277c65d40bd2dbc094fed333c5ffe3ddf06fbaa137d61e533c629421425c40e`，校验文件 `43ef90bea71b0bb798ffa0408e29681294bb9601f06bba84e9733b89e1565b8b`。
 
 ## 未完成与保留项
 
