@@ -93,6 +93,8 @@ jobs:
             "EXISTS=false" >> $env:GITHUB_OUTPUT
             Write-Host "Not present yet: $path"
           }
+          # gh api returns 1 for the expected 404; do not fail the step.
+          exit 0
 
       - name: Check WINGET_TOKEN secret
         if: steps.check.outputs.EXISTS != 'true'
