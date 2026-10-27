@@ -8,7 +8,11 @@ const bytes = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 255, 128]);
 const b64 = 'data:image/png;base64,' + bytes.toString('base64');
 const percent = 'data:image/png,' + [...bytes].map(b => '%' + b.toString(16).padStart(2, '0')).join('');
 const digest = b => crypto.createHash('sha256').update(b).digest('hex');
-const temp = () => fsp.mkdtemp(path.resolve(__dirname, '../../../.mp-verify/v340/inline-unit-'));
+const temp = async () => {
+  const prefix = path.resolve(__dirname, '../../../.mp-verify/v340/inline-unit-');
+  await fsp.mkdir(path.dirname(prefix), { recursive: true });
+  return fsp.mkdtemp(prefix);
+};
 test('shared preflight validates exact decoded sizes, whitespace, unpadded base64 and raw percent bytes', () => {
   for (const url of [b64, percent, b64.replace(/=+$/, ''), b64.replace('base64,', 'base64,\n ')]) assert.equal([...planDataImages([url]).values()][0].bytes, bytes.length);
   const svg = 'data:image/svg+xml,<svg>汉😀</svg>';

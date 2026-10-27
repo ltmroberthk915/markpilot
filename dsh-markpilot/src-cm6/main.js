@@ -1,3 +1,4 @@
+import { mountCellOverlay, ownsCellOverlay, readCellOverlayPlacement, applyCellOverlayPlacement } from "./cell-overlay-host.js";
 import { createAsyncMarkdown } from './async-markdown.js';
 // MarkPilot v3 引擎竖切（C1：CM6 文本基座）
 //
@@ -14,7 +15,7 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 import { basicSetup } from "codemirror";
-import { undo, redo } from "@codemirror/commands";
+import { undo, redo, isolateHistory } from "@codemirror/commands";
 import { StreamLanguage, LanguageDescription, LanguageSupport } from "@codemirror/language";
 import { python } from "@codemirror/legacy-modes/mode/python";
 import { javascript, json } from "@codemirror/legacy-modes/mode/javascript";
@@ -31,6 +32,7 @@ import { listSemantics } from "./lists.js";
 import { markdownContext, codeBlockAt, blockAt, scanFencedBlocks, scanStructuralContext, structuralContextAt, codeBody, quoteLead } from './markdown-context.js';
 import { breakParagraph as kpBreakParagraph, NO_BREAK_BEFORE, NO_BREAK_AFTER } from "./knuth-plass.js";
 import { tableKeys, tableBlockOf, tableLead, isSeparatorBody, displayWidth, fitWidths, applyEnter, applyEnterBr, applyTab, setTableHint, isFenceAt } from "./tables.js";
+import { cachedTableWidths, registerTableWidths, inspectTableWidths } from "./table-widths.js";
 import { mathCompletion } from "./completion.js";
 import { horizontalFrame, localPoint, horizontalScrollbarHit } from './floating-layout.js';
 import { previewFrame, PREVIEW_MAX_DISPLACEMENT, controlObstacles, textObstacles } from './overlay-layout.js';
@@ -43,7 +45,7 @@ import { createCommandContext, applySourceHistory } from './command-context.js';
 import { editPlan, inlineCodeRanges, rangesTouching } from './edit-plan.js';
 import { installToolbar, wrap as wrapInline, TOOLBAR_ACTIONS } from "./toolbar.js";
 import { installExtras } from "./extras.js";
-import { renderInline, inlineLinkSpans } from './inline-format.js';
+import { renderInline, inlineLinkSpans, inlineEmphasisSpans } from './inline-format.js';
 import { fileUrlOfPath, resolveImageSource, hasImageCandidate } from './image-path.js';
 import { imageInsertions, cancelImageInsertions } from './image-insertion.js';
 import { mappedMathSource, mathSourcePosition } from './math-source-map.js';
@@ -621,6 +623,7 @@ function mpPrefNotify(ids) {
 }
 window.mpPrefs = { get: mpPrefsAll, set: mpSetPref, subscribe: mpPrefSubscribe, notify: mpPrefNotify };
 let mpPageRaf = 0;
+let mpAppliedPageWidthPct = null;
 /** 写三个 token：内容缩放 → zoomWrap；岛尺寸 → --mp-island-scale；版心 → --mp-page-width。
  *  版心必须等布局稳定后量宽（clientWidth），所以这里只排队，真正写值在算宽函数里。 */
 function applyEnginePrefs() {
@@ -632,6 +635,7 @@ function applyEnginePrefs() {
   root.dataset.mpStatusbar = p.statusbar ? "1" : "0";
   if (zoomWrap) zoomWrap.style.setProperty("--mp-zoom", (p.zoom / 100).toFixed(4));
   schedulePageWidth();
+  scheduleTableWidthRefresh();
   applyFloatPreference();
 }
 function schedulePageWidth() {
@@ -649,9 +653,14 @@ function mpApplyPageWidth() {
   const docPx = Math.round((vw * pct) / z);
   const width = docPx + "px";
   if (root.style.getPropertyValue("--mp-page-width") !== width) {
+    const anchor = mpAppliedPageWidthPct !== null && mpAppliedPageWidthPct !== pct
+      ? captureParagraphAnchor(document.documentElement.dataset.mpReading === '1') : null;
     mathGeometryVersion++;
     root.style.setProperty("--mp-page-width", width);
+    if (anchor) restoreReadingAnchor(anchor);
   }
+  mpAppliedPageWidthPct = pct;
+  scheduleTableWidthRefresh();
 }
 /** 缩放外壳：`#editor` 的父级。工具栏/状态栏挂在 body 上 ⇒ 永远在缩放盒外（这就是"解耦"）。 */
 let zoomWrap = null;
@@ -742,6 +751,7 @@ function buildStatusBar() {
     + '<input id="mp-status-zoom" class="mp-sb-zoom-input" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" value="100" aria-label="缩放百分比（输入数字后回车）">'
     + '<span class="mp-sb-pct">%</span></span>';
   document.body.appendChild(bar);
+  syncZoomBadges(mpPref("zoom"));
   const inp = bar.querySelector(".mp-sb-zoom-input");
   const commit = () => {
     const v = Number(String(inp.value).replace(/[^0-9.]/g, ""));
@@ -2029,6 +2039,9 @@ const setActiveCell = StateEffect.define(); // { rowFrom, col } | null
 const activeCellField = StateField.define({
   create: () => null,
   update(value, tr) {
+    /* Read-only is the single authority for the active cell: no active cell
+     * (and no hidden sizer) while read-only. */
+    if (tr.state.readOnly) return null;
     let v = value;
     for (const e of tr.effects) if (e.is(setActiveCell)) v = e.value;
     if (v && tr.docChanged) {
@@ -2201,7 +2214,7 @@ function observeTableGeometry(inputView, wrap, rowFrom, lease, isHeader, columns
         const previous = owner.recent.get(item.key);
         if (width === item.width && height === item.height &&
             previous?.signature === identity.signature && previous.generation === mathGeometryVersion) continue;
-        if (width !== item.width) item.resizeWidth?.();
+        if (width !== item.width || previous?.generation !== mathGeometryVersion) item.resizeWidth?.();
         item.width = width; item.height = height;
         owner.recent.delete(item.key);
         owner.recent.set(item.key, { width, height, viewportHeight: height * inputView.scaleY, fittedWidth: item.fittedWidth?.() ?? null,
@@ -2210,6 +2223,7 @@ function observeTableGeometry(inputView, wrap, rowFrom, lease, isHeader, columns
       }
       owner.trim();
       if (!changed.length) return;
+      scheduleCellOverlay();
       const target = tableBarTarget();
       if (!target || !changed.some(item => item.rowFrom >= target.table.from && item.rowFrom <= target.table.to)) return;
       // Floating chrome is outside table layout. Reposition before paint only
@@ -2247,6 +2261,35 @@ function tableRowIndex(tb) {
   if (!index) { index = new Map(tb.rows.map((row,ordinal) => { tableRowOrdinals.set(row,ordinal); return [row.from,row]; })); tableRowIndexes.set(tb,index); }
   return index;
 }
+let tableWidthRefreshFrame = 0;
+function scheduleTableWidthRefresh() {
+  if (tableWidthRefreshFrame) return;
+  tableWidthRefreshFrame = requestAnimationFrame(() => {
+    tableWidthRefreshFrame = 0;
+    const owner = view && tableGeometryObservers.get(view);
+    for (const wrap of owner?.nodes || []) owner.sizes.get(wrap)?.resizeWidth?.();
+  });
+}
+const smallTableWidthMetadata = new WeakMap();
+function tableWidthMetadata(tb) {
+  if (!tb || tb.cols < 2 || tb.cols > 12 || (tb.rows.length + 1) * tb.cols > 128) return null;
+  let metadata = smallTableWidthMetadata.get(tb);
+  if (metadata) return metadata;
+  const cells = [tb.headerBlock.cells, ...tb.rows.map(row => row.cells)];
+  let length = 0;
+  for (const row of cells) for (const cell of row) { length += cell.length; if (length > 8192) return null; }
+  metadata = { signature: JSON.stringify([cells, tb.aligns, tb.headerBlock.qDepth || 0]), rowCount: cells.length };
+  smallTableWidthMetadata.set(tb, metadata);
+  return metadata;
+}
+function refreshTableTypography() {
+  mathGeometryVersion++;
+  overlayStyledFor = "";
+  scheduleCellOverlay();
+  scheduleTableWidthRefresh();
+}
+document.fonts?.addEventListener("loadingdone", refreshTableTypography);
+document.addEventListener("mp-typography-changed", refreshTableTypography);
 const tableFitQueues = new WeakMap();
 function scheduleTableFit(inputView, work) {
   let queue = tableFitQueues.get(inputView);
@@ -2255,13 +2298,63 @@ function scheduleTableFit(inputView, work) {
   inputView.requestMeasure({ key: queue,
     read: () => {
       const pending = [...queue]; queue.clear();
-      return pending.map(item => ({ item, width: item.valid() ? item.table.clientWidth : null }));
+      return pending.map(item => ({ item, width: item.valid() ? parseFloat(getComputedStyle(item.table).width) : null }));
     },
     write: measurements => {
       for (const { item, width } of measurements) item.finish(width !== null && item.valid() ? width : null);
     },
   });
   return () => queue.delete(work);
+}
+// DOM ownership can outlive a widget instance after CM eq-based tile reuse.
+// Equality is only a synchronous equivalence check here, not an async lease.
+const tableRowDOMOwners = new WeakMap();
+const tableRowDOMViews = new WeakMap();
+function reusableTableRowParts(dom, inputView, next, previous, owner) {
+  if (!(previous instanceof TableRowWidget) || !(owner instanceof TableRowWidget) ||
+      !(next instanceof TableRowWidget) || owner !== previous && !owner.eq(previous)) return null;
+  const widgets = [owner, previous, next];
+  if (widgets.some(w => w.isHeader || w.activeCol >= 0 || !w.geometry ||
+      !w.region || !Array.isArray(w.ranges) || !Array.isArray(w.widths))) return null;
+  const sameGeometry = (a, b) => a.geometry.key === b.geometry.key &&
+    a.geometry.signature === b.geometry.signature && a.selKey === b.selKey &&
+    a.ranges.length === b.ranges.length && a.widths.length === b.widths.length;
+  if (!sameGeometry(owner, previous) || !sameGeometry(previous, next) ||
+      !sameGeometry(owner, next)) return null;
+  const rowSelected = w => w.selKind === "row" && w.rowFrom === w.selRow;
+  if (rowSelected(previous) !== rowSelected(next)) return null;
+  const index = inputView.state.field(regionIndexField, false);
+  const current = index?.byId.get(next.region.id);
+  if (!current || current !== next.region ||
+      current.contextVersion !== next.region.contextVersion ||
+      !dom?.isConnected || !inputView.contentDOM.contains(dom) ||
+      dom.tagName !== "DIV" || !dom.classList.contains("mp-table-wrap") ||
+      dom.childElementCount !== 1) return null;
+  const table = dom.firstElementChild;
+  if (!table || table.tagName !== "TABLE" || !table.classList.contains("mp-row") ||
+      table !== owner.tableEl || table.childElementCount !== 2 ||
+      table.rows.length !== 1 || table.tBodies.length !== 1) return null;
+  const colgroup = table.firstElementChild, body = table.tBodies[0], tr = table.rows[0];
+  if (colgroup.tagName !== "COLGROUP" || table.lastElementChild !== body ||
+      body.childElementCount !== 1 || body.firstElementChild !== tr ||
+      tr.tagName !== "TR" || tr.cells.length !== next.widths.length ||
+      colgroup.children.length !== next.widths.length ||
+      [...colgroup.children].some(col => col.tagName !== "COL") ||
+      tr.classList.contains("mp-sel-row") !== rowSelected(previous) ||
+      dom.classList.contains("mp-sel-table") !== (previous.selKind === "table")) return null;
+  for (let k = 0; k < next.widths.length; k++) {
+    const cell = tr.cells[k], range = previous.ranges[k], hasSrc = !!range;
+    if (widgets.some(w => !!w.ranges[k] !== hasSrc) ||
+        cell.tagName !== "TD" || cell.classList.contains("mp-cell-editing") ||
+        cell.dataset.mpRow !== String(previous.rowFrom) || cell.dataset.mpCol !== String(k) ||
+        cell.classList.contains("mp-sel-col") !==
+          (previous.selKind === "col" && k === previous.selCol)) return null;
+    if (hasSrc ? cell.hasAttribute("data-mp-phantom") ||
+        cell.dataset.mpFrom !== String(range[0]) || cell.dataset.mpTo !== String(range[1])
+      : cell.dataset.mpPhantom !== "1" || cell.hasAttribute("data-mp-from") ||
+        cell.hasAttribute("data-mp-to")) return null;
+  }
+  return { wrap: dom, table, colgroup, tr };
 }
 class TableRowWidget extends WidgetType {
   constructor(cells, widths, isHeader, ranges, rowFrom, activeCol, qDepth = 0, qLead = 0, weights = null, selKey = "", aligns = null, region = null, geometry = null) {
@@ -2290,7 +2383,7 @@ class TableRowWidget extends WidgetType {
   /** 现算本次渲染用的列宽（%）：先按显示宽度比例，再把低于下限的列抬到下限、从宽列里扣回。 */
   fitWidthsNow(avail = this.tableEl?.clientWidth || 0) {
     if (!this.weights || !this.weights.length) return this.widths;
-    const minPx = 64;                        // 4 个中文字 + 左右各 16 padding：至少能竖排前容纳 4 字
+    const minPx = 64;                        // fallback floor includes both 16px paddings; measured fitting may borrow more
     const minPercent = avail > 0 ? Math.min(30, (minPx / avail) * 100) : 14;
     return fitWidths(this.weights, minPercent);
   }
@@ -2319,9 +2412,32 @@ class TableRowWidget extends WidgetType {
     return other.cells.join("\u0001") === this.cells.join("\u0001")
       && other.ranges.map((r) => r.join(",")).join(";") === this.ranges.map((r) => r.join(",")).join(";");
   }
-  toDOM(inputView) {
-    const wrap = document.createElement("div");
-    wrap.className = "mp-table-wrap" + (this.qDepth ? " mp-table-quote" : "");
+  updateDOM(dom, inputView, previousWidget) {
+    const owner = tableRowDOMOwners.get(dom);
+    let rebound = false;
+    try {
+      if (!reusableTableRowParts(dom, inputView, this, previousWidget, owner) ||
+          this.eq(previousWidget)) return false;
+      // Retire every old lease/RO/fit/width member before capturing fresh state.
+      rebound = true;
+      rendererLifecycle.release(dom);
+      const reused = this.toDOM(inputView, dom);
+      if (reused !== dom) throw new Error("Stable table row changed its DOM owner");
+      return true;
+    } catch {
+      // A failed partial rebind must not leave new asynchronous publishers alive.
+      if (rebound) {
+        rendererLifecycle.release(dom);
+        tableRowDOMOwners.delete(dom);
+        tableRowDOMViews.delete(dom);
+        this.tableEl = null;
+      }
+      return false;
+    }
+  }
+  toDOM(inputView, reusableWrap = null) {
+    const wrap = reusableWrap || document.createElement("div");
+    if (!reusableWrap) wrap.className = "mp-table-wrap" + (this.qDepth ? " mp-table-quote" : "");
     const region = this.region && inputView.state.field(regionIndexField).byId.get(this.region.id);
     if (region) { wrap.dataset.mpRegion = region.id; bindContainer(wrap,region.context); }
     const lease = region ? rendererLifecycle.mount(inputView,region,wrap, {
@@ -2331,8 +2447,8 @@ class TableRowWidget extends WidgetType {
         return !!next && this.eq(next);
       },
     }) : null;
-    const table = document.createElement("table");
-    if (this.qDepth) {
+    const table = reusableWrap ? wrap.firstElementChild : document.createElement("table");
+    if (this.qDepth && !reusableWrap) {
       wrap.dataset.mpQd = String(this.qDepth);
       this.qLead = this.qLead || 0;
       /* 表框左缘＝竖条右缘，表内文字的**第 1 列左缘与引用文字的 text-indent 起点对齐**：
@@ -2343,25 +2459,38 @@ class TableRowWidget extends WidgetType {
           ⇒ wrapPad = .8em - 17px + 1px = .8em - 16px（单元格 padding 16px + 外框 1px）。 */
       wrap.style.paddingLeft = "calc(var(--mp-q-inset, 0px) + var(--mp-q-pad, .8em) + " + (this.qDepth - 1) + "em - 16px)";
     }
-    table.className = "mp-row";
+    if (!reusableWrap) table.className = "mp-row";
     this.tableEl = table;                    // fitWidthsNow 需要真实可用宽度（挂载后才有）
-    const colgroup = document.createElement("colgroup");
-    const cols = [];                         // col 元素留着，挂载后按实测宽度重写一次
+    const colgroup = reusableWrap ? table.firstElementChild : document.createElement("colgroup");
+    const cols = reusableWrap ? [...colgroup.children] : [];                         // col 元素留着，挂载后按实测宽度重写一次
     const geometry = cachedTableGeometry(inputView, this.geometry);
     const hasFit = geometry?.fittedWidth > 0;
-    const initialWidths = hasFit ? this.fitWidthsNow(geometry.fittedWidth) : this.widths;
-    initialWidths.forEach((w) => { const col = document.createElement("col"); col.style.width = w + "%"; colgroup.appendChild(col); cols.push(col); });
-    table.appendChild(colgroup);
-    let fitPending = false, cancelFit = null, fittedWidth = hasFit ? geometry.fittedWidth : null;
+    const fitMetadata = tableWidthMetadata(region?.data);
+    const fitGroupKey = fitMetadata ? inputView.state.field(regionIndexField).epoch + ":" + region.id : null;
+    const fitActive = () => {
+      const active = inputView.state.field(activeCellField, false);
+      const tb = inputView.state.field(regionIndexField).byId.get(region?.id)?.data;
+      return cellComposing || inputView.composing || !!(active && tb && active.rowFrom >= tb.from && active.rowFrom <= tb.to);
+    };
+    const initialWidths = (fitMetadata && cachedTableWidths(inputView, fitGroupKey, fitMetadata.signature,
+      hasFit ? geometry.fittedWidth : null, mathGeometryVersion, fitActive())) || (hasFit ? this.fitWidthsNow(geometry.fittedWidth) : this.widths);
+    if (!reusableWrap) {
+      initialWidths.forEach((w) => { const col = document.createElement("col"); col.style.width = w + "%"; colgroup.appendChild(col); cols.push(col); });
+      table.appendChild(colgroup);
+    }
+    let widthPlanMember = null;
+    let fitPending = false, cancelFit = null, fittedWidth = hasFit ? geometry.fittedWidth : null, fittedGeneration = mathGeometryVersion;
     const fitWork = { table, valid: () => wrap.isConnected && (!lease || lease.valid()),
       finish: avail => {
         fitPending = false; cancelFit = null;
-        if (avail === null || avail === fittedWidth) return;
-        fittedWidth = avail;
+        if (avail === null) return;
+        if (avail === fittedWidth && fittedGeneration === mathGeometryVersion && !widthPlanMember) return;
+        fittedWidth = avail; fittedGeneration = mathGeometryVersion;
         const cached = cachedTableGeometry(inputView, this.geometry);
         if (cached) cached.fittedWidth = avail;
         const fitted = this.fitWidthsNow(avail);
-        for (let k = 0; k < cols.length; k++) if (fitted[k]) cols[k].style.width = fitted[k] + "%";
+        if (!widthPlanMember?.fit(avail, mathGeometryVersion, fitted))
+          for (let k = 0; k < cols.length; k++) if (fitted[k]) cols[k].style.width = fitted[k] + "%";
       },
     };
     const scheduleFit = () => {
@@ -2370,29 +2499,39 @@ class TableRowWidget extends WidgetType {
       // read/write pairs forced a full layout for each row entering the viewport.
       fitPending = true; cancelFit = scheduleTableFit(inputView, fitWork);
     };
-    if (!hasFit) scheduleFit();
+    if (!hasFit || fitMetadata) scheduleFit();
     lease?.cleanup(() => { cancelFit?.(); cancelFit = null; fitPending = false; });
     // A zoom/narrower editor changes the available CSS width without replacing
     // the widget. Refresh its existing column-fit policy on that real change;
     // height-only inputs never schedule fitting. CM's read/write phases merge work.
     observeTableGeometry(inputView, wrap, this.rowFrom, lease, this.isHeader, this.widths.length, scheduleFit, this.geometry, () => fittedWidth);
-    const tr = table.insertRow();
+    const tr = reusableWrap ? table.rows[0] : table.insertRow();
     /* 【β1 选择层级】整表 ⇒ wrap 描边；行 ⇒ 本行 <tr>；列 ⇒ **每一行**的第 col 格（缺格的行不画）。 */
-    if (this.selKind === "table") wrap.classList.add("mp-sel-table");
-    if (this.selKind === "row" && this.rowFrom === this.selRow) tr.className = "mp-sel-row";
+    if (!reusableWrap && this.selKind === "table") wrap.classList.add("mp-sel-table");
+    if (!reusableWrap && this.selKind === "row" && this.rowFrom === this.selRow) tr.className = "mp-sel-row";
     for (let k = 0; k < this.widths.length; k++) {
-      const cell = this.isHeader ? document.createElement("th") : document.createElement("td");
+      const cell = reusableWrap ? tr.cells[k] : this.isHeader ? document.createElement("th") : document.createElement("td");
       const hasSrc = !!this.ranges[k];
       const [a, b] = this.ranges[k] || [0, 0];
-      cell.dataset.mpRow = String(this.rowFrom);
-      cell.dataset.mpCol = String(k);
+      if (!reusableWrap || cell.dataset.mpRow !== String(this.rowFrom)) cell.dataset.mpRow = String(this.rowFrom);
+      if (!reusableWrap || cell.dataset.mpCol !== String(k)) cell.dataset.mpCol = String(k);
       /* 【点击映射】源码里**没有**这一格（参差行：渲染按表头列数出格）时，不许打 from/to——
          改前打的是 0/0，下游会当成真区间用，于是点到幻影格会"字段变了、覆盖层没动"。 */
-      if (hasSrc) { cell.dataset.mpFrom = String(a); cell.dataset.mpTo = String(b); }
-      else cell.dataset.mpPhantom = "1";
+      if (!reusableWrap) {
+        if (hasSrc) { cell.dataset.mpFrom = String(a); cell.dataset.mpTo = String(b); }
+        else cell.dataset.mpPhantom = "1";
+      } else if (hasSrc) {
+        if (cell.dataset.mpFrom !== String(a)) cell.dataset.mpFrom = String(a);
+        if (cell.dataset.mpTo !== String(b)) cell.dataset.mpTo = String(b);
+        if (cell.hasAttribute("data-mp-phantom")) cell.removeAttribute("data-mp-phantom");
+      } else {
+        if (cell.hasAttribute("data-mp-from")) cell.removeAttribute("data-mp-from");
+        if (cell.hasAttribute("data-mp-to")) cell.removeAttribute("data-mp-to");
+        if (cell.dataset.mpPhantom !== "1") cell.dataset.mpPhantom = "1";
+      }
       /* 【β2·对齐渲染】行内 style 覆盖 CSS 里的 `text-align: left`（左/未标注都写 left，与 CSS 默认一致）。 */
-      cell.style.textAlign = (this.aligns && this.aligns[k]) || "left";
-      if (k === this.activeCol) {
+      if (!reusableWrap) cell.style.textAlign = (this.aligns && this.aligns[k]) || "left";
+      if (!reusableWrap && k === this.activeCol) {
         cell.className = "mp-cell-editing";
         const layout = document.createElement('div'); layout.className = 'mp-cell-layout'; layout.setAttribute('aria-hidden', 'true');
         const rendered = document.createElement('div'); rendered.className = 'mp-cell-rendered-size';
@@ -2400,19 +2539,128 @@ class TableRowWidget extends WidgetType {
         const source = document.createElement('div'); source.className = 'mp-cell-source-size';
         source.textContent = mappedCellSource(this.cells[k] || '').text;
         layout.append(rendered, source); cell.appendChild(layout);
-      } else cell.innerHTML = cellHTML(mappedCellSource(this.cells[k] || "").text);
-      if (this.selKind === "col" && k === this.selCol) cell.classList.add("mp-sel-col");
-      tr.appendChild(cell);
+      } else if (!reusableWrap) cell.innerHTML = cellHTML(mappedCellSource(this.cells[k] || "").text);
+      if (!reusableWrap && this.selKind === "col" && k === this.selCol) cell.classList.add("mp-sel-col");
+      if (!reusableWrap) tr.appendChild(cell);
     }
-    wrap.appendChild(table);
+    if (!reusableWrap) wrap.appendChild(table);
+    if (fitMetadata && lease) {
+      tableRowIndex(region.data);
+      widthPlanMember = registerTableWidths(inputView, {
+        key: fitGroupKey, signature: fitMetadata.signature, rowCount: fitMetadata.rowCount,
+        ordinal: this.isHeader ? 0 : tableRowOrdinals.get(tableRowIndex(region.data).get(this.rowFrom)) + 1,
+        table, valid: () => wrap.isConnected && lease.valid(), active: fitActive,
+        generation: () => mathGeometryVersion,
+        source: () => tableWidthMetadata(inputView.state.field(regionIndexField).byId.get(region.id)?.data)?.signature,
+        apply: vector => {
+          for (let k = 0; k < cols.length; k++) {
+            const width = vector[k] + "%";
+            if (cols[k].style.width !== width) cols[k].style.width = width;
+          }
+        },
+      });
+      lease.cleanup(() => widthPlanMember.dispose());
+    }
     if (this.activeCol >= 0) {
       const positionRaf = requestAnimationFrame(() => { if (wrap.isConnected && (!lease || lease.valid())) positionCellOverlay(); });
       lease?.cleanup(() => cancelAnimationFrame(positionRaf));
     }
+    tableRowDOMOwners.set(wrap, this);
+    tableRowDOMViews.set(wrap, inputView);
     return wrap;
   }
   ignoreEvent() { return false; }
-  destroy(dom) { rendererLifecycle.release(dom); this.tableEl = null; }
+  destroy(dom) {
+    const owner = tableRowDOMOwners.get(dom);
+    // CM may install an eq widget without calling toDOM. Reused.DOM tiles do
+    // not destroy the previous widget, so this is a synchronous equivalence gate.
+    if (owner && (owner === this || owner.eq(this))) {
+      rendererLifecycle.release(dom);
+      tableRowDOMOwners.delete(dom);
+      tableRowDOMViews.delete(dom);
+    }
+    this.tableEl = null;
+  }
+}
+// The first rendered-cell down replaces its target with a body editor. Keep that
+// one real mouse gesture on its new owner until release or cancellation.
+let cellPointerSelection = null;
+function stopCellPointerSelection() { cellPointerSelection?.(); }
+function beginCellPointerSelection(event, inputView) {
+  stopCellPointerSelection();
+  if (!event.isTrusted || event.button !== 0 || event.buttons !== 1 || event.detail !== 1 ||
+      event.shiftKey || event.ctrlKey || event.altKey || event.metaKey ||
+      view !== inputView || inputView.state.readOnly || cellComposing || inputView.composing) return;
+  const owner = cellEdit, edit = cellOverlay?.querySelector('.mp-cell-overlay-text');
+  const initial = edit && cellDOMSelection(edit), doc = inputView.state.doc;
+  const epoch = inputView.state.field(regionIndexField, false)?.epoch;
+  if (!owner || !edit || !initial || initial.anchor !== initial.head || epoch == null) return;
+  const from = owner.from, to = owner.to, rowFrom = owner.rowFrom, col = owner.col;
+  const text = mappedCellSource(doc.sliceString(from, to)).text, anchor = initial.anchor;
+  let lastX = event.clientX, lastY = event.clientY, lastHead = anchor;
+  const current = () => {
+    const state = inputView.state, active = state.field(activeCellField, false);
+    const selected = edit.isConnected && cellDOMSelection(edit);
+    return view === inputView && cellEdit === owner && state.doc === doc && !state.readOnly &&
+      !cellComposing && !inputView.composing && state.field(regionIndexField, false)?.epoch === epoch &&
+      owner.epoch === epoch && owner.from === from && owner.to === to && owner.rowFrom === rowFrom && owner.col === col &&
+      active?.rowFrom === rowFrom && active.col === col && inputView.dom.isConnected && edit.isConnected &&
+      cellOverlay?.style.display !== 'none' && document.hasFocus() && document.activeElement === edit &&
+      edit.textContent === text && selected?.anchor === anchor &&
+      state.selection.ranges.length === 1 && state.selection.main.from >= from && state.selection.main.to <= to;
+  };
+  if (!current()) return;
+  // Gesture-begin serial: only a fully verified trusted left mouseup may reveal.
+  const pointerSerial = commands.serial();
+  const remove = [];
+  const stop = () => {
+    if (cellPointerSelection === stop) cellPointerSelection = null;
+    while (remove.length) remove.pop()();
+  };
+  const listen = (target, type, fn) => {
+    target.addEventListener(type, fn, true);
+    remove.push(() => target.removeEventListener(type, fn, true));
+  };
+  const move = e => {
+    if (!e.isTrusted || !(e.buttons & 1) || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || !current()) { stop(); return; }
+    if (e.clientX === lastX && e.clientY === lastY) return;
+    lastX = e.clientX; lastY = e.clientY;
+    const rect = edit.getBoundingClientRect();
+    if (rect.width <= 1 || rect.height <= 1) { stop(); return; }
+    const x = Math.max(rect.left + .5, Math.min(e.clientX, rect.right - .5));
+    const y = Math.max(rect.top + .5, Math.min(e.clientY, rect.bottom - .5));
+    const hit = document.caretRangeFromPoint(x, y);
+    if (!hit || !edit.contains(hit.startContainer)) { stop(); return; }
+    const prefix = document.createRange();
+    prefix.selectNodeContents(edit); prefix.setEnd(hit.startContainer, hit.startOffset);
+    const head = prefix.toString().length;
+    if (head === lastHead) return;
+    if (!current()) { stop(); return; }
+    setCellDOMSelection(edit, anchor, head);
+    syncCellSelection(edit);
+    lastHead = head;
+  };
+  /* Only the trusted left mouseup may finish and reveal: re-verify the captured
+   * serial, collapsed DOM and CM selections, no composition, not read-only; every
+   * other end (drag, cancel, blur, key, wheel, new pointer) only stops. */
+  const finish = e => {
+    const trustedLeftUp = e.isTrusted && e.type === 'mouseup' && e.button === 0;
+    const dom = trustedLeftUp ? cellDOMSelection(edit) : null;
+    const cm = trustedLeftUp ? inputView.state.selection : null;
+    const verified = trustedLeftUp && current() && commands.serial() === pointerSerial &&
+      !!dom && dom.anchor === dom.head &&
+      !!cm && cm.ranges.length === 1 && cm.main.anchor === cm.main.head &&
+      !cellComposing && !inputView.composing && !inputView.state.readOnly;
+    stop();
+    if (verified) scheduleCellOverlay(true);
+  };
+  cellPointerSelection = stop;
+  listen(document, 'mousemove', move);
+  for (const type of ['mousedown', 'keydown', 'wheel', 'pointercancel', 'touchcancel', 'dragstart', 'dragend', 'contextmenu']) listen(document, type, stop);
+  listen(document, 'mouseup', finish);
+  listen(edit, 'blur', stop);
+  listen(edit, 'compositionstart', stop);
+  listen(window, 'blur', stop);
 }
 /** DOM selection boundaries, including mixed text nodes created by paste. */
 function cellDOMSelection(edit) {
@@ -2599,7 +2847,8 @@ function cellOverlayCopy(event) {
   event.preventDefault();
 }
 function ensureCellOverlay() {
-  if (cellOverlay && cellOverlay.isConnected) return cellOverlay;
+  if (cellOverlay && ownsCellOverlay(view, cellOverlay)) return cellOverlay;
+  if (cellOverlay) { cellOverlay.remove(); cellOverlay = null; }
   if (cellSelectionDocument !== document) {
     cellSelectionDocument = document;
     document.addEventListener('selectionchange', () => {
@@ -2636,24 +2885,24 @@ function ensureCellOverlay() {
     if (!cellComposing) syncCellEdit(div);
     else { updateCellSizer(div); scheduleCellOverlay(true); }
   });
-  box.addEventListener('wheel', e => {
-    if (!cellEdit || !view?.dom.isConnected || !box.isConnected || box.style.display === 'none') return;
-    e.preventDefault();
-    if (e.ctrlKey || e.metaKey) { mpZoomBy(e.deltaY < 0 ? MP_ZOOM_STEP : -MP_ZOOM_STEP); scheduleCellOverlay(); return; }
-    const scale = e.deltaMode === 1 ? (parseFloat(getComputedStyle(div).lineHeight) || 24) : e.deltaMode === 2 ? view.scrollDOM.clientHeight : 1;
-    const dx = e.deltaX || (e.shiftKey ? e.deltaY : 0), dy = e.shiftKey && !e.deltaX ? 0 : e.deltaY;
-    const z = mpZoomOf(view.scrollDOM);
-    view.scrollDOM.scrollBy({ left: dx * scale / z, top: dy * scale / z, behavior: 'instant' });
-  }, { passive: false });
+  // Native scrolling belongs to the scroll host; modifier-wheel belongs to view.dom capture.
   /* 【N1】copy 必须挂在覆盖层自己身上：它挂 body、事件在 contentDOM 之外，CM6 的处理器收不到。 */
   div.addEventListener("copy", cellOverlayCopy);
   div.addEventListener("blur", () => {
-    if (cellEdit && !cellEdit.navigating && view) {
-      primeTableGeometry(view, activeCellDOM());
+    const owner = view, edit = cellEdit;
+    if (!owner || !edit || edit.navigating) return;
+    // Native mouse selection must finish against unchanged table geometry.
+    // Each activation creates a new edit object, including same-cell re-entry.
+    const current = () => view === owner && cellEdit === edit && owner.dom.isConnected &&
+      !edit.navigating && document.activeElement !== div;
+    queueMicrotask(() => {
+      if (!current()) return;
+      primeTableGeometry(owner, activeCellDOM());
       commands.suspend();
-      view.dispatch({ effects: setActiveCell.of(null) });
+      if (!current()) return;
+      owner.dispatch({ effects: setActiveCell.of(null) });
       deactivateCellOverlay();
-    }
+    });
   });
   div.addEventListener("keydown", (e) => {
     if (/^(?:Arrow|Home$|End$|Page)/.test(e.key)) scheduleCellOverlay(true);
@@ -2818,58 +3067,14 @@ function ensureCellOverlay() {
       moveActiveCellByKey(() => applyEnter(view));
     }
   });
-  document.body.appendChild(box);
+  mountCellOverlay(view, box);
   cellOverlay = box;
   return box;
 }
-function positionCellOverlay() {
-  if (!view || !cellOverlay) return;
-  const active = view.state.field(activeCellField, false);
-  if (!active) { cellOverlay.style.display = "none"; return; }
-  const cell = activeCellDOM();
-  if (!cell) { cellOverlay.style.display = "none"; return; }
-  const r = cell.getBoundingClientRect(), source = cell.querySelector('.mp-cell-source-size');
-  if (!source) { cellOverlay.style.display = 'none'; return; }
-  const sr = source.getBoundingClientRect(), z = mpZoomOf(cell);
-  cellOverlay.style.display = "block";
-  /* 【A7】排版抄**该 td 的计算样式**（覆盖层挂 body，em 基准与表格里不同，写死字号/padding 必然错位）。
-     ⚠️ 只在**活动格变了**的那一次读 computed style：本函数被滚动/rAF/每次输入的 rAF 反复调用。 */
-  /* 【A7 v2c】缓存键**必须带上格子高度**：只按"哪一格"缓存的话，激活那一刻若格子还没到最终高度
-     （图片尚未加载 / 夹具稍后用 CSS 撑高 / 行 widget 刚重建），垂直居中补偿会按旧高度算一次然后被缓存住
-     —— 复核线复跑实测就是这个症状：高行格 `dy=−36.91px`、`padTop=9px`（补偿项为 0）。
-     高度变化才会重算，因此每帧代价仍只是"一次字符串比较 + 一次整数比较"。 */
-  const styleKey = active.rowFrom + ":" + active.col + ":" + r.width + ':' + r.height + ':' + z;
-  if (overlayStyledFor !== styleKey) {
-    overlayStyledFor = styleKey;
-    try {
-      const cs = getComputedStyle(cell);
-      cellOverlay.style.fontFamily = cs.fontFamily;
-      cellOverlay.style.fontSize = (parseFloat(cs.fontSize) * z) + 'px';
-      cellOverlay.style.fontWeight = cs.fontWeight;
-      cellOverlay.style.lineHeight = cs.lineHeight === 'normal' ? 'normal' : (parseFloat(cs.lineHeight) * z) + 'px';
-      cellOverlay.style.letterSpacing = cs.letterSpacing === 'normal' ? 'normal' : (parseFloat(cs.letterSpacing) * z) + 'px';
-      /* 【β2·A4】进格编辑时排版不横跳：覆盖层抄 td 的 textAlign（不补的话点进右对齐格会从左排）。 */
-      cellOverlay.style.textAlign = cs.textAlign;
-      cellOverlay.style.color = cs.color;
-      /* 【A7 v2】内容盒原点必须对齐 td 的**内容盒**（gaps 线量出来的两条，不是拍的）：
-         · td 的 1px 边框要补进 padding，否则整块偏 1px；
-         · td 默认 `vertical-align: middle`，覆盖层是块级从顶排 ⇒ 行高小于格高时整体偏上
-           —— 实测格高 117px 时同偏移 Range 的 Δy = **−37.91px**（不是 12px，12px 只是 42px 行高那档），
-           补垂直居中后 −0.02px。 */
-      overlayPadTop = Math.max(0, sr.top - r.top);
-    } catch { overlayPadTop = 0; }
-  }
-  // The grid centers the complete source block and contributes its real height
-  // to the row. Rects are already viewport pixels; do not scale them twice.
-  cellOverlay.style.padding = `${Math.max(0, sr.top-r.top)}px ${Math.max(0, r.right-sr.right)}px ${Math.max(0, r.bottom-sr.bottom)}px ${Math.max(0, sr.left-r.left)}px`;
-  cellOverlay.style.left = r.left + "px";
-  cellOverlay.style.top = r.top + "px";
-  cellOverlay.style.width = r.width + "px";
-  /* 【A7】锁**高**而不是给下限：`min-height` 会被预览块撑到下一行（验收线实测公式格 dH=+33.22px）。 */
-  cellOverlay.style.height = r.height + "px";
-}
+function positionCellOverlay(){if(!view||!cellOverlay)return;const active=view.state.field(activeCellField,false),cell=active&&activeCellDOM(),source=cell?.querySelector('.mp-cell-source-size');const p=cell&&source&&readCellOverlayPlacement(view,cellOverlay,cell,source,mpZoomOf(view.scrollDOM));if(!p){cellOverlay.style.display='none';return;}if(cellOverlay.style.display!=='block')cellOverlay.style.display='block';const key=[active.rowFrom,active.col,p.width,p.height,p.sx,p.sy].join(':');if(overlayStyledFor!==key){overlayStyledFor=key;const cs=getComputedStyle(cell);for(const name of ['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing','textAlign','color'])if(cellOverlay.style[name]!==cs[name])cellOverlay.style[name]=cs[name];}applyCellOverlayPlacement(cellOverlay,p);}
 /** 激活/切换活动格：建覆盖层、播种源码文本、落焦点 */
 function activateCellOverlay(rowFrom, col, cols, from, to, caretOffset, selectAll, sourceSelection, pointer) {
+  stopCellPointerSelection();
   const box = ensureCellOverlay();
   const div = box.querySelector(".mp-cell-overlay-text");
   const mapped = mappedCellSource(view ? view.state.doc.sliceString(from, to) : "");
@@ -2921,9 +3126,13 @@ function activateCellOverlay(rowFrom, col, cols, from, to, caretOffset, selectAl
   focusIt();
 }
 function deactivateCellOverlay() {
+  stopCellPointerSelection();
   if (cellOverlay) cellOverlay.style.display = "none";
   cellEdit = null;
   activeCellLayout = null;
+  cellComposing = false;
+  overlayStyledFor = "";
+  cellMeasureIntent = null;
   cellRevealIntent = null;
   if (cellPositionFrame) { cancelAnimationFrame(cellPositionFrame); cellPositionFrame = 0; }
 }
@@ -3241,6 +3450,9 @@ function sourceTableBlockRange(state, previous = null) {
 const tableSourceRangeField = StateField.define({
   create(state) { return sourceTableBlockRange(state); },
   update(value, tr) {
+    /* A pure readonly->editable reconfigure keeps the null value: the old
+     * selection must not infer a source range at exit. */
+    if (!tr.docChanged && !tr.selection && tr.startState.readOnly && !tr.state.readOnly) return value;
     if (!tr.docChanged && !tr.selection && tr.startState.readOnly === tr.state.readOnly &&
         tr.startState.field(activeCellField) === tr.state.field(activeCellField) &&
         tr.startState.field(tableSelectionField) === tr.state.field(tableSelectionField) &&
@@ -3267,46 +3479,77 @@ const tableDecorations = EditorView.decorations.compute([tableDataField, activeC
   return Decoration.set(out, true);
 });
 /** 点单元格 → 激活格内编辑（覆盖层在 body 上；无格归属的原生表格范围显示对应源码） */
-let mpDropSource = null;
-/* C14【限定能力·非通用框架】owned native-text 拖源记录与只读校验：
- * 仅由真实 trusted 非空 dragstart 绑定同视图源（view/doc 引用/epoch/区间/精确源文本）；
- * readonly、dragend、Escape 取消一律清空；drop 各分支运行前一次性消费清空。
- * 判定 move 只看：同 view、同一 doc 引用、epoch 一致、区间在界、当前源文本逐字相等、
- * RAW 载荷逐字相等、实际 effectAllowed 枚举允许 move，且按实际公开
- * EditorView.dragMovesSelection facet 语义（默认 mac !altKey / 其它 !ctrlKey，
- * 实际平台探测）——绝不读捕获相 dropEffect，绝不写 DataTransfer MIME/effect，
- * 不触 CM 私有 inputState，不加新 observer/timer/重扫/历史改写；
- * CM 自身 dragstart/dragend 机制保持原生。缺失/过期/外部/不可读一概不删旧源。 */
-function mpDropBind(view) {
-  const s = view.state.selection.main;
-  if (view.state.readOnly || s.empty) { mpDropSource = null; return null; }
-  let epoch = null;
-  try { const ri = view.state.field(regionIndexField, false); epoch = ri && Number.isFinite(ri.epoch) ? ri.epoch : null; } catch { epoch = null; }
-  mpDropSource = { view, doc: view.state.doc, epoch, from: s.from, to: s.to, text: view.state.sliceDoc(s.from, s.to) };
-  return mpDropSource;
-}
-function mpDropMoveCheck(view, event, rec, rawPayload) {
-  const checks = {
-    recordBound: !!rec,
-    sameView: !!(rec && rec.view === view),
-    sameDoc: !!(rec && view.state.doc === rec.doc),
-    epochStable: (() => { if (!rec) return false; if (rec.epoch == null) return false; try { const ri = view.state.field(regionIndexField, false); const now = ri && Number.isFinite(ri.epoch) ? ri.epoch : null; return now === rec.epoch; } catch { return false; } })(),
-    rangeInBounds: !!(rec && rec.from >= 0 && rec.to > rec.from && rec.to <= view.state.doc.length),
-    sourceTextExact: !!(rec && view.state.sliceDoc(rec.from, rec.to) === rec.text),
-    rawPayloadExact: typeof rawPayload === 'string' && !!rec && rawPayload === rec.text,
-    effectAllowsMove: (() => { try { const ea = event.dataTransfer && event.dataTransfer.effectAllowed; return ea === 'move' || ea === 'copyMove' || ea === 'linkMove' || ea === 'all'; } catch { return false; } })(),
-    dragMovesSelection: (() => { try { const facet = view.state.facet(EditorView.dragMovesSelection); if (facet && facet.length) return !!facet[0](event); const mac = /Mac|iPhone|iPad|iPod/.test(String(navigator.platform || navigator.userAgent || '')); return mac ? !event.altKey : !event.ctrlKey; } catch { return false; } })(),
-  };
-  const valid = checks.recordBound && checks.sameView && checks.sameDoc && checks.epochStable && checks.rangeInBounds && checks.sourceTextExact && checks.rawPayloadExact && checks.effectAllowsMove;
-  return { valid, move: valid && checks.dragMovesSelection, checks };
-}
-function mpDropClear() { mpDropSource = null; }
+// Editor content uses selection, clipboard and insertion commands. Native drag
+// transport is disabled here before CM or editable overlay drop handlers run.
+// Never cancel dragenter: accepting it can inherit a stale native MOVE result.
+const editorContentDragDisabled = ViewPlugin.fromClass(class {
+  constructor(owner) {
+    this.owner = owner; this.document = owner.dom.ownerDocument;
+    this.capture = event => {
+      if (!this.contains(event.target)) return;
+      if (event.type === 'dragenter') { event.stopImmediatePropagation(); return; }
+      if (event.type !== 'dragstart') {
+        try { if (event.dataTransfer) event.dataTransfer.dropEffect = 'none'; } catch { /* Refusal does not read or rewrite the payload. */ }
+      }
+      event.preventDefault(); event.stopImmediatePropagation();
+    };
+    for (const type of ['dragstart', 'dragenter', 'dragover', 'drop']) this.document.addEventListener(type, this.capture, true);
+  }
+  contains(target) {
+    if (!this.owner.dom.isConnected || !target) return false;
+    if (this.owner.dom.contains(target)) return true;
+    if (ownsCellOverlay(this.owner, cellOverlay) && cellOverlay?.contains(target)) return true;
+    const element = target.nodeType === 1 ? target : target.parentElement;
+    return target.ownerDocument === this.document && !!element?.closest?.('.mp-split-pane .cm-editor');
+  }
+  destroy() {
+    for (const type of ['dragstart', 'dragenter', 'dragover', 'drop']) this.document.removeEventListener(type, this.capture, true);
+  }
+});
+
+// Blank gutter beside the active row has no native text caret. Keep the
+// existing cell owner; real text, modified selection and near cells retain
+// their normal paths. This view's capture listener also covers scrollDOM.
+const cellBackgroundClick = ViewPlugin.fromClass(class {
+  constructor(owner) {
+    this.owner = owner;
+    this.down = event => {
+      const edit = cellEdit, div = cellOverlay?.querySelector('.mp-cell-overlay-text');
+      if (!event.isTrusted || event.defaultPrevented || event.button !== 0 || event.buttons !== 1 || event.detail !== 1 ||
+          event.shiftKey || event.ctrlKey || event.metaKey || event.altKey || view !== owner || owner.state.readOnly ||
+          cellComposing || owner.composing || !edit || edit.navigating || !div || document.activeElement !== div ||
+          !document.hasFocus() || !cellDOMSelection(div) || cellOverlay.style.display === 'none') return;
+      const sc = owner.scrollDOM;
+      if (event.target !== sc && event.target !== owner.contentDOM) return;
+      const active = owner.state.field(activeCellField, false), selection = owner.state.selection;
+      if (!active || active.rowFrom !== edit.rowFrom || active.col !== edit.col ||
+          edit.epoch !== owner.state.field(regionIndexField).epoch || selection.ranges.length !== 1 ||
+          selection.main.from < edit.from || selection.main.to > edit.to ||
+          mappedCellSource(owner.state.doc.sliceString(edit.from, edit.to)).text !== div.textContent) return;
+      const cell = activeCellDOM(), row = cell?.closest('table.mp-row');
+      if (!row || !owner.contentDOM.contains(row)) return;
+      const rr = row.getBoundingClientRect(), sr = sc.getBoundingClientRect(), z = sr.height / sc.offsetHeight;
+      const left = sr.left + sc.clientLeft * z, top = sr.top + sc.clientTop * z;
+      if (!(z > 0) || event.clientX <= left + 1 || event.clientX >= left + sc.clientWidth * z - 1 ||
+          event.clientY <= Math.max(top + 1, rr.top) || event.clientY >= Math.min(top + sc.clientHeight * z - 1, rr.bottom)) return;
+      for (const c of owner.contentDOM.querySelectorAll('.mp-row th[data-mp-row], .mp-row td[data-mp-row]')) {
+        const r = c.getBoundingClientRect();
+        const dx = Math.max(r.left - event.clientX, 0, event.clientX - r.right);
+        const dy = Math.max(r.top - event.clientY, 0, event.clientY - r.bottom);
+        if (dx <= 24 && dy <= 10) return;
+      }
+      event.preventDefault();
+    };
+    owner.dom.addEventListener('mousedown', this.down, true);
+  }
+  destroy() { this.owner.dom.removeEventListener('mousedown', this.down, true); }
+});
 const tableCellClick = EditorView.domEventHandlers({
   mousedown(event, view) {
     /* 【阅读态不许改稿·2026-10-17 实测缺陷 #26】覆盖层挂在 body 上、改稿走 view.dispatch，
        EditorState.readOnly 只拦输入级命令、**不拦程序化 dispatch** ⇒ 阅读态点一格照样能打字改稿
        （实测 len 50→52）。这里与 syncCellEdit 双保险：入口不开、写口不写。 */
-    if (view.state.readOnly) return false;
+    if (view.state.readOnly) { if (event.isTrusted) readingSourceIntent = null; return false; }
     let cell = event.target && event.target.closest ? event.target.closest(".mp-row th[data-mp-row], .mp-row td[data-mp-row]") : null;
     /* 【#66】点在表格**左/右边缘**（与某行同一水平带、距最近格 ≤24px）也归到该格：
        否则 CM6 把 caret 放进块 widget 的源码行、而 DOM 选区落在 widget 边界 ⇒ 随后键入
@@ -3314,7 +3557,7 @@ const tableCellClick = EditorView.domEventHandlers({
     if (!cell) {
       const NEAR_X = 24, NEAR_Y = 10;
       let best = null, bestD = Infinity;
-      for (const c of document.querySelectorAll(".mp-row th[data-mp-row], .mp-row td[data-mp-row]")) {
+      for (const c of view.contentDOM.querySelectorAll(".mp-row th[data-mp-row], .mp-row td[data-mp-row]")) {
         const b = c.getBoundingClientRect();
         const dx = Math.max(b.left - event.clientX, 0, event.clientX - b.right);
         const dy = Math.max(b.top - event.clientY, 0, event.clientY - b.bottom);
@@ -3335,6 +3578,9 @@ const tableCellClick = EditorView.domEventHandlers({
     const realCol = Math.min(Math.max(0, col), ranges.length - 1);
     const r = ranges[realCol];
     if (!r) return false;
+    // Same-cell composition and right-click retain the native editor; never reseed an in-flight composition.
+    if (cellEdit && cellEdit.rowFrom === rowFrom && cellEdit.col === realCol &&
+        ((cellComposing || view.composing) || event.button !== 0)) return true;
     primeTableGeometry(view, cell);
     /* 【β1】点新格 ⇒ 清掉表级选择状态（行/列/整表高亮不该跨格留着） */
     view.dispatch({ effects: [setActiveCell.of({ rowFrom, col: realCol }), setTableSel.of(null)] });
@@ -3342,137 +3588,7 @@ const tableCellClick = EditorView.domEventHandlers({
     // the rendered cell may have been detached by the active-cell transaction.
     activateCellOverlay(rowFrom, realCol, ranges.length, r[0], r[1], undefined, false, undefined,
       { x: event.clientX, y: event.clientY });
-    return true;
-  },
-  /* 【#33·2026-10-17 实测缺陷】文本拖到渲染表格上时，CM6 的 drop 在块级 widget 上只能取到**块边界**位置
-     ⇒ 落点被钳到表行行首，插入的字符还会把行首管道挤掉（实测 | a1 | a2 | → 源| a1 | a2 |，表结构损坏）。
-     这里按指针命中的格（data-mp-row / data-mp-col）算出该格的源码区间，把拖入文本插进**该格内容末尾**；
-     起拖区间在 dragstart 记住（C14：完整 owned 记录），经 mpDropMoveCheck 校验为 move 时一并删除。
-     【C14·2026-10-22 实测缺陷（root r3 qualified RED）】同视图真实 MOVE 被当 copy：块分支只插入不删源
-     （拖三字 原文仍在、caret 48≠45、Undo 只回插入选区 4..7、Redo 重复）；格分支读**捕获相**
-     dropEffect（实测 none）而最终 dragend 才是 move。删除资格改为只读校验 + 实际公开
-     EditorView.dragMovesSelection 语义，绝不写 DataTransfer。 */
-  dragstart(event, view) {
-    if (!event.isTrusted || view.state.readOnly) { mpDropSource = null; return false; }
-    mpDropBind(view);
-    return false;
-  },
-  dragend() { mpDropClear(); return false; },
-  keydown(event) { if (event.key === 'Escape') mpDropClear(); return false; },
-  drop(event, view) {
-    if (view.state.readOnly) { mpDropSource = null; return false; }
-    /* C14：owned 记录在所有分支之前**一次性消费并清空**——过期/外部/已取消的记录
-     * 在本 drop 后续任何分支里都不可能再触发删源。 */
-    const src = mpDropSource; mpDropSource = null;
-    /* 【#33 紧邻边界·2026-10-17】目标不能只认"正好命中的格"：拖到行的 padding / 格间隙 / 行容器上时
-       指针在表格里、target 却不是 td（实测会把 b1 行劈成 | b1 源文本尾巴 + | b2 |）。这里退一步按几何取最近的格。 */
-    let cell = event.target && event.target.closest ? event.target.closest(".mp-row th[data-mp-row], .mp-row td[data-mp-row]") : null;
-    if (!cell && event.target && event.target.closest && event.target.closest(".mp-table-wrap")) {
-      let best = null, bestD = Infinity;
-      for (const c of document.querySelectorAll(".mp-row th[data-mp-row], .mp-row td[data-mp-row]")) {
-        const b = c.getBoundingClientRect();
-        const dx = Math.max(b.left - event.clientX, 0, event.clientX - b.right);
-        const dy = Math.max(b.top - event.clientY, 0, event.clientY - b.bottom);
-        const d = dx * dx + dy * dy;
-        if (d < bestD) { bestD = d; best = c; }
-      }
-      cell = best;
-    }
-    /* 【#61】拖到**渲染块**（display 公式 / mermaid）上：CM6 原生 drop 只能取到块边界，
-       实测落在开围栏行首 ⇒ `三字$$` 把公式围栏挤坏、后续再配对吞正文。这里整块接管：把文本
-       作为**块后独立文本行**插入（围栏/代码块源码一字不动），光标放到插入文本尾。
-       【C14】经 mpDropMoveCheck 校验的同视图真实 MOVE：删源与插入选乘**同一事务**
-       （userEvent 'move.drop'，与 CM dropText 同语义），光标经实际 ChangeSet 映射到
-       插入文本末（冻结 M61：旧插入点 45 → 删源映射 42 → caret 45）。重叠形态按
-       预先登记的保守策略：安全消费、零文档改动、围栏不动、不做投机 copy。 */
-    if (!cell) {
-      const blockEl = event.target && event.target.closest
-        ? event.target.closest(".mp-cm6-math-block:not(.mp-cm6-math-live), .mp-mermaid") : null;
-      if (blockEl) {
-        let dtText = "";
-        try { dtText = event.dataTransfer ? (event.dataTransfer.getData("text/plain") || "") : ""; } catch { return false; }
-        const dtRaw = dtText;   /* C14：归一化前的精确 RAW 载荷，仅供 move 校验 */
-        dtText = dtText.replace(/\r?\n+/g, " ").trim();
-        if (!dtText) return false;
-        event.preventDefault();
-        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-        let block = null;
-        if (blockEl.classList.contains("mp-mermaid")) {
-          const blocks = view.state.field(mermaidBlocksField, false) || [];
-          block = blocks.find((b) => pos != null && b.from - 1 <= pos && pos <= b.to + 1) || null;
-        } else {
-          const spans = view.state.field(mathSpansField, false)?.spans || [];
-          const s = spans.find((s) => s.display && pos != null && s.from - 1 <= pos && pos <= s.to + 1);
-          block = s ? { from: s.from, to: s.to } : null;
-        }
-        if (!block) { view.focus(); return true; }
-        const closeLine = view.state.doc.lineAt(block.to);
-        const nextLine = closeLine.number < view.state.doc.lines ? view.state.doc.line(closeLine.number + 1) : null;
-        const blankNext = !!(nextLine && !nextLine.text.trim());
-        const insFrom = blankNext ? nextLine.from : closeLine.to;
-        const insText = blankNext ? dtText : "\n" + dtText;
-        const moveCheck = mpDropMoveCheck(view, event, src, dtRaw);
-        const srcOutsideBlock = !!(moveCheck.move && src && (src.to < block.from || src.from > block.to));
-        const insOutsideSrc = !!(moveCheck.move && src && (insFrom <= src.from || insFrom >= src.to));
-        if (moveCheck.move && !(srcOutsideBlock && insOutsideSrc)) {
-          /* 保守拒绝（预先登记，测试前决定）：源与受保护块重叠或插入点落在源内 ⇒
-           * 安全消费、零文档改动、围栏一字不动；反馈只走既有 extras toast 通道（存在才用）。 */
-          try { window.mpExtras && window.mpExtras.toast && window.mpExtras.toast("移动与块/源重叠，已保守拒绝"); } catch { /* 静默消费 */ }
-          return true;
-        }
-        const specs = [{ from: insFrom, insert: insText }];
-        if (moveCheck.move && src) specs.push({ from: src.from, to: src.to });
-        specs.sort((a, b) => a.from - b.from);
-        const changes = view.state.changes(specs);
-        const caret = changes.mapPos(insFrom, 1);
-        view.dispatch({ changes, selection: EditorSelection.cursor(caret), userEvent: moveCheck.move ? "move.drop" : "input.drop" });
-        view.focus();
-        return true;
-      }
-    }
-    if (!cell || !event.dataTransfer) return false;
-    const rowFrom = Number(cell.dataset.mpRow);
-    const col = Number(cell.dataset.mpCol);
-    if (!Number.isFinite(rowFrom) || !Number.isFinite(col)) return false;
-    let text = "";
-    try { text = event.dataTransfer.getData("text/plain") || ""; } catch { return false; }
-    const rawText = text;   /* C14：格内归一化/管道转义之前的精确 RAW 载荷，仅供 move 校验 */
-    /* 格内不能有换行：换行会把表行劈成两行（实测 | b1 … 换行 | b2 |）。 */
-    text = text.replace(/\r?\n+/g, " ");
-    /* 【#59】拖入文本里的 `|` 是**格内字面量**，必须按格源编码转义成 `\|`：裸管道会当场把表行劈成
-       多列（实测 `| a1 | a2 |b文字|`，表从 2 列变 3 列）。粘贴/覆盖层通道早已走 encodeCellText，拖放漏了。 */
-    text = encodeCellText(text);
-    const line = view.state.doc.lineAt(rowFrom);
-    const ranges = cellRangesOf(line);
-    if (!ranges.length) return false;
-    const r = ranges[Math.min(Math.max(0, col), ranges.length - 1)];
-    if (!r) return false;
-    event.preventDefault();
-    const specs = [{ from: r[1], insert: text }];
-    /* C14：删除资格改为共享只读校验（同视图/doc/epoch/界内/源文本/RAW 载荷逐字 +
-     * effectAllowed 允许 move + 实际 dragMovesSelection facet 语义）——实测捕获相
-     * dropEffect=none 而最终 dragend=move，旧口径把真实 MOVE 当 copy。Ctrl=copy 保持保源。 */
-    const moveCheck = mpDropMoveCheck(view, event, src, rawText);
-    const isMove = moveCheck.move;
-    if (isMove && src && (src.to <= r[1] || src.from >= r[1])) specs.push({ from: src.from, to: src.to });
-    specs.sort((a, b) => a.from - b.from);
-    const changes = view.state.changes(specs);
-    const caret = changes.mapPos(r[1], 1);
-    const tr = view.state.update({ changes, selection: EditorSelection.cursor(caret), userEvent: "input.table" });
-    view.dispatch(tr);
-    /* 【#57】收场选区必须用事务后的映射位置：旧写法 `anchor: r[1] + text.length` 在 move 形态下没扣掉
-       拖源删除量 ⇒ 文末表格末格抛 "Selection points outside of document"（整次拖放无效）、非末格 caret
-       右偏拖源长度（接着打字写进隔壁格）。另外表格行是 block widget，状态选区落在格内**没有可显示的
-       DOM caret**，键入会跑到表外 ⇒ 与点格/IME 同路径：立活动格并打开格覆盖层，caret 落在插入文本尾。 */
-    const newRowFrom = tr.changes.mapPos(rowFrom, 1);
-    const newLine = tr.state.doc.lineAt(newRowFrom);
-    const newRanges = cellRangesOf(newLine);
-    const nr = newRanges[Math.min(Math.max(0, col), newRanges.length - 1)];
-    view.dispatch({ effects: [setActiveCell.of({ rowFrom: newRowFrom, col }), setTableSel.of(null)] });
-    /* activateCellOverlay 自己会把焦点给覆盖层；**不要再 view.focus()** —— 覆盖层 blur 处理器
-       （cellEdit && !navigating ⇒ setActiveCell(null)+收起）会当场把刚开的输入框关掉（实测）。 */
-    if (nr) activateCellOverlay(newRowFrom, col, newRanges.length, nr[0], nr[1], Math.max(0, caret - nr[0]));
-    else view.focus();
+    beginCellPointerSelection(event, view);
     return true;
   },
 });
@@ -3686,6 +3802,7 @@ class ImageWidget extends WidgetType {
     mpImgNodeEpoch.set(img, assetEpoch);
     const retaining = previous && img !== previous && previous.complete && previous.naturalWidth > 0 ? previous : null;
     if (retaining) img.classList.add('mp-img-pending');
+    else if (previous && img !== previous) previous.remove();
     img.alt = this.alt;
     img.title = this.title;
     if (this.width) img.setAttribute("width", this.width); else img.removeAttribute('width');
@@ -4035,12 +4152,37 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
     // 包裹件本身不替换内容（只 replace 两侧定界符），所以"**加粗里裹着行内公式**"不是冲突。
     // 旧判据拿整个 [a,b] 去测数学重叠 ⇒ `称为 $X$ **诱导的 $\sigma$-域（$\sigma$-field …）**。`
     // 这种最常见写法整对被拒 ⇒ 星号原样露出（实测：正文行 127）。
+    let sharedFormats;
+    const inlineFormats = () => {
+      if (sharedFormats === undefined) {
+        try {
+          let source = c;
+          if (source.includes('$')) {
+            const masked = source.replaceAll('$', '%').split('');
+            for (const span of rangesTouching(mathSpans, base, base + c.length))
+              masked.fill('%', Math.max(0, span.from - base), Math.min(c.length, span.to - base));
+            source = masked.join('');
+          }
+          const spans = inlineEmphasisSpans(source);
+          sharedFormats = {
+            strong: new Set(spans.filter(span => span.width === 2).map(span => span.from + ':' + span.to)),
+            emphasis: spans.filter(span => span.width === 1),
+          };
+        } catch { sharedFormats = { strong: new Set(), emphasis: [] }; }
+      }
+      return sharedFormats;
+    };
+    const ownsSharedStrong = (from, to) => inlineFormats().strong.has(from + ':' + to);
     const scan = (re, width, hideTail, nest, openLen, closeLen, pureFormat) => {
       if (huge) return;   // 【长行护栏】巨行只做图片扫描
       let m;
       re.lastIndex = 0;
       while ((m = re.exec(c))) {
-        const [a, b] = [m.index, m.index + m[0].length];
+        let a = m.index;
+        const b = m.index + m[0].length;
+        const shiftedStrong = pureFormat === 'strong' && width === 2 && c[a + 2] === '*' &&
+          a > 0 && c[a - 1] !== '*' && !/\s/.test(c[a - 1]) && ownsSharedStrong(a + 1, b);
+        if (shiftedStrong) a++;
         /* 【开/闭标记长度可以不等·2026-10-11 实测缺陷】原实现只有**一个** `width` ✗ ——
            对 `**`/`~~`/`__`（开闭都是 2）够用 ✓，但 `<u>…</u>` 是 **3 与 4** ✗
            ⇒ 开标签只隐掉前 2 个字符（`<u` ✓、`>` 留在屏幕上 ✗）、收标签只隐掉末 2 个（`u>` ✓、`</` 留着 ✗）。
@@ -4051,11 +4193,11 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
         const hides = hideTail
           ? [[a, a + 1], [c.indexOf("]", a), b]]
           : [[a, a + oL], [b - cL, b]];
-        if (!hides.every(([x, y]) => x >= 0 && y > x && free(x, y, nest === true))) { re.lastIndex = m.index + 1; continue; }
+        if (!hides.every(([x, y]) => x >= 0 && y > x && !(nest === true && inCodeSpan(x, y)) && free(x, y, nest === true))) { re.lastIndex = m.index + 1; continue; }
         push(a, b, hides);
-        // Preserve mixed star runs and code-line ownership; protect only plain double-star edges.
-        const strongEdge = pureFormat === 'strong' && width === 2 && c[a] === '*' && !codeSpans.length &&
-          c[a - 1] !== '*' && c[a + 2] !== '*' && c[b - 3] !== '*' && c[b] !== '*' ? 2 : 0;
+        const strongEdge = pureFormat === 'strong' && c[a] === '*' &&
+          (shiftedStrong || c[a - 1] !== '*' && c[b] !== '*' &&
+            (width === 3 || width === 2 && c[a + 2] !== '*' && c[b - 3] !== '*')) ? width : 0;
         const record = take(a, b, strongEdge);
         if (pureFormat) pureFormats.add(record);
       }
@@ -4138,6 +4280,19 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
      *  放在最后扫：链接/代码已占位，避免互相啃。 */
     scan(/<([A-Za-z][A-Za-z0-9+.-]{1,31}:[^<>\s]*)>/g, 1);
     scan(/\*[^*\n]+\*/g, 1, false, true);          // 斜体（最后扫：避免啃粗体内部；nest=true 才能落在粗体里）
+    if (!huge && c.includes('**') && /(^|[^*])\*(?!\*)/.test(c)) {
+      for (const span of inlineFormats().emphasis) {
+        const a = span.from, b = span.to;
+        if (!c.slice(a + 1, b - 1).includes('**')) continue;
+        if (consumed.some(([x, y]) => a < y && b > x &&
+            !(a < x && b > y || a > x && b < y))) continue;
+        const hides = [[a, a + 1], [b - 1, b]];
+        if (!hides.every(([x, y]) => !inCodeSpan(x, y) && free(x, y, true))) continue;
+        push(a, b, hides);
+        take(a, b, 1);
+      }
+    }
+
   }
   return marks;
 }
@@ -6241,6 +6396,100 @@ const commands = createCommandContext({
 // A checkpoint owns the exact CM state, including history and region epoch.
 // Its lifetime is one synchronous turn, so a delayed reply cannot restore over
 // subsequent user input. Command intent serials and allocated epochs never rewind.
+// Reading reflow keeps the same source paragraph and its fractional viewport
+// position. The synchronous CSS/readonly turn may invalidate geometry itself;
+// only that turn may arm a ticket. Later user intent always cancels restoration.
+let readingAnchorTicket = null;
+const readingAnchorMeasureKey = {};
+function readingParagraphBox(target, from, to) {
+  try {
+  const at = target.domAtPos(from);
+  const node = at.node.nodeType === 1 ? at.node : at.node.parentElement;
+  const element = node?.closest('.cm-line');
+  if (!element || !target.contentDOM.contains(element)) return null;
+  const line = target.state.doc.lineAt(target.posAtDOM(element, 0));
+  if (line.from !== from || line.to !== to) return null;
+  const box = element.getBoundingClientRect();
+  return box.height > 0 && box.width > 0 ? box : null;
+  } catch { return null; }
+}
+/* Reading source intent: the original logical source selection plus its live
+ * read-only projection and the intent serial; consumed only by a real exit. */
+let readingSourceIntent = null;
+function captureReadingAnchor(on) {
+  if ((document.documentElement.dataset.mpReading === '1') === !!on) return null;
+  return captureParagraphAnchor(on);
+}
+function captureParagraphAnchor(on) {
+  const target = view;
+  if (!target || target.composing || cellComposing) return null;
+  try {
+    const sc = target.scrollDOM, rect = sc.getBoundingClientRect();
+    const scale = rect.height / sc.offsetHeight;
+    if (!(Number.isFinite(scale) && scale > 0)) return null;
+    const y = rect.top + sc.clientHeight * .30 * scale;
+    const pos = target.posAtCoords({ x: rect.left + 4, y });
+    if (pos == null) return null;
+    const line = target.state.doc.lineAt(pos), box = readingParagraphBox(target, line.from, line.to);
+    if (!box) return null;
+    const fraction = (y - box.top) / box.height;
+    if (!Number.isFinite(fraction) || fraction < 0 || fraction > 1) return null;
+    const ticket = readingAnchorTicket = { target, doc: target.state.doc,
+      selection: target.state.selection, epoch: target.state.field(regionIndexField).epoch,
+      revision: sourceRevision, from: line.from, to: line.to, fraction, on: !!on,
+      canArm: true, armed: false };
+    queueMicrotask(() => {
+      ticket.canArm = false;
+      if (readingAnchorTicket === ticket && !ticket.armed) readingAnchorTicket = null;
+    });
+    return ticket;
+  } catch { return null; }
+}
+function restoreReadingAnchor(ticket) {
+  const target = view;
+  const sameSource = () => readingAnchorTicket === ticket && view === ticket.target &&
+    target.dom.isConnected && target.state.doc === ticket.doc &&
+    target.state.selection.eq(ticket.selection) && sourceRevision === ticket.revision &&
+    target.state.field(regionIndexField).epoch === ticket.epoch &&
+    (document.documentElement.dataset.mpReading === '1') === ticket.on &&
+    target.state.readOnly === ticket.on;
+  if (!ticket || !ticket.canArm || !target || !sameSource()) return;
+  // Arm after our synchronous theme/font and readonly effects, never after await.
+  ticket.canArm = false; ticket.armed = true;
+  const serial = commands.serial(), viewportSerial = viewportIntent.serial(target);
+  const valid = () => sameSource() && commands.serial() === serial &&
+    viewportIntent.serial(target) === viewportSerial;
+  const finish = () => { if (readingAnchorTicket === ticket) readingAnchorTicket = null; };
+  let remaining = 3;
+  const measure = () => {
+    if (!valid()) { finish(); return; }
+    target.requestMeasure({ key: readingAnchorMeasureKey,
+      read() {
+        if (!valid()) return null;
+        const sc = target.scrollDOM, rect = sc.getBoundingClientRect();
+        const scale = rect.height / sc.offsetHeight;
+        if (!(Number.isFinite(scale) && scale > 0)) return null;
+        const box = readingParagraphBox(target, ticket.from, ticket.to);
+        if (!box) return { retry: true };
+        const delta = (box.top + ticket.fraction * box.height -
+          (rect.top + sc.clientHeight * .30 * scale)) / scale;
+        const top = sc.scrollTop + delta, max = Math.max(0, sc.scrollHeight - sc.clientHeight);
+        return Number.isFinite(top) && top >= 0 && top <= max ? { top } : null;
+      },
+      write(value) {
+        if (!value || !valid()) { finish(); return; }
+        // CM compensates its scroll anchor after measure.write; own only the tail.
+        queueMicrotask(() => {
+          if (!valid()) { finish(); return; }
+          if (!value.retry) target.scrollDOM.scrollTop = value.top;
+          if (--remaining > 0) measure(); else finish();
+        });
+      },
+    });
+  };
+  measure();
+}
+
 const checkpointViewportMeasureKey = {};
 // Restore the checkpoint viewport after CM's whole measure tail (scroll-anchor
 // compensation runs after requestMeasure.write). One microtask, no dispatch/timer/align.
@@ -6704,6 +6953,8 @@ function boot(content) {
         imgPreviewField,       // 【图片】资源代次变化时让 retained/inline 图片重建
         imageAtomicRanges, // 【图片】长 data URI 的图当原子区间（方向键整块跳过）
         tableDecorations, // 表格投影：Excel 式格内编辑；无格归属的 separator 原生选区显示源码
+        cellBackgroundClick,
+        editorContentDragDisabled,
         tableCellClick,
         searchCellFocus,
         extrasCompartment.of([]),
@@ -6729,6 +6980,29 @@ function boot(content) {
         EditorView.updateListener.of((u) => {
           if (u.docChanged) sourceRevision++;
           commands.changed(u);
+          /* Reading source intent: identity staleness first, then intent-serial
+           * staleness on explicit selection transactions, then the projection
+           * rule — a read-only DOM readback (exact userEvent 'select', same
+           * serial, no doc change, read-only throughout) only updates the
+           * projection; any other selection movement clears the intent. */
+          if (readingSourceIntent) {
+            const snap = readingSourceIntent;
+            const identityOk = snap.view === u.view && u.state.doc === snap.doc &&
+              u.state.field(regionIndexField, false)?.epoch === snap.epoch;
+            if (!identityOk) readingSourceIntent = null;
+            else {
+              const explicitSelection = u.transactions.some(tr => tr.selection != null);
+              if (explicitSelection && commands.serial() !== snap.intentSerial) readingSourceIntent = null;
+              else if (!u.state.selection.eq(snap.projectedSelection)) {
+                const readOnlyProjection = commands.serial() === snap.intentSerial &&
+                  !!u.startState.readOnly && !!u.state.readOnly &&
+                  u.transactions.every(tr => !tr.docChanged && !!tr.startState.readOnly && !!tr.state.readOnly &&
+                    (tr.selection == null || tr.annotation(Transaction.userEvent) === 'select'));
+                if (readOnlyProjection) snap.projectedSelection = u.state.selection;
+                else readingSourceIntent = null;
+              }
+            }
+          }
           for (const tr of u.transactions) if (tr.isUserEvent('select.vertical')) verticalIntentDiag.custom++;
           if (u.transactions.some(tr => tr.docChanged || (tr.selection &&
             !tr.isUserEvent('select.vertical') && !tr.annotation(verticalSelection)))) {
@@ -6744,29 +7018,21 @@ function boot(content) {
               else post("change", { len: u.state.doc.length, ...window.mpEngine?.documentSession() });
             }
           }
-          /* 【#62-U2R-3】覆盖层打开时文档被外部路径改写（位图粘贴异步 commit 等）⇒ 把镜像区间与
-             活动格位置跟着事务映射，否则下一次键入会写进旧区间（数据破坏，实测把表头写成
-             `a1 Z1 | H2 |`）。映射只动位置、不写文档；活动格效果用微任务派发，避免在 update 里重入。 */
+          // activeCellField already maps the row in the current state. Derive the
+          // cell boundaries from that row once: mapping the old start with +1
+          // would move it into text inserted at the beginning of this cell.
+          // Keep the mirrored text unchanged so external edits still trigger
+          // syncCellEdit's stale-content guard before any write back.
+          if (u.geometryChanged) scheduleCellOverlay();
           if (u.docChanged && cellEdit) {
-            try {
-              const nf = u.changes.mapPos(cellEdit.from, 1);
-              const nt = u.changes.mapPos(cellEdit.to, -1);
-              if (nf !== cellEdit.from || nt !== cellEdit.to) { cellEdit.from = nf; cellEdit.to = nt; }
-              const active = u.state.field(activeCellField, false);
-              if (active) {
-                const nr = u.changes.mapPos(active.rowFrom, 1);
-                if (nr !== active.rowFrom) {
-                  const stamp = active;
-                  queueMicrotask(() => {
-                    try {
-                      if (!view) return;
-                      const cur = view.state.field(activeCellField, false);
-                      if (cur && cur === stamp) view.dispatch({ effects: setActiveCell.of({ rowFrom: nr, col: cur.col }) });
-                    } catch { /* 视图已换文档 */ }
-                  });
-                }
-              }
-            } catch { /* 映射失败不阻塞主流程 */ }
+            const active = u.state.field(activeCellField, false);
+            if (active) {
+              const line = u.state.doc.lineAt(active.rowFrom);
+              const ranges = line.from === active.rowFrom ? cellRangesOf(line) : [];
+              const range = ranges[active.col];
+              if (range) Object.assign(cellEdit, { from: range[0], to: range[1],
+                rowFrom: active.rowFrom, col: active.col, cols: ranges.length });
+            }
           }
           // 双开（形态 B）状态转发：从视图只读镜像主视图文档。分屏关闭时 mirror() 第一行返回
           //（零成本）；开着时按 Text 对象同一性判脏，纯选区/几何更新不做任何工作。
@@ -6939,7 +7205,7 @@ function boot(content) {
   }, true);
   // 表格格编辑覆盖层随滚动重定位
   /* 【β2】滚动钩子合并：先覆盖层、再表格工具栏（监听器数量不变，rAF 数量不增）。 */
-  view.scrollDOM.addEventListener("scroll", () => { scheduleCellOverlay(); positionTableBar(); }, { passive: true });
+  view.scrollDOM.addEventListener("scroll", () => { positionTableBar(); }, { passive: true });
   /* Ctrl+滚轮 ＝ 内容缩放（Typora/v2.3.3 同款手感）：只在指针位于**编辑面**内时接管，
      按 10% 一档、与快捷键共用同一个 setter；`passive:false` 才能 preventDefault 掉页面缩放。
      注意方向：deltaY < 0（向上滚）＝放大。 */
@@ -6984,8 +7250,10 @@ function boot(content) {
       return { blocks, math, inline, styles, mermaid: fresh ? scanMermaidBlocks(state.doc,blocks) : state.field(mermaidBlocksField) };
     },
     _view: () => view, // 调试/取证通道
+    __tableWidths: () => ({ geometryVersion: mathGeometryVersion, groups: inspectTableWidths(view) }),
     __cellLayout: () => ({ active: view.state.field(activeCellField),
       owner: cellEdit && { rowFrom: cellEdit.rowFrom, col: cellEdit.col, epoch: cellEdit.epoch },
+      nativeDragDiagnostic: null,
       matched: !!activeCellDOM(), sizer: !!activeCellDOM()?.querySelector('.mp-cell-source-size') }),
     __regions: () => {
       const index = view.state.field(regionIndexField);
@@ -7056,14 +7324,59 @@ function boot(content) {
       return { anchor: r.anchor, head: r.head, selected: view.state.doc.sliceString(Math.min(r.anchor, r.head), Math.max(r.anchor, r.head)) };
     },
     /* 阅读模式：真只读（readOnly + 不可编辑），选区与复制仍可用。 */
-    setReadingMode: (on) => {
+    captureReadingAnchor,
+    setReadingMode: (on, anchor = null) => {
       if (!view) return false;
       /* 【#26】进阅读态先收场活动格覆盖层：它是 body 级 contenteditable，不会跟着 readOnly 失效。 */
       if (on) { try { deactivateCellOverlay(); } catch { /* 覆盖层可能还没建 */ } }
       try {
-        view.dispatch({ effects: readingCompartment.reconfigure(on ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []) });
+        if (on) {
+          /* Every real entry re-binds the intent to the current state (or null);
+           * theme/palette re-entry cannot keep a stale value alive. */
+          if (!view.state.readOnly) {
+            const source = view.state.field(tableSourceRangeField, false);
+            readingSourceIntent = source ? { view, doc: view.state.doc,
+              epoch: view.state.field(regionIndexField).epoch, selection: view.state.selection,
+              projectedSelection: view.state.selection, intentSerial: commands.serial() } : null;
+          }
+          /* Entering reading clears the table selection in the same reconfigure
+           * transaction; activeCellField owns the active-cell clear. */
+          view.dispatch({ effects: [readingCompartment.reconfigure([EditorState.readOnly.of(true), EditorView.editable.of(false)]), setTableSel.of(null)] });
+        } else {
+          /* Only a real read-only exit consumes the intent; an equal selection is
+           * carried in the same transaction when the recorded world still matches,
+           * otherwise a pure reconfigure with no selection change. */
+          const realExit = view.state.readOnly;
+          const snap = realExit ? readingSourceIntent : null;
+          if (realExit) readingSourceIntent = null;
+          const carry = snap && snap.view === view && view.state.doc === snap.doc &&
+            view.state.field(regionIndexField, false)?.epoch === snap.epoch &&
+            view.state.selection.eq(snap.projectedSelection);
+          view.dispatch(carry
+            ? { effects: [readingCompartment.reconfigure([])], selection: snap.selection }
+            : { effects: [readingCompartment.reconfigure([])] });
+        }
+        if (anchor) restoreReadingAnchor(anchor);
         return true;
       } catch { return false; }
+    },
+    /* Native Edit→Select All intent hook (Windows fixed menu id): records intent
+     * only — invalidates the command serial and drops the reading source intent
+     * when focus belongs to the editor surface (main editor, active cell, or the
+     * page body with no external input focused); keeps the intent while an
+     * external input (search/settings) holds focus so selecting there never loses
+     * the editor's source position on reading exit. No dispatch, no focus grab,
+     * no text/history change — Chromium still performs the native action. */
+    beforeNativeSelectAll: () => {
+      if (!view) return false;
+      commands.invalidate();
+      if (readingSourceIntent) {
+        const ae = document.activeElement;
+        const editorFocus = !ae || ae === document.body || ae === document.documentElement ||
+          view.contentDOM.contains(ae) || (cellOverlay && cellOverlay.contains(ae));
+        if (editorFocus) readingSourceIntent = null;
+      }
+      return true;
     },
     checkpointDocument,
     replaceDocument: (text) => {
@@ -7092,6 +7405,9 @@ function boot(content) {
       suppressChange = true;
       try { view.setState(fresh); }
       finally { suppressChange = false; }
+      /* A replaced document invalidates any source intent (setState skips the
+       * updateListener). */
+      readingSourceIntent = null;
       /* 【#47·2026-10-18 实测缺陷 NX2】setState 是整状态替换，不会触发 updateListener ⇒ 换文档后
          大纲仍是旧文档的条目（改短文档时点陈旧条目直接抛 Selection points outside of document）。
          这里显式让扩展重建已打开的大纲。 */
@@ -7182,6 +7498,11 @@ function boot(content) {
     selectSource: pos => commands.run(() => {
       view.dispatch({ selection: { anchor: pos }, scrollIntoView: true, userEvent: 'select.pointer' });
       if (!activateSourceCellSelection(view)) view.focus();
+      /* Explicit split source navigation re-binds the intent after its dispatch;
+       * ordinary read-only clicks never reach this. */
+      if (view.state.readOnly) readingSourceIntent = { view, doc: view.state.doc,
+        epoch: view.state.field(regionIndexField).epoch, selection: view.state.selection,
+        projectedSelection: view.state.selection, intentSerial: commands.serial() };
     }, { focus: 'control' }),
     intentSerial: commands.serial,
     focusSelection: activateSourceCellSelection });

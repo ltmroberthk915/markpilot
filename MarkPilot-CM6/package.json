@@ -1,7 +1,7 @@
 {
   "name": "markpilot-cm6",
   "productName": "MarkPilot",
-  "version": "3.5.4",
+  "version": "3.5.9",
   "description": "MarkPilot — Typora 手感的即时渲染 Markdown 编辑器（独立桌面版）",
   "license": "MIT",
   "author": "jinxi",
@@ -15,7 +15,7 @@
     "dist:fresh": "node scripts/dist-fresh.cjs"
   },
   "devDependencies": {
-    "electron": "^33.0.0",
+    "electron": "44.9.3",
     "electron-builder": "^25.0.0"
   },
   "build": {

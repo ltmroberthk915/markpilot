@@ -234,3 +234,32 @@ Autosave liveness: autosave-liveness-model.cjs extracts the actual host function
 ### Table geometry and rich-document viewport budget (3.3.7)
 
 `table-scroll-workflows.cjs` uses seven synthetic native-input cases: three zoomed cell handoffs with paint-only invalidation, source/history and independent save checks; block height units; a tall atomic formula with document-budget restoration through undo; identical formula owner isolation; and automatic drag selection across screens with reversal, release, and Shift-key continuation. `tests/table-geometry.test.cjs` extracts the actual geometry and state-field code. `tests/viewport-budget.test.cjs` verifies the pinned maintained view and default/finite bounds. `build-check.cjs` requires one view and one state module.
+
+
+## Save As 文件目标边界（真实文件系统）
+
+`save-target-boundary-workflows.cjs` 直接调用指定产品目录中的真实 `DocumentStore` 和 `prepareSaveAsAssets`，在自己创建的 Markdown、图片和链接夹具上验证保存目标。它不启动 Electron，不占 app-slot，也不计作 GUI 验收。
+
+```powershell
+node tools/quality/save-target-boundary-workflows.cjs --product "C:/workspace/markpilot/MarkPilot-CM6" --out "C:/workspace/markpilot/.mp-verify/save-target-001"
+```
+
+两个参数都必须使用绝对路径。`--out` 必须尚不存在，父目录必须已存在，且输出目录不能包含产品目录或位于产品目录内。工具保留夹具、原始错误和 `receipt.json`，记录实际产品目录、两个真实模块的 SHA256、回执、文件字节哈希和 mtime。不会清理既有目录、递归删除文件或修改系统权限。
+
+| ID（数字别名） | 判据 |
+| --- | --- |
+| `same_directory_alias`（`1`） | 通过目录 junction/dir symlink 别名向同一目录另存，`copied=0/reused=0`；图片字节和 mtime 不变；MD 回执及会话路径等于 canonical 目标。 |
+| `file_symlink_target`（`2`） | 末级文件 symlink 指向另一目录时，MD 和相对图片均落在实际目标目录；源文件、图片及 symlink 保留。 |
+| `parent_alias_retarget`（`3`） | 原选目标父链接在 prepare hook 期间改向，MD 必须拒绝，两侧竞争图片保真；允许原 canonical 目录保留已发布图片，改向后的未获许可目录不能新增图片。 |
+
+`MP_QUALITY_CASES` 使用完整 ID 或数字的精确列表，以逗号、空白、分号或竖线分隔；此工具不采用其他工作流常用的正则筛选。未知 ID、重复 ID 或零选中均失败。例如：
+
+```powershell
+$env:MP_QUALITY_CASES='same_directory_alias,parent_alias_retarget'
+node tools/quality/save-target-boundary-workflows.cjs --product "C:/workspace/markpilot/MarkPilot-CM6" --out "C:/workspace/markpilot/.mp-verify/save-target-002"
+Remove-Item Env:\MP_QUALITY_CASES
+```
+
+每臂独立保留结果，前一臂失败不阻止后续臂。文件 symlink 无权限或平台不支持时，记录 `entry_unconfirmed`、保留原始 `cause.code`，整体 `passed=false` 且退出码为1；不能把该入口记为通过。工具不会提权或调整 OS 设置。`fullSuite` 仅表示三个 ID 都被选中；只有 `passed=true` 且三臂均为 `pass` 才能宣称三条边界全部得到验证。筛选后的通过只覆盖已选择的臂。
+
+该工作流独立于 `npm test` 的核心单元测试。`npm run save-target-boundary --prefix tools/quality -- --product <绝对产品目录> --out <不存在的绝对目录>` 等价于直接运行上述 CLI。导入模块不会自动运行夹具，私有包装器如需执行，必须显式调用导出的 `main()`；每次使用独立 Node 进程及新输出目录。

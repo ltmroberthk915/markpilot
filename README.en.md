@@ -1,3 +1,13 @@
+## MarkPilot 3.5.5 · Windows
+
+Source pane navigation stays aligned when zooming. Returning from a table cell to body text preserves the rendered table. Saving also works from deeper installation folders, and closing waits for saves already in progress.
+
+Short table cells wrap less often as column widths adapt to the available space. Press and drag in a cell to select immediately, with smoother forward, reverse, and Shift selection.
+
+Emphasis formatting, rich image paste, and preferences across windows are more reliable. Reading mode and page layout changes preserve your reading position more consistently.
+
+**[Download installer](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.5/markpilot-Setup-3.5.5.exe)** · **[Download portable](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.5/markpilot-3.5.5-portable.exe)** · [Release notes](docs/RELEASE-3.5.5.md)
+
 ## MarkPilot 3.5.4 · Windows
 
 Choose “Paste as plain text” (Ctrl+Shift+V) from the body context menu to keep text, tabs and line breaks. Table menus and row insertion in the split source pane follow the clicked content.

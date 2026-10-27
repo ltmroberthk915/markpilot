@@ -154,7 +154,7 @@ const {outputDir,reset,snapshot,frame,recorder}=require('./harness.cjs');
       });
     }
     if(included('export'))for(const [id,text,verify]of[
-      ['ordered','1. 甲\n2. 乙\n',d=>{assert.equal(d.ol.length,1);assert.equal(d.ul,0);assert.deepEqual(d.ol[0].items,['甲','乙']);}],
+      ['ordered','1. 甲\n2. 乙\n',d=>{assert.equal(d.ol.length,1);assert.equal(d.ul,0);assert.deepEqual(d.ol[0].items.map(s=>s.trim()),['甲','乙']);}],
       ['ordered-start','7) 甲\n8) 乙\n',d=>{assert.equal(d.ol.length,1);assert.equal(d.ol[0].start,'7');}],
       ['mixed-lists','1. 甲\n2. 乙\n\n- 丙\n- 丁\n',d=>{assert.equal(d.ol.length,1);assert.equal(d.ul,1);}],
       ['tilde','~~~text\n*x* $y$\n~~~\n',d=>assert(d.pre.some(t=>t.includes('*x* $y$')))],

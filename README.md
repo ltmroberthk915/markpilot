@@ -1,3 +1,13 @@
+## MarkPilot 3.5.5 · Windows
+
+源码分屏在页面缩放后保持更稳定的定位；从单元格回到正文编辑时，表格保持完整。较深的安装目录也能正常保存，退出时会等待已开始的保存完成。
+
+表格短内容列更少出现不必要的换行，页面缩放后依然便于阅读。单元格按住鼠标即可直接拖选，正反向选择与 Shift 扩选更连贯。
+
+强调格式、图文粘贴与多窗口偏好同步更稳定；切换阅读模式或调整页面布局时，更好地保留阅读位置。
+
+**[下载安装版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.5/markpilot-Setup-3.5.5.exe)** · **[下载便携版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.5.5/markpilot-3.5.5-portable.exe)** · [更新说明](docs/RELEASE-3.5.5.md)
+
 ## MarkPilot 3.5.4 · Windows
 
 正文右键菜单加入“纯文本粘贴 Ctrl+Shift+V”，可直接粘贴文字、制表符与换行。源码分屏中的表格菜单和插行位置随点击内容正确定位。

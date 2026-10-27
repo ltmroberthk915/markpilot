@@ -131,6 +131,7 @@ contextBridge.exposeInMainWorld('mpHost', {
   /* 右键菜单的「粘贴」：交给主进程执行（渲染进程的 execCommand('paste') 在 Electron 里不可靠）。 */
   paste: () => ipcRenderer.invoke('edit:paste'),
   history: (cmd) => ipcRenderer.invoke('edit:history', cmd),
+  selectAll: () => ipcRenderer.invoke('edit:selectAll'),
   themeGet: () => ipcRenderer.invoke('theme:get'),
   themeSet: (mode) => ipcRenderer.invoke('theme:set', mode),
   /* Typora 社区主题：选一个 .css（默认落在 Typora 的主题目录）⇒ 读回全文交给渲染侧改写与注入。

@@ -2,6 +2,8 @@
 // 纪律：**引擎一行不改**——渲染进程加载的是 dsh-markpilot 的 CM6 bundle（scripts/sync-engine.mjs 只读同步），
 // 壳只负责：窗口 / 文件读写（原子、保留 BOM 与行尾）/ 菜单 / 主题 / 外改探测 / 最近文件。
 'use strict';
+const pdfWorkerArgument=process.argv.find(a=>a.startsWith('--mp-pdf-worker='));
+if(pdfWorkerArgument){require('./shell/pdf-worker').run(pdfWorkerArgument.slice('--mp-pdf-worker='.length));return;}
 /* nativeImage 是「图片进剪贴板」的前置：普查实测漏了它 ⇒ 图片右键「复制图片」必然失败
    （nativeImage is not defined 被 try/catch 吞成 {ok:false}，用户看到"复制图片失败"）。 */
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell, nativeTheme, net, clipboard, nativeImage } = require('electron');
@@ -16,6 +18,7 @@ const appearance = new AppearanceStore(app.getPath('userData'));
 const exporter = require('./export-folder');
 // 「导出为 PDF」的打印层：从磁盘上的本地 HTML 打印（隐藏窗口 + printToPDF + 分片写盘），实现在 export-pdf.js
 const pdfExporter = require('./export-pdf');
+const pdfProcess = require('./shell/pdf-process');
 const { DocumentStore, createSession, failure } = require('./shell/document-store');
 const documents = new DocumentStore({
   prepareSaveAs: context => require('./shell/save-as-assets').prepareSaveAsAssets(context),
@@ -503,7 +506,13 @@ function buildMenu() {
         { label: '撤销', accelerator: 'CmdOrCtrl+Z', click: (_item, W) => send('menu', 'undo', activeWindow(W)) },
         { label: '重做', accelerator: 'CmdOrCtrl+Y', click: (_item, W) => send('menu', 'redo', activeWindow(W)) },
         { type: 'separator' },
-        { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' },
+        { role: 'cut' }, { role: 'copy' }, { role: 'paste' },
+        // Windows: fixed-id item so native Edit→Select All routes through
+        // send('menu','selectAll'); registerAccelerator:false keeps Chromium's
+        // own Ctrl+A semantics untouched. Other platforms keep the stock role.
+        ...(process.platform === 'win32'
+          ? [{ id: 'menu-select-all', label: '全选', accelerator: 'CmdOrCtrl+A', registerAccelerator: false, click: (_item, W) => send('menu', 'selectAll', activeWindow(W)) }]
+          : [{ role: 'selectAll' }]),
       ],
     },
     {
@@ -587,6 +596,7 @@ async function confirmReplace(S, W) {
 }
 
 const openTransactions = new Map();
+function pdfTargetHeld(file){return !!(file&&pdfActive?.publicationHeld&&documents.key(file)===pdfActive.outputKey);}
 const documentFields = Object.keys(createSession());
 async function rendererState(W, method, payload = null) {
   let timer;
@@ -603,6 +613,7 @@ ipcMain.on('doc:commit-open', (event, reply = {}) => {
   if (reply.phase === 'reject') { op.settle({ ok: false, code: 'MP_OPEN_NEWER_INPUT', error: '读取期间有新修改，已保留原文档' }); return event.returnValue = { ok: true }; }
   if (reply.phase === 'adopt') {
     if (!op.candidate || op.phase !== 'ready' || S.documentId !== op.origin || reply.documentId !== op.origin) return reject('MP_DOC_MISMATCH');
+    if(pdfTargetHeld(op.candidate.filePath))return reject('MP_EXPORT_TARGET');
     op.previous = Object.fromEntries(documentFields.map(key => [key, S[key]]));
     Object.assign(S, op.candidate, { pendingSaves: S.pendingSaves, loadRequest: S.loadRequest + 1 });
     // Once the renderer is applying a document, only its synchronous finish or
@@ -644,6 +655,7 @@ async function openPath(p, target = null) {   // 【文件多开·批 B2】targe
     if (!(await confirmReplace(S, W))) return { ok: false, canceled: true };
     await documents.pending(S);
     const candidate = createSession();
+    op.targetKey=documents.key(await documents.canonical(p));
     await documents.load(candidate, p);
     if (W.isDestroyed() || openTransactions.get(W.webContents.id) !== op || S.documentId !== op.origin) return { ok: false, code: 'MP_OPEN_STALE' };
     op.candidate = candidate; op.phase = 'ready';
@@ -754,6 +766,7 @@ async function openInNewWindow(filePath) {
     // Read before creating a renderer: an unreadable file leaves every existing
     // window intact and does not create an empty failed document.
     if (filePath) await readDoc(filePath, S);
+    if(pdfTargetHeld(S.filePath))throw failure('MP_EXPORT_TARGET','PDF 正在完成保存，请稍后打开此目标');
     const W = createWindow(S);          // 3a 已参数化：窗口与会话一一对应
     createdWindow = W;
     try { S.__tag = 'newwin-' + Date.now(); dbg('newwin:session', { tag: S.__tag, isPrimary: S === state, wcId: W.webContents.id }); } catch { }
@@ -780,6 +793,7 @@ async function openDocument(filePath) {
   try {
     if (typeof filePath !== 'string' || !filePath) throw failure('MP_BAD_PATH', '没有指定文件路径');
     const canonical = await documents.canonical(filePath), key = documents.key(canonical);
+    if(pdfTargetHeld(key))throw failure('MP_EXPORT_TARGET','PDF 正在完成保存，请稍后打开此目标');
     if (documentOpens.has(key)) return documentOpens.get(key);
     const job = (async () => {
       for (const W of BrowserWindow.getAllWindows()) {
@@ -972,6 +986,19 @@ try {
     if (initialError && process.env.MP_TEST_NO_DIALOG !== '1') void dialog.showMessageBox(win, { type: 'error', message: '打开失败', detail: initialError.message });
   });
   app.on('window-all-closed', () => app.quit());
+  // will-quit follows dirty-document confirmation; cancelling a close keeps saving available.
+  let workerQuitReady = false, workerQuitPromise = null;
+  app.on('will-quit', event => {
+    if (workerQuitReady) return;
+    event.preventDefault();
+    if (!workerQuitPromise) workerQuitPromise = Promise.all([
+      (async()=>{const s=pdfActive;if(s){if(!s.publishing){s.canceled=true;s.abort.abort();s.waiter.resolve({ok:false,canceled:true});}await s.finished.promise;}await pdfProcess.shutdownPdfWorkers();})(),
+      require('./shell/safe-file').shutdownFileWorker(),
+    ])
+      .then(results => { if (results[1]?.cleanupError) dbg('file-worker:cleanup-error', results[1]); })
+      .catch(error => dbg('file-worker:shutdown-error', String(error)))
+      .finally(() => { workerQuitReady = true; app.quit(); });
+  });
 }
 
 /* ── IPC：渲染进程（host.js）↔ 主进程 ── */
@@ -1473,6 +1500,14 @@ handle('edit:history', (e, cmd) => {
   try {
     const w = windowOf(e);
     w.webContents[cmd]();
+    return { ok: true };
+  } catch (err) { return { ok: false, error: String((err && err.message) || err) }; }
+});
+handle('edit:selectAll', e => {
+  try {
+    const w = windowOf(e);
+    if (!w) return { ok: false, error: "no-window" };
+    w.webContents.selectAll();
     return { ok: true };
   } catch (err) { return { ok: false, error: String((err && err.message) || err) }; }
 });
@@ -2075,10 +2110,10 @@ handle('export:pdf', async (e, opts = {}) => {
   const S = sessionOf(e.sender), W = windowOf(e), t0 = Date.now();
   if (pdfActive) return { ok: false, error: '已有一个 PDF 导出在进行中' };
   const stem = S.filePath ? path.basename(S.filePath, path.extname(S.filePath)) : '未命名';
-  const session = { id: 'pdf-' + process.pid + '-' + (++pdfSeq), owner: e.sender.id, documentId: S.documentId, canceled: false, waiter: deferred(), phases: [], dir: null, assetJobs: new Set(), htmlWriter: null };
+  const session = { id: 'pdf-' + process.pid + '-' + (++pdfSeq), owner: e.sender.id, documentId: S.documentId, canceled: false, waiter: deferred(), finished:deferred(),abort:new AbortController(),publishing:false,phases: [], dir: null, assetJobs: new Set(), htmlWriter: null };
   pdfActive = session; // Reserve before the first dialog or filesystem await.
   const progress = p => sendTo(W, 'export:progress', p);
-  const ownerClosed = () => { session.canceled = true; session.waiter.resolve({ ok: false, canceled: true }); };
+  const ownerClosed = () => { if(session.publishing)return;session.canceled = true;session.abort.abort();session.waiter.resolve({ ok: false, canceled: true }); };
   W.once('closed', ownerClosed);
   let dir = null, outFile = opts.outFile || process.env.MP_EXPORT_PDF || null, htmlTimer;
   const mem = pdfExporter.memorySampler(app, { intervalMs: 200 });
@@ -2094,7 +2129,9 @@ handle('export:pdf', async (e, opts = {}) => {
       await session.htmlWriter.abort({ remove: !process.env.MP_KEEP_STAGING });
     }
     if (process.env.MP_KEEP_STAGING) return;
-    await fsp.rm(target, { recursive: true, force: true });
+    // A terminated Windows print process may release its directory handle a
+    // moment after exit. Bound retries so a completed cancel stays a cancel.
+    await fsp.rm(target, { recursive: true, force: true, maxRetries: 5, retryDelay: 80 });
   };
   try {
     progress({ phase: 'pick' });
@@ -2107,7 +2144,15 @@ handle('export:pdf', async (e, opts = {}) => {
     if (session.canceled || S.documentId !== session.documentId) { progress({ phase: 'canceled' }); return { ok: false, canceled: true }; }
     outFile = path.resolve(outFile);
     const outputKey = documents.key(await documents.canonical(outFile));
-    for (const doc of sessions.values()) if (doc.filePath && documents.key(await documents.canonical(doc.filePath)) === outputKey) throw failure('MP_EXPORT_TARGET', 'PDF 不能覆盖正在编辑的文档，请选择其他路径');
+    session.outputKey=outputKey;
+    const validatePdfTarget=async()=>{
+      if(documents.key(await documents.canonical(outFile))!==outputKey)throw failure('MP_EXPORT_TARGET','PDF 保存位置已改变，请重新选择');
+      // DocumentStore only publishes canonical filePath values. Check without
+      // yielding while its target queue / short shared commit fence is held.
+      for(const doc of sessions.values())if(doc.filePath&&documents.key(doc.filePath)===outputKey)throw failure('MP_EXPORT_TARGET','PDF 不能覆盖正在编辑的文档，请选择其他路径');
+      if(documentOpens.has(outputKey)||[...openTransactions.values()].some(op=>op.targetKey===outputKey||op.candidate?.filePath&&documents.key(op.candidate.filePath)===outputKey))throw failure('MP_EXPORT_TARGET','该保存目标正在打开，PDF 未覆盖原文件');
+    };
+    await validatePdfTarget();
     await fsp.mkdir(path.dirname(outFile), { recursive: true });
     dir = await fsp.mkdtemp(path.join(app.getPath('temp'), 'markpilot-pdf-')); session.dir = dir;
     mem.start();
@@ -2137,8 +2182,10 @@ handle('export:pdf', async (e, opts = {}) => {
     const extraCss = engineCss;
     session.mathCssSource = engineCss ? 'engine' : 'none';
     dbg('export:pdf:mathCss', { source: session.mathCssSource, bytes: extraCss.length });
-    const r = await pdfExporter.printLocalHtmlToPdf({
-      BrowserWindow, ipcMain, htmlFile: html.file, outFile,
+    const r = await pdfProcess.printInWorker({
+      app,BrowserWindow, ipcMain, htmlFile: html.file, outFile,signal:session.abort.signal,onPublishing:()=>{session.publishing=true;},
+      validateTarget:validatePdfTarget,withPublication:task=>documents.queue(outputKey,async()=>{session.publicationHeld=true;try{return await task();}finally{session.publicationHeld=false;}}),
+      commitPublication:commit=>documents.commit(async()=>{await validatePdfTarget();return commit();}),
       extraCss,
       /* 【诊断口·2026-10-11】export-pdf.js 的 `o.css` 注释里写明"undefined=用 PRINT_CSS，''/null=不注入"，
          但主进程一直没把它透进来 ✗ ⇒ 只能改代码才能做"打印期样式"的对照臂 ✗。
@@ -2158,10 +2205,10 @@ handle('export:pdf', async (e, opts = {}) => {
     if (r.canceled) {
       await cleanupStaging();
       progress({ phase: 'canceled' });
-      return { ok: false, canceled: true, ms: Date.now() - t0, phases: session.phases };
+      return { ok: false, canceled: true, worker:r.worker||null,ms: Date.now() - t0, phases: session.phases };
     }
     const imgPhase = session.phases.find((p) => p.phase === 'images') || {};
-    const memReport = mem.stop();
+    const memReport = {...mem.stop(),scope:process.platform==='win32'?'editor-processes':'application-processes'};
     const result = {
       ok: true, file: outFile, bytes: r.bytes, pages: r.pages,
       ms: Date.now() - t0, printMs: r.ms, chunks: r.chunks,
@@ -2169,6 +2216,7 @@ handle('export:pdf', async (e, opts = {}) => {
       images: { total: imgPhase.images, complete: imgPhase.complete, natural: imgPhase.natural, broken: imgPhase.broken, ms: imgPhase.ms },
       gate: r.gate, memory: memReport, phases: session.phases,
       kp: r.kp || null,          // Knuth–Plass 排版统计（applied/lines/blocks/budgetSkipped/error）
+      worker:r.worker||null,
       /* 公式 CSS 的来源与字节数：此前这条链静默丢失 mathCss（PDF 里公式没排版），
          把这两项放进结果里，探针/报告能直接断言"引擎的公式样式确实进了打印窗口"。 */
       mathCss: { source: session.mathCssSource, bytes: extraCss.length },
@@ -2180,19 +2228,22 @@ handle('export:pdf', async (e, opts = {}) => {
     return result;
   } catch (err) {
     dbg('export:pdf:error', err.message);
-    await cleanupStaging().catch(e => dbg('export:pdf:cleanup-error', e.message));
+    if(!err.preserveStage)await cleanupStaging().catch(e => dbg('export:pdf:cleanup-error', e.message));
     progress({ phase: 'error', error: err.message });
-    return { ok: false, error: err.message, code: err.code, ms: Date.now() - t0, phases: session.phases };
+    return { ok: false, error: err.message, code: err.code, worker:err.worker||null,ms: Date.now() - t0, phases: session.phases };
   } finally {
     clearTimeout(htmlTimer); W.removeListener('closed', ownerClosed);
     if (pdfActive === session) pdfActive = null;
     mem.stop();
+    session.finished.resolve();
   }
 });
 handle('export:pdfCancel', e => {
   if (!pdfActive) return { ok: false, error: '没有进行中的 PDF 导出' };
   if (pdfActive.owner !== e.sender.id) return { ok: false, error: 'PDF 导出不属于当前窗口' };
+  if(pdfActive.publishing)return {ok:false,publishing:true,error:'PDF 正在完成保存'};
   pdfActive.canceled = true;
+  pdfActive.abort.abort();
   dbg('export:pdf:cancel', { id: pdfActive.id });
   try { pdfActive.waiter.resolve({ ok: false, canceled: true }); } catch { /* 已 resolve */ }
   return { ok: true, id: pdfActive.id };

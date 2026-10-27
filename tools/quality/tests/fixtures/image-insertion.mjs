@@ -45,7 +45,7 @@ test('identical-text reset and ordinary edits invalidate image commands', () => 
 
 test('reserve and cancel are effect-only, isolated from history', () => {
   const v = makeView('abc', 1), t = reserveImageInsertion(v);
-  assert.deepEqual(t.current(), { from: 1, to: 1 });
+  assert.deepEqual(t.current(), { from: 1, to: 1, head: 1 });
   assert.equal(undoDepth(v.state), 0);
   assert.equal(t.cancel(), true);
   assert.equal(t.current(), null);
@@ -68,7 +68,7 @@ test('multiple selections explicitly reject without dispatch or collapse', () =>
 test('ordinary insertion before the reservation maps both offsets', () => {
   const v = makeView('abCDxy', 2, 4), t = reserveImageInsertion(v);
   v.dispatch({ changes: { from: 0, insert: 'Q' }, selection: { anchor: 1 } });
-  assert.deepEqual(t.current(), { from: 3, to: 5 });
+  assert.deepEqual(t.current(), { from: 3, to: 5, head: 5 });
   assert.equal(t.commit('I'), true);
   assert.equal(text(v), 'QabIxy');
   assert.equal(v.state.selection.main.head, 1);
@@ -77,7 +77,7 @@ test('ordinary insertion before the reservation maps both offsets', () => {
 test('ordinary typing at an empty reservation stays after the pending image', () => {
   const v = makeView('tail'), t = reserveImageInsertion(v);
   v.dispatch({ changes: { from: 0, insert: 'ABC' }, selection: { anchor: 3 }, userEvent: 'input.type' });
-  assert.deepEqual(t.current(), { from: 0, to: 0 });
+  assert.deepEqual(t.current(), { from: 0, to: 0, head: 0 });
   t.commit('I');
   assert.equal(text(v), 'IABCtail');
   assert.equal(v.state.selection.main.head, 4);
@@ -97,7 +97,7 @@ test('ordinary change inside a reserved selection cancels instead of deleting ne
 test('insertion at selection boundaries is outside the captured text', () => {
   const v = makeView('abcdef', 2, 4), t = reserveImageInsertion(v);
   v.dispatch({ changes: [{ from: 2, insert: 'X' }, { from: 4, insert: 'Y' }], selection: { anchor: 3, head: 5 } });
-  assert.deepEqual(t.current(), { from: 3, to: 5 });
+  assert.deepEqual(t.current(), { from: 3, to: 5, head: 5 });
   t.commit('I');
   assert.equal(text(v), 'abXIYef');
   assert.equal(v.state.selection.main.head, 4);
@@ -107,7 +107,7 @@ test('same-point tickets A then B commit in request order in one transaction eac
   const v = makeView('x'), a = reserveImageInsertion(v), b = reserveImageInsertion(v);
   assert.equal(a.commit('A'), true);
   assert.equal(a.current(), null);
-  assert.deepEqual(b.current(), { from: 1, to: 1 });
+  assert.deepEqual(b.current(), { from: 1, to: 1, head: 1 });
   assert.equal(b.commit('B'), true);
   assert.equal(text(v), 'ABx');
   assert.equal(v.state.field(imageInsertions).tickets.length, 0);
@@ -117,7 +117,7 @@ test('same-point tickets A then B commit in request order in one transaction eac
 test('reversed ready/commit order still places A before B, without a payload queue', () => {
   const v = makeView('x'), a = reserveImageInsertion(v), b = reserveImageInsertion(v);
   b.commit('B');
-  assert.deepEqual(a.current(), { from: 0, to: 0 });
+  assert.deepEqual(a.current(), { from: 0, to: 0, head: 0 });
   a.commit('A');
   assert.equal(text(v), 'ABx');
   assert.equal(v.state.selection.main.head, 2);
@@ -146,7 +146,7 @@ test('different-point tickets retain their actual document positions', () => {
   point(v, 3);
   const b = reserveImageInsertion(v);
   a.commit('A');
-  assert.deepEqual(b.current(), { from: 4, to: 4 });
+  assert.deepEqual(b.current(), { from: 4, to: 4, head: 4 });
   b.commit('B');
   assert.equal(text(v), 'aAbcBd');
 });
@@ -224,7 +224,17 @@ test('typing before and after image commits does not merge with image undo', () 
 test('no-op undo has no transaction: host must send reset if it means cancel-pending', () => {
   const v = makeView('x'), t = reserveImageInsertion(v);
   assert.equal(undo(v), false);
-  assert.deepEqual(t.current(), { from: 0, to: 0 });
+  assert.deepEqual(t.current(), { from: 0, to: 0, head: 0 });
   reset(v);
   assert.equal(t.current(), null);
+});
+
+// current() exposes the original selection head so async context guards follow its orientation.
+test('reversed selection retains its mapped original head', () => {
+  const v=makeView('abCDxy',4,2),t=reserveImageInsertion(v);
+  assert.deepEqual(t.current(),{from:2,to:4,head:2});
+  v.dispatch({changes:{from:0,insert:'Q'},selection:{anchor:1}});
+  assert.deepEqual(t.current(),{from:3,to:5,head:3});
+  assert.equal(t.commit('I'),true);
+  assert.equal(text(v),'QabIxy');
 });

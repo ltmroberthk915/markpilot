@@ -49,8 +49,8 @@ async function projection(p,source){return p.evaluate(({source,code})=>{
  const exported=new DOMParser().parseFromString(html,'text/html');
  return{actual,exported:[...exported.querySelectorAll('th:first-child,td:first-child')].map(n=>({kind:n.tagName,...inspect(n,false)})),html,exportSizerCount:exported.querySelectorAll('.mp-cell-layout,.mp-cell-source-size,.mp-cell-rendered-size').length,codeExpected:code};
 },{source,code:CODE});}
-function assertProjection(p){
- assert.equal(p.actual.length,2,'nonediting header+body rendered');assert.equal(p.exported.length,2,'actual mdToHtml header+body output');assert.equal(p.exportSizerCount,0);
+function assertProjection(p,expectedKinds=['TH','TD']){
+ assert.equal(p.actual.length,expectedKinds.length,'expected table blocks rendered');assert.deepEqual(p.actual.map(c=>c.kind),expectedKinds,'only the native selection block may show source');assert.equal(p.exported.length,2,'actual mdToHtml header+body output');assert.equal(p.exportSizerCount,0);
  for(const c of [...p.actual,...p.exported]){
   assert.deepEqual(c.tags,{strong:true,em:true,u:true,s:true},c.kind+' four semantic tags');assert(c.nested,c.kind+' nested strong/em');assert.equal(c.plainText,'不采 斜体 下划线 删除线 外 内斜 尾'+(c.styles?' [标签 ](#target)':' 标签'),c.kind+' no raw formatting delimiters outside protected code/math');
   assert(c.labelStrong&&c.labelCode,c.kind+' link-label format/code projected');assert.equal(c.mathCount,2,c.kind+' formula within link label stays rendered');
@@ -76,6 +76,17 @@ async function nativeEnter(p,kind){
  return target;
 }
 async function menuSave(p,file,expected){assert((await read(p)).cellFocus,'save keeps actual cell owner');const receipt=await p.evaluate(()=>window.mpHost.recentTestMenuClick('menu-save',true));assert(receipt.ok,'installed MenuItem save callback reached');await waitUntil(async()=>{const s=await read(p);return s.source===expected&&!s.host.dirty&&!s.host.saveInFlight&&fs.readFileSync(file,'utf8')===expected;},'native menu save plus independent disk bytes',15000);return{ok:true,route:'installed MenuItem callback; no physical CtrlS claim',diskSha256:hash(fs.readFileSync(file))};}
+async function nativeLeaveTable(p,c,kind,source){
+ const phaseName=kind+'-leave-table';await phase(p,phaseName);
+ const target=await p.evaluate(()=>{const line=[...document.querySelectorAll('.cm-line')].find(n=>n.textContent.trim()==='AFTER_KEEP');if(!line)throw Error('Visible after-table paragraph missing');const range=document.createRange();range.selectNodeContents(line);const r=range.getBoundingClientRect(),x=r.left+Math.min(r.width/2,10),y=(r.top+r.bottom)/2;return{x,y,inTarget:line.contains(document.elementFromPoint(x,y)),rect:r.toJSON()};});
+ assert(target.inTarget,'leave-table click must reach actual after-table paragraph');
+ await p.mouse.move(target.x,target.y);await p.mouse.click(target.x,target.y,{delay:65});
+ const start=source.indexOf('AFTER_KEEP');assert(start>=0);
+ await waitUntil(async()=>{const s=await read(p);return s.focus&&!s.cellFocus&&s.selection.anchor>=start&&s.selection.head<=start+'AFTER_KEEP'.length;},'native click leaves table without selection/focus repair');
+ const state=await read(p);assert.equal(state.source,source);assert.equal(state.host.dirty,false);assert.equal(state.selection.anchor,state.selection.head);
+ assert(state.events.some(e=>e.phase===phaseName&&e.type==='mousedown'&&e.trusted&&e.detail===1&&!e.inCell),'trusted leave-table single press');
+ c.trace.push({step:phaseName,target,selection:state.selection,focus:state.focus});
+}
 async function main(){
  const o=args(process.argv.slice(2));assert(o.exe&&o['expected-sha256'],'--exe / --expected-sha256 required');
  const dir=outputDir(o.out,'cell-format-workflows'),release=acquireSlot();let run,currentCase,currentPage;
@@ -114,7 +125,12 @@ async function main(){
     await phase(p,kind+'-escape');assert((await read(p)).cellFocus);await p.keyboard.press('Escape');
     await waitUntil(()=>p.evaluate(()=>!document.querySelector('.mp-cell-editing')),'Esc exits active source');
     s=await capture(p,c,kind+'-rerendered',false);assert.equal(s.source,source);assert.equal(s.host.dirty,false);assert.equal(fs.readFileSync(file,'utf8'),source);
+    assert(s.focus&&!s.cellFocus,'Escape transfers to native source owner');assert.deepEqual(s.selection,before.selection,'Escape retains exact original native source endpoint');
+    const exitProjection=await projection(p,source);assertProjection(exitProjection,[kind==='th'?'TD':'TH']);c.trace.push({step:kind+'-native-source-exit',projection:exitProjection});
+    c.frames.push(await frame(p,dir,id+'-'+kind+'-native-source-exit'));
+    await nativeLeaveTable(p,c,kind,source);
     const after=await projection(p,source);assertProjection(after);c.trace.push({step:kind+'-projection-restored',projection:after});
+    c.frames.push(await frame(p,dir,id+'-'+kind+'-left-table-rendered'));
    }
    c.status='pass';c.diskRestoredSha256=hash(fs.readFileSync(file));write();console.log('PASS '+id);currentCase=null;
   }

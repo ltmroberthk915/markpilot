@@ -95,7 +95,7 @@ class DocumentStore{
         await this.validate(target,baseline);
         await fs.mkdir(path.dirname(target),{recursive:true});
         const saveAsCurrent=()=>S.documentId===documentId&&grantCurrent()&&revision>=S.lastSavedRevision&&ownerCurrent();
-        const prepared=grant?await this.prepareSaveAs({sourcePath,filePath:path.resolve(filePath),text,canonical:f=>this.canonical(f),current:saveAsCurrent}):null;
+        const prepared=grant?await this.prepareSaveAs({sourcePath,filePath:target,text,canonical:f=>this.canonical(f),current:saveAsCurrent}):null;
         const assets=prepared?.summary||prepared;
         if(grant&&!saveAsCurrent())throw failure('MP_DOC_MISMATCH','另存为的文档或窗口已改变');
         // A valid target may already use the filesystem's entire name budget.

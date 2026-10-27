@@ -54,12 +54,12 @@ test('table estimates return viewport measurements without layout reads or resca
  r.owner.recent.clear();assert.equal(estimate.call(widget),-1);
 });
 test('row fitting batches all reads before writes and rejects retired consumers',()=>{
- const queueScope={tableFitQueues:new WeakMap()},f=functions(queueScope,['scheduleTableFit']),requests=[],view={requestMeasure:r=>requests.push(r)},events=[];
- const work=name=>({table:{get clientWidth(){events.push('read-'+name);return 300;}},valid:()=>true,finish:width=>events.push('write-'+name+'-'+width)});
+ const queueScope={tableFitQueues:new WeakMap(),getComputedStyle:t=>({width:t.measuredWidth+'px'})},f=functions(queueScope,['scheduleTableFit']),requests=[],view={requestMeasure:r=>requests.push(r)},events=[];
+ const work=name=>({table:{get measuredWidth(){events.push('read-'+name);return 300.25;},get clientWidth(){throw Error('Integer clientWidth loses fractional CSS width');}},valid:()=>true,finish:width=>events.push('write-'+name+'-'+width)});
  f.scheduleTableFit(view,work('A'));f.scheduleTableFit(view,work('B'));
  assert.equal(requests[0].key,requests[1].key);
  const data=requests.at(-1).read();requests.at(-1).write(data);
- assert.deepEqual(events,['read-A','read-B','write-A-300','write-B-300']);
+ assert.deepEqual(events,['read-A','read-B','write-A-300.25','write-B-300.25']);
  events.length=0;let valid=true;const old=work('old');old.valid=()=>valid;
  f.scheduleTableFit(view,old);const pending=requests.at(-1).read();valid=false;requests.at(-1).write(pending);
  assert.deepEqual(events,['read-old','write-old-null']);

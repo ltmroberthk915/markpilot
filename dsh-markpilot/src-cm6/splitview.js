@@ -280,23 +280,8 @@ export function installSplit(deps) {
     return true;
   }
 
-  /* ── ④ 滚动对齐：内容坐标像素锚 ──
-   * 【坐标空间修正·实测定标】CM6 的 `lineBlockAt(pos).top` 以**内容盒内顶**为原点，
-   * 而 `scrollDOM.scrollTop` 以**滚动盒 padding box** 为原点，两者差一个常数
-   * mapOffset() ＝（内容盒顶 − 滚动盒顶）+ 内容盒 padding-top（同一视图内恒定，可现场量）。
-   * 不做这步定标就按 `block.top − 0.3H` 赋值，会得到一个**常数偏差**（本机实测：从视图 62px、
-   * 主视图 75px）——两侧"同一内容"因此始终差小半屏，且与缩放/字号无关（纯坐标口径错）。
-   * 定标后改用**增量**：目标行当前视口 y 与 30% 线的差就是本次要滚的量（一次到位，无迭代、无 rAF）。 */
-  function mapOffset(view) {
-    const sc = view.scrollDOM, ct = view.contentDOM;
-    const s = zoomScale(view);
-    const relCss = (ct.getBoundingClientRect().top - sc.getBoundingClientRect().top) / s;  // 视口像素 → CSS 像素
-    const padTop = parseFloat(getComputedStyle(ct).paddingTop) || 0;                        // 已是 CSS 像素
-    return relCss + padTop;
-  }
-  /** 视口像素 / CSS 像素。CSS `zoom`（Ctrl+滚轮 / 字号缩放）会让 getBoundingClientRect 走**视口像素**，
-   *  而 scrollTop、lineBlockAt().top、clientHeight 走**CSS 像素**——直接相加就是两套尺子混算，
-   *  实测 150% 时对齐偏差 ~300px（两条规则各自都对，混起来就错）。所有跨 DOM/高度图的换算都过这里。 */
+  /* CM public documentTop and BlockInfo use client pixels, including CSS zoom.
+   * Convert their viewport delta to layout pixels only when writing scrollTop. */
   function zoomScale(view) {
     const sc = view.scrollDOM;
     const h = sc.getBoundingClientRect().height;
@@ -318,17 +303,15 @@ export function installSplit(deps) {
     let pos = null;
     try { pos = view.posAtCoords({ x: r.left + 4, y }); } catch { pos = null; }
     if (pos == null) {
-      try { pos = view.lineBlockAtHeight(sc.scrollTop + sc.clientHeight * ratio - mapOffset(view)).from; } catch { pos = null; }
+      try { pos = view.lineBlockAtHeight(y - view.documentTop).from; } catch { pos = null; }
     }
     return { pos, y, scale: s };
   }
   /** 视口 y → 该视图里的"行内分数"（命中点在本行块中的相对高度） */
   function fracAt(view, y, pos, scale) {
-    const r = view.scrollDOM.getBoundingClientRect();
     const b = view.lineBlockAt(pos);
     if (!(b.height > 0)) return 0;
-    const yCss = (y - r.top) / (scale || 1);
-    return Math.min(1, Math.max(0, (yCss - (b.top + mapOffset(view))) / b.height));
+    return Math.min(1, Math.max(0, (y - view.documentTop - b.top) / b.height));
   }
   /** 把 view 滚到"pos 所在行落在视口 ANCHOR_RATIO 处"；返回是否真的动了（-1＝已在位）。
    *  【行内分数·实测定标】只按"行块顶"对齐，遇到**长段落**（一逻辑行折成十几屏行）会引入
@@ -352,10 +335,10 @@ export function installSplit(deps) {
         break;
       }
     }
-    // ② 目标行尚未渲染（大跳）：退回高度图口径（mapOffset 已把两套坐标定标）
+    // ② 未挂载行：公开高度图与 documentTop 同为 client 像素。
     if (yNow == null) {
       const b = view.lineBlockAt(pos);
-      yNow = b.top + mapOffset(view) + (frac > 0 ? frac * b.height : 0);
+      yNow = (view.documentTop + b.top + (frac > 0 ? frac * b.height : 0) - rect.top) / scale;
     }
     const target = Math.max(0, sc.scrollTop + (yNow - sc.clientHeight * ANCHOR_RATIO));
     const before = sc.scrollTop;

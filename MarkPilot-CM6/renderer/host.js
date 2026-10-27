@@ -558,6 +558,16 @@ window.mpHost.onMenu(async (cmd) => {
       if (!window.mpEngine?.menuHistory?.(cmd)) await window.mpHost.history(cmd);
       break;
     }
+    case 'selectAll': {
+      /* Windows native menu selectAll (fixed menu id): notify the engine intent
+       * hook FIRST — it only records intent (serial invalidate + conditional
+       * reading-source-intent drop); no dispatch, no focus change — then run the
+       * single fixed IPC. */
+      try { window.mpEngine?.beforeNativeSelectAll?.(); } catch { /* optional hook */ }
+      const r = await window.mpHost.selectAll();
+      if (!r || !r.ok) showBanner('全选失败：' + ((r && r.error) || '未知错误'));
+      break;
+    }
     /* 【设置真源·S1·2026-10-10（settings-truth 族）】用户"删掉 settings.json"后**仍看到**工具岛
        透明度/版心/内容缩放/状态栏开关全都还在 ✗ —— 因为渲染侧偏好是**另一套存储**：
        `localStorage` 的 mp-pref-* / mp-surfaces / mp-reading* / editor-theme…，删配置文件清不动它。
@@ -621,6 +631,7 @@ window.mpHost.onTheme((t) => { applyTheme(t.dark); });
 const PDF_PHASE_TEXT = {
   pick: '选择保存位置…', assets: '复制图片…', html: '生成 HTML…', load: '加载本地 HTML…',
   images: '等待图片解码…', style: '套用打印样式…', print: '排版打印…', write: '写入 PDF…',
+  typeset:'精细断行…','print-start':'排版打印…',
   'write-done': '写入完成', cleanup: '清理临时文件…', canceled: '已取消', error: '导出失败',
 };
 let exportActive = false;      // 由 export:progress 的阶段驱动：谁发起导出都能看到同一条提示条

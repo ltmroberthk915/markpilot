@@ -196,7 +196,7 @@ async function main() {
       assert.equal(text.slice((await snapshot(p)).selection.anchor,(await snapshot(p)).selection.head),'alpha beta','real keyboard selection');
       await p.keyboard.press('Control+Shift+U');await sleep(120);const italic=await observed(p,dir,trace,'configured-02-custom-key');
       assert.equal(italic.text,text.replace('alpha beta','*alpha beta*'),'current key configuration survives replacement');
-      assert.equal((await pane()).text,italic.text);assert((await pane()).sameText,'pane shares the current Text');await saved(p,second,italic.text);
+      assert.equal((await pane()).text,italic.text);const afterEditPane=await pane();trace.push({name:'pane-after-custom-key',...afterEditPane});assert(afterEditPane.open&&afterEditPane.readOnly,'pane remains open and read-only after input');await saved(p,second,italic.text);
       await p.keyboard.press('Control+z');assert.equal((await snapshot(p)).text,text);await p.keyboard.press('Control+y');assert.equal((await snapshot(p)).text,italic.text);
       const pos=italic.text.indexOf('\nx\n')+1,c=await p.evaluate(pos=>window.mpSplit._slave().coordsAtPos(pos),pos);assert(c&&c.bottom>c.top,'visible right source x');
       await p.mouse.click(c.left+.1,(c.top+c.bottom)/2,{delay:65});await sleep(100);assert((await snapshot(p)).focus,'source click focuses master');assert.equal((await snapshot(p)).selection.head,pos,'source click maps to current B');

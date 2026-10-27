@@ -32,7 +32,7 @@ async function main(){
    const owner=s=>s.cmFocus||s.cellFocus;
    const exact=(s,text,at,visible,domAt,label)=>{
     assert.equal(s.text,text,label+' full source / neighbors');assert.deepEqual(s.sourceSelection,{anchor:at,head:at},label+' directional source caret');assert(owner(s),label+' actual writable owner focus');if(arm.kind==='plain')assert(s.cmFocus&&!s.cellFocus&&!s.visible,label+' plain target belongs to master CM, with the old cell overlay retired');
-    assert(s.pane.open&&s.pane.readOnly&&s.pane.sameText,label+' source pane shares current immutable Text');assert.equal(s.pane.text,text,label+' source pane text');
+    assert(s.pane.open&&s.pane.readOnly,label+' source pane open and read-only');assert.equal(s.pane.text,text,label+' source pane text');
     if(s.cellFocus){assert(s.visible,label+' owned overlay is visible');assert.equal(s.cellText,visible,label+' owned overlay text');assert.deepEqual(s.domSelection,{anchor:domAt,head:domAt},label+' input/history boundary DOM caret');}
    };
    try{

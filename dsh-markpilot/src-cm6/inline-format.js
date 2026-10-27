@@ -74,6 +74,29 @@ function treeOf(source) {
   return tree;
 }
 
+export function inlineEmphasisSpans(source) {
+  const text = String(source ?? '');
+  if (!text.includes('**')) return [];
+  const out = [], stack = [treeOf(text).topNode];
+  const opaque = new Set(['InlineCode', 'SourceMath', 'SourceImage', 'Image']);
+  while (stack.length) {
+    const node = stack.pop();
+    for (let child = node.firstChild; child; child = child.nextSibling) {
+      const width = child.name === 'StrongEmphasis' ? 2 : child.name === 'Emphasis' ? 1 : 0;
+      if (width && text.slice(child.from, child.from + width) === '*'.repeat(width) &&
+          text.slice(child.to - width, child.to) === '*'.repeat(width))
+        out.push({ from: child.from, to: child.to, width });
+      if (!opaque.has(child.name)) stack.push(child);
+    }
+  }
+  return out;
+}
+
+export function inlineStrongSpans(source) {
+  return inlineEmphasisSpans(source).filter(span => span.width === 2)
+    .map(({ from, to }) => ({ from, to }));
+}
+
 export function inlineLinkSpans(source) {
   const s = String(source ?? '');
   if (!s.includes('[')) return [];

@@ -1,0 +1,10 @@
+{
+  "file": "shell\\native\\pdf-worker-guard.exe",
+  "bytes": 35328,
+  "sha256": "629c218ba5c54ffc3c266b2f1d1ccf0d3203462a13fd0a70c9ad21dd329b22e9",
+  "inputs": {
+    "source": "edd04b3a6e046d19d5800fb800ef7ae1a2ca8079328c27f752de0f07575a91d6",
+    "compiler": "46809206887326d2d24db1eff1f3064de972c3451abe766b49111450a5e08e00",
+    "script": "52b6a967f29980b79bca28186f6c5a9dcb7e1bb1ebc2972b3fd7e37616b6997e"
+  }
+}

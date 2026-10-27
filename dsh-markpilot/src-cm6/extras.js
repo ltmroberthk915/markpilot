@@ -519,7 +519,7 @@ export function installExtras(deps) {
     },
     outline: () => toggleOutline(), export: () => exportHtml(),
   };
-  function keyConfig() {
+  function keyConfig(persistMigration = true) {
     try {
       const saved = JSON.parse(localStorage.getItem('mp-keys') || '{}');
       if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return { ...DEFAULT_KEYS };
@@ -536,7 +536,7 @@ export function installExtras(deps) {
         for (const [action, combo] of Object.entries(cfg)) if (!(action in next) && claimed(combo)) cfg[action] = '';
         Object.assign(cfg, next);
         // A failed write must never leave a completed migration marker.
-        try { localStorage.setItem('mp-keys', JSON.stringify(cfg)); localStorage.setItem('mp-key-defaults-352', '1'); } catch { }
+        if (persistMigration) { try { localStorage.setItem('mp-keys', JSON.stringify(cfg)); localStorage.setItem('mp-key-defaults-352', '1'); } catch { } }
       }
       return cfg;
     } catch { return { ...DEFAULT_KEYS }; }
@@ -550,21 +550,26 @@ export function installExtras(deps) {
   };
   /** 键位显示：`Mod` → `Ctrl`（Windows 口径）。Alt/Shift 组合原样显示。 */
   const showCombo = (c) => String(c || '').replace('Mod', 'Ctrl');
-  function rebindKeys() {
+  function rebindKeys(persistMigration = true) {
     // These product actions use document/context data directly. If a future
     // high-priority action queries CM6 syntax, prepare the pending tree through
     // the shared asyncMarkdown guard before executing that action.
     const v = getView(); if (!v || !deps.keyCompartment) return;
-    const cfg = keyConfig();
+    const cfg = keyConfig(persistMigration);
     /* 【#46·2026-10-18 实测缺陷 M5】拒收无修饰键的组合（除 F1-F24）：高优先级 keymap 带
        preventDefault，录成单字母后该字母在正文被全局吞掉；同时中和旧版已落盘脏键位（升级自愈）。 */
     const usableCombo = (c) => /(^|-)Mod(-|$)|(^|-)Alt(-|$)/.test(c) || /^F([1-9]|1[0-9]|2[0-4])$/.test(c);
-    const bindings = Object.entries(cfg).filter(([a, c]) => ACTIONS[a] && c && usableCombo(c)).map(([a, c]) => ({ key: c, run: (view) => { const fn = ACTIONS[a]; if (!fn) return false; return window.mpEngine.commands.run(() => fn(view)) !== false; }, preventDefault: true }));
+    const bindings = Object.entries(cfg).filter(([a, c]) => Object.hasOwn(ACTIONS, a) && typeof c === 'string' && c && usableCombo(c)).map(([a, c]) => ({ key: c, run: (view) => { const fn = ACTIONS[a]; if (!fn) return false; return window.mpEngine.commands.run(() => fn(view)) !== false; }, preventDefault: true }));
     /* 【必须 Prec.high·2026-10-10 实测】默认优先级的 keymap 会被 basicSetup 的 defaultKeymap
        （`Mod-i` = selectParentSyntax）与语言 keymap 抢先；用 high 之后本表排在最前，
        与 tableKeys / zoomKeys 同级且**注册更早** ⇒ 只有它们的显式键位能覆盖这里，逐字节可控。 */
     v.dispatch({ effects: deps.keyCompartment.reconfigure(deps.Prec.high(deps.keymap.of(bindings))) });
   }
+
+  // Existing windows consume the current key table without becoming migration writers.
+  window.addEventListener('storage', event => {
+    if (event.storageArea === localStorage && (event.key === 'mp-keys' || event.key === null)) rebindKeys(false);
+  });
 
   /* ── 单元格/行操作小工具 ── */
   /* 【唯一实现】行内格式的包裹/取消包裹在 toolbar.js 的 `wrap` 里（deps.wrapInline 注入）。
@@ -3167,6 +3172,8 @@ export function installExtras(deps) {
   }
   function applyReading() {
     const on = readingOn();
+    let anchor = null;
+    try { anchor = window.mpEngine?.captureReadingAnchor?.(on) || null; } catch { /* 引擎未就绪 */ }
     document.documentElement.dataset.mpReading = on ? '1' : '';
     const pal = READING_PALETTES.find((p) => p.id === readingPalette()) || READING_PALETTES[0];
     // 【判据踩过的坑】必须**先判阅读态**：否则退出时会把专用配色又写回去（实测 --mp-bg 停在 #f4efdf 不还原）。
@@ -3178,7 +3185,7 @@ export function installExtras(deps) {
     if (pill) pill.title = on ? `退出阅读模式（当前配色：${pal.name}）` : '';
     if (on) applyTypography();
     /* 【真只读·2026-10-17】阅读模式在引擎侧同时置只读（D-01：此前仅有 CSS，键入会静默改稿）。 */
-    try { window.mpEngine?.setReadingMode?.(on); } catch { /* 引擎未就绪 */ }
+    try { window.mpEngine?.setReadingMode?.(on, anchor); } catch { /* 引擎未就绪 */ }
   }
   function toggleReading(force) {
     const next = typeof force === 'boolean' ? force : !readingOn();
@@ -3789,6 +3796,144 @@ export function installExtras(deps) {
     finally { clearTimeout(timer); }
   }
 
+  function pasteTextAtRange(state, range, text, blockPaste) {
+    const doc = state.doc, headLine = doc.lineAt(range.from), tailLine = doc.lineAt(range.to);
+    const empty = range.from === range.to;
+    const prevTableRow = empty && headLine.from === range.from && headLine.number > 1 && !!tableSpanOf(state, headLine.number - 1);
+    const nextTableRow = empty && tailLine.to === range.to && tailLine.number < doc.lines && !!tableSpanOf(state, tailLine.number + 1);
+    const headNl = blockPaste && range.from > 0 && (headLine.from !== range.from || prevTableRow) ? '\n' : '';
+    const tailNl = blockPaste && range.to < doc.length && (tailLine.to !== range.to || nextTableRow) ? '\n' : '';
+    return headNl + text + tailNl;
+  }
+
+  // Shared image storage policy. The caller owns its queue, ticket and commit.
+  async function prepareImageFileSource(file, mode, origin, host, current) {
+    const base64 = await fileToBase64(file);
+    if (!base64) throw new Error('图片是空的');
+    if (!await current()) return null;
+    const mime = /^image\//i.test(file?.type || '') ? file.type : 'image/png';
+    const ext = (mime.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '') || 'png';
+    const inline = 'data:' + mime + ';base64,' + base64;
+    let warning = '';
+    if (mode === 'assets') {
+      if (!origin?.filePath) warning = '文档还没保存到磁盘（Ctrl+S 保存后即可把图落盘到 assets/），本次已内联';
+      else if (!host || typeof host.saveImageToAssets !== 'function') warning = 'assets 落盘失败：当前宿主不支持 saveImageToAssets，已改为内联';
+      else try {
+        const r = await imageHostCall(host.saveImageToAssets({ docPath: origin.filePath, base64, mime, fileName: 'pasted-image.' + ext }));
+        const rel = r && (r.relPath || r.rel);
+        const bytes = Math.floor(base64.length * 3 / 4) - (base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0);
+        if (r?.ok === true && rel && r.bytes === bytes) {
+          if (!await current()) return null;
+          return { src: rel, warning: '' };
+        }
+        warning = r?.ok === true && rel
+          ? 'assets 同名冲突未解决（返回字节数不匹配），已改为内联'
+          : 'assets 落盘失败：' + (r?.error || '宿主未返回路径') + '，已改为内联';
+      } catch (e) { warning = 'assets 落盘失败：' + (e?.message || e) + '，已改为内联'; }
+    }
+    if (!await current()) return null;
+    return { src: inline, warning };
+  }
+
+  function imageTargetError(view, range) {
+    if (!range) return '插入位置已变化';
+    const head = range.head;
+    if (tableSpanOf(view.state, view.state.doc.lineAt(head).number)) return '格内不能放图片，请粘到表格外';
+    if (inFrontMatter(view.state.doc.toString(), head)) return '光标在文档头部信息区，请移到正文再粘贴';
+    if (codeBlockAt(view.state, head)) return '代码块内不能粘贴图片';
+    const spans = view.state.field(mathSpansField, false)?.spans || [];
+    if (spans.some(s => head >= s.from && (head < s.to || s.display && head === s.to))) return '公式内不能粘贴图片';
+    return '';
+  }
+
+  async function imageFileFromSource(src, host, current) {
+    let base64, mime;
+    if (/^data:/i.test(src)) {
+      const comma = src.indexOf(','), meta = src.slice(5, comma);
+      if (comma < 0 || !/^image\//i.test(meta)) throw new Error('图片数据格式不支持');
+      mime = meta.split(';')[0];
+      base64 = /;base64(?:;|$)/i.test(meta) ? src.slice(comma + 1) : btoa(unescape(encodeURIComponent(decodeURIComponent(src.slice(comma + 1)))));
+    } else {
+      if (!host || typeof host.readFileBase64 !== 'function') throw new Error('当前宿主无法读取粘贴图片');
+      let filePath;
+      if (/^https?:\/\//i.test(src)) {
+        if (typeof host.downloadImageToCache !== 'function') throw new Error('当前宿主无法获取粘贴图片');
+        const got = await imageHostCall(host.downloadImageToCache({ url: src }));
+        if (!await current()) return null;
+        if (!got?.ok) throw new Error(got?.error || '获取图片失败');
+        filePath = got.cachePath || got.absPath;
+      } else if (/^file:/i.test(src)) {
+        const url = new URL(src);
+        filePath = decodeURIComponent(url.pathname);
+        if (url.hostname && url.hostname !== 'localhost') filePath = '//' + url.hostname + filePath;
+        else if (/^\/[A-Za-z]:/.test(filePath)) filePath = filePath.slice(1);
+      } else throw new Error('粘贴图片缺少可读取的完整地址');
+      const got = await imageHostCall(host.readFileBase64(filePath));
+      if (!await current()) return null;
+      if (!got?.ok || !/^image\//i.test(got.mime || '')) throw new Error(got?.error || '粘贴来源不是图片');
+      base64 = got.base64; mime = got.mime;
+    }
+    const raw = atob(base64), bytes = Uint8Array.from(raw, c => c.charCodeAt(0));
+    return new File([bytes], 'pasted-image', { type: mime });
+  }
+
+  function pasteRichImages(view, htmlDoc) {
+    if (view.state.selection.ranges.length !== 1) { toast('含图片的粘贴请只选择一个正文位置'); return; }
+    const issue = imageTargetError(view, view.state.selection.main);
+    if (issue) { toast(issue); return; }
+    const body = htmlDoc.body.cloneNode(true), images = [...body.querySelectorAll('img')];
+    const prefix = 'MP_PASTE_IMAGE_' + crypto.randomUUID().replace(/-/g, '') + '_';
+    const originals = images.map((image, i) => {
+      const src = image.getAttribute('src') || '', token = prefix + i + '_END';
+      image.setAttribute('src', token);
+      return { src, token };
+    });
+    let template;
+    try {
+      template = htmlRichToMd(body);
+      if (originals.some(({ src, token }) => !src || template.split(token).length !== 2)) throw new Error('图片所在格式暂不支持');
+    } catch (e) { toast('未粘贴：' + (e?.message || e)); return; }
+    const ticket = reserveImageInsertion(view);
+    if (!ticket) { toast('当前无法插入图片'); return; }
+    const host = window.mpHost, mode = imageModeOf(view.state.doc.toString());
+    const originRequest = host && typeof host.docInfo === 'function'
+      ? imageHostCall(host.docInfo()).catch(() => null) : Promise.resolve(null);
+    const work = imageInsertionQueue.then(async () => {
+      const origin = await originRequest;
+      const current = async () => {
+        if (getView() !== view || !ticket.current()) return false;
+        if (origin && host && typeof host.docInfo === 'function') {
+          const now = await imageHostCall(host.docInfo()).catch(() => null);
+          if (!now || now.filePath !== origin.filePath || now.documentId !== origin.documentId) return false;
+        }
+        return !!ticket.current();
+      };
+      const canceled = () => toast('插入位置或文档已变化，图片粘贴已取消');
+      let text = template; const warnings = [];
+      for (const { src, token } of originals) {
+        if (!await current()) { canceled(); return; }
+        const file = await imageFileFromSource(src, host, current);
+        if (!file || !await current()) { canceled(); return; }
+        const prepared = await prepareImageFileSource(file, mode, origin, host, current);
+        if (!prepared) { canceled(); return; }
+        text = text.replace(token, () => prepared.src);
+        if (prepared.warning) warnings.push(prepared.warning);
+        const image = new Image(); let timer;
+        try {
+          image.src = imageSource(prepared.src);
+          try { await Promise.race([image.decode(), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('图片解码超时')), 10000); })]); } catch { /* Keep the exact source and the existing visible failure state. */ }
+        } finally { clearTimeout(timer); image.src = ''; }
+      }
+      if (!await current()) { canceled(); return; }
+      const finalIssue = imageTargetError(view, ticket.current());
+      if (finalIssue) { toast('图片粘贴已取消：' + finalIssue); return; }
+      const insert = pasteTextAtRange(view.state, ticket.current(), text, !!body.querySelector(HTML_BLOCKS));
+      if (ticket.commit(insert, 'input.paste')) toast(warnings.length ? [...new Set(warnings)].join('；') : '已粘贴富文本和图片');
+    }).catch(e => toast('未粘贴：' + (e?.message || e))).finally(() => ticket.cancel());
+    imageInsertionQueue = work;
+    return work;
+  }
+
   /** 【唯一图片插入路径】粘贴（task-13）/ 选文件（task-3 C2）/ 从浏览器取回（task-3 C2）全部汇到这里。
    *  **策略只由内部的 imageModeOf(doc) 决定**（inline / assets）⇒ 改策略只改这一个函数（task-17），
    *  别在 upload / download / paste 各写一份分支（分叉了就会出现"粘的是 assets、选文件是 inline"）。
@@ -3858,9 +4003,6 @@ export function installExtras(deps) {
     const ext = (mime.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "") || "png";
     const work = imageInsertionQueue.then(async () => {
     if (!ticket.current()) return;
-    let base64 = "";
-    try { base64 = await fileToBase64(file); } catch (e) { toast("读取剪贴板图片失败"); return; }
-    if (!base64) { toast("剪贴板里的图片是空的"); return; }
     const origin = await originRequest;
     const sameOrigin = async () => {
       if (getView() !== v || !ticket.current()) return false;
@@ -3884,6 +4026,8 @@ export function installExtras(deps) {
           })]);
         } catch { /* Keep the real source and let the widget show a failure. */ }
         if (!await sameOrigin()) { canceled(); return false; }
+        const issue = imageTargetError(v, ticket.current());
+        if (issue) { toast('图片插入已取消：' + issue); return false; }
         return ticket.commit(md, userEvent);
       } finally {
         clearTimeout(timer);
@@ -3892,42 +4036,11 @@ export function installExtras(deps) {
       }
     };
     const more = total > 1 ? "（剪贴板里有 " + total + " 张，已粘贴第 1 张）" : "";
-    /* 回落原因只**记**不弹：toast 是单例，先弹原因会被后面的"已插入图片"覆盖掉（实测踩过） */
-    let fallbackWhy = "";
-    if (mode === "assets") {
-      if (host && typeof host.saveImageToAssets === "function") {
-        const docPath = origin?.filePath || null;
-        /* 【2026-10-09·默认改成 assets 之后这条更要紧】文档还没保存过 ⇒ 不知道该把 assets/ 放哪。
-           提示要**可操作**（告诉用户怎么办），而不是只说"失败"；本次仍回退内联，图不会丢。 */
-        if (!docPath) fallbackWhy = "文档还没保存到磁盘（Ctrl+S 保存后即可把图落盘到 assets/），本次已内联";
-        else try {
-          const r = await imageHostCall(host.saveImageToAssets({ docPath, base64, mime, fileName: "pasted-image." + ext }));
-          const rel = r && (r.relPath || r.rel);
-          /* 【(b′) 不变量守卫】本图真实字节数（由 base64 长度反推，含尾部 padding 修正） */
-          const myBytes = Math.floor(base64.length * 3 / 4) - (base64.slice(-2) === "==" ? 2 : base64.slice(-1) === "=" ? 1 : 0);
-          const shellBytes = (r && typeof r.bytes === "number" && isFinite(r.bytes)) ? r.bytes : null;
-          if (r && r.ok === true && rel) {
-            if (shellBytes === myBytes) {
-              if (!await sameOrigin()) { canceled(); return; }
-              if (await insert("![](" + rel + ")", rel)) toast("已存入 assets 并插入图片" + more);
-              return;
-            }
-            /* 壳返回的字节数与本图不一致 ⇒ 那条路径指向的是**别人的图** ⇒ 绝不插入，宁可回落 inline。
-               （实测场景：连粘两张不同位图时，壳只判"文件在不在"就复用旧路径 ⇒ 用户"粘了 B 却看到 A"。） */
-            fallbackWhy = "assets 同名冲突未解决（壳返回 " + (shellBytes === null ? "未返回 bytes" : shellBytes + " 字节") + " ≠ 本图 " + myBytes + " 字节），已改为内联";
-          } else {
-            /* 回落必须**写明原因**：别让用户以为"本来就是 inline"（Lead 口径） */
-            fallbackWhy = "assets 落盘失败：" + ((r && r.error) || "宿主未返回路径") + "，已改为内联";
-          }
-        } catch (e) { fallbackWhy = "assets 落盘失败：" + ((e && e.message) || e) + "，已改为内联"; }
-      } else {
-        fallbackWhy = "assets 落盘失败：当前宿主不支持 saveImageToAssets，已改为内联";
-      }
+    const prepared = await prepareImageFileSource(file, mode, origin, host, sameOrigin);
+    if (!prepared) { canceled(); return; }
+    if (await insert('![](' + prepared.src + ')', prepared.src)) {
+      toast(prepared.warning ? prepared.warning + more : (mode === 'assets' && !prepared.src.startsWith('data:') ? '已存入 assets 并插入图片' : '已插入图片') + more);
     }
-    if (!await sameOrigin()) { canceled(); return; }
-    if (!await insert("![](data:" + mime + ";base64," + base64 + ")", "data:" + mime + ";base64," + base64)) return;
-    /* 只弹这一次：有回落原因就把它并进来（否则用户看到的只是"已插入图片"，以为本来就是 inline） */
-    toast(fallbackWhy ? (fallbackWhy + more) : ("已插入图片" + more));
     }).catch(e => { toast('插入图片失败：' + (e?.message || e)); }).finally(() => ticket.cancel());
     imageInsertionQueue = work;
     return work;
@@ -4258,6 +4371,9 @@ export function installExtras(deps) {
     const el = document.activeElement;
     const inCell = !!(el && el.classList && el.classList.contains('mp-cell-overlay-text'));
     if (inCell) {
+      if (!sourceClipboard && htmlDoc?.body.querySelector('img')) {
+        event.preventDefault(); toast('格内不能放图片，请粘到表格外'); return;
+      }
       /* ① 多行先拒绝；② 1x1 HTML 单 cell 解包；③ 其余表格仍拒绝。 */
       if (multi) {
         event.preventDefault();
@@ -4303,6 +4419,7 @@ export function installExtras(deps) {
       return;   // 其余：交回默认（单值粘贴行为不变）
     }
     if (!v || !el || !v.contentDOM.contains(el)) return;
+    const allRanges = v.state.selection.ranges;
     /* 【第二波·code-fence 缺陷·2026-10-10】代码块内粘贴 TSV / 表格片段会被下面的"建表启发式"
        改写成 Markdown 表（实测 CF-5b：Δ58、插入片段变成 `| name | value |…`、随后 4 行
        `code=false`、toast「已建成 3 行 × 2 列」；CF-5c 同形）。**代码块里的内容应当逐字**，
@@ -4324,10 +4441,20 @@ export function installExtras(deps) {
         return !!(line && line.classList.contains('mp-code'));
       } catch { return false; }
     };
-    if (caretOnCodeLine()) return;
+    if (allRanges.length === 1 && caretOnCodeLine()) return;
     // TeX is literal source. All ranges must belong to one mapped body; a
     // cross-formula or delimiter selection keeps the ordinary rich-text route.
     const mathSpans = v.state.field(mathSpansField, false)?.spans || [];
+    const literalRange = range => {
+      const code = codeBlockAt(v.state, range.from);
+      return !!code && range.to <= code.to || mathSpans.some(span => range.from >= span.from && range.to <= span.to);
+    };
+    if (allRanges.length > 1 && allRanges.every(literalRange)) {
+      if (plain) return; // Native CM owns literal text and history.
+      if (htmlDoc?.body.querySelector('img') && !clipboardFragmentText(htmlDoc)) {
+        event.preventDefault(); toast('代码或公式中的图片没有可粘贴的纯文本，已保留原选区'); return;
+      }
+    }
     const inMathBody = mathSpans.some(span => {
       const from = mathSourcePosition(span, 0);
       const to = mathSourcePosition(span, span.tex.length);
@@ -4346,6 +4473,9 @@ export function installExtras(deps) {
         v.dispatch({ ...v.state.replaceSelection(literal), userEvent: 'input.paste' });
       }
       return;
+    }
+    if (!sourceClipboard && htmlDoc?.body.querySelector('img') && !allRanges.every(literalRange)) {
+      event.preventDefault(); pasteRichImages(v, htmlDoc); return;
     }
     const plainBare = String(plain || '').replace(/\r\n?/g, '\n').trim();
     const linesNonEmpty = plainBare ? plainBare.split('\n').filter((l) => l.trim()) : [];
@@ -4366,7 +4496,7 @@ export function installExtras(deps) {
        `> | ` 孤立行 + 文末半张表，数据行错位）。本模块早就 import 了 tables.js 的 `tableSpanOf`，
        这里必须用**同一函数**（与渲染层/键位层同源），不再自己数管道。 */
     const inTableAt = (state) => {
-      try { return !!tableSpanOf(state, state.doc.lineAt(state.selection.main.head).number); } catch { return false; }
+      try { return allRanges.some(range => !literalRange(range) && !!tableSpanOf(state, state.doc.lineAt(range.head).number)); } catch { return false; }
     };
     if (inTableAt(v.state) && (multi || htmlHasTable)) {
       event.preventDefault();
@@ -4393,25 +4523,20 @@ export function installExtras(deps) {
        粘富文本/TSV 时只有主光标落稿、其余光标被吞（实测 before=2 ⇒ after=1）。这里逐落点写同一份
        内容（每处仍按 #40 的邻行表判据补换行），一次事务 + 多光标恢复；极端重叠时退回单光标路径。 */
     const nlFor = (r) => {
-      const headLine = doc.lineAt(r.from);
-      const tailLine = doc.lineAt(r.to);
-      const prevTableRow = r.empty && headLine.from === r.from && headLine.number > 1 && !!tableSpanOf(v.state, headLine.number - 1);
-      const nextTableRow = r.empty && tailLine.to === r.to && tailLine.number < doc.lines && !!tableSpanOf(v.state, tailLine.number + 1);
-      const headNl = blockPaste && r.from > 0 && (headLine.from !== r.from || prevTableRow) ? '\n' : '';
-      const tailNl = blockPaste && r.to < doc.length && (tailLine.to !== r.to || nextTableRow) ? '\n' : '';
-      return headNl + text + tailNl;
+      if (allRanges.length > 1 && literalRange(r)) return String(plain || (htmlDoc ? clipboardFragmentText(htmlDoc) : '')).replace(/\r\n?/g, '\n');
+      return pasteTextAtRange(v.state, r, text, blockPaste);
     };
-    const allRanges = v.state.selection.ranges;
     if (allRanges.length > 1) {
+      let spec;
       try {
-        const insList = allRanges.map(nlFor);
-        const tr = v.state.update({ changes: allRanges.map((r, i) => ({ from: r.from, to: r.to, insert: insList[i] })), userEvent: 'input.paste' });
-        const carets = allRanges.map((r, i) => EditorSelection.cursor(tr.changes.mapPos(r.from, -1) + insList[i].length));
-        v.dispatch(tr);
-        v.dispatch({ selection: EditorSelection.create(carets, allRanges.mainIndex) });
-        toast(convertHtml ? '已粘贴富文本' : '已建成 ' + rows.length + ' 行 × ' + rows.reduce((m, r) => Math.max(m, r.length), 0) + ' 列');
-        return;
-      } catch { /* 相邻落点等极端重叠 ⇒ 退回下面的单光标路径 */ }
+        spec = v.state.changeByRange(range => {
+          const insert = nlFor(range);
+          return { changes: { from: range.from, to: range.to, insert }, range: EditorSelection.cursor(range.from + insert.length) };
+        });
+      } catch { toast('无法粘贴到当前多光标选区'); return; }
+      v.dispatch({ ...spec, userEvent: 'input.paste' });
+      toast(convertHtml ? '已粘贴富文本' : '已建成 ' + rows.length + ' 行 × ' + rows.reduce((m, r) => Math.max(m, r.length), 0) + ' 列');
+      return;
     }
     const ins = nlFor(sel);
     v.dispatch({ changes: { from: sel.from, to: sel.to, insert: ins }, selection: { anchor: sel.from + ins.length }, userEvent: 'input.paste' });

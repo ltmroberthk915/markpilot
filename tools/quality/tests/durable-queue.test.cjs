@@ -7,7 +7,9 @@ const { hash, read, status, write } = require(queue);
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(fn) { const end = Date.now() + 20000; while (Date.now() < end) { const value = fn(); if (value) return value; await sleep(100); } throw Error('Owned queue test timed out'); }
 function fixture() {
-  const dir = fs.mkdtempSync(path.join(ROOT, '.mp-verify/v340/queue-selftest-'));
+  const prefix = path.join(ROOT, '.mp-verify/v340/queue-selftest-');
+  fs.mkdirSync(path.dirname(prefix), { recursive: true });
+  const dir = fs.mkdtempSync(prefix);
   const script = path.join(dir, 'fixture.cjs'), counter = path.join(dir, 'starts.jsonl');
   fs.writeFileSync(script, `const fs=require('node:fs'),path=require('node:path');const[out,counter,id,delay,fail]=process.argv.slice(2);fs.mkdirSync(out);fs.appendFileSync(counter,JSON.stringify({id,pid:process.pid})+'\\n');setTimeout(()=>{fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({passed:fail!=='1',cleanup:{residual:[]}}));process.exitCode=fail==='1'?17:0;},Number(delay));`);
   return { dir, script, counter, jobs: specs => specs.map(([id, delay, fail]) => ({ id, script, args: ['$OUT', counter, id, String(delay), fail ? '1' : '0'], resultFile: '$OUT/result.json', timeoutMs: 15000 })) };

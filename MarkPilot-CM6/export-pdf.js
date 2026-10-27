@@ -23,7 +23,8 @@ const fsp = require('node:fs/promises');
 const path = require('node:path');
 
 /* ── Knuth–Plass 排版（只作用于**打印这一趟的内存 DOM**）────────────────────────
- *  与 2.x 线同一份实现：打印前把 `Typora-Editor-App/app/renderer/js/knuth-plass.mjs`
+ *  默认使用 Chromium 原生排版；显式 kp:true 或对象参数时，打印前把
+ *  `Typora-Editor-App/app/renderer/js/knuth-plass.mjs`
  *  打包成 IIFE（`renderer/pdf-typeset.js`，暴露全局 MPKP），在这里注入隐藏窗口后调用。
  *  **不复制源码**：两条线共用一个真源，断行行为改一处两条线一起变（这也是"编辑与导出同源"的一部分）。
  *
@@ -348,7 +349,7 @@ function extractKatexCss(cssText, { fontDir } = {}) {
  * @param {any} [o.ipcMain]        Electron ipcMain（接 preload 的 mp:print-ready）
  * @param {string} [o.extraCss]    额外样式（引擎的公式 CSS：KaTeX 类样式只在打印窗口里补上）
  * @param {number} [o.sourceBytes] 源 Markdown 长度：Knuth–Plass 的文档级预算（见文件头 KP 注释）
- * @param {boolean|object} [o.kp]  排版开关：默认按预算自动；`false` 完全不做（诊断/基准用）
+ * @param {boolean|object} [o.kp]  默认原生排版；true 或对象显式启用按预算运行的精细断行
  */
 async function printLocalHtmlToPdf({ BrowserWindow, ipcMain, htmlFile, outFile, onPhase, isCanceled, print, css, showWindow, preloadPath, extraCss, sourceBytes, kp: kpOpt } = {}) {
   if (typeof BrowserWindow !== 'function') throw new Error('printLocalHtmlToPdf 需要注入 BrowserWindow');
@@ -444,8 +445,9 @@ async function printLocalHtmlToPdf({ BrowserWindow, ipcMain, htmlFile, outFile, 
 
     // ── 阶段 3.5：Knuth–Plass 整段最优断行（只改**这一趟打印的内存 DOM**；磁盘 HTML 不动） ──
     //  预算与 2.x 线同口径：源 ≥300KB 或可排块 ≥1800 ⇒ 整体跳过，回退 CSS 两端对齐（不给部分降级）。
-    kp = { applied: 0, lines: 0, skipped: 'disabled' };   // 外层的 kp：这里只赋值，不重新声明（catch 也要引用）
-    if (kpOpt !== false) {      const code = kpCode();
+    kp = { applied: 0, lines: 0, skipped: kpOpt === false ? 'disabled' : 'native' };
+    if (kpOpt === true || (kpOpt !== null && typeof kpOpt === 'object' && !Array.isArray(kpOpt))) {
+      const code = kpCode();
       if (!code) { kp = { applied: 0, lines: 0, error: '排版代码缺失（renderer/pdf-typeset.js 未打包）' }; mark('typeset', kp); }
       else {
         try {
@@ -474,12 +476,13 @@ async function printLocalHtmlToPdf({ BrowserWindow, ipcMain, htmlFile, outFile, 
           mark('typeset', { error: kp.error });
         }
       }
-      if (canceled()) return { ok: false, canceled: true, phases, kp };
-      /* 诊断取证：`MP_PDF_SHOT=<png 路径>` ⇒ **排版完成后、打印前**把这一趟的版面存一张图。
+    }
+    if (canceled()) return { ok: false, canceled: true, phases, kp };
+    /* 诊断取证：`MP_PDF_SHOT=<png 路径>` ⇒ **排版完成后、打印前**把这一趟的版面存一张图。
          为什么不从外面用 CDP 截：打印窗口生命周期只有几百毫秒（load→print），外部轮询抓不稳
          （实测抓空）；在这里截，图上就是即将被打印的那一版——KP 的断行与伸缩都在。
          与 MP_PDF_SHOW 的分工：SHOW 让窗口显形（人眼可看），SHOT 留图（报告可引用）。 */
-      if (process.env.MP_PDF_SHOT) {
+    if (process.env.MP_PDF_SHOT) {
         try {
           const img = await win.webContents.capturePage();
           const buf = img.toPNG();
@@ -495,7 +498,6 @@ async function printLocalHtmlToPdf({ BrowserWindow, ipcMain, htmlFile, outFile, 
           mark('shot', { file: process.env.MP_PDF_SHOT, bytes: buf.length, probe });
           kp = { ...kp, measure: probe };
         } catch (e) { mark('shot', { error: String((e && e.message) || e) }); }
-      }
     }
 
     // ── 阶段 4：printToPDF（Chromium 打印管线；printBackground 保住代码块底纹与表格边框） ──
@@ -511,6 +513,8 @@ async function printLocalHtmlToPdf({ BrowserWindow, ipcMain, htmlFile, outFile, 
       generateDocumentOutline: true,   // h1..h6 → PDF 书签（Chromium 从标题生成大纲）
       ...(print || {}),
     };
+    if (canceled()) return { ok: false, canceled: true, phases, kp };
+    mark('print-start');
     const printRace = await Promise.race([
       win.webContents.printToPDF(printOpts).then((b) => ({ ok: true, buf: b })).catch((e) => ({ ok: false, error: String(e && e.message || e) })),
       new Promise((r) => setTimeout(() => r({ ok: false, error: 'print-timeout' }), GATE.PRINT_TIMEOUT_MS)),

@@ -122,8 +122,12 @@ export function exportTypoCss() {
        编辑面那 46px 左垫是给 H1..H6 徽标悬挂用的，导出件剥掉徽标 ⇒ 不抄 46。 */
     `body{max-width:${m.width}px;margin:0 auto;padding:0 ${m.padRight}px;`
     + `font-family:var(--mp-font-body);font-size:${t.bodySize}px;line-height:${t.bodyLineHeight};color:var(--mp-fg);background:var(--mp-bg);`
-    + `text-autospace:normal;-webkit-text-stroke:${t.stroke.body} currentColor;}`,
-    `strong{font-weight:${t.stroke.strongWeight};-webkit-text-stroke:${t.stroke.strong} currentColor;}`,
+    + `text-autospace:normal;}`,
+    `strong{font-weight:${t.stroke.strongWeight};}`,
+    /* 屏幕加深不参与打印：保留原字体与字重，避免 PDF 为每个描边字形生成绘制流。
+       只限定默认补偿的媒体，不覆盖文档中显式指定的描边。 */
+    `@media screen{body{-webkit-text-stroke:${t.stroke.body} currentColor;}`
+    + `strong{-webkit-text-stroke:${t.stroke.strong} currentColor;}}`,
     /* 中文斜体楷书化：与编辑面同一款字体、同一个 1.18em 与 size-adjust（真源在 @font-face，见 index/app.css） */
     `em{font-family:'${t.kai.family}',var(--mp-font-latin),serif;font-style:italic;font-synthesis-style:none;`
     + `font-size:${t.kai.em}em;letter-spacing:${t.kai.letterSpacing};}`,

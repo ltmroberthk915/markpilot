@@ -14,11 +14,12 @@ const read=p=>p.evaluate(()=>{
  const td=document.querySelector('.mp-cell-editing'),sz=td?.querySelector('.mp-cell-source-size'),rect=e=>e?.getBoundingClientRect().toJSON()||null;
  const er=rect(el),sr=rect(sz),tr=rect(td),cs=td&&getComputedStyle(td),es=el&&getComputedStyle(el);
  const textRange=e=>{if(!e)return null;const r=document.createRange();r.selectNodeContents(e);return r.getBoundingClientRect().toJSON();};
+ const sx=er&&es?er.width/parseFloat(es.width):1,sy=er&&es?er.height/parseFloat(es.height):1,contentRect=er&&es?{left:er.left+parseFloat(es.paddingLeft)*sx,right:er.right-parseFloat(es.paddingRight)*sx,top:er.top+parseFloat(es.paddingTop)*sy,bottom:er.bottom-parseFloat(es.paddingBottom)*sy}:null;
  const cellFocus=document.hasFocus()&&ae===el,from=td?.hasAttribute('data-mp-from')?Number(td.dataset.mpFrom):null,to=td?.hasAttribute('data-mp-to')?Number(td.dataset.mpTo):null;
  const owner=window.mpEngine.__cellLayout?.()||{owner:td?{rowFrom:Number(td.dataset.mpRow),col:Number(td.dataset.mpCol)}:null,matched:!!td&&v.contentDOM.contains(td)&&from!==null&&to!==null&&[s.anchor,s.head].every(n=>n>=from&&n<=to)&&cellFocus,sizer:!!sz,observer:'live DOM fallback'};
  let domCaret=null;if(cellFocus&&ds?.focusNode&&el.contains(ds.focusNode)){let n=ds.focusNode,o=ds.focusOffset;if(n.nodeType===1){const forward=o<n.childNodes.length;n=n.childNodes[forward?o:o-1];while(n&&n.nodeType!==3)n=forward?n.firstChild:n.lastChild;if(n)o=forward?0:n.textContent.length;}if(n){const r=document.createRange();r.setStart(n,o);r.collapse(true);domCaret=r.getBoundingClientRect().toJSON();}}
  const sc=v.scrollDOM,vr=rect(sc),z=window.mpZoom.get()/100,scrollViewport={left:Math.max(0,vr.left+sc.clientLeft*z),right:Math.min(innerWidth,vr.left+(sc.clientLeft+sc.clientWidth)*z),top:Math.max(0,vr.top+sc.clientTop*z),bottom:Math.min(innerHeight,vr.top+sc.clientTop*z+sc.clientHeight*z)};
- return {text:v.state.doc.toString(),selection:{anchor:s.anchor,head:s.head},domSelection:{anchor:off(ds?.anchorNode,ds?.anchorOffset),head:off(ds?.focusNode,ds?.focusOffset)},domCaret,scrollViewport,scrollDOMRect:vr,cellFrom:from,cellTo:to,cellText:el?.textContent,cellFocus,focus:document.hasFocus()&&v.hasFocus,active:{tag:ae?.tagName,class:ae?.className},zoom:window.mpZoom.get(),owner,regions:window.mpEngine.__regions(),host:{documentId,filePath,dirty,revision,saveInFlight,saveTimer:!!saveTimer},scroll:{top:sc.scrollTop,left:sc.scrollLeft,width:sc.clientWidth,scrollWidth:sc.scrollWidth},cell:tr,source:sr,overlay:er,textRect:textRange(el),sizerText:sz?.textContent,cellFont:cs&&{family:cs.fontFamily,size:parseFloat(cs.fontSize),line:cs.lineHeight},overlayFont:es&&{family:es.fontFamily,size:parseFloat(es.fontSize),line:es.lineHeight},events:window.__sourceLayoutEvents||[]};
+ return {text:v.state.doc.toString(),selection:{anchor:s.anchor,head:s.head},domSelection:{anchor:off(ds?.anchorNode,ds?.anchorOffset),head:off(ds?.focusNode,ds?.focusOffset)},domCaret,scrollViewport,scrollDOMRect:vr,cellFrom:from,cellTo:to,cellText:el?.textContent,cellFocus,focus:document.hasFocus()&&v.hasFocus,active:{tag:ae?.tagName,class:ae?.className},zoom:window.mpZoom.get(),owner,regions:window.mpEngine.__regions(),host:{documentId,filePath,dirty,revision,saveInFlight,saveTimer:!!saveTimer},scroll:{top:sc.scrollTop,left:sc.scrollLeft,width:sc.clientWidth,scrollWidth:sc.scrollWidth},cell:tr,source:sr,overlay:er,overlayBox:rect(el?.parentElement),contentRect,textRect:textRange(el),sourceTextRect:textRange(sz),sizerText:sz?.textContent,cellFont:cs&&{family:cs.fontFamily,size:parseFloat(cs.fontSize),line:cs.lineHeight},overlayFont:es&&{family:es.fontFamily,size:parseFloat(es.fontSize),line:es.lineHeight},events:window.__sourceLayoutEvents||[]};
 });
 async function listen(p,result){
  p.on('pageerror',e=>result.errors.push({url:p.url(),error:e.message}));
@@ -73,8 +74,14 @@ function geometry(s,floor){
  assert.equal(s.sizerText,s.cellText,'active eq/payload reuse must refresh source sizer');
  assert(s.cell.height>=floor-.05,'activation preserves entry row floor');
  for(const r of [s.overlay,s.textRect]){assert(r,'complete source geometry');assert(r.left>=s.cell.left-1&&r.right<=s.cell.right+1&&r.top>=s.cell.top-1&&r.bottom<=s.cell.bottom+1,'complete source text stays inside active cell');}
- assert.equal(s.overlayFont.family,s.cellFont.family);assert(Math.abs(s.overlayFont.size-s.cellFont.size*s.zoom/100)<.05,'body overlay has same visual font scale');
- for(const k of ['left','right','top','bottom'])assert(Math.abs(s.overlay[k]-s.source[k])<1,'overlay follows full source sizer rectangle '+k);
+ // The editing portal inherits its owning scroller's zoom. Check actual glyph
+ // geometry against the independent hidden source ruler in that cell.
+ assert.equal(s.overlayFont.family,s.cellFont.family);assert(Math.abs(s.overlayFont.size-s.cellFont.size)<.05,'portal inherits the same CSS font size');
+ for(const k of ['left','right','top','bottom'])assert(Math.abs(s.textRect[k]-s.sourceTextRect[k])<1,'editable glyphs match independent source glyphs '+k);
+ for(const k of ['left','right','top','bottom']){
+  for(const r of [s.overlay,s.overlayBox])assert(Math.abs(r[k]-s.cell[k])<1,'full native editing surface follows cell border box '+k);
+  assert(Math.abs(s.contentRect[k]-s.source[k])<1,'editable content follows independent source sizer '+k);
+ }
 }
 // DOM Range is a read-only ruler. Native clicks determine actual selection.
 async function point(p,offset){return p.evaluate(offset=>{
@@ -243,4 +250,5 @@ async function main(){
   try{release();}catch(e){result.slotReleaseError=e.stack;process.exitCode=1;}result.finishedAt=new Date().toISOString();result.passed=result.cases.length>0&&result.cases.every(c=>c.status==='pass')&&!result.errors.length&&!result.fatal&&!result.slotReleaseError&&!!result.cleanup&&!result.cleanup.error&&Array.isArray(result.cleanup.residual)&&result.cleanup.residual.length===0;if(!result.passed)process.exitCode=1;write();console.log(JSON.stringify({suite:result.suite,passed:result.passed,cases:result.cases.length,expectedFullCases:result.expectedFullCases,filter:result.filter,errors:result.errors.length,cleanup:result.cleanup}));
  }
 }
-main().catch(e=>{console.error(e.stack);process.exitCode=1;});
+module.exports = { main, TABLE, TAIL, read, listen, phase, keys, insert, zoom, enter, geometry, point, visiblePoint, clickOffset, visibleCaret, fixtureMap, codepointBoundaries };
+if (require.main === module) main().catch(e => { console.error(e.stack); process.exitCode = 1; });
