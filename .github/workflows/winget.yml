@@ -64,7 +64,9 @@ jobs:
           }
           $installer = "$env:INPUT_INSTALLER_URL".Trim()
           if (-not $installer) {
-            $installer = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" --jq ".assets[] | select(.name == 'markpilot-Setup-$version.exe') | .browser_download_url" | Select-Object -First 1
+            $release = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" | ConvertFrom-Json
+            $asset = $release.assets | Where-Object { $_.name -eq "markpilot-Setup-$version.exe" } | Select-Object -First 1
+            if ($asset) { $installer = $asset.browser_download_url }
           }
           if (-not $installer) {
             throw "Release $tag has no markpilot-Setup-$version.exe asset"
