@@ -1,3 +1,9 @@
+## MarkPilot 3.6.1 · Windows
+
+Dragging a selection backward over inline math now behaves the same as dragging forward: only the formula under the caret shows its source and a single preview, while formulas already crossed stay rendered with the selection tint. After release, no extra preview boxes remain, so long selections stay clean. Other editing behavior is unchanged.
+
+**[Download installer](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.1/markpilot-Setup-3.6.1.exe)** · **[Download portable](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.1/markpilot-3.6.1-portable.exe)** · [Release notes](docs/RELEASE-3.6.1.md)
+
 ## MarkPilot 3.6.0 · Windows
 
 Long-document typing around inline math stays stable: bold paragraphs above no longer flicker or reflow on every keystroke. Press ← from the right edge of a formula, or click it, to reveal its source; the completion menu no longer covers the line being edited. Clipboard copy, cut and paste are reliable under Electron 44, cut keeps focus in the editor, and table-cell editing preserves the rest of the table.

@@ -16,9 +16,9 @@ export function createRegionSession(indexField) {
         current.selected=true;
         if(kind==='image')current.editing=r.id===image.imageId;
         else if(kind==='mermaid')current.editing=main.head>=r.from&&main.head<=r.to;
-        else if(kind==='math')current.editing ||= selection.head<r.to||(selection.head===r.to&&image.lastPointer===true);
+        else if(kind==='math')current.editing ||= selection.head>=r.from&&(selection.head<r.to||(selection.head===r.to&&image.lastPointer===true));
         else current.editing ||= selection.head>=r.from&&selection.head<=r.to;
-        current.preview=kind==='math'&&(main.head<r.to||(main.head===r.to&&image.lastPointer===true)) || kind==='image'&&current.editing;
+        current.preview=kind==='math'&&main.head>=r.from&&(main.head<r.to||(main.head===r.to&&image.lastPointer===true)) || kind==='image'&&current.editing;
         presentation.set(r.id,current);
       }
     }
