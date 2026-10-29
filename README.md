@@ -1,3 +1,10 @@
+## MarkPilot 3.6.2 · Windows
+
+本版为维护更新，编辑体验与 3.6.1 一致。重新生成并验证 Windows 安装版与便携版，日常打开、编辑、保存和导出行为不变；已有的主题、字体、自动保存和最近文件设置继续保留。
+
+**[下载安装版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.2/markpilot-Setup-3.6.2.exe)** · **[下载便携版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.2/markpilot-3.6.2-portable.exe)** · [更新说明](docs/RELEASE-3.6.2.md)
+
+
 ## MarkPilot 3.6.1 · Windows
 
 从后往前拖拽选中行内公式时，显示与从前往后一致：只有光标所在公式展开源码并显示一个预览框，已经划过的公式保持渲染和选中底色；松开鼠标后不再残留多余的预览框，长选区更清爽。其他编辑行为不变。

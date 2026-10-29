@@ -1,3 +1,10 @@
+## MarkPilot 3.6.2 · Windows
+
+This is a maintenance release. Editing behavior is unchanged from 3.6.1. The Windows installer and portable builds were rebuilt and verified; existing themes, fonts, autosave and recent-file settings are preserved.
+
+**[Download installer](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.2/markpilot-Setup-3.6.2.exe)** · **[Download portable](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.2/markpilot-3.6.2-portable.exe)** · [Release notes](docs/RELEASE-3.6.2.md)
+
+
 ## MarkPilot 3.6.1 · Windows
 
 Dragging a selection backward over inline math now behaves the same as dragging forward: only the formula under the caret shows its source and a single preview, while formulas already crossed stay rendered with the selection tint. After release, no extra preview boxes remain, so long selections stay clean. Other editing behavior is unchanged.
