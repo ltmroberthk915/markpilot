@@ -1,3 +1,10 @@
+## MarkPilot 3.6.0 · Windows
+
+Long-document typing around inline math stays stable: bold paragraphs above no longer flicker or reflow on every keystroke. Press ← from the right edge of a formula, or click it, to reveal its source; the completion menu no longer covers the line being edited. Clipboard copy, cut and paste are reliable under Electron 44, cut keeps focus in the editor, and table-cell editing preserves the rest of the table.
+
+**[Download installer](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.0/markpilot-Setup-3.6.0.exe)** · **[Download portable](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.0/markpilot-3.6.0-portable.exe)** · [Release notes](docs/RELEASE-3.6.0.md)
+
+
 ## MarkPilot 3.5.5 · Windows
 
 Source pane navigation stays aligned when zooming. Returning from a table cell to body text preserves the rendered table. Saving also works from deeper installation folders, and closing waits for saves already in progress.

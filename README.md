@@ -1,3 +1,10 @@
+## MarkPilot 3.6.0 · Windows
+
+长文档在公式行连续输入时，上方加粗段落保持稳定，不再反复闪烁或跳行；从公式右侧按 ← 或直接点击，都能展开源码，补全菜单也不再遮住当前行。Electron 44 下的剪贴板复制、剪切与粘贴更可靠，右键剪切后光标留在正文；表格单元格编辑时同表其他行保持完整。
+
+**[下载安装版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.0/markpilot-Setup-3.6.0.exe)** · **[下载便携版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.0/markpilot-3.6.0-portable.exe)** · [更新说明](docs/RELEASE-3.6.0.md)
+
+
 ## MarkPilot 3.5.5 · Windows
 
 源码分屏在页面缩放后保持更稳定的定位；从单元格回到正文编辑时，表格保持完整。较深的安装目录也能正常保存，退出时会等待已开始的保存完成。

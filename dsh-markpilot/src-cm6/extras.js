@@ -2290,7 +2290,8 @@ export function installExtras(deps) {
     /* 【普查实测·2026-10-10】原来对 DOM 选区跑 execCommand：CM6 里 DOM 选区是折叠的 ⇒ 剪贴板一字未写。
        改成读 CM 选区 → 走壳层剪贴板（与表格复制同一条 writeClip）。 */
     const selSource = selection => { try { const v = getView(); return selection.ranges.filter(r=>!r.empty).map(r=>v.state.sliceDoc(r.from,r.to)).join(v.state.lineBreak); } catch { return ""; } };
-    add("剪切", async () => {
+    const cutMenuView = getView(), cutPanel = pop;
+    const cutItem = add("剪切", async () => {
       const cutToken = window.mpHost && typeof window.mpHost.beginClipboardIntent === 'function' ? window.mpHost.beginClipboardIntent('cut') : null;
       const ticket = commands?.capture(), v = getView(), selection = ticket?.selection || v?.state.selection;
       const text = selection && selSource(selection);
@@ -2300,6 +2301,18 @@ export function installExtras(deps) {
       v.dispatch({...v.state.replaceSelection(""),userEvent:'delete.cut'});
       commands.resume(ticket);
     }, "Ctrl+X");
+    // Keep the current source owner while this asynchronous menu command starts.
+    // A later failed reply must never reclaim focus from a newer input owner.
+    cutItem.onmousedown = event => {
+      const v = getView();
+      if (!event.isTrusted || !event.cancelable || event.button !== 0 || event.buttons !== 1 ||
+          event.ctrlKey || event.shiftKey || event.altKey || event.metaKey ||
+          pop !== cutPanel || !cutPanel.isConnected || cutItem.parentNode !== cutPanel || !cutItem.contains(event.target) ||
+          v !== cutMenuView || !v?.dom.isConnected || !document.hasFocus() || !v.hasFocus ||
+          !v.contentDOM.contains(document.activeElement) || v.composing || menuTicket?.owner.kind !== 'cm' ||
+          !commands?.valid(menuTicket, { intent: false }) || !v.state.selection.eq(menuTicket.selection)) return;
+      event.preventDefault();
+    };
     add("复制", async () => {
       const copyToken = window.mpHost && typeof window.mpHost.beginClipboardIntent === 'function' ? window.mpHost.beginClipboardIntent('copy') : null;
       const ticket = commands?.capture(), selection = ticket?.selection || getView()?.state.selection;

@@ -1318,10 +1318,19 @@ function updateMathProjection(value, tr, display) {
     for (const s of state.selection.ranges) for (const r of regionsBetween(index,s.from,s.to,'math')) candidates.set(r.id,r);
   };
   addSelection(tr.startState,before); addSelection(tr.state,after);
-  const flags = (state,r) => {
+  /* 【投影只认会话呈现态·2026-10-29 实测缺陷】旧判据拿**选区几何**（head 是否落在
+     [from,to]）判断要不要重建。但同一位置在不同来源下语义不同：head===to（公式右边界）
+     方向键停在这里＝渲染态，鼠标落在这里＝编辑态（region-session 的 lastPointer 规则）。
+     结果是：①从右侧按 ←（to → to-1）或从紧后侧点公式时位置判据前后都是"在内"⇒ 不重建
+     ⇒ 源码永不展开（左侧进入会翻转几何判据，故只有左侧正常）；②在公式右侧紧后处开始
+     打字时，第一个字符让几何判据由"在内"变"在外"⇒ 重建一次**同形态的渲染 widget**，
+     白做一次 DOM 替换。
+     渲染真正读取的只有会话投影里的 editing/selected（buildInlineMath/buildBlockMath
+     的 headIn/inSel 都来自它）⇒ 判据直接用这两个值，几何量不再参与。 */
+  const intent = (state,r) => {
     if (!r) return '';
-    const ranges = state.selection.ranges;
-    return `${ranges.some(s=>s.head>=r.from&&s.head<=r.to)}:${ranges.some(s=>s.from<=r.to&&s.to>=r.from)}:${state.selection.main.head>=r.from&&state.selection.main.head<=r.to}`;
+    const p = state.field(regionSessionField, false)?.presentation.get(r.id);
+    return p ? (p.editing ? '1' : '0') + (p.selected ? '1' : '0') : '';
   };
   if (tr.docChanged || before !== after) {
     for (const id of after.invalidated) {
@@ -1332,7 +1341,7 @@ function updateMathProjection(value, tr, display) {
   for (const [id,r] of candidates) {
     const old = before.byId.get(id), next = after.byId.get(id);
     if (r.data.display !== display) continue;
-    if (tr.docChanged || old?.revision !== next?.revision || old?.contextVersion !== next?.contextVersion || flags(tr.startState,old) !== flags(tr.state,next)) ids.add(id);
+    if (tr.docChanged || old?.revision !== next?.revision || old?.contextVersion !== next?.contextVersion || intent(tr.startState,old) !== intent(tr.state,next)) ids.add(id);
   }
   let mapped = tr.docChanged ? value.map(tr.changes) : value;
   if (!ids.size) return mapped;
@@ -3507,7 +3516,7 @@ const editorContentDragDisabled = ViewPlugin.fromClass(class {
   }
 });
 
-// Blank gutter beside the active row has no native text caret. Keep the
+// Blank gutter beside a rendered row of the active table has no native text caret. Keep the
 // existing cell owner; real text, modified selection and near cells retain
 // their normal paths. This view's capture listener also covers scrollDOM.
 const cellBackgroundClick = ViewPlugin.fromClass(class {
@@ -3528,10 +3537,24 @@ const cellBackgroundClick = ViewPlugin.fromClass(class {
           mappedCellSource(owner.state.doc.sliceString(edit.from, edit.to)).text !== div.textContent) return;
       const cell = activeCellDOM(), row = cell?.closest('table.mp-row');
       if (!row || !owner.contentDOM.contains(row)) return;
-      const rr = row.getBoundingClientRect(), sr = sc.getBoundingClientRect(), z = sr.height / sc.offsetHeight;
+      const sr = sc.getBoundingClientRect(), z = sr.height / sc.offsetHeight;
       const left = sr.left + sc.clientLeft * z, top = sr.top + sc.clientTop * z;
       if (!(z > 0) || event.clientX <= left + 1 || event.clientX >= left + sc.clientWidth * z - 1 ||
-          event.clientY <= Math.max(top + 1, rr.top) || event.clientY >= Math.min(top + sc.clientHeight * z - 1, rr.bottom)) return;
+          event.clientY <= top + 1 || event.clientY >= top + sc.clientHeight * z - 1) return;
+      // Rows are separate widgets. Resolve their shared source owner instead
+      // of using the active row's (or its per-row wrapper's) vertical bounds.
+      const table = tableTablesOf(owner.state).find(tb => active.rowFrom >= tb.from && active.rowFrom <= tb.to);
+      if (!table) return;
+      const rowStarts = new Set([table.headerBlock.from, ...table.rows.map(r => r.from)]);
+      let besideTableRow = false;
+      for (const renderedRow of owner.contentDOM.querySelectorAll('table.mp-row')) {
+        const firstCell = renderedRow.querySelector('th[data-mp-row], td[data-mp-row]');
+        if (!firstCell || !rowStarts.has(Number(firstCell.dataset.mpRow))) continue;
+        const r = renderedRow.getBoundingClientRect();
+        if (event.clientY > r.top && event.clientY < r.bottom &&
+            (event.clientX < r.left || event.clientX > r.right)) { besideTableRow = true; break; }
+      }
+      if (!besideTableRow) return;
       for (const c of owner.contentDOM.querySelectorAll('.mp-row th[data-mp-row], .mp-row td[data-mp-row]')) {
         const r = c.getBoundingClientRect();
         const dx = Math.max(r.left - event.clientX, 0, event.clientX - r.right);

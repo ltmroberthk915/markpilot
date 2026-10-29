@@ -56,7 +56,20 @@ function place() {
   const below = c.bottom + 6;
   const flip = below + h > window.innerHeight - 8;
   const left=Math.min(c.left,Math.max(8,window.innerWidth-box.offsetWidth-8));
-  const slot=verticalFrame({bounds:{top:8,bottom:innerHeight-8},anchor:c,left,width:box.offsetWidth,height:h,obstacles:[...controlObstacles(owned,2),c]});
+  /* 【补全菜单不许盖住编辑行·2026-10-29 实测缺陷】原障碍表给的是**零宽光标矩形**：
+     verticalFrame 的横向相交判据 `r.right > left` 对零宽矩形恒假 ⇒ 光标行根本不算障碍。
+     当候选表高于视口上/下任一侧的剩余空间（LaTeX 列表很长、窗口又矮）时，回落分支把
+     菜单顶到视口顶端并向下撑满 ⇒ 直接盖住正在输入的公式与光标（用户截图）。⇒ 用光标所在
+     行的真实 DOM 行盒当障碍：菜单只能在行上方或下方落位，空间不足时压缩高度滚动显示。 */
+  let row = c;
+  try {
+    for (const el of view.contentDOM.querySelectorAll('.cm-line')) {
+      const r = el.getBoundingClientRect();
+      if (c.top >= r.top - 1 && c.top <= r.bottom + 1) { row = r; break; }
+    }
+  } catch { }
+  const lineBlock = { left: row.left - 2, right: row.right + 2, top: row.top - 8, bottom: row.bottom + 8 };
+  const slot=verticalFrame({bounds:{top:8,bottom:innerHeight-8},anchor:c,left,width:box.offsetWidth,height:h,obstacles:[...controlObstacles(owned,2),lineBlock]});
   return {left,top:slot?.top??(flip?Math.max(8,c.top-h-6):below),height:slot?.height??h};
   },write(value){
     if(!value||view!==owned||view.state!==state||tokenFrom!==from||tokenTo!==to||box.style.display==='none')return;
@@ -73,6 +86,15 @@ function render() {
     `<span class="d">${escapeHtml(row.detail || "")}</span></div>`).join("");
   el.style.display = "block";
   place();
+  /* 【落位收敛·2026-10-29 实测】菜单首次出现会让编辑器行盒/滚动再排几像素（实测 4.4px），
+     单次测量会把菜单放到与光标行相切处。两帧内复测两次，让 top/maxHeight 按最终布局收敛。 */
+  const token = (el.__mpSettleToken = (el.__mpSettleToken || 0) + 1);
+  const settle = n => requestAnimationFrame(() => {
+    if (el.__mpSettleToken !== token || !el.isConnected || el.style.display === "none") return;
+    place();
+    if (n > 1) settle(n - 1);
+  });
+  settle(2);
   const cur = el.querySelector(".is-active");
   if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest" });
 }

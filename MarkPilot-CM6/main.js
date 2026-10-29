@@ -6,7 +6,12 @@ const pdfWorkerArgument=process.argv.find(a=>a.startsWith('--mp-pdf-worker='));
 if(pdfWorkerArgument){require('./shell/pdf-worker').run(pdfWorkerArgument.slice('--mp-pdf-worker='.length));return;}
 /* nativeImage 是「图片进剪贴板」的前置：普查实测漏了它 ⇒ 图片右键「复制图片」必然失败
    （nativeImage is not defined 被 try/catch 吞成 {ok:false}，用户看到"复制图片失败"）。 */
-const { app, BrowserWindow, Menu, dialog, ipcMain, shell, nativeTheme, net, clipboard, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain, shell, nativeTheme, net, clipboard, nativeImage, ClipboardItem } = require('electron');
+/* api44-fix-r1: Electron 44 public clipboard adaptation (allowlisted MIME items,
+ * serialized native-write lane, factory DI for unit tests; no legacy API emulation,
+ * no private native bindings). */
+const { createClipboardService } = require('./shell/clipboard-service.js');
+const clipService = createClipboardService({ clipboard, nativeImage, ClipboardItem, dbg: (...a) => dbg(...a) });
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
@@ -443,9 +448,28 @@ function copyCurrentFilePath(W = activeWindow()) {
     return 'canceled';
   }
   try {
-    if (!consumeClipboardIntent(wc, begun.token)) { dbg('menu:copy-path:canceled'); return 'canceled'; }
-    clipboard.writeText(m.path);
-    dbg('menu:copy-path', m.path);
+    /* api44: writeText is a Promise — commit through the shared native lane with the
+     * SAME real head-guard/consume as every writer (no trivial pass-through): a newer
+     * user intent B can still cancel this not-yet-started menu A at the lane head.
+     * Menu keeps its no-adoption-wait semantics: adopted at head is terminal canceled
+     * for this token. The click path performs no await before enqueue; the outcome is
+     * logged here and observed for real via recent:test-copy-path (idle + readText). */
+    clipService.enqueueWrite({
+      label: 'menu-copy-path', items: clipService.buildItems({ text: m.path }).items,
+      guard: () => clipboardIntentIdentity(wc, begun.token)
+        ? (openTransactions.get(wc.id) && openTransactions.get(wc.id).phase === 'adopted' ? 'adopted' : 'ok')
+        : 'stale',
+      consume: () => clipboardIntentCurrent(wc, begun.token) ? consumeClipboardIntent(wc, begun.token) : false,
+    }).then((out) => {
+      if (out.status === 'committed') dbg('menu:copy-path', m.path);
+      else if (out.status === 'failed') dbg('menu:copy-path:failed', out.error || out.status);
+      else {
+        /* skipped (adopted/stale) or canceled: terminal — retire the same token so a
+         * later rollback cannot revive it (consume is a no-op when identity failed). */
+        consumeClipboardIntent(wc, begun.token);
+        dbg('menu:copy-path:canceled');
+      }
+    }).catch((e) => { dbg('menu:copy-path:failed', String((e && e.message) || e)); }); /* B1: end-of-chain catch so the fire-and-forget itself never creates an unobserved rejection */
     return m.path;
   } catch (e) {
     dbg('menu:copy-path:failed', String((e && e.message) || e));
@@ -1139,7 +1163,7 @@ if (MP_TEST_HOOKS) {
    * 【为什么返回里要带 `clipboardText` 而不是靠 click 的返回值】实测：Electron 的
    * `menuItem.click()` 返回 `undefined`（它忽略回调的返回值）——所以"点了之后剪贴板里到底是什么"
    * 只能**自己去读**（`clipboard.readText()`），不能把 click 的返回值当成结果。 */
-  handle('recent:test-copy-path', () => {
+  handle('recent:test-copy-path', async () => {
     const it = (() => {
       const menu = Menu.getApplicationMenu();
       const find = (items, id) => {
@@ -1150,8 +1174,12 @@ if (MP_TEST_HOOKS) {
     })();
     if (!it || typeof it.click !== 'function') return { ok: false, error: '没有找到 menu-copy-file-path 菜单项' };
     const ret = it.click();                                  // Electron 忽略返回值，这里只记录它
-    const after = (() => { try { return clipboard.readText(); } catch { return null; } })();
-    return { ok: true, returned: ret === undefined ? null : ret, menuEnabled: it.enabled, stateFilePath: state.filePath, clipboardText: after };
+    /* api44: the click only ENQUEUES the native write; await the shared lane to drain,
+     * then await readText for the real clipboard content — never a Promise in the reply. */
+    await clipService.idle();
+    let after = null;
+    try { after = await clipboard.readText(); } catch { after = null; }
+    return { ok: true, returned: ret === undefined ? null : ret, menuEnabled: it.enabled, stateFilePath: state.filePath, clipboardText: typeof after === 'string' ? after : null };
   });
   /* 把**当前生效的「文件」子菜单**原样弹出来（原生菜单，供桌面抓屏取证）。
    * 【为什么需要这条】CDP 拍不到原生菜单；Windows 上程序化打开菜单栏也不可用 —— 实测三条都被否掉：
@@ -1570,11 +1598,11 @@ handle('setting:set', (_e, payload = {}) => {
 /* 【尺子·2026-10-10】读系统剪贴板里有没有位图：渲染进程的 navigator.clipboard.read()
    不保证报告 OS 剪贴板的 image 口味（实测复制图片后那里只有 text/plain），
    壳层的 clipboard.readImage() 才是权威读数。 */
-handle('clipboard:hasImage', () => {
+handle('clipboard:hasImage', async () => {
   try {
-    const img = clipboard.readImage();
-    const size = img.isEmpty() ? { width: 0, height: 0 } : img.getSize();
-    return { ok: true, hasImage: !img.isEmpty(), width: size.width, height: size.height, textLen: clipboard.readText().length };
+    /* api44: readImage() is removed — the service awaits public read()/readText()
+     * and preserves the historical {ok,hasImage,width,height,textLen} reply shape. */
+    return await clipService.readInfo();
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
 async function imgSourceBytes(src, docPath) {
@@ -1661,9 +1689,40 @@ handle('clipboard:writeImage', async (e, payload = {}, token) => {
     if (!clipboardIntentFrameOk(e.sender, requestFrame)) return clipboardIntentRejectFrame(e.sender, requestFrame, token);
     if (!clipboardIntentCurrent(e.sender, token)) return clipboardIntentTerminate(e.sender, token);
     if (!img || img.isEmpty()) return { ok: false, error: "bad-image" };
-    if (!consumeClipboardIntent(e.sender, token)) return clipboardIntentCanceled();
-    clipboard.writeImage(img);
+    /* api44: clipboard.writeImage() is removed. Build allowlisted items from the
+     * validated NativeImage (toPNG) BEFORE enqueue; the shared lane holds only the
+     * native write promise, head-guard re-verifies synchronously, consume+write are
+     * adjacent. Adopted-at-head: the lane is released and the adoption settles
+     * OUTSIDE the lane (never awaited on the lane); the loop then re-enqueues and
+     * re-settles each further genuinely-adopted event the same way — no fixed
+     * retry count is claimed. */
+    const built = clipService.buildItems({ png: img.toPNG() });
+    if (!built.ok) return { ok: false, error: built.error };
     const size = img.getSize();
+    for (;;) {
+      const out = await clipService.enqueueWrite({
+        label: 'clipboard:writeImage', items: built.items,
+        guard: () => clipboardIntentIdentity(e.sender, token) && clipboardIntentFrameOk(e.sender, requestFrame)
+          ? (openTransactions.get(e.sender.id) && openTransactions.get(e.sender.id).phase === 'adopted' ? 'adopted' : 'ok')
+          : 'stale',
+        consume: () => clipboardIntentCurrent(e.sender, token) ? consumeClipboardIntent(e.sender, token) : false,
+      });
+      if (out.status === 'committed') break;
+      /* canceled (head consume() false) and stale both follow the ORIGINAL terminal
+       * contract: retire the captured same token via clipboardIntentTerminate —
+       * consume only applies while identity still matches, so a newer B is never
+       * swallowed and a rollback cannot revive this token. */
+      if (out.status === 'canceled') return clipboardIntentTerminate(e.sender, token);
+      if (out.status === 'failed') return { ok: false, failed: true, status: 'failed', error: out.error };
+      if (out.reason === 'stale') return clipboardIntentTerminate(e.sender, token);
+      if (e.sender.isDestroyed()) return clipboardIntentCanceled();
+      if ((await adoptedGate(e.sender, token)) !== 'proceed') return clipboardIntentCanceled();
+      if (!clipboardIntentFrameOk(e.sender, requestFrame)) return clipboardIntentRejectFrame(e.sender, requestFrame, token);
+    }
+    /* post-commit: intent/document must still be ours IGNORING the consumed flag
+     * (clipboardIntentCurrent is unusable after consume by design); a superseded
+     * old token keeps the existing canceled shape so the source text is preserved. */
+    if (!clipboardIntentOwnerIntactAfterConsume(e.sender, token)) return clipboardIntentCanceled();
     return { ok: true, width: size.width, height: size.height };
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
@@ -1713,6 +1772,24 @@ function clipboardIntentFrameOk(sender, frame) {
 function clipboardIntentCurrent(sender, token) {
   const I = clipboardIntent;
   if (!clipboardIntentIdentity(sender, token)) return false;
+  if (!clipboardWindowOf(sender)) return false;
+  if (!sender.mainFrame || (typeof sender.mainFrame.isDestroyed === 'function' && sender.mainFrame.isDestroyed())) return false;
+  if (I.mainFrame !== sender.mainFrame) return false;
+  const S = sessions.get(sender.id);
+  if (!S || S !== I.session) return false;
+  if (S.documentId !== I.documentId) return false;
+  return true;
+}
+/* post-commit owner check (api44): after a committed native write the token is
+ * already consumed, so clipboardIntentCurrent would always fail by design. This
+ * variant repeats the captured-owner/current-document verification while
+ * deliberately ignoring ONLY the consumed flag: token still ours, sender alive,
+ * frame still the captured mainFrame, session object and documentId unchanged.
+ * Any mismatch returns false and callers reply with the existing canceled shape
+ * (source text preserved; a superseded old token never speaks for the present). */
+function clipboardIntentOwnerIntactAfterConsume(sender, token) {
+  const I = clipboardIntent;
+  if (typeof token !== 'string' || !token || I.token !== token || I.sender !== sender) return false;
   if (!clipboardWindowOf(sender)) return false;
   if (!sender.mainFrame || (typeof sender.mainFrame.isDestroyed === 'function' && sender.mainFrame.isDestroyed())) return false;
   if (I.mainFrame !== sender.mainFrame) return false;
@@ -1799,7 +1876,7 @@ function clipboardIntentOnNavigation(W) {
 }
 const CLIPBOARD_IMAGE_SYNC_MAX_BYTES = 48 * 1024 * 1024;
 const CLIPBOARD_IMAGE_SYNC_MAX_PIXELS = 64000000;
-ipcMain.on('clipboard:writeImageSync', (event, payload = {}, token) => {
+ipcMain.on('clipboard:writeImageSync', async (event, payload = {}, token) => {
   const reject = (error) => { try { event.returnValue = { ok: false, error }; } catch { } };
   try {
     if (!event || !event.sender || event.sender.isDestroyed()) return reject('sender-closed');
@@ -1855,9 +1932,34 @@ ipcMain.on('clipboard:writeImageSync', (event, payload = {}, token) => {
     if (image.isEmpty()) return reject('bad-image');
     const size = image.getSize();
     if (!size.width || !size.height || size.width * size.height > CLIPBOARD_IMAGE_SYNC_MAX_PIXELS || size.width > 32768 || size.height > 32768) return reject('image-too-large');
-    if (!consumeClipboardIntent(event.sender, payloadToken)) return rejectCanceled();
-    clipboard.write(payload.html ? { text: payload.text, html: payload.html, image } : { text: payload.text, image });
-    event.returnValue = { ok: true, width: size.width, height: size.height };
+    /* api44 sync bridge: clipboard.write({text,html,image}) is removed. Build the
+     * allowlisted items (image/png from the validated NativeImage.toPNG()), then
+     * commit on the shared native lane. The lane holds ONLY the native write
+     * promise — the Electron 44 wrapper is native-only with no renderer callbacks,
+     * so awaiting it cannot deadlock a sendSync-blocked renderer, and event.returnValue
+     * is assigned strictly AFTER the native outcome; every path replies exactly once,
+     * with no timeout that could fake a failure while a real write still lands late. */
+    const built = clipService.buildItems({ text: payload.text, html: payload.html || undefined, png: image.toPNG() });
+    if (!built.ok) return reject(built.error);
+    const out = await clipService.enqueueWrite({
+      label: 'clipboard:writeImageSync', items: built.items,
+      guard: () => clipboardIntentIdentity(event.sender, payloadToken) && clipboardIntentFrameOk(event.sender, event.senderFrame)
+        ? (openTransactions.get(event.sender.id) && openTransactions.get(event.sender.id).phase === 'adopted' ? 'adopted' : 'ok')
+        : 'stale',
+      consume: () => clipboardIntentCurrent(event.sender, payloadToken) ? consumeClipboardIntent(event.sender, payloadToken) : false,
+    });
+    if (out.status === 'committed') {
+      if (!clipboardIntentOwnerIntactAfterConsume(event.sender, payloadToken)) return rejectCanceled();
+      event.returnValue = { ok: true, width: size.width, height: size.height };
+      return;
+    }
+    if (out.status === 'failed') { event.returnValue = { ok: false, failed: true, status: 'failed', error: out.error }; return; }
+    /* skipped (adopted/stale) or canceled: terminal canceled — consume/retire the
+     * same token (a no-op when identity already failed) so a later rollback cannot
+     * revive a token this bridge already answered canceled; the current B is never
+     * swallowed. */
+    consumeClipboardIntent(event.sender, payloadToken);
+    rejectCanceled();
   } catch (e) { reject(String((e && e.message) || e)); }
 });
 handle('clipboard:write', async (_e, p, token) => {
@@ -1888,10 +1990,41 @@ handle('clipboard:write', async (_e, p, token) => {
       if (!clipboardIntentFrameOk(_e.sender, requestFrame)) { const r = clipboardIntentRejectFrame(_e.sender, requestFrame, token); dbg('clipboardWrite:canceled', { seq }); return r; }
       if (!clipboardIntentCurrent(_e.sender, token)) return terminate();
     }
-    /* validate+consume+写盘相邻，之间无 await；消费的是 captured/current 同一个 token（不会吞 B）。
-       写盘抛错 = failed 而非 success（consume 先于同步写）。 */
-    if (!consumeClipboardIntent(_e.sender, token)) return canceled();
-    if (html) clipboard.write({ text, html }); else clipboard.writeText(text);
+    /* api44: clipboard.write({text,html}) object form is removed (it produces a
+     * REJECTED un-awaited Promise — the r2a false-ack root cause). Build allowlisted
+     * items, then commit through the shared native lane: head-guard re-verifies
+     * identity/frame/adopted synchronously; consume and the single awaited native
+     * write are adjacent with no await between; ONLY the native write promise
+     * occupies the lane. Adopted-at-head releases the lane, settles the adoption
+     * OUTSIDE it, then re-enqueues; each further genuinely-adopted event is
+     * re-settled the same way — no fixed retry count is claimed, and the renderer
+     * is never awaited inside the lane. */
+    const built = clipService.buildItems({ text: text || undefined, html: html || undefined });
+    if (!built.ok) return failed(new Error(built.error));
+    for (;;) {
+      const out = await clipService.enqueueWrite({
+        label: 'clipboard:write#' + seq, items: built.items,
+        guard: () => clipboardIntentIdentity(_e.sender, token) && clipboardIntentFrameOk(_e.sender, requestFrame)
+          ? (openTransactions.get(_e.sender.id) && openTransactions.get(_e.sender.id).phase === 'adopted' ? 'adopted' : 'ok')
+          : 'stale',
+        consume: () => clipboardIntentCurrent(_e.sender, token) ? consumeClipboardIntent(_e.sender, token) : false,
+      });
+      if (out.status === 'committed') break;
+      /* canceled (head consume() false) and stale both follow the ORIGINAL terminal
+       * contract: retire the captured same token via terminate() — consume only
+       * applies while identity still matches, so a newer B is never swallowed and a
+       * rollback cannot revive this token. */
+      if (out.status === 'canceled') return terminate();
+      if (out.status === 'failed') return failed(new Error(out.error));
+      if (out.reason === 'stale') return terminate();
+      if (_e.sender.isDestroyed()) return canceled();
+      if ((await adoptedGate(_e.sender, token)) !== 'proceed') return canceled();
+      if (!clipboardIntentFrameOk(_e.sender, requestFrame)) { const r = clipboardIntentRejectFrame(_e.sender, requestFrame, token); dbg('clipboardWrite:canceled', { seq }); return r; }
+    }
+    /* post-commit owner check IGNORING the consumed flag (clipboardIntentCurrent
+     * is unusable after consume by design); a superseded old token keeps the
+     * existing canceled shape so the source text is preserved. */
+    if (!clipboardIntentOwnerIntactAfterConsume(_e.sender, token)) return canceled();
     dbg('clipboardWrite:committed', { seq, bytes: text.length, hasHtml: !!html });
     return { ok: true, bytes: text.length, hasHtml: !!html };
   } catch (e) { return failed(e); }

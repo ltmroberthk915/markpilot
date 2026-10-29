@@ -24,19 +24,49 @@ export function createAsyncMarkdown(base, { threshold = 128 * 1024 } = {}) {
       const s = inserted.toString(); mayHTML ||= s.includes('<');
       mayContainer ||= markers.test(s) || markers.test(doc.lineAt(from).text) || markers.test(doc.lineAt(to).text);
     });
-    const ranges = []; changes?.iterChangedRanges((fromA,toA,fromB,toB)=>ranges.push({fromA,toA,fromB,toB}));
-    return { doc, revision: ++revision, status: 'pending', promise, settle, wire: null, mayContainer, mayHTML,
+    const ranges = []; let changedFrom = -1;
+    changes?.iterChangedRanges((fromA,toA,fromB,toB)=>{ ranges.push({fromA,toA,fromB,toB}); if (changedFrom < 0 || fromB < changedFrom) changedFrom = fromB; });
+    return { doc, revision: ++revision, status: 'pending', promise, settle, wire: null, mayContainer, mayHTML, changedFrom,
       forceNative: !!(before && armedDoc === before.doc), fragments: before ? TreeFragment.applyChanges(before.fragments, ranges) : [] };
   };
   const field = StateField.define({
     create: state => entry(state.doc),
     update: (value, tr) => tr.docChanged ? entry(tr.state.doc, value, tr.changes) : value,
   });
-  const counters = { requests: 0, resets: 0, deltas: 0, completed: 0, discarded: 0, nativeFallback: 0, commandFallback: 0, error: null };
+  const counters = { requests: 0, resets: 0, deltas: 0, completed: 0, discarded: 0, nativeFallback: 0, prefixFallback: 0, commandFallback: 0, error: null };
   const parser = base.parser.configure({ wrap(inner, input, fragments, ranges) {
     const pending = ParseContext.get()?.state.field(field, false);
     if (!pending || ranges.length !== 1 || ranges[0].from !== 0 || ranges[0].to !== input.length || pending.doc.length !== input.length) return inner;
     if (pending.status === 'ready') return createReadyPartial({ wire: pending.wire, nodeSet: base.parser.nodeSet, codec, inputLength: input.length });
+    if (pending.status === 'pending' && !pending.forceNative && pending.changedFrom > 0 && pending.fragments.length) {
+      /* 【编辑期高亮闪烁·2026-10-29 实测缺陷】pending 时全量解析返回 skip 解析器的
+         **空 Document 树**。Worker 回包或命令路径触发全量解析时，若新 revision 仍在
+         pending，这棵空树会替换上一棵完整树 ⇒ 整篇可见高亮消失（粗体 900→400、字形
+         宽度变化导致换行重排），用户看到"上面加粗段落反复渲染"（10fps 连拍：前一段
+         regular / 后一段 bold）。
+         修复：pending 且有旧树片段时，只用旧片段原生解析到**本次改动起点之前**，
+         返回一棵带 stoppedAt 的部分树——改动点之前的段落/标题保持原有高亮，改动点
+         及其后仍标为未解析（available 依旧 false，命令仍走 ensureForCommand 的
+         forceNative 完整解析，契约不变）。改动从 0 开始（整篇替换）时仍走 skip。 */
+      counters.prefixFallback++;
+      /* 末尾删除时 changedFrom 会等于新文档长度：直接解析到 changedFrom 等于整篇
+         完成，syntaxTreeAvailable 变 true，pending 契约被破坏。至少留最后一个字符
+         未解析（树长 length-1），既保住上方高亮，又让 available 仍为 false。 */
+      const stop = Math.min(pending.changedFrom, input.length - 1);
+      if (stop <= 0) return inner;
+      const copies = new Map();
+      const fragments = pending.fragments.map(f => {
+        if (!copies.has(f.tree)) copies.set(f.tree, codec.decode(codec.encode(f.tree, base.parser.nodeSet), base.parser.nodeSet));
+        return new TreeFragment(f.from, f.to, copies.get(f.tree), f.offset, f.openStart, f.openEnd);
+      });
+      const sub = base.parser.startParse(input, fragments, [{ from: 0, to: stop }]);
+      return {
+        get parsedPos() { return sub.parsedPos; },
+        get stoppedAt() { return stop; },
+        stopAt(pos) { sub.stopAt(Math.min(pos, stop)); },
+        advance() { return sub.advance(); },
+      };
+    }
     if (pending.status === 'failed' || pending.forceNative) {
       counters.nativeFallback++;
       if (!pending.fragments.length) return inner;
