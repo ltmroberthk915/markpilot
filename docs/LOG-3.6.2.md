@@ -10,10 +10,10 @@
 
 ## 普通用户 token owner 实验
 
-- 尝试在远端创建临时标准用户并运行 Node/PowerShell 新建与 rename 控制实验。
-- 该主机策略阻止非管理员 token 非交互启动：`Start-Process -Credential` 返回 `0xC0000142`；计划任务以该标准用户运行时未实际启动（结果 267011）。
-- 临时用户、计划任务与 ProgramData 临时目录已清理，系统未保留实验账号。
-- 结论仍停留在管理员 token 资格化：同一管理员 token 下 Node/PowerShell 新建与 rename 控制文件 owner 全部是 `BUILTIN\Administrators`；普通用户 token 未取得实测，不能宣布普通用户必现或已修复。
+- 远端临时标准用户非交互启动被主机策略阻止：`Start-Process -Credential` 返回 `0xC0000142`；计划任务未实际启动（结果 267011）。临时用户、任务与 ProgramData 目录已清理。
+- 本机 DSH 进程本身是普通用户 token（`LAPTOP-5NTLMFRQ\Ming`，Administrators 为 deny-only，Medium 完整性）。用同一套 Node/PowerShell 新建与 rename 控制在 `D:\BuyKey\owner-qual-normal-user-20261029` 实测：四个控制文件 owner 全部是 `LAPTOP-5NTLMFRQ\Ming`，`isAdmin=false`。
+- 回执：`OWNER-QUALIFICATION-NORMAL-USER.json` 与 `SAVE-METADATA-OWNER-QUALIFICATION.md`。
+- 结论：管理员 token 下 `owner -> BA` 是 token 默认 owner 行为；普通用户 token 下新建/rename 保持用户 owner。普通用户 token 上未单独重放 MarkPilot 原子保存，因此保留“产品是否应显式保留自定义 owner”的策略边界。
 
 ## 构建与打包
 
