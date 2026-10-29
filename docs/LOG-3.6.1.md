@@ -41,9 +41,11 @@
 
 ## GitHub Release
 
-- 发布提交：TBD；标签：TBD。
-- Release：`https://github.com/ltmroberthk915/markpilot/releases/tag/v3.6.1`；附件：安装版、便携版、`SHA256SUMS.txt`。TBD。
-- GitHub 附件 digest 与本地一致性：TBD。
+- 发布提交：`b5490e1cdb14bf5c5896129e0554e049f101d73b`（`release: MarkPilot 3.6.1`），父提交为公开 `c27098bb282704006a246cbeafcd955c52e228b0`；目标分支 `main`。
+- 标签：`v3.6.1`（annotated，tag object `40f79fbcb0c0465d5805acba1a06ad132a59b7a9`）。
+- Release：`https://github.com/ltmroberthk915/markpilot/releases/tag/v3.6.1`，正文取自 `docs/RELEASE-3.6.1.md`；已标记 Latest；附件已上传安装版、便携版与 `SHA256SUMS.txt`。
+- 附件：安装版 117,592,434 B / `0a18783b4bb3a7b9e9d4c6eee05f9a4a9af09e1a95aeacbb99f5bcac45bebc45`；便携版 117,331,152 B / `88731240dce39ab125772eb4c7aa4d0c1282396e61fbcf2ed49b302d0cad98af`；校验文件 187 B / `efa5050e467af02ed8519c42bf70c67b1e4583cd8cccb242b0d30b6e62d734d8`。
+- GitHub 计算的附件 digest 与本地逐项一致；release 已发布，非 draft、非 prerelease。
 
 ## 保留项
 
