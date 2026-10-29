@@ -35,12 +35,13 @@
 - 安装后的 3.6.2 正常启动并恢复 `doc-copy.md` 窗口，关闭正常。
 - 本机重建的便携版从临时目录启动，同样恢复 `doc-copy.md` 窗口，关闭正常；7-Zip 解包核对 80 个运行时文件、394,177,405 B，`MarkPilot.exe` `3.6.2.0`/`3.6.2` / `f9140880…`，ASAR `c9d580b3…`，与安装版载荷一致。
 
-## 发布（本地）
+## GitHub Release
 
 - 发布提交：`8005fc97b7044c6d7399c208c6f00a833d3cdb9b`（`release: MarkPilot 3.6.2`），父提交 `7e03ddb`；目标分支 `main`。
-- 标签：`v3.6.2`（annotated，tag object `75a5dde7c0451eee2b8ca39d7d34997afa449265`）。
-- 本地附件目录：`D:\BuyKey\markpilot-3.6.2`；安装版 `b5b8c1d0…`，便携版 `414464ce…`，SHA256SUMS 187 B。
-- 未推送到 GitHub，未创建 GitHub Release；本轮只完成本地打包与本地装机。
+- 标签：`v3.6.2`（annotated，tag object `75a5dde7c0451eee2b8ca39d7d34997afa449265`），远端 tag 指向 `8005fc9`。
+- `main` 与标签已推送；GitHub Release：`https://github.com/ltmroberthk915/markpilot/releases/tag/v3.6.2`，目标 `main`，非 draft、非 prerelease，已标记 Latest。
+- 附件（Release API 回读）：安装版 117,592,422 B / `sha256:b5b8c1d0…5ad`；便携版 102,526,625 B / `sha256:414464ce…d65`；`SHA256SUMS.txt` 187 B / `sha256:c5c1e23c…208`；三份附件服务端 digest 与本地 SHA-256 一致。
+- Release 正文取自 `docs/RELEASE-3.6.2.md`；本地附件目录：`D:\BuyKey\markpilot-3.6.2`。
 
 ## 保留项
 
