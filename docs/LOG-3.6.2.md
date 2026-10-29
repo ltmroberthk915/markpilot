@@ -35,6 +35,13 @@
 - 安装后的 3.6.2 正常启动并恢复 `doc-copy.md` 窗口，关闭正常。
 - 本机重建的便携版从临时目录启动，同样恢复 `doc-copy.md` 窗口，关闭正常。
 
+## 发布（本地）
+
+- 发布提交：`8005fc97b7044c6d7399c208c6f00a833d3cdb9b`（`release: MarkPilot 3.6.2`），父提交 `7e03ddb`；目标分支 `main`。
+- 标签：`v3.6.2`（annotated，tag object `75a5dde7c0451eee2b8ca39d7d34997afa449265`）。
+- 本地附件目录：`D:\BuyKey\markpilot-3.6.2`；安装版 `b5b8c1d0…`，便携版 `414464ce…`，SHA256SUMS 187 B。
+- 未推送到 GitHub，未创建 GitHub Release；本轮只完成本地打包与本地装机。
+
 ## 保留项
 
 - `PERF-INACTIVE-TABLE-ROW-REMOUNT` 未修复，按用户决定留给 Codex 后续处理。
