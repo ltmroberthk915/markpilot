@@ -1,0 +1,70 @@
+{
+  "name": "dsh-markdown",
+  "version": "0.2.0",
+  "description": "MarkPilot CM6 3.6.2 Markdown editor for the DeepSeek Harness sidebar: selection-to-chat insertion and version-guarded saves.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "icon": "./icon.svg",
+  "files": [
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "icon.svg",
+    "cordis.patch.yml",
+    "core.json",
+    "lib/index.js",
+    "lib/client.js",
+    "renderer-cm6",
+    "README.md"
+  ],
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "markdown",
+    "editor",
+    "codemirror"
+  ],
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.0-rc.2"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": []
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.2.0-rc.2"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "sync:core": "node scripts/sync-core.mjs",
+    "check:core": "node scripts/sync-core.mjs --check",
+    "test": "node --test test/client.test.mjs test/host.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ltmroberthk915/markpilot.git",
+    "directory": "dsh-markdown"
+  },
+  "homepage": "https://github.com/ltmroberthk915/markpilot/tree/main/dsh-markdown",
+  "bugs": {
+    "url": "https://github.com/ltmroberthk915/markpilot/issues"
+  }
+}

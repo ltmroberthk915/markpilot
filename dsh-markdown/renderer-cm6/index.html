@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <title>dsh-markdown · CM6 皮</title>
+  <!-- 目录形状契约（ARCHITECTURE §4）：
+       location.href = .../renderer-cm6/index.html
+       currentScript = .../renderer-cm6/cm6/app.js
+       Worker/mermaid/KaTeX 字体全部相对 cm6/ 解析 ⇒ 必须保持 index.html 在上一级。
+       base 用 ./，保证引擎内部所有相对 URL 都落在本插件的 renderer-cm6/ 下。 -->
+  <base href="./" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- 安全边界：脚本只许同源；样式允许引擎用内联 <style>/style 属性注入调色板；
+       图片放行 data/blob/https/http（Markdown 外链图）；字体同源。 -->
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; script-src 'self'; connect-src 'self' data: blob:; worker-src 'self' blob:" />
+  <link rel="stylesheet" href="cm6/app.css" />
+  <!-- 桥必须先于引擎加载：引擎在脚本尾部调用 window.handler.on(...) 注册下行处理。 -->
+  <script src="dsh-bridge.js"></script>
+  <!-- 选区浮按钮在 app.js 之后执行（defer 保证正文脚本先跑完）；它只读引擎 state，不改。 -->
+  <script src="dsh-selection.js" defer></script>
+  <style>
+    /* ── DSH 皮：只做三件事 ─────────────────────────────────────────────
+       1) 给 iframe 一个不会白闪的首帧底色（引擎 boot 后由 --mp-bg 接管）；
+       2) 选中浮按钮（dsh-selection.js 只加行为，样式归皮）；
+       3) 轻提示（父窗口 toast 在引擎 toast 层不可用时的兜底）。
+       纪律：不覆盖引擎的 html/body/.cm-editor 背景（引擎注入的 CSS 是后写者），
+       不引入第二套文档/主题变量；明暗只跟随 <html data-dsh-theme>。 */
+    html {
+      background: #2E3440;
+      color-scheme: dark;
+    }
+
+    @media (prefers-color-scheme: light) {
+      html {
+        background: #FAF9F6;
+        color-scheme: light;
+      }
+    }
+
+    html[data-dsh-theme="dark"] {
+      background: #2E3440;
+      color-scheme: dark;
+    }
+
+    html[data-dsh-theme="light"] {
+      background: #FAF9F6;
+      color-scheme: light;
+    }
+
+    /* 全屏编辑面（引擎 boot 会把 #editor 包进 .mp-zoom-wrap；两者都占满即可） */
+    #editor {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── 选中浮按钮 ───────────────────────────────────────────────────
+       position:fixed + transform 定位；不参与引擎 .cm-editor 的 zoom 坐标系。
+       默认 display:none，由 dsh-selection 的 data-on 切换；首帧不可见，零占用。 */
+    #dsh-md-insert {
+      position: fixed;
+      left: 0;
+      top: 0;
+      z-index: 100000;
+      display: none;
+      align-items: center;
+      gap: 5px;
+      height: 30px;
+      padding: 0 11px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, .14);
+      background: #2b303a;
+      color: #e9ecf1;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, .32);
+      font: 500 12.5px/1 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+      letter-spacing: .01em;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      will-change: transform;
+    }
+
+    #dsh-md-insert[data-on="1"] {
+      display: inline-flex;
+    }
+
+    #dsh-md-insert:hover {
+      border-color: rgba(120, 180, 255, .55);
+      background: #333a47;
+    }
+
+    #dsh-md-insert:active {
+      transform-origin: center;
+      filter: brightness(.96);
+    }
+
+    #dsh-md-insert:focus-visible {
+      outline: 2px solid #4c9aff;
+      outline-offset: 2px;
+    }
+
+    #dsh-md-insert .dsh-md-insert-icon {
+      font-size: 14px;
+      line-height: 1;
+      opacity: .9;
+    }
+
+    #dsh-md-insert[data-state="inserted"] {
+      background: #1f6f43;
+      border-color: rgba(74, 222, 128, .55);
+      color: #eafff2;
+    }
+
+    html[data-dsh-theme="light"] #dsh-md-insert {
+      background: #ffffff;
+      color: #1f2328;
+      border-color: rgba(16, 24, 40, .14);
+      box-shadow: 0 6px 18px rgba(16, 24, 40, .16);
+    }
+
+    html[data-dsh-theme="light"] #dsh-md-insert:hover {
+      background: #f3f5f8;
+      border-color: rgba(16, 24, 40, .28);
+    }
+
+    html[data-dsh-theme="light"] #dsh-md-insert[data-state="inserted"] {
+      background: #e8f7ee;
+      border-color: rgba(16, 122, 66, .4);
+      color: #146c3d;
+    }
+
+    /* ── 轻提示 ───────────────────────────────────────────────────────
+       只在引擎 mpExtras.toast 尚不可用时兜底；固定底部居中，2.6s 后自行隐去。 */
+    #dsh-md-toast {
+      position: fixed;
+      left: 50%;
+      bottom: 44px;
+      z-index: 100001;
+      display: none;
+      max-width: min(80vw, 560px);
+      padding: 8px 14px;
+      border-radius: 8px;
+      background: rgba(32, 36, 44, .96);
+      color: #f2f4f7;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+      font: 13px/1.5 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+      white-space: pre-wrap;
+      word-break: break-word;
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+
+    #dsh-md-toast[data-on="1"] {
+      display: block;
+    }
+
+    html[data-dsh-theme="light"] #dsh-md-toast {
+      background: rgba(255, 255, 255, .98);
+      color: #1f2328;
+      border: 1px solid rgba(16, 24, 40, .12);
+      box-shadow: 0 8px 24px rgba(16, 24, 40, .18);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="editor"></div>
+  <script src="cm6/app.js"></script>
+</body>
+
+</html>
