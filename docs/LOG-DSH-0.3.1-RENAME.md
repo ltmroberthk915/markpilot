@@ -63,3 +63,10 @@
 - 旧 tab 地址（`dsh-resource://file/...`）不变，文件地址协议未改
 - 旧恢复槽键 `dsh-markdown:recovery:*` 不再读取；未保存草稿如需迁移，可在旧 profile 的存储里按新前缀改名
 - 市场条目：条目名由仓库路径派生（`markpilot#dsh-markdown`），更名后需要同步更新，见文末
+
+## 发布
+
+- 源码提交 `4e2594e094065e93d7b38ccdacc0b898f8cc0f85`（main）
+- Release：`dsh-markdown-typora-v0.3.1`，资产 `dsh-markdown-typora-0.3.1.tgz`（2,522,787 B）+ `SHA256SUMS.txt`
+- 资产直链实测 200，长度一致
+- 旧 Release `dsh-markdown-v0.3.0` 保留，不删除
