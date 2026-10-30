@@ -1,3 +1,72 @@
+# MarkPilot · 万可百律
+
+> ### 写 Markdown，像写便签。
+> 即时渲染、公式点哪改哪、中文排得像纸；程序、插件与全部源码完全开源，随便改。
+
+[![最新版 3.6.6](https://img.shields.io/badge/%E6%9C%80%E6%96%B0%E7%89%88-3.6.6-4f46e5?style=for-the-badge)](https://github.com/ltmroberthk915/markpilot/releases/latest)
+[![完全免费 · 源码公开](https://img.shields.io/badge/%E5%AE%8C%E5%85%A8%E5%85%8D%E8%B4%B9-%E6%BA%90%E7%A0%81%E5%85%AC%E5%BC%80-16a34a?style=for-the-badge)](#开源与授权)
+[![平台](https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-Windows%20%7C%20VS%20Code%20%7C%20Trae-0ea5e9?style=for-the-badge)](#下载)
+
+![version](https://img.shields.io/badge/version-3.6.6-blue) ![downloads](https://img.shields.io/github/downloads/ltmroberthk915/markpilot/total?color=16a34a) ![mermaid](https://img.shields.io/badge/%E5%9B%BE%E8%A1%A8-Mermaid%2011-ff3670) ![license](https://img.shields.io/badge/license-%E5%AE%8C%E5%85%A8%E5%85%8D%E8%B4%B9%20%7C%20%E6%BA%90%E7%A0%81%E5%85%AC%E5%BC%80-brightgreen)
+
+> **[⬇️ 下载 3.6.6](https://github.com/ltmroberthk915/markpilot/releases/latest)** ·
+> 安装版与免安装便携版都有 · 装完即用，不需要任何账号
+
+---
+
+## ✨ 3.6.6：长文写作更从容
+
+| 能力 | 说明 |
+|---|---|
+| **🪟 源码双栏** | 带内嵌图片的长文档，一边读渲染结果、一边改源码，两栏同步 |
+| **🖼 内嵌图片保护** | 正文与源码栏收起图片数据；移除图片前可选择备份到文档同目录的 `assets` |
+| **🧮 表格编辑** | 中文输入法组合输入、转义竖线、格式操作与撤销重做都和单元格源码同步 |
+| **🎯 公式选区** | 跨过行内公式的选区保留完整公式，复制与继续编辑不再错位 |
+| **🧩 DSH 插件** | 同一套编辑器进驻 DeepSeek Harness 右侧栏，选中文段把 Markdown 源码送进对话 |
+| **🐎 大文档** | 15 万字文档的语法树交给 Worker，输入与滚动不抢主线程 |
+
+![护眼米黄：中西文混排、公式、表格与图表](docs/screenshots/3.6.6/hero-sepia-light.jpg)
+
+*护眼米黄主题：中文宋体、西文衬线、中西文自动留白；公式、表格与 Mermaid 图同屏。*
+
+## 界面截图
+
+| | |
+|---|---|
+| **DeepSeek Harness 插件版**——选中文段，点「插入对话」，Markdown 源码落进输入框 | **公式块**——点渲染预览里的 m，源码光标落在同一个 m |
+| ![DSH 插件：选中文段插入对话](docs/screenshots/3.6.6/dsh-insert-to-chat.jpg) | ![公式块：点 m 精准映射](docs/screenshots/3.6.6/formula-map-m.jpg) |
+| **Notion 深色** | **护眼米黄** |
+| ![Notion 深色主题](docs/screenshots/3.6.6/notion-dark.jpg) | ![护眼米黄主题](docs/screenshots/3.6.6/hero-sepia-light.jpg) |
+| **九套主题**——工具栏一键切换 | **跨公式选区**——整段选中，公式保持完整 |
+| ![九套主题](docs/screenshots/3.6.6/theme-panel.jpg) | ![跨公式选区](docs/screenshots/3.6.6/selection-across-math.jpg) |
+| **表格格内编辑**——对齐、插删行、中文组合输入 | **图文混排**——图片随文渲染，长文不被挤爆 |
+| ![表格工具条](docs/screenshots/3.6.6/table-toolbar.jpg) | ![图文混排](docs/screenshots/3.6.6/image-in-doc.jpg) |
+
+## 和 Typora 比，快多少？（实测）
+
+同一台电脑、同一个窗口大小、同一份「中文 + 公式」素材，两边都按最大化窗口打开；每一项都跑多次取中位值，并用两套互相独立的测法交叉验证，结论一致。
+
+| 场景 | 实测 |
+| --- | --- |
+| 打开小文档（1.7 KB） | MarkPilot **快约 0.2 秒**（0.51 秒 vs 0.71 秒） |
+| 打开中文档（67 KB） | MarkPilot **快约 0.14 秒**（0.61 秒 vs 0.75 秒） |
+| 打开大文档（240 KB） | 几乎一样快（0.91 秒 vs 0.90 秒） |
+| 双击文件后窗口弹出来的速度 | MarkPilot **更快**（0.29 秒 vs 0.33 秒） |
+| 在大文档末尾点开一个公式、直接进源码编辑 | MarkPilot **快 6.5 倍**（0.024 秒 vs 0.156 秒） |
+
+对照对象是同期最新版 Typora（1.14.10）。绝对时间会随机器和文档变化，但「打开文档不落后、点公式编辑快一个量级」这个结论在同一台机器上是稳定的。
+
+MarkPilot 是 AI 原生的 Markdown 编辑器：你在写上一句的时候，它已经在替你想下一句；你排版的一撇一捺之间，藏着一套正经的中文排版引擎。同一套编辑内核，三种形态——Windows 桌面应用、VS Code / Trae 插件、DeepSeek Harness 侧栏插件。
+
+## MarkPilot 3.6.6 · Windows
+
+这一版把近几次打磨收进稳定版：源码双栏在内嵌图片的长文档里同屏可读可改；正文与源码栏收起图片数据，移除图片前可备份到文档同目录；表格内的中文组合输入、转义竖线与撤销重做保持同步；跨行内公式的选区保留完整公式。同时提供 DeepSeek Harness 右侧栏插件版。
+
+**[下载安装版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.6/markpilot-Setup-3.6.6.exe)** · **[下载便携版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.6/markpilot-3.6.6-portable.exe)** · [更新说明](docs/RELEASE-3.6.6.md)
+
+<details>
+<summary>历史版本发布说明与旧版介绍（存档）</summary>
+
 ## MarkPilot 3.6.2 · Windows
 
 本版为维护更新，编辑体验与 3.6.1 一致。重新生成并验证 Windows 安装版与便携版，日常打开、编辑、保存和导出行为不变；已有的主题、字体、自动保存和最近文件设置继续保留。
@@ -148,6 +217,9 @@ MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时�
 | ![点 ω 定位源码](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/math-map-omega.png) | ![点下标定位源码](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/math-map-subscript.png) |
 | **界面透明度**——弹窗与工具栏半透明，各有 10%–100% 的滑块 | **排版**——衬线宋体、中西文自动间距、整段最优断行 |
 | ![半透明右键菜单](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/menu-translucent-70.png) | ![密集换行的正文排版](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/body-dense-wrapping.png) |
+
+
+</details>
 
 ## 六个 Typora 给不了的重磅能力
 

@@ -1,3 +1,74 @@
+# MarkPilot
+
+**A free Typora alternative with live math, inline AI completion, and print-quality typography — for Windows, VS Code, Trae, and the DeepSeek Harness sidebar.**
+
+> ### Writing Markdown should feel like writing a sticky note.
+> Live rendering, formulas you can click into, typography that respects Chinese and Latin text — and the whole source is open.
+
+[![latest 3.6.6](https://img.shields.io/badge/latest-3.6.6-4f46e5?style=for-the-badge)](https://github.com/ltmroberthk915/markpilot/releases/latest)
+[![completely free · source open](https://img.shields.io/badge/completely%20free-source%20open-16a34a?style=for-the-badge)](#license)
+[![platform](https://img.shields.io/badge/platform-Windows%20%7C%20VS%20Code%20%7C%20Trae-0ea5e9?style=for-the-badge)](#download-and-install)
+
+![version](https://img.shields.io/badge/version-3.6.6-blue) ![downloads](https://img.shields.io/github/downloads/ltmroberthk915/markpilot/total?color=16a34a) ![mermaid](https://img.shields.io/badge/diagrams-Mermaid%2011-ff3670) ![license](https://img.shields.io/badge/license-completely%20free%20%7C%20source%20open-brightgreen)
+
+> **[⬇️ Download 3.6.6](https://github.com/ltmroberthk915/markpilot/releases/latest)** ·
+> installer and portable build · no account, no sign-in
+
+---
+
+## ✨ What's new in 3.6.6
+
+| Capability | What it does |
+|---|---|
+| **🪟 Split source view** | Long documents that carry embedded images can be read and edited side by side, in sync |
+| **🖼 Embedded-image protection** | Body text and the source pane keep image payloads collapsed; an image can be backed up to an `assets` folder next to the document before it is removed |
+| **🧮 Table editing** | Chinese IME composition, escaped pipes, formatting and undo/redo stay in sync with the cell source |
+| **🎯 Formula selections** | A selection that crosses inline math keeps the whole formula, so copying and continued editing stay predictable |
+| **🧩 DSH plugin** | The same editor lives in the DeepSeek Harness right sidebar: select a passage and send its Markdown source into the conversation |
+| **🐎 Large documents** | A 150,000-character document builds its syntax tree in a worker, keeping typing and scrolling off the main thread |
+
+![Sepia light theme: mixed CJK/Latin text, formulas, tables and diagrams](docs/screenshots/3.6.6/hero-sepia-light.jpg)
+
+*The sepia light theme: Chinese serif body, Latin serif accents, automatic CJK/Latin spacing — formulas, tables and Mermaid diagrams on one page.*
+
+## Screenshots
+
+| | |
+|---|---|
+| **DeepSeek Harness plugin** — select a passage, press “Insert into chat”, and its Markdown source lands in the composer | **Formula block** — click the m in the rendered preview and the source caret lands on the same m |
+| ![DSH plugin: insert a selection into the chat](docs/screenshots/3.6.6/dsh-insert-to-chat.jpg) | ![Formula block with a precise click mapping](docs/screenshots/3.6.6/formula-map-m.jpg) |
+| **Notion dark** | **护眼米黄 (sepia light)** |
+| ![Notion dark theme](docs/screenshots/3.6.6/notion-dark.jpg) | ![Sepia light theme](docs/screenshots/3.6.6/hero-sepia-light.jpg) |
+| **Nine themes** — switch from the toolbar | **Selections across formulas** — the whole formula stays intact |
+| ![Nine themes](docs/screenshots/3.6.6/theme-panel.jpg) | ![Selection across inline formulas](docs/screenshots/3.6.6/selection-across-math.jpg) |
+| **Table cells you can edit** — alignment, row operations, Chinese IME | **Images in the document** — inline rendering without bloating long files |
+| ![Table cell toolbar](docs/screenshots/3.6.6/table-toolbar.jpg) | ![Images in the document](docs/screenshots/3.6.6/image-in-doc.jpg) |
+
+## How much faster than Typora? (measured)
+
+Same machine, same window size, same Chinese-with-formulas document, both apps opening maximized; every row was run several times and is reported as the median. Two independent measurement methods were cross-checked and agree.
+
+| Scenario | Measured |
+| --- | --- |
+| Opening a small document (1.7 KB) | MarkPilot is **~0.2 s faster** (0.51 s vs 0.71 s) |
+| Opening a medium document (67 KB) | MarkPilot is **~0.14 s faster** (0.61 s vs 0.75 s) |
+| Opening a large document (240 KB) | about the same (0.91 s vs 0.90 s) |
+| Window appearing after a double-click | MarkPilot is **faster** (0.29 s vs 0.33 s) |
+| Clicking a formula near the end of a long document to edit its LaTeX source | MarkPilot is **6.5× faster** (0.024 s vs 0.156 s) |
+
+Compared against the current Typora of that week (1.14.10). Absolute times move with the machine and the document, but “opening a document is never slower, and clicking into a formula is an order of magnitude quicker” held on this machine.
+
+MarkPilot is an AI-native Markdown editor: while you type one sentence, it is already drafting the next one, and underneath the text sits a real Chinese/Japanese/Korean typography engine. One editing core, three shapes — a native Windows desktop app, an extension for VS Code and Trae, and a sidebar plugin for DeepSeek Harness.
+
+## MarkPilot 3.6.6 for Windows
+
+This stable release gathers the recent editing work: split source view for long documents with embedded images, collapsed image payloads with an optional backup into the document's `assets` folder, table editing that keeps Chinese IME composition, escaped pipes and undo/redo in sync with the cell source, and selections that keep whole formulas intact. The DeepSeek Harness sidebar plugin ships alongside it.
+
+**[Download the installer](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.6/markpilot-Setup-3.6.6.exe)** · **[Download the portable build](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.6/markpilot-3.6.6-portable.exe)** · [Release notes](docs/RELEASE-3.6.6.md)
+
+<details>
+<summary>Release notes and previous introduction (archived)</summary>
+
 ## MarkPilot 3.6.2 · Windows
 
 This is a maintenance release. Editing behavior is unchanged from 3.6.1. The Windows installer and portable builds were rebuilt and verified; existing themes, fonts, autosave and recent-file settings are preserved.
@@ -143,6 +214,9 @@ Compared against the current Typora of that week (1.14.10); MarkPilot numbers co
 | ![Click omega](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/math-map-omega.png) | ![Click subscript](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/math-map-subscript.png) |
 | **Interface opacity** — every popup and the toolbar are translucent, with separate sliders (10–100%) | **Typography** — serif themes, CJK/Latin spacing, optimal line breaking |
 | ![Translucent context menu](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/menu-translucent-70.png) | ![Dense wrapping](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/body-dense-wrapping.png) |
+
+
+</details>
 
 ## Why people switch from Typora
 
