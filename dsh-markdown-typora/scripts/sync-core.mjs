@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // sync-core.mjs — 把 MarkPilot-CM6 已构建的 renderer/cm6 构建产物**逐字节**同步进 DSH 插件。
 //
-// 为什么只同步构建产物：dsh-markdown 是"换皮套壳"——引擎源码在 src-cm6/，构建产物由
+// 为什么只同步构建产物：dsh-markdown-typora 是"换皮套壳"——引擎源码在 src-cm6/，构建产物由
 // MarkPilot-CM6 的构建链产出。插件只消费产物；EXE 升级后重跑本脚本即可让插件核心与 EXE
 // 字节一致（core.json 记录每个文件的 SHA256/bytes，--check 随时可验证漂移）。
 //
 // 目录契约（见 README.md）：
 //   MarkPilot-CM6/renderer/cm6/{app.js,app.css,markdown-worker.js,mermaid.min.js,fonts/*，KaTeX 字体…}
-//     → dsh-markdown/renderer-cm6/cm6/  （同形；**不复制 index.html**）
-//   dsh-markdown/renderer-cm6/index.html 是 DSH 皮，永远由本插件的 core-sync 维护，不被同步覆盖。
+//     → dsh-markdown-typora/renderer-cm6/cm6/  （同形；**不复制 index.html**）
+//   dsh-markdown-typora/renderer-cm6/index.html 是 DSH 皮，永远由本插件的 core-sync 维护，不被同步覆盖。
 //
 // 用法：
 //   node scripts/sync-core.mjs                 # 同步 + 写 core.json
@@ -26,8 +26,8 @@ import {
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const HERE = dirname(fileURLToPath(import.meta.url));          // .../dsh-markdown/scripts
-const PLUGIN_DIR = resolve(HERE, '..');                        // .../dsh-markdown
+const HERE = dirname(fileURLToPath(import.meta.url));          // .../dsh-markdown-typora/scripts
+const PLUGIN_DIR = resolve(HERE, '..');                        // .../dsh-markdown-typora
 const DEFAULT_SOURCE = resolve(HERE, '..', '..', 'MarkPilot-CM6', 'renderer', 'cm6');
 const SKIN_DIR = resolve(PLUGIN_DIR, 'renderer-cm6');
 const DEST_DIR = resolve(SKIN_DIR, 'cm6');

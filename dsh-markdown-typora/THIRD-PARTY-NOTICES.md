@@ -1,6 +1,6 @@
 # Third-party notices
 
-`dsh-markdown` is a DSH wrapper around the already-built MarkPilot CM6 renderer.
+`dsh-markdown-typora` is a DSH wrapper around the already-built MarkPilot CM6 renderer.
 The following upstream projects are included in, or bundled by, that renderer:
 
 - **MarkPilot** — MIT — <https://github.com/ltmroberthk915/markpilot>

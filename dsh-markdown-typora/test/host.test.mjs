@@ -1,4 +1,4 @@
-// dsh-markdown 宿主半边：纯函数 + mock ctx + 真实 node:http 集成测试。
+// dsh-markdown-typora 宿主半边：纯函数 + mock ctx + 真实 node:http 集成测试。
 // 运行：node --test test/host.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -338,14 +338,14 @@ test('apply(ctx) 挂 prefix 路由；open/save/stat/edit 走 mock ctx.fs 与真�
   assert.equal(routes.length, 1);
   const route = routes[0];
   assert.equal(route.kind, 'prefix');
-  assert.equal(route.path, '/dsh-markdown');
+  assert.equal(route.path, '/dsh-markdown-typora');
   assert.equal(BODY_MAX_BYTES, 64 * 1024 * 1024);
 
   const { server, port } = await startServer(route);
-  const opened = await postJson(port, '/dsh-markdown/api/open', { path: 'D:/docs/a.md' });
+  const opened = await postJson(port, '/dsh-markdown-typora/api/open', { path: 'D:/docs/a.md' });
   const v1 = opened.json.value.version;
-  const sseOther = await openSse(port, '/dsh-markdown/api/watch?path=' + encodeURIComponent('D:/docs/other.md'));
-  const sseMain = await openSse(port, '/dsh-markdown/api/watch?path=' + encodeURIComponent('D:/docs/a.md'));
+  const sseOther = await openSse(port, '/dsh-markdown-typora/api/watch?path=' + encodeURIComponent('D:/docs/other.md'));
+  const sseMain = await openSse(port, '/dsh-markdown-typora/api/watch?path=' + encodeURIComponent('D:/docs/a.md'));
   try {
     assert.equal(opened.status, 200);
     assert.equal(opened.json.ok, true);
@@ -354,24 +354,24 @@ test('apply(ctx) 挂 prefix 路由；open/save/stat/edit 走 mock ctx.fs 与真�
     assert.equal(opened.json.value.displayPath, normalize('D:/docs/a.md'));
 
     // 缺 path → 明确 bad-request
-    const noPath = await postJson(port, '/dsh-markdown/api/open', {});
+    const noPath = await postJson(port, '/dsh-markdown-typora/api/open', {});
     assert.equal(noPath.json.ok, false);
     assert.equal(noPath.json.error.code, 'bad-request');
 
     // save 缺 baseVersion → 拒绝且磁盘不变（关 tab flush 也不许盲写）
-    const noBase = await postJson(port, '/dsh-markdown/api/save', { path: 'D:/docs/a.md', text: '# X\n' });
+    const noBase = await postJson(port, '/dsh-markdown-typora/api/save', { path: 'D:/docs/a.md', text: '# X\n' });
     assert.equal(noBase.json.ok, false);
     assert.equal(noBase.json.error.code, 'bad-request');
     assert.equal(fs.files.get(normalize('D:/docs/a.md')).text, '# A\n');
 
     // 旧 baseVersion → FS_STALE_VERSION 原样返回，文件不被覆盖
-    const stale = await postJson(port, '/dsh-markdown/api/save', { path: 'D:/docs/a.md', text: '# stolen\n', baseVersion: 'bogus' });
+    const stale = await postJson(port, '/dsh-markdown-typora/api/save', { path: 'D:/docs/a.md', text: '# stolen\n', baseVersion: 'bogus' });
     assert.equal(stale.json.ok, false);
     assert.equal(stale.json.error.code, 'FS_STALE_VERSION');
     assert.equal(fs.files.get(normalize('D:/docs/a.md')).text, '# A\n');
 
     // 正确 baseVersion → 成功；向所有 SSE 连接广播 version
-    const saved = await postJson(port, '/dsh-markdown/api/save', { path: 'D:/docs/a.md', text: '# B\n', baseVersion: v1 });
+    const saved = await postJson(port, '/dsh-markdown-typora/api/save', { path: 'D:/docs/a.md', text: '# B\n', baseVersion: v1 });
     assert.equal(saved.json.ok, true);
     const v2 = saved.json.value.version;
     assert.notEqual(v2, v1);
@@ -383,12 +383,12 @@ test('apply(ctx) 挂 prefix 路由；open/save/stat/edit 走 mock ctx.fs 与真�
     assert.equal(eventOther.version, v2, '写成功后要向所有 SSE 连接广播（客户端按 path 过滤）');
 
     // stat 返回新版本
-    const stat = await postJson(port, '/dsh-markdown/api/stat', { path: 'D:/docs/a.md' });
+    const stat = await postJson(port, '/dsh-markdown-typora/api/stat', { path: 'D:/docs/a.md' });
     assert.equal(stat.json.ok, true);
     assert.equal(stat.json.value.version, v2);
 
     // edit：oldString/newString + baseVersion 守卫，带 delta 广播
-    const edited = await postJson(port, '/dsh-markdown/api/edit', {
+    const edited = await postJson(port, '/dsh-markdown-typora/api/edit', {
       path: 'D:/docs/a.md', oldString: 'B', newString: 'C', baseVersion: v2,
     });
     assert.equal(edited.json.ok, true);
@@ -403,26 +403,26 @@ test('apply(ctx) 挂 prefix 路由；open/save/stat/edit 走 mock ctx.fs 与真�
     assert.equal(editDelta.delta.newString, 'C');
 
     // edit 旧版本 → FS_STALE_VERSION
-    const editStale = await postJson(port, '/dsh-markdown/api/edit', {
+    const editStale = await postJson(port, '/dsh-markdown-typora/api/edit', {
       path: 'D:/docs/a.md', oldString: 'C', newString: 'D', baseVersion: v2,
     });
     assert.equal(editStale.json.error.code, 'FS_STALE_VERSION');
 
     // 不支持的 endpoint：明确 404，不静默
-    const unknown = await postJson(port, '/dsh-markdown/api/nope', {});
+    const unknown = await postJson(port, '/dsh-markdown-typora/api/nope', {});
     assert.equal(unknown.status, 404);
     assert.equal(unknown.json.error.code, 'not-found');
 
     // content-type 不对：415
     const wrongType = await rawRequest(port, {
-      method: 'POST', path: '/dsh-markdown/api/open', headers: { 'content-type': 'text/plain' }, body: '{}',
+      method: 'POST', path: '/dsh-markdown-typora/api/open', headers: { 'content-type': 'text/plain' }, body: '{}',
     });
     assert.equal(wrongType.status, 415);
 
     // loopback 栅栏：外部 Host / 跨站 Origin 一律 403
-    const evilHost = await postJson(port, '/dsh-markdown/api/open', { path: 'D:/docs/a.md' }, { host: 'evil.example' });
+    const evilHost = await postJson(port, '/dsh-markdown-typora/api/open', { path: 'D:/docs/a.md' }, { host: 'evil.example' });
     assert.equal(evilHost.status, 403);
-    const evilOrigin = await postJson(port, '/dsh-markdown/api/open', { path: 'D:/docs/a.md' }, { origin: 'http://evil.example' });
+    const evilOrigin = await postJson(port, '/dsh-markdown-typora/api/open', { path: 'D:/docs/a.md' }, { origin: 'http://evil.example' });
     assert.equal(evilOrigin.status, 403);
   } finally {
     destroySse(sseMain);
@@ -443,10 +443,10 @@ test('requestRejection 可用时以方法调用（优先于 loopback 栅栏）',
   const { server, port } = await startServer(routes[0]);
   try {
     // 外部 Host 也能通过：说明栅栏交给 connection（方法形式）而不是本地 loopback 判定
-    const allowed = await postJson(port, '/dsh-markdown/api/stat', { path: 'D:/d/x.md' }, { host: 'evil.example' });
+    const allowed = await postJson(port, '/dsh-markdown-typora/api/stat', { path: 'D:/d/x.md' }, { host: 'evil.example' });
     assert.equal(allowed.status, 200);
     assert.equal(allowed.json.ok, true);
-    const blocked = await postJson(port, '/dsh-markdown/api/stat', { path: 'D:/d/x.md' }, { host: 'evil.example', 'x-block': '1' });
+    const blocked = await postJson(port, '/dsh-markdown-typora/api/stat', { path: 'D:/d/x.md' }, { host: 'evil.example', 'x-block': '1' });
     assert.equal(blocked.status, 403);
   } finally {
     await stopServer(server);
@@ -468,7 +468,7 @@ test('静态路由：MIME/ETag/304/no-cache/fonts 长缓存/HEAD/core.json/穿�
 
   const { server, port } = await startServer(host.route);
   try {
-    const index = await rawRequest(port, { path: '/dsh-markdown/renderer-cm6/index.html' });
+    const index = await rawRequest(port, { path: '/dsh-markdown-typora/renderer-cm6/index.html' });
     assert.equal(index.status, 200);
     assert.equal(index.headers['content-type'], 'text/html; charset=utf-8');
     assert.equal(index.headers['cache-control'], 'no-cache');
@@ -476,39 +476,39 @@ test('静态路由：MIME/ETag/304/no-cache/fonts 长缓存/HEAD/core.json/穿�
     assert.match(index.body, /<!doctype html>/);
 
     const notModified = await rawRequest(port, {
-      path: '/dsh-markdown/renderer-cm6/index.html',
+      path: '/dsh-markdown-typora/renderer-cm6/index.html',
       headers: { 'if-none-match': index.headers.etag },
     });
     assert.equal(notModified.status, 304);
     assert.equal(notModified.body, '');
 
-    const app = await rawRequest(port, { path: '/dsh-markdown/renderer-cm6/app.js' });
+    const app = await rawRequest(port, { path: '/dsh-markdown-typora/renderer-cm6/app.js' });
     assert.equal(app.headers['content-type'], 'text/javascript; charset=utf-8');
     assert.equal(app.headers['cache-control'], 'no-cache');
 
-    const bridge = await rawRequest(port, { path: '/dsh-markdown/renderer-cm6/dsh-bridge.js' });
+    const bridge = await rawRequest(port, { path: '/dsh-markdown-typora/renderer-cm6/dsh-bridge.js' });
     assert.equal(bridge.headers['cache-control'], 'no-cache');
 
-    const font = await rawRequest(port, { path: '/dsh-markdown/renderer-cm6/cm6/fonts/f.woff2' });
+    const font = await rawRequest(port, { path: '/dsh-markdown-typora/renderer-cm6/cm6/fonts/f.woff2' });
     assert.equal(font.status, 200);
     assert.equal(font.headers['content-type'], 'font/woff2');
     assert.equal(font.headers['cache-control'], 'public, max-age=604800');
     assert.equal(font.buffer.length, 4);
 
     // 目录根（/renderer-cm6/ 与不带尾斜杠）落到 index.html
-    const rootSlash = await rawRequest(port, { path: '/dsh-markdown/renderer-cm6/' });
+    const rootSlash = await rawRequest(port, { path: '/dsh-markdown-typora/renderer-cm6/' });
     assert.equal(rootSlash.status, 200);
     assert.match(rootSlash.body, /<!doctype html>/);
-    const rootNoSlash = await rawRequest(port, { path: '/dsh-markdown/renderer-cm6' });
+    const rootNoSlash = await rawRequest(port, { path: '/dsh-markdown-typora/renderer-cm6' });
     assert.equal(rootNoSlash.status, 200);
 
     // HEAD 不返回 body
-    const head = await rawRequest(port, { method: 'HEAD', path: '/dsh-markdown/renderer-cm6/app.js' });
+    const head = await rawRequest(port, { method: 'HEAD', path: '/dsh-markdown-typora/renderer-cm6/app.js' });
     assert.equal(head.status, 200);
     assert.equal(head.body, '');
 
     // core.json 正常返回
-    const core = await rawRequest(port, { path: '/dsh-markdown/core.json' });
+    const core = await rawRequest(port, { path: '/dsh-markdown-typora/core.json' });
     assert.equal(core.status, 200);
     assert.equal(core.headers['content-type'], 'application/json; charset=utf-8');
     assert.equal(core.headers['cache-control'], 'no-store');
@@ -516,18 +516,18 @@ test('静态路由：MIME/ETag/304/no-cache/fonts 长缓存/HEAD/core.json/穿�
 
     // 路径穿越：编码斜杠必须 403；WHATWG URL 会把 %2e%2e 归一化成 ..（结果落在静态前缀之外），
     // 此时路由层 404，绝不能 200 返回包内文件。两条路径都不许把内容泄出去。
-    const traversal = await rawRequest(port, { path: '/dsh-markdown/renderer-cm6/..%2f..%2fcore.json' });
+    const traversal = await rawRequest(port, { path: '/dsh-markdown-typora/renderer-cm6/..%2f..%2fcore.json' });
     assert.equal(traversal.status, 403);
-    const traversal2 = await rawRequest(port, { path: '/dsh-markdown/renderer-cm6/%2e%2e/%2e%2e/package.json' });
+    const traversal2 = await rawRequest(port, { path: '/dsh-markdown-typora/renderer-cm6/%2e%2e/%2e%2e/package.json' });
     assert.ok(traversal2.status === 403 || traversal2.status === 404, `expected 403/404, got ${traversal2.status}`);
-    assert.equal(traversal2.body.includes('"name": "dsh-markdown"'), false, '包内文件内容不得泄露');
+    assert.equal(traversal2.body.includes('"name": "dsh-markdown-typora"'), false, '包内文件内容不得泄露');
 
     // core.json 不存在 → 404 JSON，客户端不崩
     const missingRoot = await mkdtemp(join(tmpdir(), 'dshmd-nocore-'));
     const hostNoCore = createHost({ fs, rootDir: missingRoot, log: SILENT_LOG });
     const noCore = await startServer(hostNoCore.route);
     try {
-      const core404 = await rawRequest(noCore.port, { path: '/dsh-markdown/core.json' });
+      const core404 = await rawRequest(noCore.port, { path: '/dsh-markdown-typora/core.json' });
       assert.equal(core404.status, 404);
       assert.equal(core404.json.error.code, 'not-found');
     } finally {
@@ -548,7 +548,7 @@ test('SSE watch：fs.watch 变更 120ms 防抖广播', async () => {
   const fs = createMockFs({ 'D:/d/w.md': 'one' });
   const host = createHost({ fs, log: SILENT_LOG, watchDebounceMs: 25, watchProbeMs: 30, heartbeatMs: 5000 });
   const { server, port } = await startServer(host.route);
-  const sse = await openSse(port, '/dsh-markdown/api/watch?path=' + encodeURIComponent('D:/d/w.md'));
+  const sse = await openSse(port, '/dsh-markdown-typora/api/watch?path=' + encodeURIComponent('D:/d/w.md'));
   try {
     await waitUntil(() => fs.watchers.length >= 1);
     await new Promise((resolve) => setTimeout(resolve, 30)); // 等基线版本建立
@@ -578,7 +578,7 @@ test('SSE watch：fs.watch 不可用时降级为探测（2s 默认档在测试�
   fs.watchMode = 'reject';
   const host = createHost({ fs, log: SILENT_LOG, watchDebounceMs: 10, watchProbeMs: 30, heartbeatMs: 5000 });
   const { server, port } = await startServer(host.route);
-  const sse = await openSse(port, '/dsh-markdown/api/watch?path=' + encodeURIComponent('D:/d/p.md'));
+  const sse = await openSse(port, '/dsh-markdown-typora/api/watch?path=' + encodeURIComponent('D:/d/p.md'));
   try {
     await waitUntil(() => host._internals.watchers.size >= 1);
     await new Promise((resolve) => setTimeout(resolve, 120)); // 让探测跑几轮建立基线
@@ -597,7 +597,7 @@ test('body 上限：超过配置即 413，不静默截断', async () => {
   const host = createHost({ fs, log: SILENT_LOG, bodyLimit: 128 });
   const { server, port } = await startServer(host.route);
   try {
-    const huge = await postJson(port, '/dsh-markdown/api/save', {
+    const huge = await postJson(port, '/dsh-markdown-typora/api/save', {
       path: 'D:/d/big.md', text: 'x'.repeat(1024), baseVersion: 'v1',
     });
     assert.equal(huge.status, 413);

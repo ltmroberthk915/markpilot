@@ -209,7 +209,7 @@
   window.hostApi = {
     invoke: function (cmd, args) {
       if (cmd === 'toolbar-height') return Promise.resolve(null);
-      if (cmd === 'app-info') return Promise.resolve({ name: 'dsh-markdown for DSH', version: '0.1.0', host: 'dsh' });
+      if (cmd === 'app-info') return Promise.resolve({ name: 'dsh-markdown-typora for DSH', version: '0.1.0', host: 'dsh' });
       return new Promise(function (resolve, reject) {
         var id = 'dshhost-' + (++hostSequence);
         var timer = setTimeout(function () {

@@ -1,4 +1,4 @@
-# dsh-markdown
+# dsh-markdown-typora
 
 **A Markdown editor for the DeepSeek Harness right sidebar, built on MarkPilot CM6 3.6.6.**
 
@@ -46,24 +46,24 @@ The editor engine is the same accepted build that ships with MarkPilot 3.6.6:
 
 ### From a GitHub release
 
-Download `dsh-markdown-0.3.0.tgz` from the [MarkPilot releases](https://github.com/ltmroberthk915/markpilot/releases) and add it to the profile that runs your host:
+Download `dsh-markdown-typora-0.3.1.tgz` from the [MarkPilot releases](https://github.com/ltmroberthk915/markpilot/releases) and add it to the profile that runs your host:
 
 ```sh
-dsh plugin --profile web add ./dsh-markdown-0.3.0.tgz
-dsh plugin --profile desktop add ./dsh-markdown-0.3.0.tgz
+dsh plugin --profile web add ./dsh-markdown-typora-0.3.1.tgz
+dsh plugin --profile desktop add ./dsh-markdown-typora-0.3.1.tgz
 ```
 
 Restart the host afterwards; the plugin then appears on the **Plugins** page and opens from the right sidebar. The plugin market listing follows the public release.
 
 ### Manual (development checkout)
 
-The plugin is the `dsh-markdown/` subdirectory of the [MarkPilot repository](https://github.com/ltmroberthk915/markpilot). To load a checkout as a bundle:
+The plugin is the `dsh-markdown-typora/` subdirectory of the [MarkPilot repository](https://github.com/ltmroberthk915/markpilot). To load a checkout as a bundle:
 
 ```sh
 git clone https://github.com/ltmroberthk915/markpilot.git
 ```
 
-Then add a junction/symlink from the profile's `node_modules` to `markpilot/dsh-markdown`, add `"dsh-markdown"` to the profile `package.json`'s `dsh.profile.bundles`, and restart the host. The plugin must be a bundle, not a raw `cordis.patch.yml` file-URL insert, to appear in the Plugins page.
+Then add a junction/symlink from the profile's `node_modules` to `markpilot/dsh-markdown-typora`, add `"dsh-markdown-typora"` to the profile `package.json`'s `dsh.profile.bundles`, and restart the host. The plugin must be a bundle, not a raw `cordis.patch.yml` file-URL insert, to appear in the Plugins page.
 
 ## Use
 
@@ -83,8 +83,8 @@ The editor engine is the already-built MarkPilot CM6 3.6.6 renderer, copied byte
 The engine source is not modified. `core.json` records the version and a SHA-256 for every core file. Maintainers of the MarkPilot monorepo can refresh it with:
 
 ```sh
-node dsh-markdown/scripts/sync-core.mjs
-node dsh-markdown/scripts/sync-core.mjs --check
+node dsh-markdown-typora/scripts/sync-core.mjs
+node dsh-markdown-typora/scripts/sync-core.mjs --check
 ```
 
 ## Known limits

@@ -1,0 +1,4 @@
+# dsh bundle patch: 把 dsh-markdown-typora 插进 profile 组合层。
+- insert:
+    - id: dsh-markdown-typora
+      name: dsh-markdown-typora

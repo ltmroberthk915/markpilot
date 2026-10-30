@@ -1,4 +1,0 @@
-# dsh bundle patch: 把 dsh-markdown 插进 profile 组合层。
-- insert:
-    - id: dsh-markdown
-      name: dsh-markdown

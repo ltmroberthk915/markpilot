@@ -24,7 +24,7 @@
 | **🖼 Embedded-image protection** | Body text and the source pane keep image payloads collapsed; an image can be backed up to an `assets` folder next to the document before it is removed |
 | **🧮 Table editing** | Chinese IME composition, escaped pipes, formatting and undo/redo stay in sync with the cell source |
 | **🎯 Formula selections** | A selection that crosses inline math keeps the whole formula, so copying and continued editing stay predictable |
-| **🧩 DSH plugin** | The same editor lives in the DeepSeek Harness right sidebar: select a passage and send its Markdown source into the conversation |
+| **🧩 DSH plugin** | The same editor lives in the DeepSeek Harness right sidebar as `dsh-markdown-typora`: select a passage and send its Markdown source into the conversation |
 | **🐎 Large documents** | A 150,000-character document builds its syntax tree in a worker, keeping typing and scrolling off the main thread |
 
 ![Sepia light theme: mixed CJK/Latin text, formulas, tables and diagrams](docs/screenshots/3.6.6/hero-sepia-light.jpg)

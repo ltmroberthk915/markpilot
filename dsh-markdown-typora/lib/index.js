@@ -1,4 +1,4 @@
-// dsh-markdown 宿主半边（DSH 0.2.1 契约版）：
+// dsh-markdown-typora 宿主半边（DSH 0.2.1 契约版）：
 //   renderer-cm6 静态路由 + 版本守卫编辑面 API（open/save/stat/edit）+ SSE watch + markdown 模型工具。
 //
 // 插件三件套形状（宿主 cordis loader 读的就是这个）：
@@ -21,12 +21,12 @@ import { readFile, stat as fsStat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize, sep, extname } from 'node:path';
 
-export const name = 'dsh-markdown';
+export const name = 'dsh-markdown-typora';
 
 /** 必需服务：webServer（路由挂载点）+ fs（版本守卫读写）。 */
 export const inject = ['webServer', 'fs'];
 
-const ROUTE_PREFIX = '/dsh-markdown';
+const ROUTE_PREFIX = '/dsh-markdown-typora';
 const STATIC_PREFIX = ROUTE_PREFIX + '/renderer-cm6/';
 const API_PREFIX = ROUTE_PREFIX + '/api/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
@@ -236,7 +236,7 @@ function sendText(res, status, text, extraHeaders) {
 export function createHost(options = {}) {
   const fs = options.fs;
   if (!fs || typeof fs.resolve !== 'function' || typeof fs.writeText !== 'function') {
-    throw new Error('dsh-markdown: a filesystem service (ctx.fs) is required');
+    throw new Error('dsh-markdown-typora: a filesystem service (ctx.fs) is required');
   }
   const log = options.log ?? console;
   const rootDir = normalize(options.rootDir ?? PLUGIN_ROOT);
@@ -442,7 +442,7 @@ export function createHost(options = {}) {
     res.end(req.method === 'HEAD' ? undefined : data);
   }
 
-  /** GET /dsh-markdown/api/watch?path=…：SSE 外部变更流；心跳 15s；close 幂等清理。 */
+  /** GET /dsh-markdown-typora/api/watch?path=…：SSE 外部变更流；心跳 15s；close 幂等清理。 */
   async function handleWatch(req, res, url) {
     const path = url.searchParams.get('path') ?? '';
     if (!path) {
@@ -747,7 +747,7 @@ export function apply(ctx) {
           try { if (typeof dispose === 'function') dispose(); } catch { /* 已清理 */ }
           try { host.close(); } catch { /* 已清理 */ }
         };
-      }, 'dsh-markdown: routes');
+      }, 'dsh-markdown-typora: routes');
     } else {
       ctx.webServer.register(host.route);
     }
@@ -858,7 +858,7 @@ export function createMarkdownToolDefinition(dispatch) {
  */
 export function registerMarkdownTool(ctx, { dispatch, log } = {}) {
   const onWarn = (error) => {
-    try { log?.warn?.('dsh-markdown: model tool disabled: %s', String(error?.message ?? error)); } catch { /* 忽略 */ }
+    try { log?.warn?.('dsh-markdown-typora: model tool disabled: %s', String(error?.message ?? error)); } catch { /* 忽略 */ }
   };
   try {
     if (typeof ctx?.inject !== 'function') return;
@@ -888,7 +888,7 @@ export function registerMarkdownTool(ctx, { dispatch, log } = {}) {
             stopped = true;
             try { if (typeof dispose === 'function') dispose(); } catch (error) { onWarn(error); }
           };
-        }, 'dsh-markdown: markdown tool');
+        }, 'dsh-markdown-typora: markdown tool');
       } catch (error) {
         onWarn(error);
       }
