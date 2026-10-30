@@ -18,6 +18,7 @@
 //   4. 每个 async 分支都有 try/catch，错误以 {ok:false,error:{code,message}} 返回，code 原样透传。
 
 import { readFile, stat as fsStat } from 'node:fs/promises';
+import { createReadStream } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize, sep, extname } from 'node:path';
 
@@ -29,12 +30,15 @@ export const inject = ['webServer', 'fs'];
 const ROUTE_PREFIX = '/dsh-markdown-typora';
 const STATIC_PREFIX = ROUTE_PREFIX + '/renderer-cm6/';
 const API_PREFIX = ROUTE_PREFIX + '/api/';
+const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
 const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit']);
 const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '::1']);
 
 /** 请求体上限：64MB。含内联图文档常见 10MB+；上限之外明确 413，不静默截断。 */
 export const BODY_MAX_BYTES = 64 * 1024 * 1024;
+/** 本地图片响应上限：与请求体同口径。超过只给 413，不把整块内容读进内存。 */
+export const IMAGE_MAX_BYTES = 64 * 1024 * 1024;
 const WATCH_DEBOUNCE_MS = 120;
 const WATCH_PROBE_MS = 2000;
 const SSE_HEARTBEAT_MS = 15000;
@@ -130,6 +134,145 @@ export function resolveStaticTarget(rootDir, rawRelative) {
   const target = normalize(join(root, slashed));
   if (target !== root && !target.startsWith(root + sep)) return null;
   return target;
+}
+
+/* ══ 本地图片路由（文档相对路径图的取字节通道）══════════════════════════════════════
+ * 为什么需要：CM6 引擎按"当前文档所在目录"解析相对图片路径（`image-path.js` 的
+ * resolveImageSource）；桌面壳把它拼成 file:// 并靠 file 页面读盘。DSH 的编辑面是
+ * **http 源**：CSP 的 img-src 不含 file:，Chromium 也禁止 http 页面加载 file:// 子资源
+ * ⇒ 相对路径图必然"图片加载失败"。所以由插件提供唯一合法的本地图片通道：
+ *   GET /dsh-markdown-typora/img/<绝对本地路径（逐段百分号编码，保留 /）>
+ * 桥（renderer-cm6/dsh-bridge.js）在 open 时把 <base href> 指到
+ *   /dsh-markdown-typora/img/<文档目录>/
+ * ⇒ 引擎发出的相对 URL 原样落到本路由。浏览器按 RFC 3986 自己归一化 `../`，
+ * 因此这里拿到的永远是规整的绝对路径。
+ *
+ * 安全边界（三条都必须成立，缺一即拒）：
+ *   ① 形态：只接受盘符绝对路径（D:/x/y.png）或 UNC（//server/share/y.png），
+ *      拒空段 / 单点 / 双点 / NUL / 坏编码 —— 归一化不靠浏览器，自己逐段验；
+ *   ② 扩展名：图片白名单之外一律不服务（本路由不是通用文件服务）；
+ *   ③ 只在既有信任栅栏之后（loopback + 宿主鉴权），且只读、只 GET/HEAD。
+ * 说明：该读面不强于既有 /api/open（它本来就能读任意路径文本）。 */
+
+/** 图片 MIME（本路由专用；比静态表窄，且不接受 fonts/wasm 之类）。 */
+export const IMAGE_MIME_BY_EXT = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.jfif': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+  '.avif': 'image/avif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+};
+
+export function imageMimeFor(filePath) {
+  return IMAGE_MIME_BY_EXT[extname(String(filePath)).toLowerCase()] ?? null;
+}
+
+/**
+ * 把 URL 里 `/img/` 之后的剩余路径还原成**绝对本地路径**；不合规一律 null（纯函数）。
+ * 规则见本节注释①。解码逐段进行：`%2e%2e` 解出来是 `..`，同样被拒。
+ */
+export function decodeImageRequestPath(rawPath) {
+  if (typeof rawPath !== 'string' || rawPath.length === 0) return null;
+  const slashed = rawPath.replace(/\\/g, '/');
+  let unc = false;
+  let rest = slashed;
+  if (rest.startsWith('//')) { unc = true; rest = rest.slice(2); }
+  else if (rest.startsWith('/')) rest = rest.slice(1);
+  if (rest.length === 0) return null;
+  const segments = rest.split('/');
+  const decoded = [];
+  // Windows 设备名段（CON/NUL/COM1…）会被当成设备打开：读 CON 可能把请求挂住，
+  // 所以连"图片扩展名"都不看，段一级直接拒。
+  const DEVICE_NAME = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
+  for (const segment of segments) {
+    let value;
+    try {
+      value = decodeURIComponent(segment);
+    } catch {
+      return null;
+    }
+    if (value.length === 0) return null;
+    if (value === '.' || value === '..') return null;
+    if (value.includes('\0')) return null;
+    if (/[\\/]/.test(value)) return null;   // %2f/%5c 解出来的分隔符不许再切一层
+    if (DEVICE_NAME.test(value)) return null;
+    if (decoded.length > 0 && value.includes(':')) return null;   // 备用数据流（a.png:b）不收
+    decoded.push(value);
+  }
+  if (decoded.length < 1) return null;
+  let localPath;
+  if (unc) {
+    if (decoded.length < 2) return null;    // //server 后面至少还要有共享名
+    localPath = '//' + decoded.join('/');
+  } else {
+    if (!/^[A-Za-z]:$/.test(decoded[0])) return null;   // 必须是盘符绝对路径
+    if (decoded.length < 2) return null;
+    localPath = decoded[0].toUpperCase() + '/' + decoded.slice(1).join('/');
+  }
+  if (!imageMimeFor(localPath)) return null;
+  return normalize(localPath);
+}
+
+/** 服务一次本地图片请求：ETag/304、HEAD、大小上限、流式输出。返回是否已响应。 */
+export async function serveImageFile(req, res, rawPath) {
+  const method = req?.method === 'HEAD' ? 'HEAD' : 'GET';
+  const target = decodeImageRequestPath(rawPath);
+  if (!target) {
+    sendText(res, 400, 'bad image path');
+    return false;
+  }
+  let info;
+  try {
+    info = await fsStat(target);
+  } catch (error) {
+    sendText(res, error?.code === 'ENOENT' ? 404 : 500, error?.code === 'ENOENT' ? 'not found' : 'stat error');
+    return false;
+  }
+  if (!info.isFile()) {
+    sendText(res, 404, 'not found');
+    return false;
+  }
+  if (info.size > IMAGE_MAX_BYTES) {
+    sendText(res, 413, 'image too large');
+    return false;
+  }
+  const etag = makeEtag(info.size, info.mtimeMs);
+  const headers = {
+    'content-type': imageMimeFor(target),
+    'cache-control': 'no-cache',
+    etag,
+    'x-content-type-options': 'nosniff',
+    // SVG 在 <img> 里不执行脚本，但**直接导航**（地址栏/window.open）时就是同源文档、脚本可跑。
+    // 这条 CSP 对 <img> 渲染零影响，对文档导航把脚本/表单/子资源全部中和。
+    'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox",
+  };
+  if (isNotModified(req.headers['if-none-match'], etag)) {
+    res.writeHead(304, headers);
+    res.end();
+    return true;
+  }
+  // 不写 content-length：stat 与流之间有 TOCTOU（文件被改写会截断/挂住）。
+  // 交给 chunked 传输，浏览器按流读完即可。
+  res.writeHead(200, headers);
+  if (method === 'HEAD') {
+    res.end();
+    return true;
+  }
+  await new Promise((resolve) => {
+    let settled = false;
+    const done = () => { if (settled) return; settled = true; resolve(); };
+    const stream = createReadStream(target);
+    stream.on('error', () => { try { res.destroy(); } catch { /* 已断 */ } done(); });
+    stream.on('end', done);
+    res.on('close', () => { try { stream.destroy(); } catch { /* 已断 */ } done(); });
+    stream.pipe(res);
+  });
+  return true;
 }
 
 /** FsError 等错误的稳定码（分支认码不认文案；不许把 code 吞成 message）。 */
@@ -649,6 +792,11 @@ export function createHost(options = {}) {
 
         if (isRead && pathname === CORE_JSON_PATH) {
           await serveCoreJson(req, res);
+          return;
+        }
+        // 本地图片通道（文档相对路径图）：见 serveImageFile 上方注释。
+        if (isRead && pathname.startsWith(IMG_PREFIX)) {
+          await serveImageFile(req, res, pathname.slice(IMG_PREFIX.length));
           return;
         }
         if (isRead && pathname === STATIC_PREFIX.slice(0, -1)) {

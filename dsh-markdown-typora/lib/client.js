@@ -1283,7 +1283,7 @@ window.__ModuleLoader__.load({
     exports.__test = __test;
 
     // 调试面（只读镜像，方便宿主/桌面工具观察；不影响渲染）。
-    try { window.__DSH_MARKDOWN__ = { openDocs: openDocs, version: "0.3.1" }; } catch (e) { /* 沙箱环境 */ }
+    try { window.__DSH_MARKDOWN__ = { openDocs: openDocs, version: "0.3.2" }; } catch (e) { /* 沙箱环境 */ }
 
     return module.exports;
   },

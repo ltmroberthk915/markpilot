@@ -32,6 +32,7 @@ Write Markdown in DSH with Typora-style live rendering; select a passage and sen
 - **Theme-aware** — follows the host's light/dark theme, including the first frame.
 - **Offline assets** — KaTeX fonts, the Markdown worker and Mermaid ship with the plugin; no CDN.
 - **Document reference** — type `@mp` in the composer to reference the open document.
+- **Local images in the document** — `![](assets/diagram.png)` and parent-folder references such as `![](../figures/a.png)` render in the panel, read through the plugin's own read-only image route; a file that is genuinely missing still shows an explicit placeholder instead of an empty box.
 
 ## What's new in the 3.6.6 engine
 
@@ -46,11 +47,11 @@ The editor engine is the same accepted build that ships with MarkPilot 3.6.6:
 
 ### From a GitHub release
 
-Download `dsh-markdown-typora-0.3.1.tgz` from the [MarkPilot releases](https://github.com/ltmroberthk915/markpilot/releases) and add it to the profile that runs your host:
+Download `dsh-markdown-typora-0.3.2.tgz` from the [MarkPilot releases](https://github.com/ltmroberthk915/markpilot/releases) and add it to the profile that runs your host:
 
 ```sh
-dsh plugin --profile web add ./dsh-markdown-typora-0.3.1.tgz
-dsh plugin --profile desktop add ./dsh-markdown-typora-0.3.1.tgz
+dsh plugin --profile web add ./dsh-markdown-typora-0.3.2.tgz
+dsh plugin --profile desktop add ./dsh-markdown-typora-0.3.2.tgz
 ```
 
 Restart the host afterwards; the plugin then appears on the **Plugins** page and opens from the right sidebar. The plugin market listing follows the public release.
@@ -90,6 +91,7 @@ node dsh-markdown-typora/scripts/sync-core.mjs --check
 ## Known limits
 
 - Desktop-only MarkPilot features that need Electron native APIs (export, image picker) may be unavailable in DSH.
+- Image references are resolved against the document's folder, so relative paths (`assets/…`, `../figures/…`) work; an absolute Windows path (`![](D:\pics\a.png)`) does not render in DSH, and a reference whose filename contains `#`, `?` or `%` cannot be addressed as a URL.
 - A selection over 256 KiB is rejected with a message instead of being silently truncated.
 - Insertion does not steal focus; undo it from the composer.
 - Tested against DSH 0.2.1-rc.3; the plugin requires `dsh >= 0.2.0-rc.2`.

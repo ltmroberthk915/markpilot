@@ -11,6 +11,8 @@ import {
   createHost,
   createMarkdownToolDefinition,
   resolveStaticTarget,
+  decodeImageRequestPath,
+  imageMimeFor,
   makeEtag,
   isNotModified,
   cacheControlFor,
@@ -535,6 +537,97 @@ test('静态路由：MIME/ETag/304/no-cache/fonts 长缓存/HEAD/core.json/穿�
       hostNoCore.close();
       await rm(missingRoot, { recursive: true, force: true });
     }
+  } finally {
+    await stopServer(server);
+    host.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+/* ───────────────────── 本地图片路由（文档相对路径图） ───────────────────── */
+
+test('decodeImageRequestPath：盘符/UNC 绝对路径逐段解码；穿越/非图片/坏编码一律拒', () => {
+  assert.equal(decodeImageRequestPath('D%3A/Users/Ming/docs/assets/a.png'), normalize('D:/Users/Ming/docs/assets/a.png'));
+  assert.equal(decodeImageRequestPath('C:/x/y%20z/%E5%9B%BE.png'), normalize('C:/x/y z/图.png'));
+  assert.equal(decodeImageRequestPath('//server/share/pic/a.png'), normalize('//server/share/pic/a.png'));
+  const rejected = [
+    'D%3A/../secret.png',
+    'D%3A/a/%2e%2e/secret.png',
+    'D%3A//a.png',
+    '/etc/passwd.png',
+    'relative/a.png',
+    'D%3A/a/notes.txt',
+    'D%3A/a/evil.png%00.txt',
+    'D%3A/a/bad%E0%A4%A.png',
+    'D%3A/a%2f..%2fb.png',
+    '//server',
+    '',
+    'D%3A/',
+    'D%3A/a/b/c.PDF',
+    // Windows 设备名段：读 CON 可能把请求挂住，必须在段一级拒
+    'D%3A/a/CON.png',
+    'D%3A/NUL.png',
+    'D%3A/a/com1.bmp',
+    'D%3A/a/lpt9',
+    // 备用数据流（a.png:b）不收
+    'D%3A/a/pic.png%3Astream',
+  ];
+  for (const bad of rejected) {
+    assert.equal(decodeImageRequestPath(bad), null, 'expected null for ' + JSON.stringify(bad));
+  }
+  assert.equal(imageMimeFor('x.PNG'), 'image/png');
+  assert.equal(imageMimeFor('x.webp'), 'image/webp');
+  assert.equal(imageMimeFor('x.txt'), null);
+});
+
+test('本地图片路由：真实文件 200/304/HEAD/404/400，字节与 MIME 正确且不走 body', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dshmd-img-'));
+  const fs = createMockFs({});
+  const host = createHost({ fs, rootDir: root, log: SILENT_LOG });
+  const docDir = join(root, 'docs');
+  await mkdir(join(docDir, 'assets'), { recursive: true });
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4, 5, 6]);
+  const imagePath = join(docDir, 'assets', 'pasted-image-2.png');
+  await writeFile(imagePath, png);
+  await writeFile(join(docDir, 'assets', 'note.txt'), 'not an image\n', 'utf8');
+  const encodePath = (value) => value.replace(/\\/g, '/').split('/').map((segment) => encodeURIComponent(segment)).join('/');
+  const routeOf = (value) => '/dsh-markdown-typora/img/' + encodePath(value);
+  const { server, port } = await startServer(host.route);
+  try {
+    const ok = await rawRequest(port, { path: routeOf(imagePath) });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.headers['content-type'], 'image/png');
+    assert.equal(ok.headers['cache-control'], 'no-cache');
+    assert.equal(ok.headers['x-content-type-options'], 'nosniff');
+    assert.match(ok.headers.etag, /^"\d+-\d+"$/);
+    assert.deepEqual(ok.buffer, png);
+
+    const notModified = await rawRequest(port, { path: routeOf(imagePath), headers: { 'if-none-match': ok.headers.etag } });
+    assert.equal(notModified.status, 304);
+    assert.equal(notModified.body, '');
+
+    const head = await rawRequest(port, { method: 'HEAD', path: routeOf(imagePath) });
+    assert.equal(head.status, 200);
+    assert.equal(head.body, '');
+    assert.equal(head.headers['content-type'], 'image/png');
+
+    // 缺失文件：仍然明确 404（引擎据此显示「图片加载失败」占位，不许假装成功）
+    const missing = await rawRequest(port, { path: routeOf(join(docDir, 'assets', 'nope.png')) });
+    assert.equal(missing.status, 404);
+
+    // 非图片扩展名：不是通用文件服务
+    const notImage = await rawRequest(port, { path: routeOf(join(docDir, 'assets', 'note.txt')) });
+    assert.equal(notImage.status, 400);
+
+    // 穿越（编码点段）与目录本身都拒
+    const traversal = await rawRequest(port, { path: '/dsh-markdown-typora/img/D%3A/..%2f..%2fcore.json' });
+    assert.equal(traversal.status, 400);
+    const directory = await rawRequest(port, { path: routeOf(docDir) });
+    assert.equal(directory.status, 400);
+
+    // POST 不在这条路由的语义里：读方法之外直接落到 404（路由层只认 GET/HEAD）
+    const post = await rawRequest(port, { method: 'POST', path: routeOf(imagePath), body: '{}' });
+    assert.ok(post.status === 404 || post.status === 405, 'expected 404/405, got ' + post.status);
   } finally {
     await stopServer(server);
     host.close();

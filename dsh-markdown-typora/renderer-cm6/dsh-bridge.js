@@ -150,6 +150,135 @@
     if (watchdog) { clearInterval(watchdog); watchdog = null; }
   }
 
+  /* ── 文档相对路径图：把 <base> 指到宿主的本地图片路由 ─────────────────────────
+   * 为什么必须由桥来做：引擎只在收到 `mp:docdir` 时才自己设 <base>，而那条通道在桌面壳里
+   * 拼的是 file://；DSH 的编辑面是 **http 源**，CSP 的 img-src 不含 file:，Chromium 也不许
+   * http 页面加载 file:// 子资源 ⇒ 相对路径图必然「图片加载失败」（实测就是这个现象）。
+   * 桥改成等价语义：基准 = 宿主 /img/ 路由 + 文档目录，于是引擎发出的相对 src 落到同一路由。
+   * 规则（与 lib/index.js 的 decodeImageRequestPath 对齐）：
+   *   · 目录按 / 逐段 percent-encode 并保留分隔符 ⇒ 空格/中文/#?% 全部安全；
+   *   · `../` 由浏览器按 RFC 3986 自己归一化，宿主拿到的已经是规整的绝对路径；
+   *   · 没有目录（未命名文档 / 宿主没给 rootPath）⇒ 退回 ./，保持现状，不崩不抛。 */
+  var IMG_ROUTE = (function () {
+    try {
+      var matched = /^(.*\/)renderer-cm6\/[^/]*$/.exec(location.pathname);
+      if (matched) return matched[1] + 'img/';
+    } catch (error) { /* 老内核没有 location.pathname */ }
+    return '/dsh-markdown-typora/img/';
+  })();
+
+  function encodeLocalDir(dir) {
+    return String(dir).split('/').map(function (segment) {
+      return encodeURIComponent(segment).replace(/[!'()*]/g, function (ch) {
+        return '%' + ch.charCodeAt(0).toString(16).toUpperCase();
+      });
+    }).join('/');
+  }
+
+  function applyDocBase(rootPath) {
+    var dir = typeof rootPath === 'string' ? rootPath.replace(/\\/g, '/').replace(/\/+$/, '') : '';
+    // 只认"盘符绝对目录"：`.` / 相对形态 / 空串一律当作没有目录（directoryOf("a.md") 会给 "."，
+    // 那种情况设 base 反而会静默落到 img/./ 上）。UNC 目录暂不支持（未实测，宁可不设）。
+    if (!/^[A-Za-z]:(\/|$)/.test(dir)) dir = '';
+    var href = dir ? IMG_ROUTE + encodeLocalDir(dir) + '/' : './';
+    try {
+      // 只改写**自己**那个 base：引擎的 `base[data-mp-docbase]` 一旦出现（它插在 head.firstChild）
+      // 才是树序第一个、真正生效的那个；抢着改它等于替引擎做决定，宁可让 verifyDocBase 报警。
+      var base = document.querySelector('base[data-dsh-docbase]')
+        || document.querySelector('base:not([data-mp-docbase])');
+      if (!base) {
+        base = document.createElement('base');
+        base.setAttribute('data-dsh-docbase', '1');
+        (document.head || document.documentElement).insertBefore(base, document.head ? document.head.firstChild : null);
+      }
+      if (base.getAttribute('href') !== href) base.setAttribute('href', href);
+      verifyDocBase(href);
+      return href;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /* base 的**唯一写者**断言（只在异常时打一条 console.error，不抢写、不重试）：
+   * HTML 规范下多个 <base> 只有树序第一个生效；引擎将来若补上 `mp:docdir` 通道，
+   * 它会往 head.firstChild 插一个 file:// 的 base（main.js mpSetDocPath）抢先夺权 ⇒
+   * 本桥的基准静默失效、图又裂。那属于"看起来修好了其实没有"，必须留一条可检索的证据。 */
+  var baseWarned = false;
+  function verifyDocBase(expected) {
+    if (baseWarned) return;
+    try {
+      var bases = document.querySelectorAll('base');
+      var actual = document.baseURI;
+      var want = new URL(expected, location.href).href;
+      if (actual !== want || bases.length !== 1) {
+        baseWarned = true;
+        try {
+          console.error('[dsh-bridge] <base> 未按预期生效：base 数量=' + bases.length
+            + ' 期望=' + want + ' 实际=' + actual);
+        } catch (ignored) { /* 无 console */ }
+      }
+    } catch (error) { /* 老内核：忽略 */ }
+  }
+
+  /* 图片路由能力探测（每个 iframe 只探一次，结果缓存）。
+   * 为什么要探：插件升级后宿主进程可能还是旧代码（没有 /img/ 路由）。
+   * 判据用**两种宿主对同一个"合法但不存在"图片路径的不同答法**：
+   *   新宿主：serveImageFile 里 stat ENOENT ⇒ 404 + text/plain（"not found"）；
+   *   旧宿主：prefix 路由把未知路径落到 sendJson 兜底 ⇒ 404 + application/json。
+   * ★ 必须有超时：这条探测挡在 open 派发之前，宿主若挂住（半死连接/排队），编辑面会永远空白，
+   *   而看门狗在本分支已经停掉、父侧 doc.opened 也已置位 ⇒ 没有任何重试路径（错-53 的同族）。
+   *   超时/网络错误一律按"本次不可用"处理（基准退回 ./，与修复前一致），且**不缓存**失败，
+   *   下一次 open 还能再试；只有"明确 404+json"才缓存 false。 */
+  var IMAGE_ROUTE_PROBE_MS = 2000;
+  var imageRouteReady = null;
+  function routeProbeFailed() {
+    imageRouteReady = null;      // 断网/超时/异常都可能是瞬时的：别把 iframe 永久钉在"不可用"
+    return false;
+  }
+  function resolveImageRoute() {
+    if (typeof imageRouteReady === 'boolean') return Promise.resolve(imageRouteReady);
+    if (imageRouteReady) return imageRouteReady;         // 探测进行中：复用同一个 Promise
+    if (typeof fetch !== 'function' || typeof AbortController !== 'function') {
+      imageRouteReady = false;
+      return Promise.resolve(false);
+    }
+    var controller = new AbortController();
+    var timer = setTimeout(function () {
+      try { controller.abort(); } catch (error) { /* 老内核 */ }
+    }, IMAGE_ROUTE_PROBE_MS);
+    imageRouteReady = fetch(IMG_ROUTE + 'C%3A/__dshmd_probe__/probe.png', {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+      .then(function (res) {
+        var type = '';
+        try { type = String((res.headers && res.headers.get('content-type')) || ''); } catch (error) { type = ''; }
+        var ready;
+        if (res && res.status === 404 && type.indexOf('text/plain') === 0) ready = true;      // 新宿主
+        else if (res && res.status === 404 && type.indexOf('application/json') === 0) ready = false; // 旧宿主（确定性）
+        else return routeProbeFailed();                                                       // 其它形态：本次不用，下次再试
+        imageRouteReady = ready;
+        return ready;
+      })
+      .catch(routeProbeFailed)
+      .then(function (value) { clearTimeout(timer); return value; });
+    return imageRouteReady;
+  }
+
+  function runHandlers(type, content) {
+    var list = handlers[type];
+    if (!list) return;
+    for (var i = 0; i < list.length; i += 1) {
+      try { list[i](content); } catch (error) {
+        // 引擎 handler 抛错不许拖垮桥：留给宿主控制台一条可检索的日志。
+        try { console.error('[dsh-bridge] handler failed:', type, error); } catch (ignored) { /* 无 console */ }
+      }
+    }
+  }
+
+  /** 最近一次 open 的链路自证（不缓存文档，只记"探测成没成、耗时、当时的 base"）。 */
+  var openTrace = null;
+
   window.addEventListener('message', function (event) {
     var data = event.data;
     if (!data || data.__dshmd !== true || data.dir !== 'down') return;
@@ -168,25 +297,35 @@
     if (type === 'theme') { applyHostTheme(normalizeDark(content)); return; }
     if (type === 'toast') { showToast(content); emitSkin('toast', { text: typeof content === 'string' ? content : '' }); return; }
 
-    if (type === 'open' || type === 'setValue') {
+    // 【顺序纪律】open 期间先摆好文档目录基准，再把文档交给引擎：
+    // 引擎首次渲染就要按正确基准解析相对图片路径（见 index.html 的目录形状契约）。
+    // 探测是异步的：宿主若是"还没重启成新代码"的旧版（没有 /img/ 路由），基准退回 ./，
+    // 行为与修复前一致 —— 绝不出现"桥换了基准、宿主不认路"的半截状态。
+    if (type === 'open') {
+      handshakeSatisfied = true;
+      stopWatchdog();
+      var docDir = content && typeof content === 'object' ? (content.rootPath || content.docDir || '') : '';
+      // 自证（错-27/错-36）：出问题时必须能分清"探测挂了"与"引擎 boot 挂了"。
+      var trace = { dir: docDir, ready: null, base: null, ms: 0, startedAt: Date.now() };
+      openTrace = trace;
+      resolveImageRoute().then(function (ready) {
+        applyDocBase(ready ? docDir : '');
+        trace.ready = !!ready;
+        trace.base = (function () { try { return document.baseURI; } catch (error) { return null; } })();
+        runHandlers('open', content);
+        trace.ms = Date.now() - trace.startedAt;
+        // 引擎 boot() 是同步的：handler 返回时 window.mpEngine 已创建。
+        // 用微任务而不是 0ms 定时器：不新增宏任务，也不抢渲染帧。
+        queueMicrotask(maybeApplyPendingTheme);
+      });
+      return;
+    }
+
+    if (type === 'setValue') {
       handshakeSatisfied = true;
       stopWatchdog();
     }
-
-    var list = handlers[type];
-    if (list) {
-      for (var i = 0; i < list.length; i += 1) {
-        try { list[i](content); } catch (error) {
-          // 引擎 handler 抛错不许拖垮桥：留给宿主控制台一条可检索的日志。
-          try { console.error('[dsh-bridge] handler failed:', type, error); } catch (ignored) { /* 无 console */ }
-        }
-      }
-    }
-    if (type === 'open') {
-      // 引擎 boot() 是同步的：handler 返回时 window.mpEngine 已创建。
-      // 用微任务而不是 0ms 定时器：不新增宏任务，也不抢渲染帧。
-      queueMicrotask(maybeApplyPendingTheme);
-    }
+    runHandlers(type, content);
   });
 
   var bridge = {
@@ -233,6 +372,10 @@
     theme: function () { return { dark: themeDark, pending: pendingThemeApply }; },
     watchdog: function () { return { armed: !!watchdog, ticks: watchdogTicks, satisfied: handshakeSatisfied }; },
     lastTheme: function () { try { return localStorage.getItem('dshmd-theme'); } catch (error) { return null; } },
+    docBase: function () { try { return document.baseURI; } catch (error) { return null; } },
+    imageRoute: function () { return IMG_ROUTE; },
+    routeReady: function () { return imageRouteReady; },
+    openTrace: function () { return openTrace; },
   };
 
   // 首帧：若上一次宿主主题已知，直接上屏（避免深色宿主闪白/浅色宿主闪黑）。
