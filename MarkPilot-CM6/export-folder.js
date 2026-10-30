@@ -250,4 +250,4 @@ function createHtmlWriter({ dir, name } = {}) {
   };
 }
 
-module.exports = { safeName, classify, prepareAssets, createHtmlWriter, isExternal };
+module.exports = { safeName, classify, prepareAssets, createHtmlWriter, isExternal, dataImageChunks };

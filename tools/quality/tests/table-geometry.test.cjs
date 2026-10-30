@@ -3,6 +3,19 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),test=require('node:test'),acorn=require('acorn');
 const source=fs.readFileSync(path.resolve(__dirname,'../../../dsh-markpilot/src-cm6/main.js'),'utf8');
 const ast=acorn.parse(source,{ecmaVersion:'latest',sourceType:'module'});
+test('a reused row immediately paints its computed initial widths before deferred fitting',()=>{
+ const node=ast.body.find(n=>n.type==='ClassDeclaration'&&n.id.name==='TableRowWidget');
+ const method=node.body.body.find(n=>n.key.name==='toDOM');
+ const cells=[0,1].map(()=>({dataset:{mpRow:'10',mpFrom:'11',mpTo:'12'},hasAttribute:()=>false,removeAttribute(){}}));
+ const cols=[{style:{width:'50%'}},{style:{width:'50%'}}],table={firstElementChild:{children:cols},rows:[{cells}]},wrap={firstElementChild:table};
+ const scope={cachedTableGeometry:()=>({fittedWidth:400}),tableWidthMetadata:()=>null,mathGeometryVersion:1,
+  observeTableGeometry(){},tableRowDOMOwners:new WeakMap(),tableRowDOMViews:new WeakMap()};
+ const render=Function('scope','with(scope){return function(inputView,reusableWrap){'+source.slice(method.value.body.start+1,method.value.body.end-1)+'};}')(scope);
+ const widget={region:null,geometry:{},qDepth:0,weights:null,widths:[50,50],ranges:[[20,22],[23,25]],rowFrom:19,activeCol:-1,fitWidthsNow:()=>[30,70]};
+ assert.equal(render.call(widget,{},wrap),wrap);
+ assert.deepEqual(cols.map(col=>col.style.width),['30%','70%'],'existing columns must receive the fresh initial vector immediately');
+ assert.equal(cells[1].dataset.mpFrom,'23','source positions rebound on retained cells');
+});
 function functions(scope,names){
  const code=names.map(name=>{const node=ast.body.find(n=>n.type==='FunctionDeclaration'&&n.id.name===name);assert(node,name);return source.slice(node.start,node.end);}).join('\n');
  return Function('scope','with(scope){'+code+';return {'+names.join(',')+'};}')(scope);

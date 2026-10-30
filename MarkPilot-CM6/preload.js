@@ -102,6 +102,7 @@ contextBridge.exposeInMainWorld('mpHost', {
    *  失败一律 {ok:false, error(可读中文), code} —— 不抛异常、不弹模态框、不静默 */
   pickImages: (opts) => ipcRenderer.invoke('image:pick', opts || {}),
   saveImageToAssets: (opts) => ipcRenderer.invoke('image:saveToAssets', opts || {}),
+  backupEmbeddedImages: (opts) => ipcRenderer.invoke('image:backupEmbedded', opts || {}),
   base64ToFile: (opts) => ipcRenderer.invoke('image:base64ToFile', opts || {}),
   downloadImageToCache: (opts) => ipcRenderer.invoke('image:download', opts || {}),
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),

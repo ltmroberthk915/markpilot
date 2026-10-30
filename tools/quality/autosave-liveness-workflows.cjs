@@ -12,7 +12,7 @@ const INITIAL='Before\n\n|H|K|\n|---|---|\n|a\\|b|KEEP|\n\nAfter\n';
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 const result={schema:1,suite:'autosave-liveness-workflows',kind:'actual-ui-probe',startedAt:new Date().toISOString(),transport:'Supported Chromium CDP composition/cancel; no synthetic DOM events; OS IME unverified',cases:[],frames:[],errors:[],cleanupErrors:[],clipboard:{touched:false},probe:{file:path.relative(ROOT,__filename),sha256:sha256(__filename)}};
 let run,release;
-async function read(p){return p.evaluate(async()=>{const v=window.mpEngine._view(),el=document.querySelector('.mp-cell-overlay-text'),sel=v.state.selection.main;return{text:v.state.doc.toString(),selection:{anchor:sel.anchor,head:sel.head},active:document.activeElement?.className,hasFocus:document.hasFocus(),cmFocus:document.hasFocus()&&v.hasFocus,cellFocus:document.hasFocus()&&el===document.activeElement,cellText:el?.textContent,viewComposing:v.composing,commandsAllowed:!!window.mpEngine.commands.capture({flush:false}),host:{dirty,timerArmed:!!saveTimer,inFlight:saveInFlight,revision,documentId,autoGeneration,policy:savePolicy,lastSaveError,saveBlocked},scroll:{top:v.scrollDOM.scrollTop,left:v.scrollDOM.scrollLeft},doc:await window.mpHost.currentDoc(),events:window.__autoEvents,saveTrace:window.__mpDbg?.saveTrace};});}
+async function read(p){return p.evaluate(async()=>{const v=window.mpEngine._view(),el=document.querySelector('.mp-cell-overlay-text'),sel=v.state.selection.main,dom=getSelection();const offset=(node,at)=>{if(!el?.contains(node))return null;const range=document.createRange();range.selectNodeContents(el);range.setEnd(node,at);return range.toString().length;};return{text:v.state.doc.toString(),selection:{anchor:sel.anchor,head:sel.head},domSelection:dom?{anchor:offset(dom.anchorNode,dom.anchorOffset),head:offset(dom.focusNode,dom.focusOffset)}:null,active:document.activeElement?.className,hasFocus:document.hasFocus(),cmFocus:document.hasFocus()&&v.hasFocus,cellFocus:document.hasFocus()&&el===document.activeElement,cellText:el?.textContent,viewComposing:v.composing,commandsAllowed:!!window.mpEngine.commands.capture({flush:false}),host:{dirty,timerArmed:!!saveTimer,inFlight:saveInFlight,revision,documentId,autoGeneration,policy:savePolicy,lastSaveError,saveBlocked},scroll:{top:v.scrollDOM.scrollTop,left:v.scrollDOM.scrollLeft},doc:await window.mpHost.currentDoc(),events:window.__autoEvents,saveTrace:window.__mpDbg?.saveTrace};});}
 (async()=>{try{
   const initial=INITIAL,settings={theme:'light'};
   release=acquireSlot(ROOT);const owner=path.join(dir,'owner.md');fs.writeFileSync(owner,'Owned autosave liveness probe\n');
@@ -29,12 +29,24 @@ async function read(p){return p.evaluate(async()=>{const v=window.mpEngine._view
     if(mode==='cell'){
       const rowFrom=initial.lastIndexOf('|a\\|b|KEEP|');item.rowFrom=rowFrom;
       await p.locator('.mp-row td[data-mp-row="'+rowFrom+'"][data-mp-col="0"]').click({delay:65});
+      // Prove the reported boundary independently: one visible step is after a.
+      await p.keyboard.press('Home');await p.keyboard.press('ArrowRight');
+      item.beforePipe=await read(p);assert(item.beforePipe.cellFocus);
+      assert.deepEqual(item.beforePipe.domSelection,{anchor:1,head:1});
+      await p.keyboard.insertText('R');await sleep(90);item.beforePipeEntered=await read(p);
+      assert.equal(item.beforePipeEntered.text,initial.replace('|a\\|b|KEEP|','|aR\\|b|KEEP|'),'typing before visible pipe stays before escaped source pipe');
+      item.frames.push(await frame(p,dir,'cell-00-before-pipe',{caret:'dom'}));
+      await p.keyboard.press('Control+z');await sleep(150);assert.equal((await read(p)).text,initial);
+      await waitUntil(()=>fs.readFileSync(file,'utf8')===initial,'boundary proof restores original disk',4500);
       await p.keyboard.press('Home');await p.keyboard.press('ArrowRight');await p.keyboard.press('ArrowRight');
+      // keydown precedes native caret movement; selectionchange updates CM later.
+      // Two visible steps in a|b are after |: source offset is rowFrom + 4.
+      await waitUntil(async()=>{const s=await read(p);return s.cellFocus&&s.domSelection?.anchor===2&&s.domSelection.head===2&&s.selection.anchor===rowFrom+4&&s.selection.head===rowFrom+4;},'native DOM caret and source selection settle after escaped pipe');
     }
-    const start=await read(p);assert(mode==='cell'?start.cellFocus:start.cmFocus,'native input owner has focus');
-    assert.equal(start.selection.anchor,start.selection.head);const at=start.selection.head;
+    const start=await read(p);item.start=start;assert(mode==='cell'?start.cellFocus:start.cmFocus,'native input owner has focus');
+    assert.equal(start.selection.anchor,start.selection.head);
     await p.keyboard.insertText('R');await sleep(90);const entered=await read(p);
-    const expected=initial.slice(0,at)+'R'+initial.slice(at);assert.equal(entered.text,expected,'native R exact source');
+    const expected=mode==='cell'?initial.replace('|a\\|b|KEEP|','|a\\|Rb|KEEP|'):initial+'R';assert.equal(entered.text,expected,'native R exact source at independently specified visible caret');
     await waitUntil(()=>fs.readFileSync(file,'utf8')===expected,'ordinary R saves once',4500);item.positive=await read(p);
     await p.keyboard.press('Control+z');await sleep(150);assert.equal((await read(p)).text,initial,'Undo restores exact corpus');
     await waitUntil(()=>fs.readFileSync(file,'utf8')===initial,'Undo autosaves exact original copy',4500);

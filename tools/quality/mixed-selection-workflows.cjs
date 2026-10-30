@@ -63,7 +63,7 @@ async function main() {
     };
     const armClipboard = async (p, trace, name) => {
       const marker = 'QUALITY_MIXED_ARM_' + SEED + '_' + name;
-      const ack = await p.evaluate(text => window.mpHost.writeClipboard({ text }), marker);
+      const ack = await p.evaluate(text => window.mpHost.writeClipboard({ text }, window.mpHost.beginClipboardIntent('copy')), marker);
       const check = clipboard.verifyText(marker); trace.push({ name: 'clipboard-arm-' + name, ack, check });
       requireEntry(ack?.ok && check.matches, 'actual native clipboard arm');
     };

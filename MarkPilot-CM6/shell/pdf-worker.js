@@ -11,7 +11,7 @@ function run(configFile){
   const size=fs.statSync(configFile).size;if(size>pdf.GATE.HTML_MAX_BYTES)throw Error('PDF 输入配置过大');
   c=JSON.parse(fs.readFileSync(configFile,'utf8'));
   const eq=(a,b)=>path.resolve(a).toLowerCase()===path.resolve(b).toLowerCase();
-  if(c.schema!==1||c.token!==process.env.MP_PDF_WORKER_TOKEN||!/^[a-f0-9-]{36}$/.test(c.token)||!eq(path.dirname(configFile),c.runDir)||path.basename(c.runDir)!=='pdf-worker-'+c.token||!eq(path.dirname(c.runDir),c.stageDir)||!eq(path.dirname(c.stageDir),app.getPath('temp'))||!path.basename(c.stageDir).startsWith('markpilot-pdf-')||!eq(path.dirname(c.htmlFile),c.stageDir)||!eq(fs.realpathSync(c.runDir),c.runDir)||!eq(app.getPath('userData'),path.join(c.runDir,'profile-real')))throw Error('PDF 输入不属于本次导出');
+  if(c.schema!==1||c.token!==process.env.MP_PDF_WORKER_TOKEN||!/^[a-f0-9-]{36}$/.test(c.token)||!eq(path.dirname(configFile),c.runDir)||path.basename(c.runDir)!=='pdf-worker-'+c.token||!eq(path.dirname(c.runDir),c.stageDir)||!eq(path.dirname(c.stageDir),fs.realpathSync.native(app.getPath('temp')))||!path.basename(c.stageDir).startsWith('markpilot-pdf-')||!eq(path.dirname(c.htmlFile),c.stageDir)||!eq(fs.realpathSync(c.runDir),c.runDir)||!eq(app.getPath('userData'),path.join(c.runDir,'profile-real')))throw Error('PDF 输入不属于本次导出');
  }catch(error){console.error('PDF worker admission:',String(error));app.exit(2);return;}
  const phases=[];
  const report=p=>{phases.push(p);writeJson(path.join(c.runDir,'progress.json'),{token:c.token,phases});};

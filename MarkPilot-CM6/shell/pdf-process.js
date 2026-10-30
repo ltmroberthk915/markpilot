@@ -82,7 +82,7 @@ function printInWorker(options){
   }
   try{
    if(requestedCancel())throw canceled();
-   const stage=path.dirname(path.resolve(options.htmlFile)),temp=path.resolve(options.app.getPath('temp'));
+   const stage=path.dirname(path.resolve(options.htmlFile)),temp=await fsp.realpath(options.app.getPath('temp'));
    if(!same(path.dirname(stage),temp)||!path.basename(stage).startsWith('markpilot-pdf-')||!same(await fsp.realpath(stage),stage))throw fail('MP_PDF_STAGE','PDF 临时目录不属于本次导出');
    job.token=crypto.randomUUID();job.runDir=path.join(stage,'pdf-worker-'+job.token);await fsp.mkdir(job.runDir);
    const profile=path.join(job.runDir,'profile-real');await fsp.mkdir(profile);

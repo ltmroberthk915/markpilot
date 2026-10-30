@@ -95,7 +95,7 @@ async function main(){
     };
     const copied=async(p,expected,trace)=>{
       assert((await snapshot(p)).focus,'copy keyboard focus');
-      const written=await p.evaluate(()=>window.mpHost.writeClipboard({text:'QUALITY_COPY_ARM'})),armed=clipboard.verifyText('QUALITY_COPY_ARM');trace.push({name:'clipboard-arm',write:written,...armed});assert(written.ok,'copy arm write acknowledgement');assert(armed.matches,'independent copy arm');
+      const written=await p.evaluate(()=>window.mpHost.writeClipboard({text:'QUALITY_COPY_ARM'}, window.mpHost.beginClipboardIntent('copy'))),armed=clipboard.verifyText('QUALITY_COPY_ARM');trace.push({name:'clipboard-arm',write:written,...armed});assert(written.ok,'copy arm write acknowledgement');assert(armed.matches,'independent copy arm');
       await p.keyboard.press('Control+c');await sleep(80);const check=clipboard.verifyText(expected);trace.push({name:'copied-source',...check});assert(check.matches,'copy retains exact Markdown, including formula delimiters');
       const before=await snapshot(p);await p.keyboard.press('Control+End');assert((await snapshot(p)).selection.head===before.text.length,'paste at document end');
       const beforePaste=clipboard.verifyText(expected);trace.push({name:'clipboard-before-paste',...beforePaste});assert(beforePaste.matches,'clipboard immediately before paste');await p.keyboard.press('Control+v');await sleep(200);const afterPaste=clipboard.verifyText(expected);trace.push({name:'clipboard-after-paste',...afterPaste});assert(afterPaste.matches,'clipboard after paste');

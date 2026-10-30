@@ -27,6 +27,7 @@
  */
 import { EditorView } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
+import { createImagePayloadProjection } from './image-payload.js';
 
 const ANCHOR_RATIO = 0.30;   // 取主视图视口 30% 高度处的像素锚（Marijn 官方口径）
 
@@ -35,12 +36,13 @@ export function installSplit(deps) {
   let pane = null, slave = null, driver = null, expectedScroll = -1, expectedMasterScroll = -1, hlLine = null, slaveDoc = null, slaveLocalDoc = null, correctTimer = null;
 
   const isOpen = () => !!slave;
+  const payloadProjection = deps.imagePayloads ? createImagePayloadProjection(deps.imagePayloads) : [];
 
   /** 从视图 state：最小扩展集（只读 + 换行 + 不挂任何装饰）＋主视图同一个 Text 引用 */
   function sourceState(doc) {
     return EditorState.create({
       doc,
-      extensions: [EditorState.readOnly.of(true), EditorView.editable.of(false), EditorView.lineWrapping],
+      extensions: [EditorState.readOnly.of(true), EditorView.editable.of(false), EditorView.lineWrapping, payloadProjection],
     });
   }
 
@@ -136,9 +138,12 @@ export function installSplit(deps) {
     a.scrollDOM.addEventListener('scroll', onMasterScroll, { passive: true });
     slave.scrollDOM.addEventListener('scroll', onSlaveScroll, { passive: true });
     document.addEventListener('visibilitychange', onVisibility);
-    // 打开即对齐（两拍：新视图首帧高度图未就绪；timeout 在后台也会跑，不依赖 rAF）
+    // Construction/reflow scrolls are output until both height maps settle.
+    // A trusted new input retires this ownership through the existing protocol.
+    const ticket = mirrorPending = { active: true, opening: true, master: a, source: slave,
+      masterDoc: slaveDoc, localDoc: slaveLocalDoc, serial: deps.intentSerial?.() };
     alignSlaveToMaster();
-    scheduleCorrect(() => { if (slave) alignSlaveToMaster(); });
+    settleMirror(ticket);
     // 点击从视图（源码）→ 主视图落位并聚焦
     slave.dom.addEventListener('mousedown', (e) => {
       // Context menus retain the master's range; only a primary click locates it.
@@ -352,6 +357,10 @@ export function installSplit(deps) {
   }
   function onMasterScroll() {
     if (!slave || driver) return;
+    if (mirrorPending?.opening) {
+      if (ownsMirror(mirrorPending)) return;
+      retireMirror();
+    }
     const a = getView(); if (!a) return;
     const expected = expectedMasterScroll; expectedMasterScroll = -1; // 一次回声：读到即清
     // 程序化滚动回声：仅吞本次登记值；不匹配就是真实驱动

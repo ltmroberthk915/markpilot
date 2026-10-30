@@ -1,13 +1,13 @@
 import { StateField, Prec } from '@codemirror/state';
 import { EditorView, ViewPlugin, keymap } from '@codemirror/view';
-import { Language, ParseContext, syntaxTree, syntaxTreeAvailable, forceParsing } from '@codemirror/language';
+import { Language, LanguageSupport, ParseContext, syntaxTree, syntaxTreeAvailable, forceParsing } from '@codemirror/language';
 import { markdownKeymap } from '@codemirror/lang-markdown';
 import { defaultKeymap, cursorGroupLeft, cursorGroupRight, deleteGroupBackward, deleteGroupForward } from '@codemirror/commands';
 import { foldKeymap } from '@codemirror/language';
 import { completionKeymap } from '@codemirror/autocomplete';
-import { Tree, TreeBuffer, NodeProp, TreeFragment } from '@lezer/common';
+import { Tree, TreeBuffer, NodeProp, TreeFragment, Parser } from '@lezer/common';
 import { codeBlockAt } from './markdown-context.js';
-import { createRawTreeCodec, createReadyPartial } from './worker-tree-codec.js';
+import { createRawTreeCodec, createReadyPartial, copyPendingPrefix } from './worker-tree-codec.js';
 
 export function createAsyncMarkdown(base, { threshold = 128 * 1024 } = {}) {
   const codec = createRawTreeCodec({ Tree, TreeBuffer, NodeProp });
@@ -18,14 +18,17 @@ export function createAsyncMarkdown(base, { threshold = 128 * 1024 } = {}) {
     if (doc.length < threshold || typeof Worker === 'undefined') return null;
     let settle;
     const promise = new Promise(resolve => { settle = resolve; });
-    let mayContainer = before?.mayContainer ?? false, mayHTML = before?.mayHTML ?? false;
-    if (!before) { for (const line of doc.iterLines()) { mayContainer ||= markers.test(line); mayHTML ||= line.includes('<'); if (mayContainer && mayHTML) break; } }
+    const ranges = []; let changedFrom = -1;
+    changes?.iterChangedRanges((fromA,toA,fromB,toB)=>{ ranges.push({fromA,toA,fromB,toB}); if (changedFrom < 0 || fromB < changedFrom) changedFrom = fromB; });
+    const replaced = before && ranges.length === 1 && ranges[0].fromA === 0 && ranges[0].toA === before.doc.length;
+    // A complete replacement has no remaining old markup. Keeping its old
+    // flags would force every ordinary Enter through a full native parse.
+    let mayContainer = !replaced && before?.mayContainer || false, mayHTML = !replaced && before?.mayHTML || false;
+    if (!before || replaced) { for (const line of doc.iterLines()) { mayContainer ||= markers.test(line); mayHTML ||= line.includes('<'); if (mayContainer && mayHTML) break; } }
     else if (!mayContainer || !mayHTML) changes.iterChanges((_a, _b, from, to, inserted) => {
       const s = inserted.toString(); mayHTML ||= s.includes('<');
       mayContainer ||= markers.test(s) || markers.test(doc.lineAt(from).text) || markers.test(doc.lineAt(to).text);
     });
-    const ranges = []; let changedFrom = -1;
-    changes?.iterChangedRanges((fromA,toA,fromB,toB)=>{ ranges.push({fromA,toA,fromB,toB}); if (changedFrom < 0 || fromB < changedFrom) changedFrom = fromB; });
     return { doc, revision: ++revision, status: 'pending', promise, settle, wire: null, mayContainer, mayHTML, changedFrom,
       forceNative: !!(before && armedDoc === before.doc), fragments: before ? TreeFragment.applyChanges(before.fragments, ranges) : [] };
   };
@@ -39,32 +42,20 @@ export function createAsyncMarkdown(base, { threshold = 128 * 1024 } = {}) {
     if (!pending || ranges.length !== 1 || ranges[0].from !== 0 || ranges[0].to !== input.length || pending.doc.length !== input.length) return inner;
     if (pending.status === 'ready') return createReadyPartial({ wire: pending.wire, nodeSet: base.parser.nodeSet, codec, inputLength: input.length });
     if (pending.status === 'pending' && !pending.forceNative && pending.changedFrom > 0 && pending.fragments.length) {
-      /* 【编辑期高亮闪烁·2026-10-29 实测缺陷】pending 时全量解析返回 skip 解析器的
-         **空 Document 树**。Worker 回包或命令路径触发全量解析时，若新 revision 仍在
-         pending，这棵空树会替换上一棵完整树 ⇒ 整篇可见高亮消失（粗体 900→400、字形
-         宽度变化导致换行重排），用户看到"上面加粗段落反复渲染"（10fps 连拍：前一段
-         regular / 后一段 bold）。
-         修复：pending 且有旧树片段时，只用旧片段原生解析到**本次改动起点之前**，
-         返回一棵带 stoppedAt 的部分树——改动点之前的段落/标题保持原有高亮，改动点
-         及其后仍标为未解析（available 依旧 false，命令仍走 ensureForCommand 的
-         forceNative 完整解析，契约不变）。改动从 0 开始（整篇替换）时仍走 skip。 */
+      // Keep raw unchanged prefix nodes without reparsing their text. Register
+      // the suffix with the official promise-based skipping parser: a fixed
+      // stoppedAt would make ParseContext restart the same prefix until its
+      // entire foreground/idle time budget expired. Availability remains false
+      // because the suffix is absent from its valid fragments.
       counters.prefixFallback++;
-      /* 末尾删除时 changedFrom 会等于新文档长度：直接解析到 changedFrom 等于整篇
-         完成，syntaxTreeAvailable 变 true，pending 契约被破坏。至少留最后一个字符
-         未解析（树长 length-1），既保住上方高亮，又让 available 仍为 false。 */
-      const stop = Math.min(pending.changedFrom, input.length - 1);
-      if (stop <= 0) return inner;
-      const copies = new Map();
-      const fragments = pending.fragments.map(f => {
-        if (!copies.has(f.tree)) copies.set(f.tree, codec.decode(codec.encode(f.tree, base.parser.nodeSet), base.parser.nodeSet));
-        return new TreeFragment(f.from, f.to, copies.get(f.tree), f.offset, f.openStart, f.openEnd);
-      });
-      const sub = base.parser.startParse(input, fragments, [{ from: 0, to: stop }]);
+      const prefix = copyPendingPrefix({ fragments: pending.fragments, changedFrom: pending.changedFrom,
+        inputLength: input.length, documentType, Tree, TreeBuffer });
+      const sub = ParseContext.getSkippingParser(pending.promise).startParse(input, fragments, [{ from: prefix.stop, to: input.length }]);
       return {
         get parsedPos() { return sub.parsedPos; },
-        get stoppedAt() { return stop; },
-        stopAt(pos) { sub.stopAt(Math.min(pos, stop)); },
-        advance() { return sub.advance(); },
+        get stoppedAt() { return sub.stoppedAt; },
+        stopAt(pos) { sub.stopAt(pos); },
+        advance() { return sub.advance() ? prefix.tree : null; },
       };
     }
     if (pending.status === 'failed' || pending.forceNative) {
@@ -204,6 +195,35 @@ export function createAsyncMarkdown(base, { threshold = 128 * 1024 } = {}) {
   } });
   return {
     language: new Language(base.data, parser, [], base.name), extension: [field, plugin, nativeKeys, syntaxKeys, completionGuard, guardedInput, guardedPaste],
+    withMixedSupport(support) {
+      const language = support.language;
+      const outer = new class extends Parser {
+        createParse(input, fragments, ranges) {
+          const context = ParseContext.get(), current = context?.state.field(field, false);
+          if (current && current.doc === context.state.doc && !current.forceNative &&
+              (current.status === 'pending' || current.status === 'ready') &&
+              current.doc.length === input.length && ranges.length === 1 &&
+              ranges[0].from === 0 && ranges[0].to === input.length) {
+            // Worker snapshots contain independent nodes, so MixedParse cannot
+            // reuse their identity. Its old-fragment lookup is quadratic for a
+            // wide table. Keep fragments only when they carry actual nested
+            // language mounts, which can still be reused by position/parser.
+            const stack = fragments.map(f => f.tree), seen = new Set();
+            let mounted = false;
+            while (stack.length && !mounted) {
+              const tree = stack.pop();
+              if (!(tree instanceof Tree) || seen.has(tree)) continue;
+              seen.add(tree);
+              mounted = !!tree.prop(NodeProp.mounted);
+              if (!mounted) for (const child of tree.children) stack.push(child);
+            }
+            if (!mounted) fragments = [];
+          }
+          return language.parser.startParse(input, fragments, ranges);
+        }
+      };
+      return new LanguageSupport(new Language(language.data, outer, [], language.name), support.support);
+    },
     inspect(state, detailed = false) {
       const current = state.field(field, false), tree = syntaxTree(state);
       const inner = Array.isArray(detailed) ? detailed.map(pos => {

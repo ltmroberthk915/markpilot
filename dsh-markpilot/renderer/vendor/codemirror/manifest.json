@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "purpose": "codemirror-view-maintained-viewport-budget",
+  "purpose": "codemirror-view-maintained-viewport-budget-and-long-line-geometry",
   "upstreamVersion": "6.43.14",
   "upstreamSha256": "73339f0c64071b55fc2d24e69ad6527a37068c2465b1fec3a50726923f3b7ea5",
-  "patch": "Five VP.Margin uses in getViewport become a public bounded Facet with immediate budget-change recalculation; excess-range tolerance, scroll targets and selection viewports retain upstream logic",
+  "patch": "Public bounded viewport Facet; wrapped long-line gaps use compressed DOM coordinates and convert client lengths to CSS lengths without changing height estimates. Excess-range tolerance, scroll targets, selection viewports and BigScaler retain upstream logic",
   "defaultMargin": 1000,
   "minMargin": 300,
   "maxMargin": 1000,
-  "sourceSha256": "502430f29a4119704e67c766a134d8c34b5f672f1d2a85546f41d775663c8614",
+  "sourceSha256": "9bc28e7b854d7efd86183771c530e862e0bc26bddbdeee89ce0e84e39c6eda1b",
   "licenseSha256": "05c6130cda97e7600ca91427a41e8a065efcf82365fc0293e7de80faec494c07"
 }

@@ -25,7 +25,9 @@ for (let i = 0; i < argv.length; i += 2) {
 }
 if (!opts.runtime || !opts.out) throw new Error('--runtime and --out are required');
 const core = artifactFiles.map(f => 'MarkPilot-CM6/' + f), codec = 'dsh-markpilot/src-cm6/cell-source-map.js';
-assert.equal(core.length, 7, 'the seven packaged identity files must remain present');
+assert.equal(new Set(core).size, core.length, 'packaged identity files must be unique');
+assert(core.length > 0, 'packaged identity must not be empty');
+for (const file of core) assert(fs.statSync(path.join(ROOT, file)).isFile(), 'packaged identity file exists: ' + file);
 assert(core.includes('MarkPilot-CM6/renderer/cm6/app.js'));
 assert(core.includes('MarkPilot-CM6/renderer/cm6/markdown-worker.js'));
 const sourceFiles = [...fs.readdirSync(path.join(ROOT, 'dsh-markpilot/src-cm6')).filter(f => f.endsWith('.js')).map(f => 'dsh-markpilot/src-cm6/' + f)];
@@ -58,6 +60,7 @@ const build = () => {
     bundle: true, format: 'iife', minify: true, outfile: path.join(copy, 'MarkPilot-CM6/renderer/cm6/app.js'),
     loader: { '.woff': 'file', '.woff2': 'file', '.ttf': 'file' },
     nodePaths: [path.join(ROOT, 'dsh-markpilot/node_modules')], logLevel: 'error',
+    alias: { '@codemirror/view': path.join(copy, 'dsh-markpilot/renderer/vendor/codemirror/view.js') },
   });
   return sha256(path.join(copy, 'MarkPilot-CM6/renderer/cm6/app.js'));
 };

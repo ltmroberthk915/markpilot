@@ -51,6 +51,8 @@ import { imageInsertions, cancelImageInsertions } from './image-insertion.js';
 import { mappedMathSource, mathSourcePosition } from './math-source-map.js';
 import { mappedCellSource, cellSourceOffset, cellTextOffset, cellTextChange, encodeCellText } from './cell-source-map.js';
 import { installSplit } from "./splitview.js";
+import { isEmbeddedImage, embeddedImages, protectedPayloadDecoration, protectImagePayloads, safeImagePayloadPosition } from './image-payload.js';
+import { createImageRemovalGate } from './image-removal.js';
 import { editorFontVarsCss, editorHeadingsCss, editorContentMetricsCss, editorKaiRuleCss, editorKaiStyle, exportTypoCss } from "./typography.js";
 
 /* ══ 数学渲染缓存层（W1×W2 交叉确认快赢包）══
@@ -2168,6 +2170,7 @@ function tableRowGeometry(state, tb, block, isHeader, region) {
   return { key: [state.field(regionIndexField).epoch, region.id, region.contextVersion, ordinal, tb.rows.length, tb.widths.length].join(':'), signature };
 }
 function cachedTableGeometry(inputView, geometry) {
+  if (!geometry) return null;
   const cached = geometry && tableGeometryObservers.get(inputView)?.recent.get(geometry.key);
   return cached?.signature === geometry.signature && cached.generation === mathGeometryVersion ? cached : null;
 }
@@ -2325,8 +2328,11 @@ function reusableTableRowParts(dom, inputView, next, previous, owner) {
   const widgets = [owner, previous, next];
   if (widgets.some(w => w.isHeader || w.activeCol >= 0 || !w.geometry ||
       !w.region || !Array.isArray(w.ranges) || !Array.isArray(w.widths))) return null;
+  // Source offsets are rebound below. Width-only table changes can reuse an
+  // unchanged inactive row, but content, alignment and selection cannot.
   const sameGeometry = (a, b) => a.geometry.key === b.geometry.key &&
-    a.geometry.signature === b.geometry.signature && a.selKey === b.selKey &&
+    a.cells.length === b.cells.length && a.cells.every((cell, k) => cell === b.cells[k]) &&
+    a.alignKey === b.alignKey && a.qDepth === b.qDepth && a.qLead === b.qLead && a.selKey === b.selKey &&
     a.ranges.length === b.ranges.length && a.widths.length === b.widths.length;
   if (!sameGeometry(owner, previous) || !sameGeometry(previous, next) ||
       !sameGeometry(owner, next)) return null;
@@ -2486,6 +2492,10 @@ class TableRowWidget extends WidgetType {
     if (!reusableWrap) {
       initialWidths.forEach((w) => { const col = document.createElement("col"); col.style.width = w + "%"; colgroup.appendChild(col); cols.push(col); });
       table.appendChild(colgroup);
+    } else {
+      // Use the same cached/frozen shared policy as a freshly mounted row.
+      // Later measured fitting remains the sole publisher of fitted widths.
+      initialWidths.forEach((w, k) => { const width = w + "%"; if (cols[k].style.width !== width) cols[k].style.width = width; });
     }
     let widthPlanMember = null;
     let fitPending = false, cancelFit = null, fittedWidth = hasFit ? geometry.fittedWidth : null, fittedGeneration = mathGeometryVersion;
@@ -2744,8 +2754,18 @@ function syncCellEdit(edit) {
           : 'input.type';
   view.dispatch({ changes: { from: from + change.from, to: from + change.to, insert: change.insert },
     selection, userEvent });
+  if (!cellEdit || view.state.doc.sliceString(from, from + change.source.length) !== change.source) {
+    if (cellEdit) resyncCellEdit(edit);
+    return;
+  }
   cellEdit.text = newText;
   cellEdit.to = from + change.source.length;
+  if (embeddedImages(view.state, regionIndexField).some(region => region.from >= from && region.to <= cellEdit.to)) {
+    const owner = cellEdit, sel = view.state.selection.main;
+    activateCellOverlay(owner.rowFrom, owner.col, owner.cols, from, owner.to, undefined, false,
+      { anchor: sel.anchor, head: sel.head });
+    return;
+  }
   /* 【A7-(b)】这里原先每次输入都刷一次格内预览（含一次 cellHTML 渲染比较）。已按决定删除：
      预览卡片与"不遮住下一行"在相邻行上结构性互斥（可用带宽 2px vs 卡片 30px+），
      而去掉它同时最贴 Typora、并在每键路径上**净省**一次 innerHTML 写入 + 一次渲染比较。 */
@@ -2775,7 +2795,13 @@ function resyncCellEdit(edit) {
     view.dispatch({ effects: setActiveCell.of(null) });
     deactivateCellOverlay(); view.focus(); return;
   }
-  const [from, to] = range, mapped = mappedCellSource(view.state.doc.sliceString(from, to));
+  const [from, to] = range;
+  if (embeddedImages(view.state, regionIndexField).some(region => region.from >= from && region.to <= to)) {
+    activateCellOverlay(line.from, active.col, ranges.length, from, to, undefined, false,
+      { anchor: sel.anchor, head: sel.head });
+    return;
+  }
+  const mapped = mappedCellSource(view.state.doc.sliceString(from, to));
   Object.assign(cellEdit, { from, to, text: mapped.text, rowFrom: active.rowFrom, col: active.col, cols: ranges.length });
   if (edit.textContent !== mapped.text) edit.textContent = mapped.text;
   updateCellSizer(edit);
@@ -3084,6 +3110,20 @@ function positionCellOverlay(){if(!view||!cellOverlay)return;const active=view.s
 /** 激活/切换活动格：建覆盖层、播种源码文本、落焦点 */
 function activateCellOverlay(rowFrom, col, cols, from, to, caretOffset, selectAll, sourceSelection, pointer) {
   stopCellPointerSelection();
+  const payloads = embeddedImages(view.state, regionIndexField).filter(region => region.from >= from && region.to <= to);
+  if (payloads.length) {
+    const requested = sourceSelection || (selectAll ? { anchor: from, head: to } :
+      { anchor: typeof caretOffset === 'number' ? from + caretOffset : payloads[0].editFrom });
+    const selection = { anchor: safeImagePayloadPosition(payloads, requested.anchor),
+      head: safeImagePayloadPosition(payloads, requested.head ?? requested.anchor) };
+    deactivateCellOverlay();
+    const oldEdit = cellOverlay?.querySelector('.mp-cell-overlay-text');
+    if (oldEdit) oldEdit.textContent = '';
+    view.dispatch({ effects: [setActiveCell.of(null), setTableSel.of(null)], selection,
+      userEvent: 'select', annotations: Transaction.addToHistory.of(false) });
+    view.focus();
+    return;
+  }
   const box = ensureCellOverlay();
   const div = box.querySelector(".mp-cell-overlay-text");
   const mapped = mappedCellSource(view ? view.state.doc.sliceString(from, to) : "");
@@ -3217,6 +3257,20 @@ function moveActiveCellByKey(run) {
  *     Ctrl+C 在列层级给的是**当前格源码**（K20 的红侧就是这条）；
  *   · 整表层级 Ctrl+X 会删掉整块（可撤销），与"表消失"同义 —— 行层级的 Ctrl+X 另走"删除本行"
  *     （见 docSourceClipboard.cut 的 rowCut 分支：直接 replaceSelection 会把表切成"只剩表头"）。 */
+const setTableImeTail = StateEffect.define();
+const tableImeTailField = StateField.define({
+  create: () => null,
+  update(value, tr) {
+    for (const effect of tr.effects) if (effect.is(setTableImeTail)) value = effect.value;
+    if (!value || tr.state.readOnly) return null;
+    if (tr.docChanged) {
+      let changedBeforeTail = false;
+      tr.changes.iterChangedRanges((from) => { if (from < value.from) changedBeforeTail = true; });
+      if (changedBeforeTail) return null;
+    }
+    return value;
+  },
+});
 const setTableSel = StateEffect.define(); // { kind, rowFrom, col } | null
 const tableSelectionField = StateField.define({
   create: () => null,
@@ -3338,6 +3392,19 @@ function cycleTableSelection() {
 
 /** 行/列/整表层级下**用户打字**：先把表级状态清掉、把选区折叠到该格**内容起点**再放行
  *  （不然一个看不见的按键会插到 line.from 上、把表行结构改掉 —— `REVIEW-BETA.md` §3.5）。 */
+const tableSelectionTextInput = EditorView.domEventHandlers({
+  beforeinput(event, target) {
+    const state = target.state, selected = state.field(tableSelectionField, false);
+    if (state.readOnly || target.compositionStarted || event.isComposing || !event.cancelable ||
+        event.inputType !== 'insertText' || typeof event.data !== 'string' || !event.data ||
+        !selected || selected.kind === 'cell' || tableTablesOf(state).at(-1)?.to !== state.doc.length) return false;
+    // The EOF carrier is a DOM input position; the logical table selection remains
+    // the command target. Route the actual text before DOM diffing can include the row.
+    event.preventDefault();
+    target.dispatch({ ...state.replaceSelection(event.data), userEvent: 'input.type' });
+    return true;
+  },
+});
 const tableSelInputGuard = EditorState.transactionFilter.of((tr) => {
   const cur = tr.startState.field(tableSelectionField, false);
   /* 【#12 收窄·2026-10-17】守卫只承行/列/整表层级：格级选区下的替换是正常编辑，放行后行数才不会被改写掉。 */
@@ -3402,7 +3469,9 @@ function tableRowWidgetFor(state,tb,block,isHeader,region) {
   /* 【β1】行/列/整表的高亮只能靠 widget DOM 的 class（源码行被 block widget 整行替换，
      原生选区在屏幕上不可见）⇒ 把选择状态编成一个短 key 传给 widget，由它在 toDOM 里落 class。 */
   const selKey = sel ? sel.kind + ":" + sel.rowFrom + ":" + sel.col : "";
-  const ranges = cellRangesOf(state.doc.lineAt(block.from));
+  const rowLine = state.doc.lineAt(block.from);
+  const ranges = cellRangesOf(rowLine.to > block.to
+    ? { from: rowLine.from, text: rowLine.text.slice(0, block.to - rowLine.from) } : rowLine);
   if (!ranges.length) return null;
   const activeCol = active && active.rowFrom === block.from ? active.col : -1;
   return new TableRowWidget(isHeader ? tb.headerBlock.cells : block.cells, tb.widths, isHeader, ranges, block.from, activeCol,
@@ -3415,6 +3484,8 @@ function sourceTableBlockRange(state, previous = null) {
   const tables = state.field(tableDataField);
   if (!tables.length) return null;
   const sel = state.selection.main;
+  const tail = state.field(tableImeTailField, false);
+  if (tail && sel.from >= tail.from) return null;
   // scanTables and mapTables retain ordered, disjoint table and row source ranges.
   let lo = 0, hi = tables.length;
   while (lo < hi) {
@@ -3465,21 +3536,24 @@ const tableSourceRangeField = StateField.define({
     if (!tr.docChanged && !tr.selection && tr.startState.readOnly === tr.state.readOnly &&
         tr.startState.field(activeCellField) === tr.state.field(activeCellField) &&
         tr.startState.field(tableSelectionField) === tr.state.field(tableSelectionField) &&
+        tr.startState.field(tableImeTailField) === tr.state.field(tableImeTailField) &&
         tr.startState.field(tableDataField) === tr.state.field(tableDataField)) return value;
     return sourceTableBlockRange(tr.state, value);
   },
 });
-const tableDecorations = EditorView.decorations.compute([tableDataField, activeCellField, tableSelectionField, tableSourceRangeField], (state) => {
+const tableDecorations = EditorView.decorations.compute([tableDataField, activeCellField, tableSelectionField, tableSourceRangeField, tableImeTailField], (state) => {
   const out = [];
   const source = state.field(tableSourceRangeField);
-  for (const tb of state.field(tableDataField)) {
+  const tail = state.field(tableImeTailField);
+  for (const tb of tail ? tail.tables : state.field(tableDataField)) {
     const mk = (block, isHeader) => {
       if (source && block.from >= source.from && block.to <= source.to) return;
-      const widget = tableRowWidgetFor(state,tb,block,isHeader,regionAt(state.field(regionIndexField),block.from,'table'));
+      const widget = tableRowWidgetFor(state,tb,block,isHeader,regionAt(tail ? tail.regions : state.field(regionIndexField),block.from,'table'));
       if (!widget) return;
       out.push(Decoration.replace({
         widget,
         block: true,
+        inclusiveEnd: !(tail || (state.field(tableSelectionField)?.kind !== 'cell' && state.field(tableSelectionField))) || block.to !== (tail ? tail.from : state.doc.length),
       }).range(block.from, block.to));
     };
     mk(tb.headerBlock, true);
@@ -4412,7 +4486,8 @@ function imageSessionDecorations(state) {
   const m = region.data, im = m.image, out = [Decoration.widget({
     widget: new ImageWidget(im.src, im.alt, im.title, im.width, im.height, im.align, region, true), block: true, side: 1,
   }).range(m.to)];
-  if (!session.expanded && m.payload && m.payload[1] - m.payload[0] > 512) {
+  if (isEmbeddedImage(region)) out.push(protectedPayloadDecoration(region));
+  else if (!session.expanded && m.payload && m.payload[1] - m.payload[0] > 512) {
     const from = m.payload[0] + 24, to = m.payload[1] - 16;
     out.push(Decoration.replace({ widget: new ImagePayloadWidget(region.id, to - from) }).range(from, to));
   }
@@ -4434,13 +4509,57 @@ const imageAtomicRanges = EditorView.atomicRanges.of((view) => {
   const marks = view.state.field(inlineMarksField, false) || [];
   const rs = [];
   const session = view.state.field(regionSessionField), index = view.state.field(regionIndexField);
-  for (const m of marks) if (m.image && m.image.src.length > 512) {
+  for (const m of marks) if (m.image) {
     const r = regionAt(index, m.from, 'image');
-    if (r?.id === session.imageId) {
+    const protectedImage = isEmbeddedImage(r), tableSource = view.state.field(tableSourceRangeField);
+    if (!protectedImage && m.image.src.length <= 512) continue;
+    if (r?.id === session.imageId || protectedImage && tableSource && r.from >= tableSource.from && r.to <= tableSource.to) {
+      if (protectedImage) { rs.push(Decoration.replace({}).range(...r.payload)); continue; }
       if (!session.expanded && m.payload && m.payload[1] - m.payload[0] > 512) rs.push(Decoration.replace({}).range(m.payload[0] + 24, m.payload[1] - 16));
     } else rs.push(Decoration.replace({}).range(m.from, m.to));
   }
   return Decoration.set(rs, true);
+});
+/* 【公式选区·3d】行内公式的**选区吸附**（2026-10-30 用户实测缺陷）：
+   在 $a+b$ 内部点击后 Shift+End，选区原为 4..9（"+b$ 后"），复制丢开头 "$a"。
+   CM6 的 Shift+End 走 moveToLineBoundary，不读 atomicRanges；点击编辑时行内公式
+   又只有源码、没有选中吸附。这里在一个**用户选区事务**里把部分覆盖的行内公式
+   扩成整块：一端落在公式内部、另一端越过公式另一侧时，该端吸附到公式边界。
+   - 只处理 select 事件，空选区/光标不动（保留"点进公式编辑"手感）；
+   - Shift+点击公式用 'select.pointer.glyph' 豁免，保留精确源码端点契约；
+   - 块公式（display）不参与，避免影响块级选区。
+   多选区安全：逐 range 修正；保留 assoc。 */
+/* 【公式选区·3d·指针/键盘】非 Shift+点击 的选区事务也做整块吸附：
+   - 拖选跨过行内公式边界（一端在内部、另一端越过另一侧）→ 整块公式进入选区；
+   - Shift+点击公式用独立 userEvent 'select.pointer.glyph' 豁免，保留精确源码端点的既有契约。
+   多选区安全：逐 range 修正，空选区不动。 */
+const mathPointerSelectionSnap = EditorState.transactionFilter.of((tr) => {
+  if (tr.docChanged) return tr;
+  const ev = tr.annotation(Transaction.userEvent) || '';
+  if (!ev.startsWith('select') || ev === 'select.pointer.glyph') return tr;
+  const sel = tr.selection;
+  if (!sel || !sel.ranges.length) return tr;
+  const spans = tr.state.field(mathSpansField, false)?.spans;
+  if (!spans || !spans.length) return tr;
+  let changed = false;
+  const ranges = sel.ranges.map((r) => {
+    if (r.empty) return r;
+    let anchor = r.anchor, head = r.head;
+    for (const s of spans) {
+      if (s.display) continue;
+      if (anchor > s.from && anchor < s.to) {
+        if (head >= s.to) { anchor = s.from; changed = true; }
+        else if (head <= s.from) { anchor = s.to; changed = true; }
+      }
+      if (head > s.from && head < s.to) {
+        if (anchor >= s.to) { head = s.from; changed = true; }
+        else if (anchor <= s.from) { head = s.to; changed = true; }
+      }
+    }
+    return anchor === r.anchor && head === r.head ? r : EditorSelection.range(anchor, head, r.assoc);
+  });
+  if (!changed) return tr;
+  return [tr, { selection: EditorSelection.create(ranges, sel.mainIndex) }];
 });
 /** 引用标记的零宽占位（见 scanInlineMarks 里的说明）：不显示任何字形，但**在行盒里留一个零宽盒**，
  *  让整段引用被选中时原生高亮仍然是连续的一块。`aria-hidden` 免得读屏念出一串空。 */
@@ -4456,7 +4575,7 @@ class QuoteMarkWidget extends WidgetType {
   }
   ignoreEvent() { return true; }
 }
-const inlineMarkDecorations = EditorView.decorations.compute(["selection", inlineMarksField, tableDataField, imgBaseField, imgPreviewField, regionIndexField, regionSessionField], (state) => {
+const inlineMarkDecorations = EditorView.decorations.compute(["selection", inlineMarksField, tableDataField, tableSourceRangeField, imgBaseField, imgPreviewField, regionIndexField, regionSessionField], (state) => {
   const out = [];
   const tables = state.field(tableDataField, false) || [];
   const inTable = (pos) => tables.some((t) => pos >= t.from && pos <= t.to);   // 表格行走块级 widget，行内装饰必须让位
@@ -4466,6 +4585,11 @@ const inlineMarkDecorations = EditorView.decorations.compute(["selection", inlin
        前沿线实测那种行"折行"要 50~78ms/键。所以**长 src 的图永远保持 widget**（要改地址走"编辑源码"）。 */
     if (mark.image) {
       const region = regionAt(state.field(regionIndexField), mark.from, 'image');
+      const tableSource = state.field(tableSourceRangeField);
+      if (isEmbeddedImage(region) && tableSource && mark.from >= tableSource.from && mark.to <= tableSource.to) {
+        out.push(protectedPayloadDecoration(region));
+        continue;
+      }
       if (state.field(regionSessionField).imageId !== region?.id) {
         out.push(Decoration.replace({ widget: new ImageWidget(mark.image.src, mark.image.alt, mark.image.title,
           mark.image.width, mark.image.height, mark.image.align, region) }).range(mark.from, mark.to));
@@ -4607,7 +4731,7 @@ function floatClickToSource(box, view, event) {
 }
 function setMathPointerSelection(view, pos, gesture) {
   const anchor = gesture?.shift ? gesture.anchor : pos;
-  view.dispatch({ selection: { anchor, head: pos }, userEvent: 'select.pointer' });
+  view.dispatch({ selection: { anchor, head: pos }, userEvent: gesture?.shift ? 'select.pointer.glyph' : 'select.pointer' });
   view.focus();
 }
 function floatScrollbarHit(box, event) {
@@ -4971,7 +5095,7 @@ const docSourceClipboard = EditorView.domEventHandlers({
   cut(event, view) {
     const st = view.state;
     const ranges = st.selection.ranges.filter((r) => !r.empty);
-    if (!ranges.length) return false;
+    if (!ranges.length) { event.preventDefault(); return true; }
     /* 【整表剪切·2026-10-17 实测缺陷 TBL-6】整表选区（Ctrl+A 递进到"整表"）下 Ctrl+X 与 Ctrl+C 两条口径：
        复制给 TSV+<table>，剪切却落到原生路径给 markdown 源码；更糟的是原生删除被 tableSelInputGuard 按
        "行级删除不许毁表"的口径拦下 ⇒ **一个字都没删**（实测：doc 一字不变、剪贴板已被换掉）。
@@ -6003,6 +6127,17 @@ table.mp-row th { background: var(--mp-capsule); font-weight: 500; }
 .mp-img-retained.is-center { display: block; text-align: center; }
 .mp-img-retained.is-right { display: block; text-align: right; }
 .mp-image-payload { color: var(--mp-muted); border: 1px solid var(--mp-border); border-radius: 3px; padding: 0 4px; cursor: pointer; }
+.mp-image-payload-protected { cursor: default; white-space: nowrap; font: inherit; }
+.mp-image-removal-dialog { width: min(508px, calc(100vw - 40px)); max-height: calc(100vh - 40px); box-sizing: border-box; overflow: auto; padding: 24px; border: 1px solid var(--mp-border, #888); border-radius: 10px; background: var(--mp-bg, #fff); color: var(--mp-fg, #222); font: 15px/1.6 system-ui, sans-serif; }
+.mp-image-removal-dialog::backdrop { background: #0008; }
+.mp-image-removal-dialog h3 { margin: 0 0 12px; font-size: 19px; }
+.mp-image-removal-dialog p { margin: 10px 0; }
+.mp-image-removal-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+.mp-image-removal-actions button { font: inherit; padding: 6px 12px; cursor: pointer; border: 1px solid var(--mp-border, #888); border-radius: 5px; color: inherit; background: transparent; }
+.mp-image-removal-actions button:first-child { background: var(--mp-accent, #286bb2); color: white; }
+.mp-image-removal-actions button:disabled { opacity: .5; cursor: default; }
+.mp-image-removal-actions button:focus-visible { outline: 2px solid var(--mp-accent, #286bb2); outline-offset: 3px; }
+.mp-image-removal-status { min-height: 1.6em; }
 .mp-img .mp-img-fallback {
   display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 6px; max-width: 100%;
   padding: 6px 10px; border: 1px dashed var(--mp-border); border-radius: 6px;
@@ -6414,6 +6549,13 @@ const commands = createCommandContext({
   },
   composing: () => cellComposing || !!view?.composing,
   cancelViewport: v => viewportIntent.cancel(v),
+});
+const imageRemoval = createImageRemovalGate({
+  getView: () => view,
+  images: state => embeddedImages(state, regionIndexField),
+  identity: state => state.field(imageInsertions).identity,
+  bypass: () => suppressChange,
+  afterApply: () => { if (cellEdit && cellOverlay) resyncCellEdit(cellOverlay.querySelector('.mp-cell-overlay-text')); },
 });
 
 // A checkpoint owns the exact CM state, including history and region epoch.
@@ -6921,6 +7063,7 @@ function boot(content) {
   applyEnginePrefs();    // 缩放/岛尺寸/版心/状态栏四件套：装编辑器之前先把 token 写好（首帧即正确）
   if (!document.querySelector(".mp-statusbar")) buildStatusBar();
   const asyncSyntax = createAsyncMarkdown(markdownLanguage);
+  let imeTableRelocate = null;
   view = new EditorView({
     state: EditorState.create({
       doc: content,
@@ -6930,8 +7073,14 @@ function boot(content) {
         mathCompletion(), // Open candidates have priority over structural Enter/Tab.
         asyncSyntax.extension, // Prepare native tree queries before basicSetup; math candidates stay first.
         basicSetup,
+        EditorState.transactionExtender.of(tr => {
+          const ctx = imeTableRelocate;
+          if (!ctx || !tr.docChanged || !tr.isUserEvent('input.type.compose') ||
+              !ownsTableComposition(ctx) || tableCompositionText(ctx, tr.newDoc) === null) return null;
+          return { annotations: Transaction.addToHistory.of(false) };
+        }),
         readingCompartment.of([]),          // 阅读模式：真只读（D-01）
-        markdown({
+        asyncSyntax.withMixedSupport(markdown({
           addKeymap: false,
           base: asyncSyntax.language,
           // 代码围栏语法着色（2.3.3 hljs 对齐）。【复判实锤】lang-markdown 的
@@ -6946,7 +7095,7 @@ function boot(content) {
             LanguageDescription.of({ name: "shell", alias: ["bash", "sh"], support: new LanguageSupport(StreamLanguage.define(shell)) }),
             LanguageDescription.of({ name: "xml", alias: ["html"], support: new LanguageSupport(StreamLanguage.define(xml)) }),
           ],
-        }),
+        })),
         syntaxHighlighting(mdHighlight),
         mathDecorations, // 派生层（行内）：selection+预计算 spans → 投影/源码切换＋编辑浮动预览
         mathSpansField, // 数据层：仅文档变化时重扫（选区变化零重扫）
@@ -6961,6 +7110,7 @@ function boot(content) {
         inlineMarksField, // 行内标记数据层（**/`/~~/链接，仅文档变化重扫；须在 mathSpansField 后）
         regionIndexField,
         regionSessionField,
+        protectImagePayloads(regionIndexField, transaction => imageRemoval.filter(transaction), () => suppressChange),
         imageSessionField,
         rendererLifecycle.extension,
         viewportIntent.extension,
@@ -6975,6 +7125,7 @@ function boot(content) {
         imgBaseField,          // 【图片】文档目录变化时踢一脚，让图片 widget 用新的 base 重建
         imgPreviewField,       // 【图片】资源代次变化时让 retained/inline 图片重建
         imageAtomicRanges, // 【图片】长 data URI 的图当原子区间（方向键整块跳过）
+        mathPointerSelectionSnap, // 【公式】指针/键盘选区跨公式边界时整块吸附（Shift+点击豁免）
         tableDecorations, // 表格投影：Excel 式格内编辑；无格归属的 separator 原生选区显示源码
         cellBackgroundClick,
         editorContentDragDisabled,
@@ -6983,8 +7134,10 @@ function boot(content) {
         extrasCompartment.of([]),
         keyCompartment.of(keymap.of([])),
         activeCellField, // 活动格状态（effect 驱动）
+        tableImeTailField,
         tableSelectionField, // 【β1】选择层级（格/行/列/整表）—— 与活动格**解耦**（见 tableSelectionField 注释）
         tableSourceRangeField, // 同一 separator 行的原生选区；null/相同块坐标保持身份
+        tableSelectionTextInput,
         tableSelInputGuard, // 【β1】行/列/整表层级下打字：先收场再放行（不许一个看不见的按键改表结构）
         listSemantics,
         tableKeys,
@@ -7078,6 +7231,7 @@ function boot(content) {
       ],
     }),
     parent: document.getElementById("editor"),
+    dispatchTransactions: (transactions, target) => imageRemoval.dispatch(transactions, target),
   });
   /* 【#51·2026-10-18 实测缺陷 N6】行/列/整表选择下开始 IME 组字：表行是 block widget，没有可承载
      IME 焦点的文本 DOM；守卫把第一笔组字事务搬进格首后收掉表级状态，而 CM6 的组字观察器仍以
@@ -7085,7 +7239,25 @@ function boot(content) {
      方案：组字**开始**时把 CM/DOM 选区临时落到表格块之后的真实文本行（同时收掉表级选择），让 IME
      在正常文本位置完成组字；compositionend 时把这段组字文本整体搬进目标格内容起点，并打开格覆盖层，
      后续键入回到正常格内路径。 */
-  let imeTableRelocate = null;
+  // A composition owns only an insertion at its original safe position. A change
+  // elsewhere invalidates that ownership, even when the document epoch is unchanged.
+  function tableCompositionText(ctx, doc) {
+    const size = doc.length - ctx.baselineDoc.length, from = ctx.safeFrom;
+    if (size < 0 || !ctx.baselineDoc.slice(0, from).eq(doc.slice(0, from)) ||
+        !ctx.baselineDoc.slice(from).eq(doc.slice(from + size))) return null;
+    return doc.sliceString(from, from + size);
+  }
+  function ownsTableComposition(ctx) {
+    return view === ctx.view && view.dom.isConnected &&
+      view.state.field(regionIndexField).epoch === ctx.epoch && !view.state.readOnly &&
+      (!ctx.tail || view.state.field(tableImeTailField) === ctx.tail);
+  }
+  function releaseTableComposition(ctx) {
+    if (ctx?.tail && view === ctx.view && view.dom.isConnected &&
+        view.state.field(tableImeTailField) === ctx.tail) {
+      view.dispatch({ effects: setTableImeTail.of(null), annotations: Transaction.addToHistory.of(false) });
+    }
+  }
   function tableSafeTextPos(st, rowLine) {
     /* 【C12·EDGE-A5-A2】表行判据改为**缓存表成员**：旧 `^\s*\|`（#58 后剥前缀版）仍把
        无前导管道的真实表行（如 b1 行）当"非表行"，组字临时位落进表内 ⇒ 实测 destructively
@@ -7113,6 +7285,7 @@ function boot(content) {
         if (inAnyTable(line.from)) { n--; continue; }
         return Math.max(line.from, line.to);
       }
+      if (tables[tables.length - 1].to === st.doc.length) return st.doc.length;
     } catch { /* 落在异常上就放弃搬迁 */ }
     return null;
   }
@@ -7136,10 +7309,13 @@ function boot(content) {
       const seg = rowLine.text.slice(r[0] - rowLine.from, r[1] - rowLine.from);
       const sel = st.selection.main;
       const safeLine = st.doc.lineAt(safeFrom);
-      imeTableRelocate = { rowFrom: cur.rowFrom, col: cur.col, kind: cur.kind, cellAt: r[0] + (seg.length - seg.trimStart().length), safeFrom, selFrom: sel.from, selTo: sel.to, safeText: safeLine.text, safeRel: safeFrom - safeLine.from };
+      imeTableRelocate = { view, baselineDoc: st.doc, epoch: st.field(regionIndexField).epoch, rowFrom: cur.rowFrom, col: cur.col, kind: cur.kind, cellAt: r[0] + (seg.length - seg.trimStart().length), safeFrom, selFrom: sel.from, selTo: sel.to, safeText: safeLine.text, safeRel: safeFrom - safeLine.from };
       /* 先收表级状态、再把选区落到真实文本位置：CM6 的组字锚点因此不再是 widget 边界。 */
-      view.dispatch({ selection: EditorSelection.cursor(safeFrom), effects: [setTableSel.of(null), setActiveCell.of(null)], userEvent: 'select.pointer' });
-    } catch { imeTableRelocate = null; }
+      const tail = safeFrom === st.doc.length && tableTablesOf(st).at(-1)?.to === safeFrom
+        ? { from: safeFrom, tables: tableTablesOf(st), regions: st.field(regionIndexField) } : null;
+      imeTableRelocate.tail = tail;
+      view.dispatch({ selection: EditorSelection.cursor(safeFrom), effects: [setTableSel.of(null), setActiveCell.of(null), setTableImeTail.of(tail)], annotations: Transaction.addToHistory.of(false), userEvent: 'select.pointer' });
+    } catch { const ctx = imeTableRelocate; imeTableRelocate = null; releaseTableComposition(ctx); }
   }, true);
   /* #56：组字收尾也必须 document capture —— 实测取消/失焦时 compositionend 的 target 可能不在
      contentDOM 内（Esc 取消形态 target 落到 body），挂在 view.dom 上会漏掉 ⇒ 残留与恢复都做不了。 */
@@ -7147,74 +7323,41 @@ function boot(content) {
     const ctx = imeTableRelocate;
     if (!ctx || !view) return;
     imeTableRelocate = null;
-    const text = event.data || '';
     try {
-      const st = view.state;
-      const from = Math.min(ctx.safeFrom, st.doc.length);
-      const to = Math.min(from + text.length, st.doc.length);
-      const landed = text ? st.doc.sliceString(from, to) : '';
-      if (!text || landed !== text) {
-        /* 【#56】组字被取消（Esc/失焦/候选取消）时什么都不该发生：① 清掉已落在临时行上的组字残留
-           （实测 Esc 取消后 CM6 把 "ni" 留在表后新行）；② 把组字开始前搬走的表级选择与选区原样还回去。
-           两件事在同一笔事务里做，且**不进撤销栈**（取消的用户语义＝零操作）。 */
-        try {
-          const len = st.doc.length;
-          const line = st.doc.lineAt(Math.min(ctx.safeFrom, len));
-          const orig = ctx.safeText ?? '', cur = line.text;
-          let p = 0; const max = Math.min(orig.length, cur.length);
-          while (p < max && orig[p] === cur[p]) p++;
-          let s = 0;
-          while (s < Math.min(orig.length - p, cur.length - p) && orig[orig.length - 1 - s] === cur[cur.length - 1 - s]) s++;
-          const leftover = cur.slice(p, cur.length - s);
-          const at = Math.min(ctx.safeRel ?? 0, cur.length);
-          const delFrom = leftover && p === at ? line.from + p : -1;
-          const delTo = delFrom >= 0 ? delFrom + leftover.length : -1;
-          const a = Math.min(ctx.selFrom, len), b = Math.min(ctx.selTo, len);
-          const baseSel = EditorSelection.range(Math.min(a, b), Math.max(a, b));
-          const tr = view.state.update({
-            changes: delFrom >= 0 ? { from: delFrom, to: delTo, insert: '' } : undefined,
-            selection: delFrom >= 0
-              ? EditorSelection.range(
-                trPos(baseSel.from), trPos(baseSel.to))
-              : baseSel,
-            effects: [setTableSel.of({ kind: ctx.kind, rowFrom: Math.min(ctx.rowFrom, len), col: ctx.col }), setActiveCell.of(null)],
-            userEvent: 'select.pointer',
-            annotations: Transaction.addToHistory.of(false),
-          });
-          /* trPos：把原选区的端点映射过"删掉 leftover"这一笔（端点 >= delTo 的右移）。 */
-          function trPos(pos) {
-            if (delFrom < 0) return pos;
-            if (pos >= delTo) return pos - leftover.length;
-            if (pos <= delFrom) return pos;
-            return delFrom;
-          }
-          view.dispatch(tr);
-        } catch { /* 文档在组字期间被外部替换 ⇒ 不做恢复 */ }
-        return;   // 组字被取消 / 没落在临时行 ⇒ 不搬
-      }
-      const changes = ctx.cellAt >= from
-        ? [{ from: ctx.cellAt, insert: text }, { from, to, insert: '' }]
-        : [{ from, to, insert: '' }, { from: ctx.cellAt, insert: text }];
-      const tr = view.state.update({ changes, userEvent: 'input.type' });
-      view.dispatch(tr);
-      const rowFrom = tr.changes.mapPos(ctx.rowFrom, 1);
-      const line = tr.state.doc.lineAt(rowFrom);
-      const ranges = cellRangesOf(line);
-      const r = ranges[Math.max(0, Math.min(ctx.col, ranges.length - 1))];
+      if (!ownsTableComposition(ctx)) return;
+      const text = tableCompositionText(ctx, view.state.doc), ending = event.data || '';
+      if (text === null || (ending && (!text || !text.endsWith(ending)))) return;
+      const cancelled = !ending;
+      const cleanup = view.state.update({
+        changes: text ? { from: ctx.safeFrom, to: ctx.safeFrom + text.length } : undefined,
+        selection: cancelled ? EditorSelection.range(ctx.selFrom, ctx.selTo) : EditorSelection.cursor(ctx.cellAt),
+        effects: [setTableImeTail.of(null), setActiveCell.of(null),
+          setTableSel.of(cancelled ? { kind: ctx.kind, rowFrom: ctx.rowFrom, col: ctx.col } : null)],
+        annotations: Transaction.addToHistory.of(false),
+      });
+      if (cancelled) { view.dispatch(cleanup); return; }
+      // The temporary input has no history. One normal insertion owns the final
+      // edit, so cancellation adds no empty Undo step and preserves a Redo branch.
+      const tr = cleanup.state.update({ changes: { from: ctx.cellAt, insert: text },
+        selection: EditorSelection.cursor(ctx.cellAt + text.length),
+        annotations: isolateHistory.of('before'), userEvent: 'input.type' });
+      view.dispatch([cleanup, tr]);
+      if (view.state.doc !== tr.state.doc) return;
+      const rowFrom = tr.changes.mapPos(ctx.rowFrom, 1), line = tr.state.doc.lineAt(rowFrom);
+      const ranges = cellRangesOf(line), r = ranges[Math.max(0, Math.min(ctx.col, ranges.length - 1))];
       if (!r) return;
-      const caret = tr.changes.mapPos(ctx.cellAt, 1);
-      const relocate = { rowFrom, col: ctx.col, cols: ranges.length, from: r[0], to: r[1], caret: Math.max(0, caret - r[0]) };
-      /* compositionend 里 CM6 仍在收尾（view.composing 尚未归零），立即开覆盖层会被同拍的状态更新收掉；
-         下一拍再开，用户看到的是组字提交后直接进入格内编辑。 */
+      const caret = ctx.cellAt + text.length;
+      const committedSelection = view.state.selection, committedSerial = commands.serial();
       setTimeout(() => {
         try {
-          if (!view || view.state.doc !== tr.state.doc) return;
-          /* 覆盖层定位依赖 activeCellField（activeCellDOM 取不到就 display:none）⇒ 先立活动格再激活。 */
-          view.dispatch({ effects: setActiveCell.of({ rowFrom: relocate.rowFrom, col: relocate.col }) });
-          activateCellOverlay(relocate.rowFrom, relocate.col, relocate.cols, relocate.from, relocate.to, relocate.caret);
-        } catch (e) { console.warn('[mp] ime 组字搬迁后打开格覆盖层失败：', e); }
+          if (view !== ctx.view || !view.dom.isConnected || view.state.readOnly ||
+              view.state.field(regionIndexField).epoch !== ctx.epoch || view.state.doc !== tr.state.doc ||
+              !view.state.selection.eq(committedSelection) || commands.serial() !== committedSerial) return;
+          view.dispatch({ effects: setActiveCell.of({ rowFrom, col: ctx.col }) });
+          activateCellOverlay(rowFrom, ctx.col, ranges.length, r[0], r[1], Math.max(0, caret - r[0]));
+        } catch (error) { console.warn('[mp] ime cell activation failed:', error); }
       }, 0);
-    } catch { imeTableRelocate = null; }
+    } finally { releaseTableComposition(ctx); }
   });
   // IME 组字收尾：组字期间挂起的 change 脏标在此一笔补发（丢一笔＝保存调度失联）。
   view.dom.addEventListener("compositionend", () => {
@@ -7349,7 +7492,7 @@ function boot(content) {
     /* 阅读模式：真只读（readOnly + 不可编辑），选区与复制仍可用。 */
     captureReadingAnchor,
     setReadingMode: (on, anchor = null) => {
-      if (!view) return false;
+      if (!view || ((cellComposing || view.compositionStarted) && !!on !== view.state.readOnly)) return false;
       /* 【#26】进阅读态先收场活动格覆盖层：它是 body 级 contenteditable，不会跟着 readOnly 失效。 */
       if (on) { try { deactivateCellOverlay(); } catch { /* 覆盖层可能还没建 */ } }
       try {
@@ -7404,6 +7547,7 @@ function boot(content) {
     checkpointDocument,
     replaceDocument: (text) => {
       if (!view || cellComposing || view.composing) return false;
+      imageRemoval.cancel();
       const checkpoint = checkpointDocument();
       if (!checkpoint) return false;
       try {
@@ -7518,7 +7662,9 @@ function boot(content) {
   // 从视图在 open() 时用**自己的最小 state**现场创建）——故这里不需要 Compartment，扩展数组结构零改动；
   // 引擎侧唯一的钩子就是上面 updateListener 里的那一行 mirror(u.state)。
   window.mpSplit = installSplit({ EditorView, EditorState, getView: () => view,
+    imagePayloads: () => embeddedImages(view.state, regionIndexField),
     selectSource: pos => commands.run(() => {
+      pos = safeImagePayloadPosition(embeddedImages(view.state, regionIndexField), pos);
       view.dispatch({ selection: { anchor: pos }, scrollIntoView: true, userEvent: 'select.pointer' });
       if (!activateSourceCellSelection(view)) view.focus();
       /* Explicit split source navigation re-binds the intent after its dispatch;

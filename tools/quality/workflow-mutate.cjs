@@ -178,7 +178,7 @@ if (opts.kind === 'cell-history') {
   ].join('\n'));
 }
 if (opts.kind === 'cell-owner') {
-  once('  if (!containsSelection(range) || (line && isSeparatorBody(tableLead(line.text).body))) {',
+  once('  if (!containsSelection(range) || (line && isSeparatorBody(line.text.slice(tableLead(line.text).off)))) {',
     '  if (false) { // Regression: keep the previous cell owner after native history restores another cell.');
 }
 if (opts.kind === 'boot') {

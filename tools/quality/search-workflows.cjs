@@ -150,10 +150,17 @@ async function main() {
       assert.equal(s.text, initial, 'fresh complete document');
       return { p, file };
     };
+    const readDisk = async file => {
+      const until=Date.now()+1500;let attempts=0;
+      for(;;){try{return fs.readFileSync(file,'utf8');}catch(error){
+        if(!['EBUSY','EACCES','EPERM'].includes(error.code)||Date.now()>=until)throw error;
+        (result.diskReadRetries ||= []).push({file:path.basename(file),code:error.code,attempt:++attempts});await sleep(35);
+      }}
+    };
     const capture = async (p, file, trace, name) => {
       const s = await state(p);
       const channel = s.cell.focus ? 'cell-dom' : s.search.focus ? 'search-input' : s.editorFocus ? 'cm-source' : 'unfocused';
-      const entry = { name, ...s, fixtureFile: file, focusChannel: channel, diskText: fs.readFileSync(file, 'utf8') };
+      const entry = { name, ...s, fixtureFile: file, focusChannel: channel, diskText: await readDisk(file) };
       trace.push(entry);
       entry.screenshot = await frame(p, dir, name,
         channel === 'cm-source' ? {} : { caret: 'dom', allowMissingCaret: true });
@@ -191,7 +198,7 @@ async function main() {
     const settleText = async (p, expected, label) => {
       await waitUntil(async () => (await state(p)).text === expected, label, 3000);
     };
-    const settleDisk = (file, expected) => waitUntil(() => fs.readFileSync(file, 'utf8') === expected, 'complete expected bytes saved', 6000);
+    const settleDisk = (file, expected) => waitUntil(async () => await readDisk(file) === expected, 'complete expected bytes saved', 6000);
     const table = 'PRE_GUARD\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nPOST_GUARD\n';
     const searchArm = async (kind, trace, arm = {}) => {
       const initial = arm.initial || table, query = arm.query || 'KEEP';

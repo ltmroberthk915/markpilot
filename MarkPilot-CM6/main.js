@@ -1483,6 +1483,37 @@ handle('image:saveToAssets', (_e, opts = {}) => {
   imageAssetsQueue = result.catch(() => {});
   return result;
 });
+handle('image:backupEmbedded', (event, opts = {}) => {
+  const session = sessionOf(event.sender), documentId = session.documentId, filePath = session.filePath;
+  const current = () => !event.sender.isDestroyed() && session.documentId === documentId && session.filePath === filePath;
+  if (!filePath || opts.documentId !== documentId || opts.filePath !== filePath ||
+      !Array.isArray(opts.sources) || !opts.sources.length || opts.sources.length > 4096 || opts.sources.some(src => typeof src !== 'string' || !/^data:image\//i.test(src)))
+    return { ok: false, error: '文档已变化或图片数据无效，请重新操作。' };
+  let plans;
+  try { plans = require('./shell/data-images.cjs').planDataImages(opts.sources); }
+  catch (error) { return { ok: false, error: error.message }; }
+  const result = imageAssetsQueue.then(async () => {
+    const files = [];
+    try {
+      for (const plan of plans.values()) {
+        if (!current()) throw new Error('文档已变化，原操作已取消。');
+        const bytes = Buffer.concat([...exporter.dataImageChunks(plan)]);
+        if (bytes.length !== plan.bytes) throw new Error('图片解码校验失败。');
+        const digest = crypto.createHash('sha256').update(bytes).digest('hex');
+        const receipt = await imgSaveToAssets({ docPath: filePath, base64: bytes.toString('base64'),
+          mime: plan.src.slice(5, plan.src.indexOf(',')).split(';')[0].toLowerCase(), fileName: 'embedded-image-' + digest.slice(0, 16) + plan.ext });
+        if (!receipt.ok) throw new Error(receipt.error || '图片写入失败。');
+        files.push({ path: receipt.absPath, relativePath: receipt.relPath, reused: receipt.reused, sha256: digest, bytes: bytes.length });
+        if (!current()) throw new Error('文档已变化，原操作已取消。');
+        if (!(await fsp.readFile(receipt.absPath)).equals(bytes)) throw new Error('备份文件校验失败。');
+        if (!current()) throw new Error('文档已变化，原操作已取消。');
+      }
+      return { ok: true, documentId, filePath, files };
+    } catch (error) { return { ok: false, error: error.message, files }; }
+  });
+  imageAssetsQueue = result.catch(() => {});
+  return result;
+});
 handle('image:base64ToFile', async (_e, { base64, mime, fileName } = {}) => {
   if (typeof base64 !== 'string' || !base64) return { ok: false, error: 'base64 为空' };
   const buf = Buffer.from(base64, 'base64');
@@ -2128,8 +2159,12 @@ let pdfActive = null;
 let pdfSeq = 0;
 function pdfStage(e, dir, pdfSessionId) {
   const resolved = typeof dir === 'string' ? path.resolve(dir) : null;
-  const rel = resolved ? path.relative(app.getPath('temp'), resolved) : '';
-  const reserved = rel && !path.isAbsolute(rel) && rel.split(path.sep)[0].toLowerCase().startsWith('markpilot-pdf-');
+  // Windows may supply TEMP in 8.3 form. Recognize both spellings, while the
+  // owned session itself always uses the canonical root captured at creation.
+  const reserved = resolved && [pdfActive?.tempRoot || fs.realpathSync.native(app.getPath('temp')), app.getPath('temp')].some(root => {
+    const rel = path.relative(root, resolved);
+    return rel && !path.isAbsolute(rel) && rel.split(path.sep)[0].toLowerCase().startsWith('markpilot-pdf-');
+  });
   if (pdfSessionId === undefined && !reserved) return null;
   const s = pdfActive;
   if (!s || s.canceled || s.closing || s.owner !== e.sender.id || pdfSessionId !== s.id || !resolved || !s.dir || path.relative(s.dir, resolved) !== '') {
@@ -2253,8 +2288,8 @@ handle('export:pdf', async (e, opts = {}) => {
   const cleanupStaging = async () => {
     session.closing = true;
     if (!dir) return;
-    const target = path.resolve(dir), parent = path.resolve(app.getPath('temp'));
-    if (path.dirname(target) !== parent || !path.basename(target).startsWith('markpilot-pdf-')) throw new Error('PDF 临时目录超出清理范围');
+    const target = path.resolve(dir), parent = session.tempRoot;
+    if (!parent || path.dirname(target) !== parent || !path.basename(target).startsWith('markpilot-pdf-') || await fsp.realpath(target) !== target) throw new Error('PDF 临时目录超出清理范围');
     await Promise.allSettled([...session.assetJobs]);
     if (session.htmlWriter) {
       const entry = exportWriters.get(session.htmlWriter.id);
@@ -2287,7 +2322,8 @@ handle('export:pdf', async (e, opts = {}) => {
     };
     await validatePdfTarget();
     await fsp.mkdir(path.dirname(outFile), { recursive: true });
-    dir = await fsp.mkdtemp(path.join(app.getPath('temp'), 'markpilot-pdf-')); session.dir = dir;
+    session.tempRoot = await fsp.realpath(app.getPath('temp'));
+    dir = await fsp.mkdtemp(path.join(session.tempRoot, 'markpilot-pdf-')); session.dir = dir;
     mem.start();
     // ③ 请渲染侧用**引擎自己的**文件夹导出流程把 HTML + assets/ 写到 staging
     sendTo(W, 'export:make-html', { id: session.id, documentId: session.documentId, stageDir: dir, name: stem });

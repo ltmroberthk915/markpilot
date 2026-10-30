@@ -38,7 +38,7 @@ async function main(){
       await p.keyboard.press('Control+End');
       if(config.code){await p.keyboard.press('Control+Home');await p.keyboard.press('ArrowDown');await p.keyboard.press('ArrowDown');assert(await p.evaluate(()=>document.querySelector('.cm-line.cm-activeLine')?.classList.contains('mp-code')),'literal code context');}
       trace.push({name:'before',...await snapshot(p),screenshot:await frame(p,dir,name+'-01-before')});
-      const written=await p.evaluate(payload=>window.mpHost.writeClipboard(payload),{text:plain,html});assert(written?.ok,'native clipboard write');
+      const written=await p.evaluate(payload=>window.mpHost.writeClipboard(payload, window.mpHost.beginClipboardIntent('copy')),{text:plain,html});assert(written?.ok,'native clipboard write');
       const before={text:clipboard.verifyText(plain),html:html?clipboard.verifyHtml(html):{matches:true,absent:true}};trace.push({name:'clipboard-before',...before});assert(before.text.matches&&before.html.matches,'independent clipboard armed');
       await p.evaluate(tokens=>{window.__qualityPaste=null;document.addEventListener('paste',e=>{const h=e.clipboardData?.getData('text/html')||'',source=h||e.clipboardData?.getData('text/plain')||'';window.__qualityPaste={trusted:e.isTrusted,types:[...e.clipboardData.types],format:h?'html':'plain',tokens:tokens.map(t=>source.includes(t))};},{capture:true,once:true});},tokens);
       await p.keyboard.press(config.key||'Control+v');

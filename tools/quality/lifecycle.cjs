@@ -127,6 +127,8 @@ async function launch(o, doc, runDir, extraEnv = {}) {
     // A portable wrapper extracts a different running executable. Resolve the
     // archive from the actual editor page, rather than guessing beside wrapper.
     const artifactRoot=path.resolve(require('node:url').fileURLToPath(new URL('../',page.url())));
+    if (o.app && fs.realpathSync.native(artifactRoot).toLowerCase() !== fs.realpathSync.native(path.resolve(o.app)).toLowerCase())
+      throw new Error('Runtime ignored the requested source app; actual application: ' + artifactRoot);
     const asarPath=o.app?null:artifactRoot,resourcesPath=o.app?path.join(path.dirname(exe),'resources'):path.dirname(asarPath);
     const asarSha256=asarPath&&fs.existsSync(asarPath)?sha256(asarPath):null;
     const runtimeExecutablePath=o.app?exe:path.join(path.dirname(resourcesPath),'MarkPilot.exe');

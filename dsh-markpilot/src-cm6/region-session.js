@@ -10,15 +10,20 @@ export const expandRegionPayload = StateEffect.define();
 export function createRegionSession(indexField) {
   function project(state,image) {
     const index=state.field(indexField),presentation=new Map(),main=state.selection.main;
+    // A block replacement's right DOM edge belongs to the next line. Keep the
+    // closing fence as text at its exact source endpoint so native input cannot
+    // drift past the following LF. Inline tails retain their pointer policy.
+    const ownsMathHead=(r,head)=>head>=r.from&&(head<r.to||
+      (head===r.to&&(r.form==='display'||image.lastPointer===true)));
     for(const kind of ['math','code','mermaid','table','image']) for(const selection of state.selection.ranges) {
       for(const r of regionsBetween(index,selection.from,selection.to,kind)) {
         const current=presentation.get(r.id)||{id:r.id,kind,from:r.from,to:r.to,selected:false,editing:false,preview:false};
         current.selected=true;
         if(kind==='image')current.editing=r.id===image.imageId;
         else if(kind==='mermaid')current.editing=main.head>=r.from&&main.head<=r.to;
-        else if(kind==='math')current.editing ||= selection.head>=r.from&&(selection.head<r.to||(selection.head===r.to&&image.lastPointer===true));
+        else if(kind==='math')current.editing ||= ownsMathHead(r,selection.head);
         else current.editing ||= selection.head>=r.from&&selection.head<=r.to;
-        current.preview=kind==='math'&&main.head>=r.from&&(main.head<r.to||(main.head===r.to&&image.lastPointer===true)) || kind==='image'&&current.editing;
+        current.preview=kind==='math'&&ownsMathHead(r,main.head) || kind==='image'&&current.editing;
         presentation.set(r.id,current);
       }
     }

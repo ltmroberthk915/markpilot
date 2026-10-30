@@ -2,6 +2,24 @@
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path'),{pathToFileURL}=require('node:url');
 const root=path.resolve(__dirname,'../../..'),local=n=>pathToFileURL(path.join(root,'dsh-markpilot/src-cm6',n)).href;
 const cm=n=>pathToFileURL(path.join(root,'dsh-markpilot/node_modules/@codemirror',n,'dist/index.js')).href;
+
+test('display math right endpoint retains text ownership while inline and reverse boundaries keep their policy',async()=>{
+ const {EditorState,EditorSelection,StateField}=await import(cm('state'));
+ const {createRegionIndex}=await import(local('region-index.js')),{createRegionSession}=await import(local('region-session.js'));
+ // Producer records are fixtures; the real index and session own the policy.
+ const rows=[{kind:'math',form:'display',from:4,to:13,content:'x+y'},{kind:'math',form:'inline',from:20,to:25,content:'z'}];
+ const source=StateField.define({create:()=>rows,update:v=>v}),index=createRegionIndex(s=>s.field(source),[source]),session=createRegionSession(index);
+ let state=EditorState.create({doc:'PRE\n$$\nx+y\n$$\nPOST\n $z$     ',selection:{anchor:12},extensions:[EditorState.allowMultipleSelections.of(true),source,index,session]});
+ const flags=from=>[...state.field(session).presentation.values()].find(r=>r.from===from);
+ for(const head of [12,13]){state=state.update({selection:{anchor:head},userEvent:'select'}).state;assert.equal(flags(4)?.editing,true);assert.equal(flags(4)?.preview,true);}
+ state=state.update({selection:{anchor:14},userEvent:'select'}).state;assert(!flags(4)?.editing,'next source character leaves display editing');
+ state=state.update({selection:{anchor:25},userEvent:'select'}).state;assert.equal(flags(20)?.editing,false,'inline keyboard tail remains closed');
+ state=state.update({selection:{anchor:25},userEvent:'select.pointer'}).state;assert.equal(flags(20)?.editing,true,'inline pointer tail still opens');
+ state=state.update({selection:{anchor:13,head:3},userEvent:'select'}).state;assert.equal(flags(4)?.selected,true);assert.equal(flags(4)?.editing,false,'reverse head before region never opens it');
+ state=state.update({selection:EditorSelection.create([EditorSelection.cursor(13),EditorSelection.cursor(23)],1),userEvent:'select'}).state;
+ assert.equal(flags(4)?.editing,true);assert.equal(flags(4)?.preview,false);assert.equal(flags(20)?.preview,true,'only main range owns preview');
+ assert.equal(state.doc.toString(),'PRE\n$$\nx+y\n$$\nPOST\n $z$     ');
+});
 test('all kinds share directed selection sessions; math has per-range source and only main preview',async()=>{
  const {EditorState,EditorSelection,StateField}=await import(cm('state'));
  const {createRegionIndex}=await import(local('region-index.js')),{createRegionSession,activateRegion}=await import(local('region-session.js'));

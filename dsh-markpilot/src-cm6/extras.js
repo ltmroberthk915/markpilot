@@ -2235,8 +2235,9 @@ export function installExtras(deps) {
         const at = imgInfo && imgInfo.pos != null ? imgInfo.pos : v.state.selection.main.head;
         const range = imageRangeAt(at);
         if (!range) { toast("找不到这段图片语法"); return; }
+        const before = v.state.doc;
         v.dispatch({ changes: { from: range.from, to: range.to, insert: "" }, userEvent: "delete.image" });
-        toast("已删除图片");
+        if (v.state.doc !== before) toast("已删除图片");
       } catch (e) { console.error("[mp] 删除图片失败：", e); }
     }, true);
     h.appendChild(pop);

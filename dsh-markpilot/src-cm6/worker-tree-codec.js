@@ -105,3 +105,49 @@ export function createReadyPartial({ wire, nodeSet, codec, inputLength }) {
   };
 }
 
+// A pending Worker must not synchronously reparse a multi-megabyte Paragraph
+// merely to retain the unchanged prefix's highlighting. Only the first mapped
+// raw fragment is trustworthy: later fragments may lie beyond an earlier edit
+// whose Worker reply has not arrived yet. Never return its mutable Tree objects
+// directly, since the outer mixed-language parser attaches mounts to them.
+export function copyPendingPrefix({ fragments, changedFrom, inputLength, documentType, Tree, TreeBuffer }) {
+  const first = fragments[0];
+  const stop = first && first.from === 0 && first.offset === 0 && !first.openStart
+    ? Math.max(0, Math.min(changedFrom, inputLength - 1, first.to)) : 0;
+  const containers = new Set(['', 'Document', 'Paragraph', 'Blockquote', 'BulletList', 'OrderedList', 'ListItem',
+    'Table', 'TableHeader', 'TableRow', 'TableCell', 'FencedCode', 'IndentedCode', 'CodeText', 'HTMLBlock']);
+  function copy(node, limit) {
+    const length = Math.min(node.length, limit);
+    if (node instanceof TreeBuffer) {
+      if (node.length <= limit) return new TreeBuffer(node.buffer.slice(), node.length, node.set);
+      const source = node.buffer, target = [];
+      function append(fromIndex, endIndex) {
+        for (let i = fromIndex; i < endIndex;) {
+          const [id, from, to, end] = source.subarray(i, i + 4);
+          if (from >= length) break;
+          if (to <= length) {
+            const shift = target.length - i;
+            for (let j = i; j < end; j += 4) target.push(source[j], source[j + 1], source[j + 2], source[j + 3] + shift);
+          } else if (containers.has(node.set.types[id].name)) {
+            const at = target.length; target.push(id, from, length, 0);
+            append(i + 4, end); target[at + 3] = target.length;
+          }
+          i = end;
+        }
+      }
+      append(0, source.length);
+      return new TreeBuffer(new Uint16Array(target), length, node.set);
+    }
+    if (node.length > limit && !containers.has(node.type.name)) return null;
+    const children = [], positions = [];
+    for (let i = 0; i < node.children.length; i++) {
+      if (node.positions[i] >= length) break;
+      const child = copy(node.children[i], length - node.positions[i]);
+      if (child) { children.push(child); positions.push(node.positions[i]); }
+    }
+    return new Tree(node.type, children, positions, length, node.length <= limit ? node.propValues : []);
+  }
+  const prefix = stop ? copy(first.tree, stop) : null;
+  return { stop, tree: new Tree(documentType, prefix?.children || [], prefix?.positions || [], inputLength) };
+}
+

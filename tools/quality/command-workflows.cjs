@@ -47,11 +47,19 @@ async function main(){
      const response=await p.evaluate(file=>window.mpHost.openPath(file),second);assert(response.ok,'Actual shell document replacement');await waitUntil(async()=>{const s=await read();return s.text===SECOND&&s.host.filePath===second&&s.host.documentId!==clean.host.documentId&&s.session.epoch!==clean.session.epoch},'new document ID and engine epoch before old reply',7000);
      await p.keyboard.press('Control+a');exact(await capture('05-new-document-selected'),SECOND,0,SECOND.length);
     }
-    await waitUntil(()=>clipboard.verifyText('ALPHA').matches,'independent clipboard ALPHA readback',7000);
-    if(mode==='normal')await waitUntil(async()=>{const s=await read();return s.text==='\nOMEGA\n'&&s.focus},'normal delayed cut actually deletes and resumes',7000);
-    else await waitUntil(async()=>{const s=await read();return s.toast.includes('选区已改变，已复制原选区，本次未剪切')||s.text!==(mode==='new-document'?SECOND:BASE);},'actual stale cut reply completed',7000);
+    if(mode==='new-document'){
+     // A document switch invalidates the host clipboard capability before its
+     // delayed native write. A selection change within the same document does not.
+     await waitUntil(()=>fs.readFileSync(log,'utf8').includes('clipboardWrite:canceled {"seq":1}'),'old document clipboard write canceled',7000);
+     assert(!fs.readFileSync(log,'utf8').includes('clipboardWrite:committed'),'canceled write never commits');
+     assert(clipboard.verifyText(sentinel).matches,'document switch preserves the independent original sentinel');
+    }else{
+     await waitUntil(()=>clipboard.verifyText('ALPHA').matches,'independent clipboard ALPHA readback',7000);
+     if(mode==='normal')await waitUntil(async()=>{const s=await read();return s.text==='\nOMEGA\n'&&s.focus},'normal delayed cut actually deletes and resumes',7000);
+     else await waitUntil(async()=>{const s=await read();return s.toast.includes('选区已改变，已复制原选区，本次未剪切')||s.text!==BASE;},'actual stale cut reply completed',7000);
+    }
     assert.equal(starts(),beforeStart+1,'No unexpected clipboard writes');
-    const replied=await capture('06-clipboard-reply');assert(clipboard.verifyText('ALPHA').matches,'Old original range copied independently');
+    const replied=await capture('06-clipboard-reply');assert(clipboard.verifyText(mode==='new-document'?sentinel:'ALPHA').matches,'independent terminal clipboard bytes');
     if(mode==='normal'){
      exact(replied,'\nOMEGA\n',0);await p.keyboard.press('Control+z');const undone=await capture('07-undo');assert.equal(undone.text,BASE,'Undo restores complete original source');assert(undone.focus);
      await p.keyboard.press('Control+y');await p.keyboard.press('1');exact(await capture('08-redo-immediate-one'),'1\nOMEGA\n',1);await p.keyboard.press('Control+s');await waitUntil(()=>fs.readFileSync(file,'utf8')==='1\nOMEGA\n','normal full disk bytes');
@@ -59,6 +67,8 @@ async function main(){
      exact(replied,BASE,6,11);assert.equal(fs.readFileSync(file,'utf8'),BASE,'Declined cut leaves old disk unchanged');await p.keyboard.insertText('R');exact(await capture('07-immediate-range-replacement'),'ALPHA\nR\n',7);await p.keyboard.press('Control+s');await waitUntil(()=>fs.readFileSync(file,'utf8')==='ALPHA\nR\n','race continuation full disk bytes');
     }else{
      exact(replied,SECOND,0,SECOND.length);assert.notEqual(replied.host.documentId,clean.host.documentId);assert.notEqual(replied.session.epoch,clean.session.epoch);assert.equal(replied.host.filePath,second);assert.equal(fs.readFileSync(file,'utf8'),BASE,'Old document disk unchanged');assert.equal(fs.readFileSync(second,'utf8'),SECOND,'New document disk unchanged');assert(!replied.host.dirty);
+     await p.keyboard.press('Control+z');assert.equal((await read()).text,SECOND,'old cut adds no history to new document');
+     await p.keyboard.insertText('R');assert.equal((await read()).text,'R');await p.keyboard.press('Control+z');assert.equal((await read()).text,SECOND,'new document still owns its independent history');
     }
     const final=await capture('09-final'),events=final.events;assert(events.length&&events.every(e=>e.trusted),'Input ledger contains trusted events only');
     const channels={keyboard:events.some(e=>e.type==='keydown'&&e.key==='ArrowRight'),mouse:events.some(e=>e.type==='contextmenu'&&e.button===2),modifiedKeys:events.some(e=>e.type==='keydown'&&(e.ctrl||e.shift)),mouseKeyboard:events.some(e=>e.type==='mousedown'&&e.inMaster)&&events.some(e=>e.type==='keydown'&&e.shift),drag:events.filter(e=>e.type==='mousemove'&&(e.buttons&1)).length>=3&&events.some(e=>e.type==='mouseup'&&e.button===0)};assert(Object.values(channels).every(Boolean),'Five trusted input channels');trace.push({stage:'five-channel-ledger',channels});

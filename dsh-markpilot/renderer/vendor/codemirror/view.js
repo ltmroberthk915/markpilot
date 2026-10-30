@@ -6204,24 +6204,25 @@ class LineGap {
     }
     draw(viewState, wrapping) {
         return Decoration.replace({
-            widget: new LineGapWidget(this.displaySize * (wrapping ? viewState.scaleY : viewState.scaleX), wrapping)
+            widget: new LineGapWidget(this.displaySize, wrapping, this.displaySize / (wrapping ? viewState.scaleY : viewState.scaleX))
         }).range(this.from, this.to);
     }
 }
 class LineGapWidget extends WidgetType {
-    constructor(size, vertical) {
+    constructor(size, vertical, cssSize = size) {
         super();
         this.size = size;
+        this.cssSize = cssSize;
         this.vertical = vertical;
     }
-    eq(other) { return other.size == this.size && other.vertical == this.vertical; }
+    eq(other) { return other.size == this.size && other.cssSize == this.cssSize && other.vertical == this.vertical; }
     toDOM() {
         let elt = document.createElement("div");
         if (this.vertical) {
-            elt.style.height = this.size + "px";
+            elt.style.height = this.cssSize + "px";
         }
         else {
-            elt.style.width = this.size + "px";
+            elt.style.width = this.cssSize + "px";
             elt.style.height = "2px";
             elt.style.display = "inline-block";
         }
@@ -6579,13 +6580,13 @@ class ViewState {
                 let top, bot;
                 if (target != null) {
                     let targetFrac = findFraction(structure, target);
-                    let spaceFrac = ((this.visibleBottom - this.visibleTop) / 2 + marginHeight) / line.height;
+                    let spaceFrac = ((this.pixelViewport.bottom - this.pixelViewport.top) / 2 + marginHeight) / line.height;
                     top = targetFrac - spaceFrac;
                     bot = targetFrac + spaceFrac;
                 }
                 else {
-                    top = (this.visibleTop - line.top - marginHeight) / line.height;
-                    bot = (this.visibleBottom - line.top + marginHeight) / line.height;
+                    top = (this.pixelViewport.top - line.top - marginHeight) / line.height;
+                    bot = (this.pixelViewport.bottom - line.top + marginHeight) / line.height;
                 }
                 viewFrom = findPosition(structure, top);
                 viewTo = findPosition(structure, bot);
