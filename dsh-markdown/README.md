@@ -8,7 +8,7 @@ Write Markdown in DSH with Typora-style live rendering; select a passage and sen
 
 | | |
 | --- | --- |
-| **Selection → chat, inside DSH**<br>![A selection inserted into the DSH conversation](assets/screenshots/01-dsh-insert-to-chat.jpg) | **A formula block, Typora-style**<br>![Formula source with its rendered preview](assets/screenshots/02-math-formula-box.jpg) |
+| **Selection → chat, inside DSH**<br>![A selection inserted into the DSH conversation](assets/screenshots/01-dsh-insert-to-chat.jpg) | **A formula block, Typora-style — click a glyph and the source caret lands on it**<br>![Formula source with its rendered preview](assets/screenshots/02-math-formula-box.jpg) |
 | **Notion dark**<br>![Editor in the Notion dark theme](assets/screenshots/03-hero-notion-dark.jpg) | **护眼米黄 (sepia light)**<br>![Editor in the sepia light theme](assets/screenshots/04-hero-sepia-light.jpg) |
 | **9 themes, switchable from the toolbar**<br>![Theme picker](assets/screenshots/05-theme-panel.jpg) | **A selection that crosses inline formulas**<br>![Selection across inline math](assets/screenshots/06-selection-across-math.jpg) |
 | **Table cells are real cells**<br>![Table cell toolbar](assets/screenshots/07-table-toolbar.jpg) | **Images render in the document**<br>![Image in the document](assets/screenshots/08-image-in-doc.jpg) |
