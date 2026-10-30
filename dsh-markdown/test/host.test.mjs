@@ -464,7 +464,7 @@ test('静态路由：MIME/ETag/304/no-cache/fonts 长缓存/HEAD/core.json/穿�
   await writeFile(join(root, 'renderer-cm6', 'app.js'), 'console.log(1);\n', 'utf8');
   await writeFile(join(root, 'renderer-cm6', 'dsh-bridge.js'), '// bridge\n', 'utf8');
   await writeFile(join(root, 'renderer-cm6', 'cm6', 'fonts', 'f.woff2'), Buffer.from([0, 1, 2, 3]));
-  await writeFile(join(root, 'core.json'), JSON.stringify({ core: 'MarkPilot CM6', version: '3.6.2' }), 'utf8');
+  await writeFile(join(root, 'core.json'), JSON.stringify({ core: 'MarkPilot CM6', version: '3.6.6' }), 'utf8');
 
   const { server, port } = await startServer(host.route);
   try {
@@ -512,7 +512,7 @@ test('静态路由：MIME/ETag/304/no-cache/fonts 长缓存/HEAD/core.json/穿�
     assert.equal(core.status, 200);
     assert.equal(core.headers['content-type'], 'application/json; charset=utf-8');
     assert.equal(core.headers['cache-control'], 'no-store');
-    assert.equal(core.json.version, '3.6.2');
+    assert.equal(core.json.version, '3.6.6');
 
     // 路径穿越：编码斜杠必须 403；WHATWG URL 会把 %2e%2e 归一化成 ..（结果落在静态前缀之外），
     // 此时路由层 404，绝不能 200 返回包内文件。两条路径都不许把内容泄出去。

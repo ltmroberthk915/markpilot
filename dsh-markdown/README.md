@@ -1,6 +1,6 @@
 # dsh-markdown
 
-**A Markdown editor for the DeepSeek Harness right sidebar, built on MarkPilot CM6 3.6.2.**
+**A Markdown editor for the DeepSeek Harness right sidebar, built on MarkPilot CM6 3.6.6.**
 
 Write Markdown in DSH with Typora-style live rendering; select a passage and send its **Markdown source** straight into the current conversation.
 
@@ -13,11 +13,27 @@ Write Markdown in DSH with Typora-style live rendering; select a passage and sen
 - **Offline assets** — KaTeX fonts, the Markdown worker and Mermaid ship with the plugin; no CDN.
 - **Document reference** — type `@mp` in the composer to reference the open document.
 
+## What's new in the 3.6.6 engine
+
+The editor engine is the same accepted build that ships with MarkPilot 3.6.6:
+
+- **Source view for long documents** — documents that carry embedded images can now show the rendered page and editable source side by side.
+- **Embedded-image protection** — body text and the source view keep image payloads collapsed, and an image can be backed up to an `assets` folder next to the document before it is removed.
+- **Table editing** — Chinese IME composition, escaped pipes, formatting commands and undo/redo stay in sync with the cell source.
+- **Formula selections** — a selection that crosses an inline formula keeps the whole formula, so copying and continued editing stay predictable.
+
 ## Install
 
-### From the DSH plugin market
+### From a GitHub release
 
-Open **Plugins → Discover**, search for **dsh-markdown**, and install it. Restart the host if the market asks you to.
+Download `dsh-markdown-0.3.0.tgz` from the [MarkPilot releases](https://github.com/ltmroberthk915/markpilot/releases) and add it to the profile that runs your host:
+
+```sh
+dsh plugin --profile web add ./dsh-markdown-0.3.0.tgz
+dsh plugin --profile desktop add ./dsh-markdown-0.3.0.tgz
+```
+
+Restart the host afterwards; the plugin then appears on the **Plugins** page and opens from the right sidebar. The plugin market listing follows the public release.
 
 ### Manual (development checkout)
 
@@ -38,7 +54,7 @@ Then add a junction/symlink from the profile's `node_modules` to `markpilot/dsh-
 
 ## How it is built
 
-The editor engine is the already-built MarkPilot CM6 3.6.2 renderer, copied byte-for-byte into `renderer-cm6/cm6/`. The plugin adds only:
+The editor engine is the already-built MarkPilot CM6 3.6.6 renderer, copied byte-for-byte into `renderer-cm6/cm6/`. The plugin adds only:
 
 - `renderer-cm6/index.html` + `dsh-bridge.js` + `dsh-selection.js` — the DSH skin and selection bridge;
 - `lib/index.js` — static routes, version-guarded file API, SSE change stream;

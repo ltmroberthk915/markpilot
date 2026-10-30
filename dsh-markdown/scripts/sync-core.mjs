@@ -33,7 +33,7 @@ const SKIN_DIR = resolve(PLUGIN_DIR, 'renderer-cm6');
 const DEST_DIR = resolve(SKIN_DIR, 'cm6');
 const CORE_JSON = resolve(PLUGIN_DIR, 'core.json');
 const CORE_NAME = 'MarkPilot CM6';
-const FALLBACK_VERSION = '3.6.2';
+const FALLBACK_VERSION = '3.6.6';
 const EXCLUDED_AT_ROOT = new Set(['index.html']);              // 皮归插件，核心入口不搬
 
 function fail(code, message) {

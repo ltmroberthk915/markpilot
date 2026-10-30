@@ -318,6 +318,17 @@ window.__ModuleLoader__.load({
       return res.json();
     }
 
+    /**
+     * 上行消息判定（协议 v1 的两个信封）：
+     *   __dshmd —— 插件桥 dsh-bridge.js 的 emit（init / bridge-ready / insert-to-chat …）；
+     *   __dshmp —— 引擎自身的 shell 通道（change / text / openLink 直接 post 给父窗口）。
+     * 两者都必须是 dir:"up" 且来自当前代 iframe；漏判 __dshmp 会让脏标与 requestText 回执全部丢失。
+     */
+    function isUpEnvelope(data) {
+      if (!data || data.dir !== "up") return false;
+      return data.__dshmd === true || data.__dshmp === true;
+    }
+
     const __test = {
       constants: {
         TAB_TYPE_ID: TAB_TYPE_ID,
@@ -347,6 +358,7 @@ window.__ModuleLoader__.load({
       insertSelectionToChat: insertSelectionToChat,
       buildTabDefinition: buildTabDefinition,
       isDarkTheme: isDarkTheme,
+      isUpEnvelope: isUpEnvelope,
     };
 
     /* ───────────────────────── 宿主能力（iframe host-invoke） ───────────────────────── */
@@ -886,7 +898,7 @@ window.__ModuleLoader__.load({
 
         function onMessage(event) {
           const data = event && event.data;
-          if (!data || data.__dshmd !== true || data.dir !== "up") return;
+          if (!isUpEnvelope(data)) return;
           const liveWin = doc.win || currentFrameWin();
           if (!liveWin || event.source !== liveWin) return; // 只认当前代 iframe，旧 iframe 的晚到消息丢弃
           const type = data.type;
@@ -1271,7 +1283,7 @@ window.__ModuleLoader__.load({
     exports.__test = __test;
 
     // 调试面（只读镜像，方便宿主/桌面工具观察；不影响渲染）。
-    try { window.__DSH_MARKDOWN__ = { openDocs: openDocs, version: "0.2.0" }; } catch (e) { /* 沙箱环境 */ }
+    try { window.__DSH_MARKDOWN__ = { openDocs: openDocs, version: "0.3.0" }; } catch (e) { /* 沙箱环境 */ }
 
     return module.exports;
   },

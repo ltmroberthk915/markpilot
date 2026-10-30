@@ -270,3 +270,20 @@ test('apply 防御性：tab 类型 + tab body 各自注册，服务缺失不抛'
   // 极简 ctx（没有 sidebarRightTabs / inject）也不能抛
   assert.doesNotThrow(() => mod.apply({ slots: { inject(name, cb) { return cb(); }, register() { return () => {}; } }, effect(fn) { return fn(); } }));
 });
+
+test('上行信封：__dshmd（桥）与 __dshmp（引擎直发）都接受，down/非法拒绝', async () => {
+  const { test: T } = await loadClientFactory();
+  // 插件桥的三种上行
+  assert.equal(T.isUpEnvelope({ __dshmd: true, dir: 'up', type: 'bridge-ready' }), true);
+  assert.equal(T.isUpEnvelope({ __dshmd: true, dir: 'up', type: 'insert-to-chat', content: { text: 'x' } }), true);
+  // 引擎自身 shell 通道的两种上行（3.6.2 起就是这样 post 的；漏判会让脏标/回执全丢）
+  assert.equal(T.isUpEnvelope({ __dshmp: true, dir: 'up', type: 'change', content: { len: 12, epoch: 1, sourceRevision: 1 } }), true);
+  assert.equal(T.isUpEnvelope({ __dshmp: true, dir: 'up', type: 'text', content: 'abc' }), true);
+  // 下行与非法形态一律拒绝
+  assert.equal(T.isUpEnvelope({ __dshmd: true, dir: 'down', type: 'theme' }), false);
+  assert.equal(T.isUpEnvelope({ dir: 'up', type: 'change' }), false);
+  assert.equal(T.isUpEnvelope({ __dshmd: 'yes', dir: 'up' }), false);
+  assert.equal(T.isUpEnvelope({ __dshmd: true }), false);
+  assert.equal(T.isUpEnvelope(null), false);
+  assert.equal(T.isUpEnvelope(undefined), false);
+});
