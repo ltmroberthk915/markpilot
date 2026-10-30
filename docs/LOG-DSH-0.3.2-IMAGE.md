@@ -65,3 +65,21 @@
   因此表格里的相对图**跟着变好**；引擎 `main.js:5274` 的 `fetch(相对)` 预取从 404 变 200
   （"复制图片"顺带可用）；`main.js:146` 与 `extras.js:967/973` 的 `document.baseURI` **兜底**分支
   会指向 `/img/<docdir>/` —— 前者本次实测仍正常（mermaid 回归臂），后者的导出入口在 DSH 里不可达。
+
+## 5. 发布收据（0.3.2）
+
+- 源码提交：`b0e2a85`（main，8 文件 +512/−19）；分支保护以管理员身份直推
+  （`remote: Bypassed rule violations … Changes must be made through a pull request`，与 `LOG-REPO-PROTECTION.md` 口径一致）
+- 打包：`npm pack` → `dsh-markdown-typora-0.3.2.tgz`，**2,527,994 B**
+  - sha256 `190ad625c0720b6de3c60e8effa885b48f5e24733498812d4edc85cbbb5282fe`
+  - 解包复核：`package.json` = `dsh-markdown-typora@0.3.2`；136 文件 7,467,893 B；`core.json` 仍 124 文件 /
+    `coreHash d6df048c…`；`lib/index.js` 含 `serveImageFile`、桥含 `applyDocBase`/`resolveImageRoute`/`AbortController`；
+    `test/` 未进包（`files` 白名单）
+- Release：`dsh-markdown-typora-v0.3.2`（Latest，`/releases/latest` 已指向它）
+  - 资产：`dsh-markdown-typora-0.3.2.tgz`（2,527,994 B）+ `SHA256SUMS.txt`（96 B）
+  - 资产回下载复核：字节数一致、sha256 与打包一致
+  - 说明文件：`docs/RELEASE-DSH-0.3.2.md`（`--notes-file`）
+- 市场条目：`D:\BuyKey\_publish\entry-dsh-markdown-typora.yml` 已按 0.3.2 更新（`tarball` 指向本 tag）。
+  上游 `awesome-dsh-plugin` 目前只有旧条目 `ltmroberthk915__markpilot--dsh-markdown.yml`，
+  需要改名 + 更新 `url`/`name`/`tarball` 才能让市场索引到新包 —— 这是对第三方仓库的公开动作，**待确认后再提 PR**。
+
