@@ -4,6 +4,26 @@
 
 Write Markdown in DSH with Typora-style live rendering; select a passage and send its **Markdown source** straight into the current conversation.
 
+## Screenshots
+
+| | |
+| --- | --- |
+| **Notion dark**<br>![Editor in the Notion dark theme](assets/screenshots/01-hero-notion-dark.jpg) | **护眼米黄 (sepia light)**<br>![Editor in the sepia light theme](assets/screenshots/02-hero-sepia-light.jpg) |
+| **9 themes, switchable from the toolbar**<br>![Theme picker](assets/screenshots/03-theme-panel.jpg) | **A selection that crosses inline formulas**<br>![Selection across inline math](assets/screenshots/04-selection-across-math.jpg) |
+| **Selection → chat**<br>![Insert a selection into the conversation](assets/screenshots/05-selection-to-chat.jpg) | **Table cells are real cells**<br>![Table cell toolbar](assets/screenshots/06-table-toolbar.jpg) |
+| **Images render in the document**<br>![Image in the document](assets/screenshots/07-image-in-doc.jpg) | **Chinese typography**<br>![Chinese typography](assets/screenshots/08-typography-chinese.jpg) |
+
+## Beyond Typora, inside DSH
+
+- **Click a formula to edit its source** — block and inline math expand to the editable `$…$` source in place, and return to the rendered form when the caret leaves.
+- **Selections keep formulas whole** — a selection that crosses inline math carries complete formulas; copy and cut hand back the Markdown source, not the rendered glyphs.
+- **Table cells, not table text** — an alignment toolbar appears over the table, with row/column operations, escaped pipes, Chinese IME composition and undo/redo kept in sync with the cell source.
+- **Nine built-in themes** — 宋韵 (dark/light), Notion (dark/light), Solarized (dark/light), GitHub dark, 护眼米黄 and 柔和淡绿. Follow the host, or pick one from the toolbar.
+- **Live Mermaid, KaTeX and the Markdown worker, all offline** — diagrams, math and fonts load from the plugin; there is no CDN in the path.
+- **Large documents** — the Markdown syntax tree is built in a web worker, so a 150,000-character document loads and accepts typing without the UI thread parsing it.
+- **Selection → chat** — the DSH-specific move: the selection's Markdown source goes into the current conversation from the floating button or `Ctrl/Cmd + Shift + Enter`.
+- **Guarded saves** — version-checked writes, a conflict banner instead of an overwrite, and a recovery slot when a tab closes with unsaved edits.
+
 ## Features
 
 - **Real editor, not a preview** — CodeMirror 6 with live headings, lists, tables, inline math, code blocks and Mermaid.
