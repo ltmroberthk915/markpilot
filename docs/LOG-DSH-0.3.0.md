@@ -91,3 +91,20 @@ tests 26 / pass 26 / fail 0（exit 0）
 node D:\BuyKey\markpilot-public\dsh-markdown\scripts\sync-core.mjs --check
 # 重启 DSH（Desktop 托盘彻底退出后重开）→ 右侧栏打开一个 .md → 输入任意字符 → 等 2s → 读盘核对文件字节
 ```
+
+## 7. 发布收据
+
+- 源码提交：`33f9d19c5157fe667cb4b2f60cf9ce3ebb48072e`（main，已推送）
+- GitHub Release：`https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-v0.3.0`
+- 资产：
+  - `dsh-markdown-0.3.0.tgz` 2,522,038 B，SHA-256 `dfca925c2c0e557fdfdaec48e15177625b8fae636c6ae65b15cc6af425c58b27`（与 GitHub 回报的 asset digest 相同）
+  - `SHA256SUMS.txt` 89 B
+- 打包：`npm pack`，136 文件 / 解包 7.4 MB；`package/core.json` 为 `3.6.6`、`package/package.json` 为 `0.3.0`。
+- 本机安装核对：解包 tgz 与 `D:\BuyKey\markpilot-public\dsh-markdown` 逐文件 SHA-256 比对 136/136 相同；
+  web / desktop 两个 profile 的 `node_modules/dsh-markdown` 仍指向该目录，`core.json` 读到 `3.6.6` / 124 文件。
+
+## 8. 本机生效状态
+
+- 引擎与皮（`renderer-cm6/**`）：宿主按请求读盘，下一次 iframe 加载即新内核。
+- 客户端包（`lib/client.js`，含本轮信封修复）：宿主启动时打包进内存，需重启宿主后才生效；
+  本会话运行在旧宿主进程内，未代为重启。
