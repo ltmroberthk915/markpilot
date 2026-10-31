@@ -101,11 +101,21 @@ docs/LOG-DSH-0.3.3-MANUAL-SAVE.md             本文件
 
 ## 5. 发布收据（0.3.3）
 
-- 源码提交：待补
+- 源码提交：`95f821c`（main，10 文件 +573/−21）；分支保护以管理员身份直推
+  （`remote: Bypassed rule violations … Changes must be made through a pull request`）。
 - 打包：`npm pack` → `dsh-markdown-typora-0.3.3.tgz`
-  - 字节数 / sha256：待补
-  - 解包复核：待补
-- Release：`dsh-markdown-typora-v0.3.3`
-  - 资产：`dsh-markdown-typora-0.3.3.tgz` + `SHA256SUMS.txt`
-  - 资产回下载复核：待补
-- 市场条目：`D:\BuyKey\_publish\entry-dsh-markdown-typora.yml` 更新为 0.3.3
+  - 2,531,182 B；sha256 `2599faa0d7cd97fa65c8dc3e3a57098a8f19551339e9e23654b0faac116f6990`
+  - 解包复核：`package.json` = `dsh-markdown-typora@0.3.3`；136 文件 7,479,336 B；
+    `core.json` 仍 124 文件 / version 3.6.6 / `coreHash d6df048c976e…`；
+    `lib/index.js` 含 `directWriteText`/`isSandboxWriteDenied`，
+    `lib/client.js` 含 `composeInsertionText`/`manual-save`，
+    桥含 `manual-save`；`test/` 未进包（`files` 白名单）。
+- Release：`dsh-markdown-typora-v0.3.3`（Latest，
+  <https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v0.3.3>）
+  - 资产：`dsh-markdown-typora-0.3.3.tgz`（2,531,182 B）+ `SHA256SUMS.txt`（96 B）
+  - 资产回下载复核：字节数一致、sha256 与打包一致；说明文件使用
+    `docs/RELEASE-DSH-0.3.3.md`。
+- 市场条目：`D:\BuyKey\_publish\entry-dsh-markdown-typora.yml` 已更新为 0.3.3
+  （`tarball` 指向本 tag）。上游 `awesome-dsh-plugin` 条目改名/更新属于对第三方
+  仓库的公开动作，待确认后再提 PR。
+
