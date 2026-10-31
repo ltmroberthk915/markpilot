@@ -1,7 +1,7 @@
 # dsh-markdown-typora 0.3.4：图片右侧点击落点修复（内部记录）
 
 日期：2026-10-31（Asia/Shanghai）
-产品：`dsh-markdown-typora` 0.3.4；内核 MarkPilot CM6 **3.6.8 + 图片右侧补丁**
+产品：`dsh-markdown-typora` 0.3.4；内核 MarkPilot CM6 **3.6.9（图片右侧补丁已随引擎发布）**
 身份：`core.json` coreHash `9150b5bb82c3384a427fd723f7f464a6c45ccbdf26df799a398ba69b7be6cdb4`，
 `renderer-cm6/cm6/app.js` sha256 `b06de411debe28862547239a9a9ed9d0fa27cabc804dd05d63c1f6ed2cc93e6d`（1,485,205 B）。
 改动文件：引擎 `dsh-markpilot/src-cm6/main.js`（+145），构建产物 `MarkPilot-CM6/renderer/cm6/app.js`，

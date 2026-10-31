@@ -1,8 +1,8 @@
 {
   "core": "MarkPilot CM6",
-  "version": "3.6.8",
+  "version": "3.6.9",
   "source": "../MarkPilot-CM6/renderer/cm6",
-  "syncedAt": "2026-10-31T04:21:37.988Z",
+  "syncedAt": "2026-10-31T04:52:31.281Z",
   "generator": "scripts/sync-core.mjs",
   "files": [
     {
