@@ -115,7 +115,13 @@ docs/LOG-DSH-0.3.3-MANUAL-SAVE.md             本文件
   - 资产：`dsh-markdown-typora-0.3.3.tgz`（2,531,182 B）+ `SHA256SUMS.txt`（96 B）
   - 资产回下载复核：字节数一致、sha256 与打包一致；说明文件使用
     `docs/RELEASE-DSH-0.3.3.md`。
-- 市场条目：`D:\BuyKey\_publish\entry-dsh-markdown-typora.yml` 已更新为 0.3.3
-  （`tarball` 指向本 tag）。上游 `awesome-dsh-plugin` 条目改名/更新属于对第三方
-  仓库的公开动作，待确认后再提 PR。
+- 市场条目：`D:\BuyKey\_publish\entry-dsh-markdown-typora.yml` 与
+  `fork-entry` 均已更新为 0.3.3 的 tarball，描述包含 Typora/手动保存/工作区外保存/
+  绝对路径。上游 PR **#10776** 已提交：
+  <https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/10776>
+  （1 file +3/−3，`MERGEABLE`；截至本记录 CI 仍 pending，合并由维护者执行）。
+  合并后官方 `plugins.json` 需重新构建；中国区优先的 npm 快照当时仍是
+  `dsh-plugin-catalog@2026.1030.12510`（7,723 条，旧名 `markpilot#dsh-markdown`，
+  无 `typora`），需等下一次目录构建/镜像同步。
+
 
