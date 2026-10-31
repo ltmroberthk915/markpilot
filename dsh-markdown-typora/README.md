@@ -1,6 +1,6 @@
 # dsh-markdown-typora
 
-**A Markdown editor for the DeepSeek Harness right sidebar, built on MarkPilot CM6 3.6.6.**
+**A Markdown editor for the DeepSeek Harness right sidebar, built on MarkPilot CM6 3.6.8.**
 
 Write Markdown in DSH with Typora-style live rendering; select a passage and send its **Markdown source** straight into the current conversation.
 
@@ -34,11 +34,13 @@ Write Markdown in DSH with Typora-style live rendering; select a passage and sen
 - **Offline assets** — KaTeX fonts, the Markdown worker and Mermaid ship with the plugin; no CDN.
 - **Document reference** — type `@mp` in the composer to reference the open document.
 - **Local images in the document** — `![](assets/diagram.png)` and parent-folder references such as `![](../figures/a.png)` render in the panel, read through the plugin's own read-only image route; a file that is genuinely missing still shows an explicit placeholder instead of an empty box.
+- **Edit right beside an image** — a click in the blank to the right of an image starts editing on the following line (headings, lists and task items keep their markers), instead of opening the image's Markdown source; clicking the image itself still opens its source.
 
-## What's new in the 3.6.6 engine
+## What's new in the 3.6.8 engine
 
-The editor engine is the same accepted build that ships with MarkPilot 3.6.6:
+The editor engine is the same accepted build that ships with MarkPilot 3.6.8:
 
+- **Image right-side clicks** — the blank to the right of an image edits the following line; the image itself still opens its source, and a click in the editor's right gutter no longer drops the caret.
 - **Source view for long documents** — documents that carry embedded images can now show the rendered page and editable source side by side.
 - **Embedded-image protection** — body text and the source view keep image payloads collapsed, and an image can be backed up to an `assets` folder next to the document before it is removed.
 - **Table editing** — Chinese IME composition, escaped pipes, formatting commands and undo/redo stay in sync with the cell source.

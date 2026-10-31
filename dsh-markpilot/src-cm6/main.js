@@ -5818,6 +5818,150 @@ const regionKeys = Prec.highest(keymap.of([
   } })),
 ]));
 
+/* ══ 【图片右侧空白·2026-10-31】点图片右侧 ⇒ 落下一行行首 ═══════════════════════════
+ * 用户可见缺陷（真实文档 + 装机 EXE 实测）：图片（`![](url)` 独占一行）被点开源码后，
+ * 点其右侧空白有两种坏结果 ——
+ *   ① 近侧（仍在 `.cm-content` 宽度内）：CM6 把落点映射到图片 Markdown 行的 r.to（`）`之后），
+ *      该位置仍在图片 region 的闭区间 [from,to] 内 ⇒ `region-session` 不退休、源码行继续展开，
+ *      光标停在图片源码区；继续输入会改到图片语法。
+ *   ② 远侧（`.cm-scroller` 空白/装订线）：CM6 的 mousedown 只装在 `.cm-content` 上 ⇒
+ *      编辑器失焦（activeElement 变 `.cm-scroller`），光标消失。
+ * 目标语义（用户确认）：无论图片是否已被点开，点图片右侧任意横向距离都在**图片下一行行首**
+ * 编辑；点击本身不改文档、不展开源码、不失焦。图片本身的点击仍进入源码（光标在 `[]` 之间）。
+ *
+ * 为什么挂在 scrollDOM 的 capture：一条监听同时覆盖上面两个入口（content 空白 + scroller 空白），
+ * 且先于 CM6 装在 contentDOM 上的 mousedown 处理器；`stopPropagation` 让原生落点逻辑不参与。
+ * 修饰键（Shift/Ctrl/Alt/Meta）一律放行：Shift+点扩选、Ctrl+点加光标是既有契约。
+ * 拖拽保留：按下后把 head 跟着指针用 `posAtCoords` 扩展（selection-only，不进历史）。
+ * 只接管"图片是该行最后一个非空白内容"的行；`![x](y) 后文` 的右侧仍是原生文本点击。
+ * 滚动条、块级交互物（图片/公式浮层/表格/单元格覆盖层/面板）一律不接管。 */
+function imageRightBlankTarget(view, event) {
+  /* 只认真实、单次、无修饰的主键按下；双击/三击的第二、三下交还原生（取词/整行），
+     组字中与已被前置处理器吃掉的事件也不接管。 */
+  if (!event.isTrusted || event.defaultPrevented || event.button !== 0 || event.detail !== 1 ||
+      event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return null;
+  if (view.composing) return null;
+  const state = view.state;
+  const scroll = view.scrollDOM, box = scroll.getBoundingClientRect();
+  if (!(event.clientX >= box.left && event.clientX < box.right && event.clientY >= box.top && event.clientY < box.bottom)) return null;
+  /* 滚动条口径要按**当前内容缩放**换算：clientWidth/clientLeft 是布局像素，
+     clientX 是视口像素；直接相加在 200% 档会把内容右缘外一大段误判成滚动条。 */
+  const zoom = mpZoomOf(scroll) || 1;
+  const bar = scroll.offsetWidth - scroll.clientWidth;
+  if (bar > 1 && event.clientX >= box.left + (scroll.clientLeft + scroll.clientWidth) * zoom) return null;
+  const hit = document.elementFromPoint(event.clientX, event.clientY);
+  const hitMount = hit && hit.closest ? hit.closest('.mp-img') : null;
+  if (hit && hit.closest && hit.closest('.mp-inline-float, .mp-row, .mp-cell-overlay, .mp-table-bar, .mp-image-payload, .cm-panel, .cm-tooltip, .mp-pop, .mp-dlg')) return null;
+  const index = state.field(regionIndexField, false);
+  if (!index) return null;
+  const context = state.field(markdownContext, false);
+  const doc = state.doc;
+  const tables = state.field(tableDataField, false) || [];
+  const displayMath = state.field(mathSpansField).spans.filter((s) => s.display);
+  let best = null;
+  for (const mount of view.dom.querySelectorAll('.mp-img[data-mp-region]')) {
+    if (!mount.isConnected) continue;
+    /* 点到**另一张**图片 widget（含它的空白外层）不是本图右侧；交还原生。 */
+    if (hitMount && hitMount !== mount) continue;
+    const region = index.byId.get(mount.dataset.mpRegion);
+    if (!region || region.kind !== 'image') continue;
+    const img = mount.querySelector('img:not(.mp-img-pending)') || mount;
+    const ir = img.getBoundingClientRect(), area = mount.getBoundingClientRect();
+    if (!(ir.width > 0 && ir.height > 0)) continue;
+    if (event.clientX <= ir.right) continue;                        // 只接管绘制图片的右缘之外
+    if (event.clientY < area.top || event.clientY > area.bottom) continue;  // 同一图片高度带
+    const line = doc.lineAt(region.from);
+    /* 图片之后还有正文（`![x](y) 后文`）⇒ 右侧是真实文字区，交还原生点击；
+       只有行尾空白允许改落点。 */
+    if (line.text.slice(Math.max(0, region.to - line.from)).trim()) continue;
+    /* 下一行落点：普通/引用/列表跳过容器前缀；标题跳过 `# `；任务项跳过 `[ ] `；
+       表格/围栏/分隔线/块公式/缩进代码/围栏体内没有"同行可安全插入的内容起点"
+       ⇒ 退化为图片紧右侧（光标在图片语法之后，不把结构行写坏；仍收起源码会话）。 */
+    let pos = region.to;
+    if (line.number < doc.lines) {
+      const next = doc.line(line.number + 1);
+      const lead = Math.max(0, Math.min(next.length, structuralContextAt(context, next.from)?.lead || 0));
+      const rest = next.text.slice(lead);
+      const structural = /^(?:`{3,}|~{3,})/.test(rest) || /^\${2,}/.test(rest) ||
+        /^(?:-{3,}|\*{3,}|_{3,})\s*$/.test(rest) || /^ {4,}\S/.test(next.text) || /^\t\S/.test(next.text) ||
+        !!codeBlockAt(state, next.from) || tables.some((t) => next.from >= t.from && next.from <= t.to) ||
+        displayMath.some((s) => next.from >= s.from && next.from <= s.to);
+      if (!structural) {
+        let off = lead;
+        const heading = /^#{1,6}[ \t]+/.exec(rest);
+        if (heading) off += heading[0].length;
+        const task = /^\[[ xX]\][ \t]+/.exec(next.text.slice(off));
+        if (task) off += task[0].length;
+        pos = next.from + Math.min(next.length, off);
+      }
+    }
+    if (!best || ir.right > best.right) best = { region, pos, line: line.number, right: ir.right };
+  }
+  return best;
+}
+
+const imageRightBlankClick = ViewPlugin.fromClass(class {
+  constructor(view) {
+    this.view = view;
+    this.drag = null;
+    this.doc = null;
+    this.onDown = (event) => this.mousedown(event);
+    this.onMove = (event) => this.mousemove(event);
+    this.onUp = () => this.mouseup();
+    view.scrollDOM.addEventListener('mousedown', this.onDown, true);
+  }
+  mousedown(event) {
+    const target = imageRightBlankTarget(this.view, event);
+    if (!target) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this.drag = { anchor: target.pos, head: target.pos, x: event.clientX, y: event.clientY, moved: false };
+    this.view.dispatch({
+      /* 显式退休：末行图片没有"下一行"时落点退化为 doc.length==region.to，
+         仅靠"head 落在 region 外"的规则不会收起源码；退休效果保证任何情况下
+         点右侧都不会把图片留在源码会话里。 */
+      effects: [retireRegion.of({ id: target.region.id })],
+      selection: { anchor: target.pos }, scrollIntoView: true,
+      userEvent: 'select.pointer', annotations: Transaction.addToHistory.of(false),
+    });
+    this.view.focus();
+    if (!this.doc) {
+      this.doc = this.view.dom.ownerDocument;
+      this.doc.addEventListener('mousemove', this.onMove, true);
+      this.doc.addEventListener('mouseup', this.onUp, true);
+    }
+    /* 取证口：真实入口若被别的东西抢走，探针可以一眼看出最后是谁落的点。 */
+    try {
+      this.view.__mpImageRightBlank = { region: target.region?.id ?? null, pos: target.pos,
+        line: this.view.state.doc.lineAt(target.pos).number, at: Date.now() };
+    } catch { /* 忽略 */ }
+  }
+  mousemove(event) {
+    const drag = this.drag;
+    if (!drag || !(event.buttons & 1)) return;
+    if (Math.abs(event.clientX - drag.x) + Math.abs(event.clientY - drag.y) > 2) drag.moved = true;
+    if (!drag.moved) return;
+    const pos = this.view.posAtCoords({ x: event.clientX, y: event.clientY });
+    if (pos == null || pos === drag.head) return;
+    drag.head = pos;
+    this.view.dispatch({
+      selection: { anchor: drag.anchor, head: pos },
+      userEvent: 'select.pointer', annotations: Transaction.addToHistory.of(false),
+    });
+  }
+  mouseup() {
+    this.drag = null;
+    if (!this.doc) return;
+    this.doc.removeEventListener('mousemove', this.onMove, true);
+    this.doc.removeEventListener('mouseup', this.onUp, true);
+    this.doc = null;
+  }
+  destroy() {
+    this.view.scrollDOM.removeEventListener('mousedown', this.onDown, true);
+    this.mouseup();
+  }
+});
+
 /* ══ Telari（宋体-朙/暗）主题系统——2.3.3 观测等价，CSS 全面模拟 ══
  *  权威源与 vditor 引擎同键同默认（renderer/js/themes.js preferredTheme）：
  *  localStorage['editor-theme']，未选过时 'dark'!=='false' → telari-dark。
@@ -7203,6 +7347,7 @@ function boot(content) {
         docSourceClipboard, // 选区含公式时按文档源码写剪贴板（D8 配套）
         mathPointerGesture,
         clickToSource,
+        imageRightBlankClick, // 【图片右侧·2026-10-31】右侧空白 ⇒ 下一行行首（近/远两个入口；不展开源码、不失焦）
         kpTypesetPlugin,    // 【排版美化·2026-10-09】阅读模式 + 小文档 + 用户显式开启时，按 Knuth–Plass 整段最优断行
         imgPrefetchPlugin,  // 【图片】选区/视口变化后预取 Blob（copy 里不能 await）
         sbField,            // 状态栏数据源（文档长度 + 选区主位置；只在这两个数变化时才动 DOM）
