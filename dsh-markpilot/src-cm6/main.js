@@ -1312,10 +1312,21 @@ function buildInlineMath(state, spans = state.field(mathSpansField).spans) {
   return Decoration.set(out, true);
 }
 const mathProjectionStats = { full: 0, patched: 0, touched: 0 };
+/* 组字收尾后强制重算某个公式投影：组字期间 CM6 会保留正在组字的文本节点，
+   会话态可以在组字结束后才恢复为渲染态；仅靠 docChanged 不会把这一笔补上
+   （收尾时 head 已越过公式右边界，不再落入候选集）。由 compositionend 收尾
+   派发一次无文档变更、不进历史的刷新。 */
+const refreshMathAt = StateEffect.define();
 function updateMathProjection(value, tr, display) {
   const before = tr.startState.field(regionIndexField), after = tr.state.field(regionIndexField);
-  if (!tr.docChanged && !tr.selection && before === after) return value;
+  const forcedIds = new Set();
+  for (const e of tr.effects) if (e.is(refreshMathAt)) forcedIds.add(e.value);
+  if (!tr.docChanged && !tr.selection && before === after && !forcedIds.size) return value;
   const candidates = new Map(), ids = new Set();
+  for (const id of forcedIds) {
+    const r = after.byId.get(id) || before.byId.get(id);
+    if (r?.kind === 'math' && r.data.display === display) candidates.set(id, r);
+  }
   const addSelection = (state, index) => {
     for (const s of state.selection.ranges) for (const r of regionsBetween(index,s.from,s.to,'math')) candidates.set(r.id,r);
   };
@@ -1332,8 +1343,14 @@ function updateMathProjection(value, tr, display) {
   const intent = (state,r) => {
     if (!r) return '';
     const p = state.field(regionSessionField, false)?.presentation.get(r.id);
-    return p ? (p.editing ? '1' : '0') + (p.selected ? '1' : '0') : '';
+    if (!p) return '';
+    /* Editing mode never reads `selected` (buildInlineMath/buildBlockMath only
+       consult it for the rendered form). Including it made a held entry that
+       lost its selection flag look like an intent change and rebuilt the
+       projection at the composition boundary. */
+    return p.editing ? 'e' : p.selected ? 'r1' : 'r0';
   };
+  const composing = tr.isUserEvent('input.type.compose');
   if (tr.docChanged || before !== after) {
     for (const id of after.invalidated) {
       const r = after.byId.get(id) || before.byId.get(id);
@@ -1343,7 +1360,16 @@ function updateMathProjection(value, tr, display) {
   for (const [id,r] of candidates) {
     const old = before.byId.get(id), next = after.byId.get(id);
     if (r.data.display !== display) continue;
-    if (tr.docChanged || old?.revision !== next?.revision || old?.contextVersion !== next?.contextVersion || intent(tr.startState,old) !== intent(tr.state,next)) ids.add(id);
+    /* 【IME·2026-10-31】组字期间 CM6 不会重建正在组字的文本节点。旧判据只要
+       `tr.docChanged` 就重发这批装饰 ⇒ 公式右边界开始组字的那一笔把 replace
+       widget 插进去、源码文本却仍被 CM 保留，屏幕上同时出现渲染公式与 `$P$`
+      （双光标/重影），且组字收尾后也不自愈。
+       装饰只有在**位置或内容真的变了**、或会话意图变了时才需要重建；几何稳定
+      （from/to/revision/contextVersion 全同）就让它按 changes 映射即可。这样
+      组字插入落在公式右边界外时不再触发源码↔渲染的 DOM 替换。 */
+    const stable = old && next && old.from === next.from && old.to === next.to &&
+      old.revision === next.revision && old.contextVersion === next.contextVersion;
+    if (!stable || forcedIds.has(id) || (!composing && intent(tr.startState,old) !== intent(tr.state,next))) ids.add(id);
   }
   let mapped = tr.docChanged ? value.map(tr.changes) : value;
   if (!ids.size) return mapped;
@@ -7063,7 +7089,36 @@ function boot(content) {
   applyEnginePrefs();    // 缩放/岛尺寸/版心/状态栏四件套：装编辑器之前先把 token 写好（首帧即正确）
   if (!document.querySelector(".mp-statusbar")) buildStatusBar();
   const asyncSyntax = createAsyncMarkdown(markdownLanguage);
+  /* Copied text followed immediately by a Ctrl/Cmd+click is overwhelmingly
+     an attempt to place the caret at the paste target, not an intentional
+     multi-cursor add: users often keep Ctrl down after Ctrl+C and click the
+     destination. CM6's default Ctrl+click then adds a second selection; the
+     next paste fills both ranges and one keystroke edits two lines.
+     Treat the first click while the same modifier is still held from a copy
+     as a normal click. A deliberate multi-cursor (Ctrl+click without copying,
+     or after releasing/re-pressing the modifier) is untouched. */
+  let modHeld = false, copyHeldMod = false;
+  const isMacPlatform = /Mac|iPhone|iPad/.test(navigator.platform || '');
+  const modifierKey = event => event.key === 'Control' || event.key === 'Meta';
+  document.addEventListener('keydown', event => {
+    if (modifierKey(event)) modHeld = true;
+  }, true);
+  document.addEventListener('keyup', event => {
+    if (!modifierKey(event)) return;
+    modHeld = false;
+    copyHeldMod = false;
+  }, true);
+  document.addEventListener('copy', () => { copyHeldMod = modHeld; }, true);
+  document.addEventListener('mouseup', event => {
+    if (event.button === 0) copyHeldMod = false;
+  }, true);
   let imeTableRelocate = null;
+  /* Composition that starts on/inside an inline or block math region. The
+     region session holds editing state through compose transactions; this
+     context is only for the post-composition projection refresh, because the
+     caret has moved past the formula boundary by commit time and therefore no
+     longer appears in the normal selection candidate set. */
+  let mathComposition = null;
   view = new EditorView({
     state: EditorState.create({
       doc: content,
@@ -7222,6 +7277,12 @@ function boot(content) {
         }),
         themeVars,
         EditorView.lineWrapping,
+        EditorView.clickAddsSelectionRange.of(event => {
+          const mod = isMacPlatform ? event.metaKey : event.ctrlKey;
+          if (!mod) return false;
+          if (copyHeldMod) { copyHeldMod = false; return false; }
+          return true;
+        }),
         // Rich documents create expensive formula DOM outside the screen.
         // Keep a smaller buffer while preserving the visible and selected blocks.
         EditorView.viewportMargin.compute(["doc", mathSpansField, tableDataField], state =>
@@ -7359,6 +7420,57 @@ function boot(content) {
       }, 0);
     } finally { releaseTableComposition(ctx); }
   });
+  /* Math composition runs in the normal content DOM. Record every editing
+     math region touched by the selection before CM6/Chromium change it
+     (a shared `$A$$B$` boundary belongs to both); after composition end
+     (including cancel) ask the projection to rebuild those regions once the
+     composition is fully over. The refresh is selection-only, no doc change
+     and no history entry. */
+  document.addEventListener("compositionstart", (event) => {
+    if (!view || imeTableRelocate) return;
+    const target = event.composedPath?.()[0] || event.target;
+    if (!view.contentDOM.contains(target)) return;
+    const index = view.state.field(regionIndexField, false);
+    const presentation = view.state.field(regionSessionField, false)?.presentation;
+    if (!index || !presentation) return;
+    const ids = new Set();
+    for (const range of view.state.selection.ranges) {
+      for (const region of regionsBetween(index, range.from, range.to, 'math')) {
+        if (presentation.get(region.id)?.editing) ids.add(region.id);
+      }
+    }
+    if (!ids.size) return;
+    mathComposition = { view, ids: [...ids], token: {}, at: Date.now() };
+  }, true);
+  function refreshComposedMath(ctx) {
+    if (!ctx || mathComposition?.token !== ctx.token) return;
+    mathComposition = null;
+    let attempts = 0;
+    const run = () => {
+      if (!view || view !== ctx.view || !view.dom.isConnected) return;
+      if (view.composing || view.compositionStarted) {
+        if (++attempts < 120) setTimeout(run, 16);
+        return;
+      }
+      const effects = [];
+      for (const id of ctx.ids) {
+        const region = view.state.field(regionIndexField, false)?.byId.get(id);
+        if (region?.kind === 'math') effects.push(refreshMathAt.of(id));
+      }
+      if (!effects.length) return;
+      view.dispatch({
+        selection: view.state.selection,
+        effects,
+        annotations: Transaction.addToHistory.of(false),
+        userEvent: 'select',
+      });
+    };
+    setTimeout(run, 0);
+  }
+  document.addEventListener("compositionend", () => {
+    const ctx = mathComposition;
+    if (ctx) refreshComposedMath(ctx);
+  }, true);
   // IME 组字收尾：组字期间挂起的 change 脏标在此一笔补发（丢一笔＝保存调度失联）。
   view.dom.addEventListener("compositionend", () => {
     if (!composingDirty || !view) return;
