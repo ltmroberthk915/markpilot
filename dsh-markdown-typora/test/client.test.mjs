@@ -136,6 +136,16 @@ test('保存闸门：串行排队 / 缺 baseVersion 拒绝 / 干净跳过', asyn
   assert.equal(T.saveGate({ opened: true, dirty: true, saving: false, baseVersion: 'v1', dead: true }).action, 'skip');
 });
 
+test('手动保存闸门：无改动给 clean，冲突/缺版本给 block，飞行中排队', async () => {
+  const { test: T } = await loadClientFactory();
+  assert.deepEqual(plain(T.manualSaveGate({ opened: true, dirty: true, saving: false, conflict: false, baseVersion: 'v1' })), { action: 'save', reason: 'dirty' });
+  assert.deepEqual(plain(T.manualSaveGate({ opened: true, dirty: false, saving: false, conflict: false, baseVersion: 'v1' })), { action: 'clean', reason: 'clean' });
+  assert.deepEqual(plain(T.manualSaveGate({ opened: true, dirty: true, saving: true, conflict: false, baseVersion: 'v1' })), { action: 'queue', reason: 'saving' });
+  assert.equal(T.manualSaveGate({ opened: true, dirty: true, saving: false, conflict: true, baseVersion: 'v1' }).action, 'block');
+  assert.equal(T.manualSaveGate({ opened: true, dirty: true, saving: false, conflict: false, baseVersion: '' }).code, 'missing-base-version');
+  assert.equal(T.manualSaveGate({ opened: false, dirty: true, saving: false, conflict: false, baseVersion: 'v1' }).action, 'skip');
+});
+
 test('保存请求体：所有 save 必带 baseVersion（含关 tab flush 形态）', async () => {
   const { test: T } = await loadClientFactory();
   const ok = T.buildSaveRequest({ path: 'D:/docs/a.md', text: 'x', baseVersion: 'v9' });
@@ -286,4 +296,14 @@ test('上行信封：__dshmd（桥）与 __dshmp（引擎直发）都接受，do
   assert.equal(T.isUpEnvelope({ __dshmd: true }), false);
   assert.equal(T.isUpEnvelope(null), false);
   assert.equal(T.isUpEnvelope(undefined), false);
+});
+
+test('插入对话载荷：开头永远带文档绝对路径，再空一行接选区', async () => {
+  const { test: T } = await loadClientFactory();
+  const path = String.raw`D:\Users\Ming\Desktop\秋招笔试\新建 Markdown 文档.md`;
+  assert.equal(T.composeInsertionText(path, '**选中** 内容'), path + '\n\n**选中** 内容');
+  assert.equal(T.composeInsertionText(path, ''), path);
+  assert.equal(T.composeInsertionText('  ' + path + '  ', 'x'), path + '\n\nx');
+  assert.equal(T.composeInsertionText('', 'x'), 'x');
+  assert.equal(T.composeInsertionText(null, 'x'), 'x');
 });

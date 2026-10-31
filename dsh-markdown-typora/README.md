@@ -27,8 +27,9 @@ Write Markdown in DSH with Typora-style live rendering; select a passage and sen
 ## Features
 
 - **Real editor, not a preview** — CodeMirror 6 with live headings, lists, tables, inline math, code blocks and Mermaid.
-- **Selection → chat** — a floating **Insert into chat** button appears beside a selection; `Ctrl/Cmd + Shift + Enter` does the same. The Markdown source (not the rendered text) is inserted at the composer caret, without stealing focus.
-- **Guarded saves** — debounced autosave with version checks; an external edit is never overwritten. A dirty buffer is kept in a recovery slot when the tab closes.
+- **Selection → chat** — a floating **Insert into chat** button appears beside a selection; `Ctrl/Cmd + Shift + Enter` does the same. The payload starts with the document's absolute path, then a blank line and the Markdown source (not the rendered text), inserted at the composer caret without stealing focus.
+- **Guarded saves** — debounced autosave with version checks; `Ctrl/Cmd + S` saves immediately with a visible result, whether the caret is in the editor or elsewhere in the panel. An external edit is never overwritten. A dirty buffer is kept in a recovery slot when the tab closes.
+- **Save files outside the session workspace** — a file opened from the sidebar saves directly to its own folder even when it sits outside the workspace root of the current session; version checks and conflict warnings are unchanged. Files that are read-only or locked at the OS level still report an error.
 - **Theme-aware** — follows the host's light/dark theme, including the first frame.
 - **Offline assets** — KaTeX fonts, the Markdown worker and Mermaid ship with the plugin; no CDN.
 - **Document reference** — type `@mp` in the composer to reference the open document.
@@ -47,11 +48,11 @@ The editor engine is the same accepted build that ships with MarkPilot 3.6.6:
 
 ### From a GitHub release
 
-Download `dsh-markdown-typora-0.3.2.tgz` from the [MarkPilot releases](https://github.com/ltmroberthk915/markpilot/releases) and add it to the profile that runs your host:
+Download `dsh-markdown-typora-0.3.3.tgz` from the [MarkPilot releases](https://github.com/ltmroberthk915/markpilot/releases) and add it to the profile that runs your host:
 
 ```sh
-dsh plugin --profile web add ./dsh-markdown-typora-0.3.2.tgz
-dsh plugin --profile desktop add ./dsh-markdown-typora-0.3.2.tgz
+dsh plugin --profile web add ./dsh-markdown-typora-0.3.3.tgz
+dsh plugin --profile desktop add ./dsh-markdown-typora-0.3.3.tgz
 ```
 
 Restart the host afterwards; the plugin then appears on the **Plugins** page and opens from the right sidebar. The plugin market listing follows the public release.
@@ -70,7 +71,7 @@ Then add a junction/symlink from the profile's `node_modules` to `markpilot/dsh-
 
 1. Open the right sidebar, press `Ctrl+P` (workspace files) and click a `.md` file.
 2. Write; the editor autosaves after 1.5 s and refuses to overwrite a newer file on disk.
-3. Select a passage → click **Insert into chat** (or `Ctrl/Cmd + Shift + Enter`).
+3. Select a passage → click **Insert into chat** (or `Ctrl/Cmd + Shift + Enter`). The document's absolute path is placed at the top, then a blank line and the selection.
 4. To undo the insertion, click back into the composer and press `Ctrl/Cmd + Z`; focus stays in the editor by design.
 
 ## How it is built

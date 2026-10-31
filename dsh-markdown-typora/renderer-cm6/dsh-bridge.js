@@ -3,7 +3,7 @@
 // 契约：
 //   上行 iframe → 父窗口：{ __dshmd:true, dir:'up',   type, content }
 //   下行 父窗口 → iframe：{ __dshmd:true, dir:'down', type, content }
-//   上行类型：bridge-ready | init | change | text | insert-to-chat | host-invoke | openLink
+//   上行类型：bridge-ready | init | change | text | insert-to-chat | host-invoke | openLink | manual-save
 //   下行类型：open | setValue | requestText | theme | toast | host-result
 //
 // 为什么桥必须早于 cm6/app.js 加载：引擎在脚本尾部同步调用 window.handler.on("open"…)/
@@ -342,6 +342,23 @@
   };
   window.handler = bridge;
   window.vscodeEvent = bridge;
+
+  /* ── 手动保存（Ctrl+S / 工具栏保存）────────────────────────────────────────
+   * 引擎的快捷键表把 Ctrl+S 绑到 actions.save；该动作只认 window.mpHost.__save
+   * （其次 __save 缺失时才退到 docInfo()+save()/saveAs()）。DSH 皮此前从未定义
+   * window.mpHost ⇒ Ctrl+S 被 keymap 吃掉后什么都不发生（不是落盘、也不是报错）。
+   * 这里只加最小宿主面：__save 发一条上行 manual-save，由 lib/client.js 走
+   * 与自动保存同一条版本守卫写路径；不缓存文档、不改引擎、不伪造版本。
+   * 注意：只补 __save，不定义 docInfo，避免改变引擎其它宿主能力的判定。 */
+  (function installManualSaveHost() {
+    var host = window.mpHost;
+    if (!host || (typeof host !== 'object' && typeof host !== 'function')) host = window.mpHost = {};
+    if (typeof host.__save === 'function') return;
+    host.__save = function () {
+      send('manual-save', { source: 'ctrl-s', at: Date.now() });
+      return true;
+    };
+  })();
 
   // 宿主能力调用（协议 v1 的 host-invoke 上行；父窗口以 host-result 应答）。
   // 引擎当前不消费 hostApi，保留为宿主演进位；超时兜底避免永久挂起。

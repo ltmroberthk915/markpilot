@@ -9,6 +9,10 @@
 //   · 保存：change{len} 脏标 → 1500ms 防抖 → requestText（2s 超时）拉全文 → 串行保存，
 //     每次 save 必带 baseVersion（关 tab 的 keepalive flush 也一样）；FS_STALE_VERSION 只给
 //     冲突横幅（重载磁盘版本 / 复制我的内容），绝不覆盖；
+//   · 手动保存：iframe 内 Ctrl+S（引擎 keymap）经 dsh-bridge 的 mpHost.__save 上行
+//     manual-save；焦点在本 tab 的壳上时由父窗口 keydown 兜住（同时 preventDefault，
+//     避免浏览器弹出“保存网页/HTML”）。两者都走同一个 runSave，立即拉全文、立即落盘，
+//     并给出“已保存/保存失败/无改动”反馈；不排队盲写、不绕过版本守卫；
 //   · SSE 外部变更：干净缓冲才 setValue 静默重载；脏/冲突只提示；SSE 断开降级 2s→6s 轮询，
 //     页面隐藏/后台 tab 暂停轮询；
 //   · 选中文段插入：只用 props.inputActions（captureInsertion + insertText，失败重 capture 一次），
@@ -197,6 +201,20 @@ window.__ModuleLoader__.load({
       return { action: "save", reason: "dirty" };
     }
 
+    /**
+     * 手动保存闸门（纯函数）：Ctrl+S 与自动保存共用版本守卫，但“干净/冲突/无基准版本”
+     * 要在 UI 上给出明确反馈，而不是静默跳过。
+     *   skip  = dead / 未打开；clean = 无改动；block = 冲突或缺 baseVersion；
+     *   queue = 已有保存飞行；save = 立即保存。
+     */
+    function manualSaveGate(state) {
+      const s = state || {};
+      if (s.conflict) return { action: "block", reason: "conflict", code: "FS_STALE_VERSION" };
+      const base = saveGate(s);
+      if (base.action === "skip" && base.reason === "clean") return { action: "clean", reason: "clean" };
+      return base;
+    }
+
     /** 保存请求体：path/text/baseVersion 三者齐全才放行（baseVersion 永不省略）。 */
     function buildSaveRequest(payload) {
       const p = payload || {};
@@ -221,6 +239,18 @@ window.__ModuleLoader__.load({
       if (s.hidden) return false;
       if (s.visible === false) return false;
       return true;
+    }
+
+    /**
+     * 选中文段 → 对话时的载荷：开头永远先给文档绝对路径，再空一行接选区源码。
+     * 这样对话里能直接看出这段内容来自哪个文件；路径为空时退回原文，不插入空行。
+     */
+    function composeInsertionText(path, text) {
+      const source = typeof path === "string" ? path.trim() : "";
+      const body = typeof text === "string" ? text : "";
+      if (!source) return body;
+      if (!body) return source;
+      return source + "\n\n" + body;
     }
 
     /**
@@ -352,10 +382,12 @@ window.__ModuleLoader__.load({
       ticketOf: ticketOf,
       isCurrentTicket: isCurrentTicket,
       saveGate: saveGate,
+      manualSaveGate: manualSaveGate,
       buildSaveRequest: buildSaveRequest,
       nextPollDelay: nextPollDelay,
       shouldAcceptExternal: shouldAcceptExternal,
       insertSelectionToChat: insertSelectionToChat,
+      composeInsertionText: composeInsertionText,
       buildTabDefinition: buildTabDefinition,
       isDarkTheme: isDarkTheme,
       isUpEnvelope: isUpEnvelope,
@@ -427,6 +459,7 @@ window.__ModuleLoader__.load({
       const sessionIdFromProps = typeof props.sessionId === "string" ? props.sessionId : "";
 
       const frameRef = React.useRef(null);
+      const rootRef = React.useRef(null);
       const st = React.useRef({ doc: null, actions: {} }).current;
       const inputActionsRef = React.useRef(props.inputActions);
       inputActionsRef.current = props.inputActions;
@@ -461,6 +494,7 @@ window.__ModuleLoader__.load({
           conflict: false,
           saving: false,
           saveQueued: false,
+          manualPending: false,
           editSeq: 0,
           text: "",
           textFresh: false,
@@ -638,7 +672,8 @@ window.__ModuleLoader__.load({
           }, typeof delay === "number" ? Math.max(0, delay) : SAVE_DEBOUNCE_MS);
         }
 
-        async function runSave() {
+        async function runSave(options) {
+          const manual = !!(options && options.manual);
           if (doc.dead) return;
           const gate = saveGate({
             dirty: doc.dirty,
@@ -647,21 +682,43 @@ window.__ModuleLoader__.load({
             opened: doc.opened,
             dead: doc.dead,
           });
-          if (gate.action === "queue") { doc.saveQueued = true; return; }
-          if (gate.action === "block") { showError("保存被拒绝：缺少基准版本（请重新打开文档）"); return; }
-          if (gate.action !== "save") return;
+          if (gate.action === "queue") {
+            doc.saveQueued = true;
+            if (manual) {
+              doc.manualPending = true;
+              post("toast", "正在保存，完成后会保存最新改动");
+            }
+            return;
+          }
+          if (gate.action === "block") {
+            showError("保存被拒绝：缺少基准版本（请重新打开文档）");
+            if (manual) post("toast", "保存被拒绝：缺少基准版本");
+            return;
+          }
+          if (gate.action !== "save") {
+            if (manual) post("toast", gate.reason === "clean" ? "没有需要保存的改动" : "文档尚未就绪，暂不能保存");
+            return;
+          }
+          const manualThisRun = manual || doc.manualPending;
+          doc.manualPending = false;
           doc.saving = true;
           const saveSeq = doc.editSeq; // 保存飞行期间的新编辑靠它识别：宁可多存一轮，不许把脏标清掉
           if (doc.phase !== "dirty" && doc.phase !== "conflict") showPhase("saving", "保存中…");
+          if (manualThisRun) showPhase("saving", "手动保存中…");
           try {
             const pulled = await pullText();
             if (!alive()) return;
             if (pulled.stale) {
               showError("保存暂停：编辑器未在 " + PULL_TIMEOUT_MS + "ms 内返回全文（未写入磁盘，可继续编辑后重试）");
+              if (manualThisRun) post("toast", "保存暂停：编辑器未返回全文，未写入磁盘");
               return;
             }
             const request = buildSaveRequest({ path: doc.absPath, text: pulled.text, baseVersion: doc.lastVersion });
-            if (!request.ok) { showError("保存被拒绝：" + request.reason); return; }
+            if (!request.ok) {
+              showError("保存被拒绝：" + request.reason);
+              if (manualThisRun) post("toast", "保存被拒绝：" + request.reason);
+              return;
+            }
             const result = await api("save", request.body);
             if (!alive()) return;
             if (result.ok === true) {
@@ -679,6 +736,7 @@ window.__ModuleLoader__.load({
               doc.externalStale = false;
               doc.staleNotified = false;
               showPhase(doc.dirty ? "dirty" : "ready", doc.dirty ? "编辑中…（上一轮已保存，继续保存新改动）" : "已保存");
+              if (manualThisRun) post("toast", doc.dirty ? "已保存；还有新改动，继续保存中…" : "已保存");
               // 保存飞行期间可能被外部改过：落盘后 stat 对账（干净则静默重载，脏则只标记）。
               try {
                 const stat = await api("stat", { path: doc.absPath });
@@ -690,16 +748,69 @@ window.__ModuleLoader__.load({
             } else if (result.error && result.error.code === "FS_STALE_VERSION") {
               doc.conflict = true;
               showPhase("conflict", "文件已在别处被修改（" + (result.error.message || "FS_STALE_VERSION") + "）；版本守卫拒绝覆盖");
+              if (manualThisRun) post("toast", "文件已在别处被修改，未覆盖；请先重载磁盘版本");
             } else {
-              showError("保存失败：" + (result.error && result.error.code ? result.error.code : "error") + " — " + (result.error && result.error.message ? result.error.message : ""));
+              const message = (result.error && result.error.code ? result.error.code : "error") + " — " + (result.error && result.error.message ? result.error.message : "");
+              showError("保存失败：" + message);
+              if (manualThisRun) post("toast", "保存失败：" + message);
             }
           } catch (error) {
-            if (alive()) showError("保存失败：" + String(error && error.message ? error.message : error));
+            if (alive()) {
+              const message = String(error && error.message ? error.message : error);
+              showError("保存失败：" + message);
+              if (manualThisRun) post("toast", "保存失败：" + message);
+            }
           } finally {
             doc.saving = false;
-            if (doc.saveQueued && alive()) { doc.saveQueued = false; scheduleSave(0); }
+            if (doc.saveQueued && alive()) {
+              doc.saveQueued = false;
+              if (doc.manualPending) {
+                doc.manualPending = false;
+                void runSave({ manual: true });
+              } else {
+                scheduleSave(0);
+              }
+            }
           }
         }
+
+        /**
+         * 手动保存：iframe 内 Ctrl+S（引擎 keymap → bridge.mpHost.__save）与
+         * 焦点在本 tab 壳上时的父窗口 Ctrl+S 都走这里。
+         * 立即取消 1500ms 防抖并拉全文，但不绕过版本守卫；所有结果都给用户一条可见反馈。
+         */
+        function manualSave(content) {
+          if (doc.dead) return;
+          const gate = manualSaveGate({
+            dirty: doc.dirty,
+            saving: doc.saving,
+            conflict: doc.conflict,
+            baseVersion: doc.lastVersion,
+            opened: doc.opened,
+            dead: doc.dead,
+          });
+          if (gate.action === "skip") return;
+          if (gate.action === "clean") { post("toast", "没有需要保存的改动"); return; }
+          if (gate.action === "block") {
+            if (gate.reason === "conflict") {
+              showPhase("conflict", "文件已在别处被修改；版本守卫拒绝覆盖");
+              post("toast", "文件已在别处被修改，未覆盖；请先重载磁盘版本");
+            } else {
+              showError("保存被拒绝：缺少基准版本（请重新打开文档）");
+              post("toast", "保存被拒绝：缺少基准版本");
+            }
+            return;
+          }
+          if (doc.saveTimer) { clearTimeout(doc.saveTimer); doc.saveTimer = null; }
+          if (gate.action === "queue") {
+            doc.saveQueued = true;
+            doc.manualPending = true;
+            post("toast", "正在保存，完成后会保存最新改动");
+            return;
+          }
+          void runSave({ manual: true });
+        }
+
 
         /** 首次打开 / 干净缓冲下的外部变更重载。silent=true 时失败不弹错误横幅。 */
         async function loadFromDisk(options) {
@@ -880,7 +991,10 @@ window.__ModuleLoader__.load({
             ? content
             : (content && typeof content.text === "string" ? content.text : "");
           if (!text) return;
-          const outcome = await insertSelectionToChat(inputActionsRef.current, text, {
+          // 用户口径：选中→对话的内容开头永远带文档绝对路径（显示路径优先）。
+          const sourcePath = doc.displayPath || doc.absPath || doc.path || "";
+          const payload = composeInsertionText(sourcePath, text);
+          const outcome = await insertSelectionToChat(inputActionsRef.current, payload, {
             clipboard: clipboardOf(),
           });
           if (!alive()) return;
@@ -928,6 +1042,7 @@ window.__ModuleLoader__.load({
             return;
           }
           if (type === "change") { onDirty(data.content); return; }
+          if (type === "manual-save") { manualSave(data.content); return; }
           if (type === "text") { onText(typeof data.content === "string" ? data.content : ""); return; }
           if (type === "insert-to-chat") { void onInsertToChat(data.content); return; }
           if (type === "host-invoke") { handleHostInvoke(data.content, post); return; }
@@ -998,6 +1113,24 @@ window.__ModuleLoader__.load({
 
         window.addEventListener("message", onMessage);
         const disposeMessage = () => { try { window.removeEventListener("message", onMessage); } catch (e) { /* 忽略 */ } };
+
+        /* 焦点在 iframe 内时，Ctrl+S 由引擎 keymap 处理；焦点在 tab 壳、其它面板
+         * 甚至对话输入框时，父窗口在捕获阶段兜住并保存当前可见的 Markdown tab，
+         * 同时 preventDefault，避免浏览器弹“保存网页/HTML”。用户口径：只要这个
+         * 文档 tab 打开着，不论当前焦点在不在编辑区，Ctrl+S 都应保存文档。 */
+        const onManualShortcut = (event) => {
+          if (!event || event.defaultPrevented || event.isComposing) return;
+          if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+          if (String(event.key || "").toLowerCase() !== "s") return;
+          if (doc.dead || doc.tabVisible === false) return;
+          event.preventDefault();
+          event.stopPropagation();
+          manualSave({ source: "shortcut" });
+        };
+        try {
+          window.addEventListener("keydown", onManualShortcut, true);
+          cleanups.push(() => { try { window.removeEventListener("keydown", onManualShortcut, true); } catch (e) { /* 忽略 */ } });
+        } catch (e) { /* 无 window（测试环境） */ }
 
         // 主题：只观察 body 的 data-ds-dark-theme 属性（不做 DOM 树观察）。
         let themeObserver = null;
@@ -1092,7 +1225,7 @@ window.__ModuleLoader__.load({
       }
 
       const frameName = "dsh-markdown-typora-" + String((tab && (tab.id || tab.occurrenceId)) || "tab");
-      return h("div", { style: { width: "100%", height: "100%", display: "flex", flexDirection: "column", minHeight: 0 } },
+      return h("div", { ref: rootRef, style: { width: "100%", height: "100%", display: "flex", flexDirection: "column", minHeight: 0 } },
         banner,
         h("iframe", {
           key: depKey,

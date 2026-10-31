@@ -17,7 +17,7 @@
 //      unhandled rejection + watcher 泄漏。这里 await 捕获并幂等 close。
 //   4. 每个 async 分支都有 try/catch，错误以 {ok:false,error:{code,message}} 返回，code 原样透传。
 
-import { readFile, stat as fsStat } from 'node:fs/promises';
+import { readFile, stat as fsStat, writeFile as fsWriteFile } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize, sep, extname } from 'node:path';
@@ -282,6 +282,68 @@ export function errorCode(error) {
   if (error?.name === 'AbortError') return 'FS_ABORTED';
   return 'fs-error';
 }
+
+/**
+ * DSH 文件策略拒绝这次写入（workspace-write 只允许会话工作区内的路径）。
+ * 只在这个明确码/文案上走原生 fs 回退；OS 的 EACCES/EPERM 仍然照常失败。
+ */
+export function isSandboxWriteDenied(error) {
+  if (errorCode(error) === 'FS_SANDBOX_DENIED') return true;
+  const message = String(error?.message ?? error ?? '');
+  return /file access denied under (workspace-write|read-only) mode/i.test(message);
+}
+
+function codedError(code, message) {
+  const error = new Error(String(message));
+  error.code = code;
+  return error;
+}
+
+/** ctx.fs 的 target 同时带 displayPath 和 realpath targetKey；原生写用后者。 */
+function nativeTargetPath(target) {
+  const key = target?.targetKey;
+  if (typeof key === 'string' && key.length > 0) return key;
+  const displayPath = target?.displayPath;
+  return typeof displayPath === 'string' ? displayPath : '';
+}
+
+/** 与 dsh-fs-local 的 versionOf 同形：dev:ino:size:mtimeNs:ctimeNs（bigint）。 */
+function versionOfBigInt(info) {
+  return `${info.dev}:${info.ino}:${info.size}:${info.mtimeNs}:${info.ctimeNs}`;
+}
+
+/**
+ * 沙箱拒绝写入时的原生 fs 回退。保留版本守卫：先读 ctx.fs.stat（读路径在
+ * workspace-write 下仍可用），baseVersion 不匹配照样报 FS_STALE_VERSION；
+ * 写后优先用 ctx.fs.stat 的新版本，读不到才用同形的 bigint 版本。
+ *
+ * 注意：这是用户明确要求的“绕过 DSH 文件策略”，只对 Markdown 文档保存生效，
+ * 不改变插件其它 fs 能力；OS 权限错误不会被吞掉。
+ */
+async function directWriteText(fs, target, text, baseVersion) {
+  const path = nativeTargetPath(target);
+  if (!path) throw codedError('FS_IO_ERROR', 'direct write: target has no native path');
+  let before = null;
+  try { before = await fs.stat(target); } catch { before = null; }
+  if (before) {
+    if (String(before.version) !== String(baseVersion)) {
+      throw codedError('FS_STALE_VERSION', 'file changed since read');
+    }
+  } else {
+    const info = await fsStat(path, { bigint: true }).catch(() => null);
+    if (!info) throw codedError('FS_NOT_FOUND', `not found: ${target.displayPath ?? path}`);
+    if (versionOfBigInt(info) !== String(baseVersion)) {
+      throw codedError('FS_STALE_VERSION', 'file changed since read');
+    }
+  }
+  await fsWriteFile(path, String(text), 'utf8');
+  let after = null;
+  try { after = await fs.stat(target); } catch { after = null; }
+  if (after) return { version: after.version, displayPath: target.displayPath };
+  const info = await fsStat(path, { bigint: true });
+  return { version: versionOfBigInt(info), displayPath: target.displayPath };
+}
+
 
 function textBlock(text) {
   return [{ type: 'text', text: String(text ?? '') }];
@@ -657,7 +719,16 @@ export function createHost(options = {}) {
     if (text === null) return badRequest('text is required');
     if (!baseVersion) return badRequest('baseVersion is required — refusing to overwrite without a version guard');
     const target = await fs.resolve(path, resolveOptions(payload));
-    const result = await fs.writeText(target, text, { kind: 'replaceIfVersion', version: baseVersion });
+    let result;
+    try {
+      result = await fs.writeText(target, text, { kind: 'replaceIfVersion', version: baseVersion });
+    } catch (error) {
+      if (!isSandboxWriteDenied(error)) throw error;
+      try {
+        log.warn?.('%s: DSH 文件策略拒绝写入 %s；按配置回退原生 fs 写入', name, target?.displayPath ?? path);
+      } catch { /* 日志失败不阻塞保存 */ }
+      result = await directWriteText(fs, target, text, baseVersion);
+    }
     const version = result?.version;
     broadcastChange(target, version);
     return {

@@ -1,6 +1,6 @@
 {
   "name": "dsh-markdown-typora",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "MarkPilot CM6 3.6.6 Markdown editor for the DeepSeek Harness sidebar: selection-to-chat insertion and version-guarded saves.",
   "license": "MIT",
   "type": "module",

@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { mkdtemp, writeFile, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, normalize, isAbsolute } from 'node:path';
 import {
@@ -757,3 +757,44 @@ test('markdown 工具定义：0.2.1 defineTool 形态（output.schema/render）+
 test('createHost 缺少 fs 服务时明确抛错（apply 会捕获并告警）', () => {
   assert.throws(() => createHost({}), /fs/);
 });
+
+test('DSH 文件策略拒绝写入时回退原生 fs，且版本守卫仍然生效', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dsh-md-sandbox-write-'));
+  const file = join(dir, 'outside.md');
+  await writeFile(file, '# A\n', 'utf8');
+  const fs = createMockFs({});
+  let statCalls = 0;
+  fs.resolve = async (targetPath) => ({ targetKey: normalize(targetPath), displayPath: normalize(targetPath) });
+  fs.stat = async () => {
+    statCalls += 1;
+    return { version: statCalls === 1 ? 'v1' : 'v2', size: 4, type: 'file' };
+  };
+  fs.writeText = async () => {
+    throw new MockFsError('cannot write "...": file access denied under workspace-write mode', 'FS_SANDBOX_DENIED');
+  };
+  const { ctx, routes } = createMockContext(fs);
+  apply(ctx);
+  const { server, port } = await startServer(routes[0]);
+  try {
+    const saved = await postJson(port, '/dsh-markdown-typora/api/save', {
+      path: file, text: '# B\n', baseVersion: 'v1',
+    });
+    assert.equal(saved.json.ok, true);
+    assert.equal(saved.json.value.version, 'v2');
+    assert.equal(await readFile(file, 'utf8'), '# B\n');
+
+    // 回退路径也必须先验 baseVersion：旧版本不得覆盖磁盘。
+    statCalls = 0;
+    const before = await readFile(file, 'utf8');
+    const stale = await postJson(port, '/dsh-markdown-typora/api/save', {
+      path: file, text: '# C\n', baseVersion: 'v0',
+    });
+    assert.equal(stale.json.ok, false);
+    assert.equal(stale.json.error.code, 'FS_STALE_VERSION');
+    assert.equal(await readFile(file, 'utf8'), before);
+  } finally {
+    await stopServer(server);
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
