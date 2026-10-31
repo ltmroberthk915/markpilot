@@ -57,7 +57,7 @@
   `.mp-verify/quality/img-caret-r1/dsh-click5/result.json`，截图同目录（`01-image-source`、
   `02-active-near-right`、`03-far-right`、`04-typed-next-line` 及 2x 裁剪）。
 - **隔离装机产物（装的 Electron runtime + 新 ASAR）**：真实文档副本 + 合成夹具 20/20 通过，含
-  inactive/active 近远、图片本体、拖选、Shift+点击、图片本体不变、失焦、引用/列表/标题/任务/表格/末行、
+  inactive/active 近远、图片本体、拖选、Shift+点击、修饰键边界、引用/列表/标题/任务/表格/末行、
   200% 缩放、滚动条、真实文档近/远/激活三臂：`.mp-verify/quality/img-caret-r1/run21/result.json`。
 - **既有图片/区域回归**：`tools/quality/region-workflows.cjs` 13/13，clipboard 恢复、无残留进程：
   `.mp-verify/quality/img-caret-r1/region-r2/result.json`。
@@ -80,3 +80,23 @@
 - 从空白处自写拖拽不带 CM6 边缘自动滚动/原子吸附；从**已展开**图片的空白处起拖会在按下瞬间
   收起源码（布局塌陷一次）。
 - 下一行是表格/围栏/分隔线/块公式/缩进代码时，落点为图片紧右侧而非该结构内部（避免写坏结构）。
+
+## 7. 发布与实装收据（2026-10-31）
+
+- 提交：`f149e8e`（release: MarkPilot 3.6.9 and dsh-markdown-typora 0.3.4）已推 `origin/main`。
+- Release：<https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v0.3.4>
+  - `dsh-markdown-typora-0.3.4.tgz` 2,533,373 B，
+    sha256 `9d4999f01eabab1de6e252026f9de6dbefb9f5a94ff36f097eb339dbf983740d`
+  - `SHA256SUMS.txt` 96 B；Release API digest 与本地一致；解包复核 `package.json` = 0.3.4、
+    `core.json` = 3.6.9 / 124 文件 / coreHash `9150b5bb…`，`test/` 未进包。
+- 市场：awesome-dsh-plugin PR **#10776** 已更新到 0.3.4
+  （<https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/10776>，OPEN/MERGEABLE，
+  1 file +3/−3：tarball 指到 0.3.4、双语描述补“点图片右侧直接下一行”）；合并后由目录构建更新
+  `dsh-plugin-catalog`，中国区镜像随下次同步。
+- npm：**阻塞**。`%USERPROFILE%\.npmrc` 里的 `//registry.npmjs.org/:_authToken` 已失效：
+  `npm whoami` 401、`npm publish --access public` 返回 404（无权限）。需要有效的 npm granular token
+  或在本机 `npm login` 后重跑 `npm publish --access public`（包内已含 136 文件、2.5 MB）。
+- 本机插件：desktop profile 的 junction 已指向 0.3.4 / core 3.6.9；DSH 宿主仍跑着旧 iframe，
+  需关闭并重开 Markdown 标签页（或重启 DSH）后生效；`dsh plugin --profile desktop list` 被 Electron
+  宿主拒绝执行，是宿主托管 profile 的预期行为。
+

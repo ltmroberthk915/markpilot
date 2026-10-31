@@ -47,3 +47,19 @@
 - `markpilot-Setup-3.6.9.exe` / `markpilot-3.6.9-portable.exe`（见 `candidate.json` 的 SHA-256）
 - GitHub Release `v3.6.9`，资产含上述两包与 `SHA256SUMS.txt`
 - DSH 插件 `dsh-markdown-typora-v0.3.4`（tgz）
+
+## 5. 发布与实装（2026-10-31）
+
+- 提交：`f149e8e`（release: MarkPilot 3.6.9 and dsh-markdown-typora 0.3.4）已推 `origin/main`。
+- Release：<https://github.com/ltmroberthk915/markpilot/releases/tag/v3.6.9>
+  - `markpilot-Setup-3.6.9.exe` 117,597,994 B，sha256 `810e60b81427a5babdfadb7a6c7140f3642d328993c4a7d5b9048b9d3c2f7d28`
+  - `markpilot-3.6.9-portable.exe` 117,336,702 B，sha256 `5a549eeed80c199359c26b6c9e38600fe47b711a5835946c1d631c8572282ac0`
+  - `SHA256SUMS.txt` 187 B；Release API 回报的 digest 与本地一致。
+- 载荷核对：`verify-package.cjs` 三包全绿；ASAR `e1cc640904cef686d441d675d1768b48c3f12b8ae35388bd25ed3e6706ff56e5`，
+  EXE `e91e1728c6fd53e47fd278b54ea2b8f55849140e50a568323c37c1578296d656`；
+  ASAR 内 `renderer/cm6/app.js` = `b06de411…`，124 个引擎文件与运行时逐字节核对。
+- 实装：`markpilot-Setup-3.6.9.exe /S` 退出码 0；`MarkPilot.exe` PE `3.6.9.0` / product `3.6.9`，
+  `resources/app.asar` sha256 `e1cc6409…`；用装机 EXE + 真实文档副本重跑图片右侧臂通过
+  （`.mp-verify/quality/release-3.6.9/installed-real/result.json`）。
+- npm 不适用于桌面 EXE（桌面只走 GitHub Release）。
+
