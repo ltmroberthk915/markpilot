@@ -49,11 +49,11 @@ DSH 侧：`web` 与 `desktop` 两个 profile 的 `dsh-markdown-typora` 均是指
 - 真实微软拼音（公式与表格提交“你”）的物理输入证据来自上一候选 D1（ASAR `d1f12e18…`）。本轮没有在最终 ASAR `a9dd12f8…` 上重跑物理 IME；IME 相关源码未变，但这里不据此声明最终候选的物理 IME 通过。
 - DSH 宿主未重启；插件在磁盘上的字节与 TGZ 已核对，运行中模块的加载状态如实记为“未重启”。
 
-完整交付收据为 `.mp-verify/editing-3616/delivery.json`，SHA-256 `27660c85e8558b09e654f74f2ab696b8749a3dd5e733f8f302b604005396f8cf`；正式安装收据 `official-install.json`（SHA-256 `0bbb8126…`）。
+完整交付收据为 `.mp-verify/editing-3616/delivery.json`，SHA-256 `e26203ff0aa3d57088c37ff414add79055758f61cb108869928985052b17805d`；正式安装收据 `official-install.json`（SHA-256 `0bbb8126…`）。
 
 ## 发布与实装
 
 - GitHub：`main` 已推送（释放提交 `70d0838`、合并提交 `fd94839`，以及 `7000c2d`、`370ed7b`、`34db652`、`28d7dc9`）；[MarkPilot 3.6.16](https://github.com/ltmroberthk915/markpilot/releases/tag/v3.6.16) 与 [dsh-markdown-typora 0.3.11](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v0.3.11) 已发布。Release API 记录的 Setup/portable/TGZ/SHA256SUMS digest 与本地逐项一致；桌面 Release 触发的 winget 工作流成功，插件 Release 同时触发的 winget 工作流按预期失败（它期待桌面 Setup，与 0.3.4 时相同）。
-- npm：**仍被阻断**。`npm whoami` 返回 401、`npm publish --access public` 返回 404（无权限）；`%USERPROFILE%\.npmrc` 里的 token 已失效，与 0.3.4 轮记录一致。`npm pack --dry-run` 的 146 个文件、2,654,982 字节与 GitHub 资产一致；换有效 token 或 `npm login` 后重跑即可发布。
+- npm：**已发布**。通过 Edge 完成 `npm login --auth-type=web`（账号 `ltmroberthk`），`npm publish --access public` 经安全密钥二次确认后发布 `dsh-markdown-typora@0.3.11`（latest，146 个文件，2,655,030 B）。registry tarball SHA-256 `0169a98d…` 与 GitHub Release 资产逐字节一致；dist shasum `efd0a254…`、integrity `sha512-lQZM…`。此前的 401/404 仅说明旧 token 失效。
 - DSH 实装：`web`/`desktop` profile 保持指向本源码的 link（0.3.11 / core 3.6.16）；运行中的 desktop 宿主通过插件管理器 `pluginManager/setBundleEnabled` 关闭再启用 `dsh-markdown-typora`，两次均 `application=applied`、无警告，插件 fiber 为 active；`headless` profile 从本次 GitHub Release 的 TGZ 全新安装为 `dsh-markdown-typora@0.3.11`，下载文件摘要与 Release digest 一致。
 - 实装 EXE 为本次 Release 的同一个 Setup：安装版 3.6.16.0 / ProductVersion 3.6.16，EXE `339ff062…`，ASAR `a9dd12f8…`；发布用 Setup `92fa932d…` 为 rcedit 盖章后的安装包。
