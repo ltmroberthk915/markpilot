@@ -1,6 +1,6 @@
 # dsh-markdown-typora
 
-**A Markdown editor for the DeepSeek Harness right sidebar, built on MarkPilot CM6 3.6.16.**
+**A Markdown editor for the DeepSeek Harness right sidebar, built on MarkPilot CM6 3.6.17.**
 
 Write Markdown in DSH with Typora-style live rendering; select a passage and send its **Markdown source** straight into the current conversation.
 
@@ -18,7 +18,7 @@ Write Markdown in DSH with Typora-style live rendering; select a passage and sen
 - **Click a formula to edit its source** — block and inline math expand to the editable `$…$` source in place, and return to the rendered form when the caret leaves.
 - **Selections keep formulas whole** — a selection that crosses inline math carries complete formulas; copy and cut hand back the Markdown source, not the rendered glyphs.
 - **Table cells, not table text** — an alignment toolbar appears over the table, with row/column operations, escaped pipes, Chinese IME composition and undo/redo kept in sync with the cell source.
-- **Nine built-in themes** — 宋韵 (dark/light), Notion (dark/light), Solarized (dark/light), GitHub dark, 护眼米黄 and 柔和淡绿. Follow the host, or pick one from the toolbar.
+- **Ten built-in themes** — 宋韵 (dark, light and the restored V2 deep-blue), Notion (dark/light), Solarized (dark/light), GitHub dark, 护眼米黄 and 柔和淡绿. Follow the host, or pick one from the toolbar.
 - **Live Mermaid, KaTeX and the Markdown worker, all offline** — diagrams, math and fonts load from the plugin; there is no CDN in the path.
 - **Large documents** — the Markdown syntax tree is built in a web worker, so a 150,000-character document loads and accepts typing without the UI thread parsing it.
 - **Selection → chat** — the DSH-specific move: the selection's Markdown source goes into the current conversation from the floating button or `Ctrl/Cmd + Shift + Enter`.
@@ -37,9 +37,9 @@ Write Markdown in DSH with Typora-style live rendering; select a passage and sen
 - **Local images in the document** — `![](assets/diagram.png)` and parent-folder references such as `![](../figures/a.png)` render in the panel, read through the plugin's own read-only image route; a file that is genuinely missing still shows an explicit placeholder instead of an empty box.
 - **Edit right beside an image** — a click in the blank to the right of an image starts editing on the following line (headings, lists and task items keep their markers), instead of opening the image's Markdown source; clicking the image itself still opens its source.
 
-## What's new in the 3.6.16 engine
+## What's new in the 3.6.17 engine
 
-The editor engine is the same accepted build that ships with MarkPilot 3.6.16. Since the 0.3.4 plugin, the right sidebar gained the engine's multi-window work and the save-path fixes that came with it:
+The editor engine is the same accepted build that ships with MarkPilot 3.6.17. Since the 0.3.4 plugin, the right sidebar gained the engine's multi-window work and the save-path fixes that came with it:
 
 - **Shared editing across windows** — the same note can be open in the desktop app and the DSH sidebar. Unsaved edits are exchanged live, each window undoes only its own typing, and a real conflict is shown with the draft kept instead of overwriting the other window.
 - **Save while typing** — a save in flight is re-synced to the latest text; an external writer is detected and reported; the recovery banner's **Keep my changes** now actually writes the shared draft; and a cut → undo → redo followed by Ctrl+S no longer fails as an invalid collaborative edit.
@@ -47,6 +47,7 @@ The editor engine is the same accepted build that ships with MarkPilot 3.6.16. S
 - **Table and rich-paste editing** — cell commands, End/Backspace, escaped pipes, Chinese IME composition, and pasted HTML tables keep captions, source links, inline images and alignment.
 - **Cross-note cut** — real images and local Markdown links are re-based when a passage moves between lecture and summary notes; included definitions are renamed without breaking existing references.
 - **Plugin manager reload** — notes opened after a plugin reload still join the live session, and repeated reloads reuse the background writer instead of leaking workers.
+- **Restored V2 theme** — the final V2 release's deep-blue Song palette is back as **宋韵 深蓝** (#2E3440), a tenth built-in theme; the existing 宋韵 深色 stays unchanged.
 
 ## Install
 
@@ -61,14 +62,14 @@ Or open **Settings → Plugins → Add plugin** and enter `dsh-markdown-typora`.
 
 ### From a GitHub release
 
-Download `dsh-markdown-typora-0.3.11.tgz` from the [MarkPilot releases](https://github.com/ltmroberthk915/markpilot/releases) and add it to the profile that runs your host:
+Download `dsh-markdown-typora-0.3.12.tgz` from the [MarkPilot releases](https://github.com/ltmroberthk915/markpilot/releases) and add it to the profile that runs your host:
 
 ```sh
-dsh plugin --profile web add ./dsh-markdown-typora-0.3.11.tgz
-dsh plugin --profile desktop add ./dsh-markdown-typora-0.3.11.tgz
+dsh plugin --profile web add ./dsh-markdown-typora-0.3.12.tgz
+dsh plugin --profile desktop add ./dsh-markdown-typora-0.3.12.tgz
 ```
 
-When the npm registry lists 0.3.11, installing by package name above gives this build; if the registry copy still lags, use the TGZ above to get exactly 0.3.11.
+When the npm registry lists 0.3.12, installing by package name above gives this build; if the registry copy still lags, use the TGZ above to get exactly 0.3.12.
 ### Manual (development checkout)
 
 The plugin is the `dsh-markdown-typora/` subdirectory of the [MarkPilot repository](https://github.com/ltmroberthk915/markpilot). To load a checkout as a bundle:
@@ -88,7 +89,7 @@ Then add a junction/symlink from the profile's `node_modules` to `markpilot/dsh-
 
 ## How it is built
 
-The editor engine is the already-built MarkPilot CM6 3.6.16 renderer, copied byte-for-byte into `renderer-cm6/cm6/`. The plugin adds only:
+The editor engine is the already-built MarkPilot CM6 3.6.17 renderer, copied byte-for-byte into `renderer-cm6/cm6/`. The plugin adds only:
 
 - `renderer-cm6/index.html` + `dsh-bridge.js` + `dsh-selection.js` — the DSH skin and selection bridge;
 - `lib/index.js` — static routes, version-guarded file API, SSE change stream;

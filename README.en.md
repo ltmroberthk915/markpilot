@@ -39,8 +39,8 @@
 | ![DSH plugin: insert a selection into the chat](docs/screenshots/3.6.6/dsh-insert-to-chat.jpg) | ![Formula block with a precise click mapping](docs/screenshots/3.6.6/formula-map-m.jpg) |
 | **Notion dark** | **护眼米黄 (sepia light)** |
 | ![Notion dark theme](docs/screenshots/3.6.6/notion-dark.jpg) | ![Sepia light theme](docs/screenshots/3.6.6/hero-sepia-light.jpg) |
-| **Nine themes** — switch from the toolbar | **Selections across formulas** — the whole formula stays intact |
-| ![Nine themes](docs/screenshots/3.6.6/theme-panel.jpg) | ![Selection across inline formulas](docs/screenshots/3.6.6/selection-across-math.jpg) |
+| **Ten themes** — switch from the toolbar | **Selections across formulas** — the whole formula stays intact |
+| ![Ten themes](docs/screenshots/3.6.6/theme-panel.jpg) | ![Selection across inline formulas](docs/screenshots/3.6.6/selection-across-math.jpg) |
 | **Table cells you can edit** — alignment, row operations, Chinese IME | **Images in the document** — inline rendering without bloating long files |
 | ![Table cell toolbar](docs/screenshots/3.6.6/table-toolbar.jpg) | ![Images in the document](docs/screenshots/3.6.6/image-in-doc.jpg) |
 
@@ -256,7 +256,7 @@ Chunked background rendering with source-cache reuse: open a big document, keep 
 The part of the 2.0 series we polished hardest:
 
 - **Automatic CJK/Latin spacing** — breathing room between Chinese, Latin and digits, without disturbing pixel layout inside formulas and code;
-- **Serif dual themes** (Song/Ming styles, light and dark) — Chinese serif body text paired with Georgia for Latin, hairline-stroke outlines, dark-mode tables that don't collapse into black stripes, Chinese italics rendered in Kai style;
+- **Serif themes** (Song styles: dark, light, and the restored V2 deep-blue) — Chinese serif body text paired with Georgia for Latin, hairline-stroke outlines, dark-mode tables that don't collapse into black stripes, Chinese italics rendered in Kai style;
 - **1280 px reading measure** — no more reading a wide screen line-by-line to the edge;
 - **Knuth–Plass optimal line breaking on export**, the same family of algorithm TeX has used for forty years of mathematical typesetting.
 

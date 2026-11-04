@@ -1,1 +1,1 @@
-0169a98df28d34d546a9b4755b8f88236bd59810e39ba3f50d71f6dc5aaae852  dsh-markdown-typora-0.3.11.tgz
+60db59a7350c110788dd061b27eba7c08fa5e2d3db0077c355d255b936d330ff  dsh-markdown-typora-0.3.12.tgz

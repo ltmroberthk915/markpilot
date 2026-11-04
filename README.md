@@ -37,8 +37,8 @@
 | ![DSH 插件：选中文段插入对话](docs/screenshots/3.6.6/dsh-insert-to-chat.jpg) | ![公式块：点 m 精准映射](docs/screenshots/3.6.6/formula-map-m.jpg) |
 | **Notion 深色** | **护眼米黄** |
 | ![Notion 深色主题](docs/screenshots/3.6.6/notion-dark.jpg) | ![护眼米黄主题](docs/screenshots/3.6.6/hero-sepia-light.jpg) |
-| **九套主题**——工具栏一键切换 | **跨公式选区**——整段选中，公式保持完整 |
-| ![九套主题](docs/screenshots/3.6.6/theme-panel.jpg) | ![跨公式选区](docs/screenshots/3.6.6/selection-across-math.jpg) |
+| **十套主题**——工具栏一键切换 | **跨公式选区**——整段选中，公式保持完整 |
+| ![十套主题](docs/screenshots/3.6.6/theme-panel.jpg) | ![跨公式选区](docs/screenshots/3.6.6/selection-across-math.jpg) |
 | **表格格内编辑**——对齐、插删行、中文组合输入 | **图文混排**——图片随文渲染，长文不被挤爆 |
 | ![表格工具条](docs/screenshots/3.6.6/table-toolbar.jpg) | ![图文混排](docs/screenshots/3.6.6/image-in-doc.jpg) |
 
@@ -244,7 +244,7 @@ MarkPilot 是一款 AI 原生的 Markdown 编辑器：你在写上一句的时�
 这是 2.0 系列打磨最狠的一块，也是中文名「万可百律」里那个「律」字的来历——排版的韵律：
 
 - **中西文混排自动间距**：中文与西文、数字之间自动留出呼吸空隙，公式与代码内部的像素布局不受干扰；
-- **宋体系衬线双主题**（宋体-朙 / 宋体-暗）：正文中文宋体、西文 Georgia 双衬线，细笔画描边、暗色表格不再陷成黑条纹，中文斜体以楷体呈现——把屏幕当"纸"来排；
+- **宋体系衬线主题**（宋韵 深色/浅色，另有恢复自 V2 的「宋韵 深蓝」）：正文中文宋体、西文 Georgia 双衬线，细笔画描边、暗色表格不再陷成黑条纹，中文斜体以楷体呈现——把屏幕当"纸"来排；
 - **1280px 阅读版心**：宽屏不再一行读到脖子断；
 - **导出采用 TeX 同源的 Knuth–Plass 整段最优断行**：不是逐行贪心塞满，而是整段代价最优——TeX 排了四十年的数学论文，用的就是它。
 
