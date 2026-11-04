@@ -49,4 +49,4 @@ DSH 侧：`web` 与 `desktop` 两个 profile 的 `dsh-markdown-typora` 均是指
 - 真实微软拼音（公式与表格提交“你”）的物理输入证据来自上一候选 D1（ASAR `d1f12e18…`）。本轮没有在最终 ASAR `a9dd12f8…` 上重跑物理 IME；IME 相关源码未变，但这里不据此声明最终候选的物理 IME 通过。
 - DSH 宿主未重启；插件在磁盘上的字节与 TGZ 已核对，运行中模块的加载状态如实记为“未重启”。
 
-完整交付收据为 `.mp-verify/editing-3616/delivery.json`，SHA-256 `772e5ff5644e8470c264dfbbdc4c2824fbe3ec1cc215a2dfcbab28675313ffea`；正式安装收据 `official-install.json`（SHA-256 `0bbb8126…`）。未做任何远端发布或推送。
+完整交付收据为 `.mp-verify/editing-3616/delivery.json`，SHA-256 `0cc56ec0007fd8c642093ac7a97675430cde61cfe5349136222f1e396af8669f`；正式安装收据 `official-install.json`（SHA-256 `0bbb8126…`）。未做任何远端发布或推送。
