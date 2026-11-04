@@ -10,11 +10,11 @@
     "./client": "./lib/client.js",
     "./package.json": "./package.json"
   },
-  "icon": "./icon.svg",
+  "icon": "./icon.png",
   "files": [
     "LICENSE",
     "THIRD-PARTY-NOTICES.md",
-    "icon.svg",
+    "icon.png",
     "cordis.patch.yml",
     "core.json",
     "host.json",

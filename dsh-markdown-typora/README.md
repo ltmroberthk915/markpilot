@@ -50,6 +50,15 @@ The editor engine is the same accepted build that ships with MarkPilot 3.6.16. S
 
 ## Install
 
+### From npm
+
+```sh
+dsh plugin --profile web add dsh-markdown-typora
+dsh plugin --profile desktop add dsh-markdown-typora
+```
+
+Or open **Settings → Plugins → Add plugin** and enter `dsh-markdown-typora`. Restart the host afterwards; the plugin then appears on the **Plugins** page and opens from the right sidebar.
+
 ### From a GitHub release
 
 Download `dsh-markdown-typora-0.3.11.tgz` from the [MarkPilot releases](https://github.com/ltmroberthk915/markpilot/releases) and add it to the profile that runs your host:
@@ -59,8 +68,7 @@ dsh plugin --profile web add ./dsh-markdown-typora-0.3.11.tgz
 dsh plugin --profile desktop add ./dsh-markdown-typora-0.3.11.tgz
 ```
 
-Restart the host afterwards; the plugin then appears on the **Plugins** page and opens from the right sidebar. The plugin market listing follows the public release.
-
+Use this only when you cannot install from npm; the package on npm tracks the same source.
 ### Manual (development checkout)
 
 The plugin is the `dsh-markdown-typora/` subdirectory of the [MarkPilot repository](https://github.com/ltmroberthk915/markpilot). To load a checkout as a bundle:
