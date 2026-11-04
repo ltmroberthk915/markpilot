@@ -149,7 +149,7 @@ async function main() {
   function makeHost(env) {
     return new Function('env', '"use strict";\n' +
       'let saveAsSerial = 0, documentId = env.documentId, filePath = env.filePath, saveTask = null;\n' +
-      'const window = env.window, document = env.document, saveTrace = env.saveTrace, saveFailure = env.saveFailure;\n' +
+      'const window = env.window, document = env.document, saveTrace = env.saveTrace, saveAsFailure = env.saveAsFailure;\n' +
       'const doSave = env.doSave;\n' +
       'const saveAsFlow = ' + fnSrc + ';\n' +
       'return { saveAsFlow, snapshot: () => ({ saveAsSerial, documentId }),' +
@@ -159,7 +159,7 @@ async function main() {
     const v = newView('doc body'); const r = rig(v); r.set({ ownerKind: 'cm' });
     const failures = [];
     const env = { documentId: 'd1', filePath: null, window: { mpEngine: { commands: r.cc }, mpHost: {} },
-      document: globalThis.document, saveTrace: () => {}, saveFailure: (e) => failures.push(e), doSave: async () => true };
+      document: globalThis.document, saveTrace: () => {}, saveAsFailure: (e) => failures.push(e), doSave: async () => true };
     return { env, failures, ...r, view: v };
   };
 

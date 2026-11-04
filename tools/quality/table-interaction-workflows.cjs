@@ -276,6 +276,13 @@ await check('stable-row-native-owner-and-history', async c => {
     }
     return out;
   };
+  // Visible Home/End is intentional this batch: native End stops at the visible
+  // content boundary, while the independently split raw field still carries the
+  // Markdown padding spaces. Derive both visible bounds from that same split.
+  const visibleBounds = (text, range) => {
+    const raw = text.slice(range[0], range[1]);
+    return { start: range[0] + (raw.length - raw.trimStart().length), end: range[0] + raw.trimEnd().length };
+  };
   const {p} = await fresh(c.id, E0);
   await zoom(p, 100); // Qualify visible-row ownership independently of inherited zoom.
   const first = bareRows(E0)[2]; // header, separator, then the first data row
@@ -331,9 +338,11 @@ await check('stable-row-native-owner-and-history', async c => {
   assert(c.initialNodes.count >= 5, 'five fully visible inactive rows recorded before input');
   await enter(p); await keys(p, 'End', true);
   let s = await read(p);
-  assert.equal(s.selection.anchor, first.ranges[0][1]);
-  assert.equal(s.selection.head, first.ranges[0][1], 'native End reaches independent raw field end');
-  const qAt = first.ranges[0][1], E1 = E0.slice(0, qAt) + 'Q' + E0.slice(qAt);
+  const firstVisible = visibleBounds(E0, first.ranges[0]);
+  assert.equal(s.selection.anchor, firstVisible.end);
+  assert.equal(s.selection.head, firstVisible.end, 'native End reaches the visible end of the independent raw field (Markdown padding is not caret-reachable)');
+  const qAt = firstVisible.end, E1 = E0.slice(0, qAt) + 'Q' + E0.slice(qAt);
+  assert.equal(E1.split('\n')[4], '| R0Q | s | t |', 'visible End + Q produces the exact | R0Q | source');
   await insert(p, 'Q', true);
   s = await capture(p, c, 'first-cell-Q'); assert.equal(s.text, E1);
   c.retainedNodes = await p.evaluate(() => window.__stableRowOwnershipRefs.map(r => ({
@@ -374,9 +383,10 @@ await check('stable-row-native-owner-and-history', async c => {
   s = await read(p); assert.equal(s.text, E1);
   assert.equal(s.cellText, E1.slice(...model.ranges[0]));
   await keys(p, 'End', true); s = await read(p);
-  assert.equal(s.selection.anchor, model.ranges[0][1]);
-  assert.equal(s.selection.head, model.ranges[0][1]);
-  const zAt = model.ranges[0][1], E2 = E1.slice(0, zAt) + 'Z' + E1.slice(zAt);
+  const fifthVisible = visibleBounds(E1, model.ranges[0]);
+  assert.equal(s.selection.anchor, fifthVisible.end);
+  assert.equal(s.selection.head, fifthVisible.end);
+  const zAt = fifthVisible.end, E2 = E1.slice(0, zAt) + 'Z' + E1.slice(zAt);
   await insert(p, 'Z', true);
   assert.equal((await capture(p, c, 'fifth-row-Z')).text, E2);
   await keys(p, 'Control+z', true);

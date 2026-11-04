@@ -25,6 +25,7 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { syncHost } from './sync-host.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));          // .../dsh-markdown-typora/scripts
 const PLUGIN_DIR = resolve(HERE, '..');                        // .../dsh-markdown-typora
@@ -251,4 +252,5 @@ function check({ sourceDir }) {
 
 const args = parseArgs(process.argv.slice(2));if (args.help) { process.stdout.write(USAGE); process.exit(0); }
 const sourceDir = args.from ? resolve(process.cwd(), args.from) : DEFAULT_SOURCE;
+syncHost(args.check);
 process.exit(args.check ? check({ sourceDir }) : sync({ sourceDir }));

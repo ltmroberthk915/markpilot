@@ -10,12 +10,12 @@ import { createAsyncMarkdown } from './async-markdown.js';
 // - 桥契约与 vditor 版同形（open/init/change/setValue），tab 壳与桥一行不改。
 
 import { EditorState, EditorSelection, StateField, StateEffect, Transaction, Annotation, Prec, Compartment, Text } from "@codemirror/state";
-import { EditorView, ViewPlugin, Decoration, WidgetType, keymap } from "@codemirror/view";
+import { EditorView, ViewPlugin, Decoration, WidgetType, keymap, runScopeHandlers } from "@codemirror/view";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 import { basicSetup } from "codemirror";
-import { undo, redo, isolateHistory } from "@codemirror/commands";
+import { undo, redo, isolateHistory, undoDepth, invertedEffects, redoDepth } from "@codemirror/commands";
 import { StreamLanguage, LanguageDescription, LanguageSupport } from "@codemirror/language";
 import { python } from "@codemirror/legacy-modes/mode/python";
 import { javascript, json } from "@codemirror/legacy-modes/mode/javascript";
@@ -40,16 +40,21 @@ import { createRegionIndex, regionAt, regionsBetween } from './region-index.js';
 import { createRegionSession, activateRegion, retireRegion, expandRegionPayload } from './region-session.js';
 import { containerContext, createContainerContextReader, bindContainer } from './container-presentation.js';
 import { createRenderLifecycle } from './render-lifecycle.js';
+import {compositionPointerSelection} from './composition-pointer.js';
 import { createViewportIntent, scrollViewportBounds } from './viewport-intent.js';
-import { createCommandContext, applySourceHistory } from './command-context.js';
+import { beforeImageReveal, imageReadingPoint } from './image-layout.js';
+import { createLiveDocument, liveRemoteAccepted } from './live-document.js';
+import { createCommandContext } from './command-context.js';
+import { createHistoryGuard } from './history-guard.mjs';
 import { editPlan, inlineCodeRanges, rangesTouching } from './edit-plan.js';
 import { installToolbar, wrap as wrapInline, TOOLBAR_ACTIONS } from "./toolbar.js";
 import { installExtras } from "./extras.js";
-import { renderInline, inlineLinkSpans, inlineEmphasisSpans } from './inline-format.js';
+import { inlineCodeSpans, renderInline, inlineLinkSpans, inlineEmphasisSpans, inlineMathSpans, hasUnescapedDollar, singleLineDisplayTex } from './inline-format.js';
 import { fileUrlOfPath, resolveImageSource, hasImageCandidate } from './image-path.js';
+import { beginNativeImageTransfer, sourceImageTicket } from './image-transfer.js';
 import { imageInsertions, cancelImageInsertions } from './image-insertion.js';
 import { mappedMathSource, mathSourcePosition } from './math-source-map.js';
-import { mappedCellSource, cellSourceOffset, cellTextOffset, cellTextChange, encodeCellText } from './cell-source-map.js';
+import { mappedCellSource, cellSourceOffset, cellTextOffset, cellTextChange, encodeCellText, cellContentSpan, cellCaretEdge } from './cell-source-map.js';
 import { installSplit } from "./splitview.js";
 import { isEmbeddedImage, embeddedImages, protectedPayloadDecoration, protectImagePayloads, safeImagePayloadPosition } from './image-payload.js';
 import { createImageRemovalGate } from './image-removal.js';
@@ -1130,19 +1135,14 @@ function scanMathSpans(doc, blocks = scanFencedBlocks(doc), structure = scanStru
   let openDollar = null; // 跨行形态：`$$内容…` 开 → `…内容$$` 合（见下）
   let openSingle = null; // 【单 $ 跨多行】`$\begin{…}` 开 → 以 `$` 结尾的行合（引用区里 LLM 生成的推导块常见）
   let tentativeFrom = 0; // spans 中自该下标起，属于"未闭合区"的临时行内 span
-  let openSingleFrom = 0;
+  let openSingleFrom = 0, fenceOwner = null;
   /** 行内 `$…$` 扫描（与主路径同口径） */
   function pushInline(line) {
-    const re = /(^|[^\\$])\$((?:\\[^\n]|[^$\n\\])+?)\$/g;
-    const code = inlineCodeRanges(line.text);
-    let m;
-    while ((m = re.exec(line.text))) {
-      const start = line.from + m.index + m[1].length;
-      if (code.some(([a,b]) => start < line.from+b && start+m[2].length+2 > line.from+a)) continue;
-      /* 【#29·2026-10-17】内容 trim 后为空（美元符加空格再加美元符）不算公式：
-         否则被换成空 widget，那几个字符从屏幕上消失、也点不中。与格内/导出扫描器口径一致。 */
-      if (!m[2].trim()) continue;
-      spans.push({ from: start, to: start + m[2].length + 2, tex: m[2], display: false, texFrom: start + 1 });
+    for (const atom of inlineMathSpans(line.text)) {
+      const lead = atom.width === 2 ? atom.tex.length - atom.tex.trimStart().length : 0;
+      spans.push({ from: line.from + atom.from, to: line.from + atom.to,
+        tex: atom.width === 2 ? atom.tex.trim() : atom.tex, display: false,
+        texFrom: line.from + atom.from + atom.width + lead });
     }
   }
   for (let i = 1; i <= doc.lines; i++) {
@@ -1156,7 +1156,14 @@ function scanMathSpans(doc, blocks = scanFencedBlocks(doc), structure = scanStru
     // ① 已开启跨行形态：本行只要「以 $$ 收尾」就闭合（含整行只有 $$ 的情况，允许尾随空白）
     /* 【单 $ 跨多行·引用区】各行的 `> ` 前缀要剥掉再拼 tex，否则 KaTeX 会吃到 '>'。 */
     /* 前缀判据唯一化（#15/TBL-3）。 */
-    const qOff = structuralContextAt(structure,line.from)?.lead ?? tableLead(t).off;
+    const context = structuralContextAt(structure, line.from);
+    const owner = context?.path.at(-1) ?? null;
+    if (owner !== fenceOwner) {
+      fenceOwner = owner;
+      openDollar = openSingle = null;
+      if (fences.length) { fences = []; fenceGroups.push(fences); }
+    }
+    const qOff = context?.lead ?? tableLead(t).off;
     const qText = t.slice(qOff);
     if (openSingle) {
       const body = qText;
@@ -1193,19 +1200,18 @@ function scanMathSpans(doc, blocks = scanFencedBlocks(doc), structure = scanStru
       continue;
     }
     if (openDollar) {
-      const cm = /\$\$\s*$/.exec(t);
+      const cm = /\$\$\s*$/.exec(qText);
       if (cm) {
-        const texEnd = line.from + cm.index;
-        let raw = doc.sliceString(openDollar.texFrom, texEnd);
-        if (openDollar.quoted) raw = raw.split("\n").map((l) => l.replace(/^[ \t]*(?:>[ \t]?)+/, "")).join("\n");
-        const lead = raw.length - raw.trimStart().length;
+        const texEnd = line.from + qOff + cm.index;
+        openDollar.parts.push({ text: qText.slice(0, cm.index), from: line.from + qOff });
+        const source = mappedMathSource(openDollar.parts);
         spans.length = tentativeFrom; // 区内"临时行内 span"作废（会与块级 replace 装饰重叠→CM6 抛错）
-        if (raw.trim()) spans.push({ from: openDollar.from, to: texEnd + 2, tex: raw.trim(), display: true, texFrom: openDollar.texFrom + lead });
-        else spans.push({ from: openDollar.from, to: texEnd + 2, tex: "", display: true, texFrom: openDollar.texFrom });
+        spans.push({ from: openDollar.from, to: texEnd + 2, ...source, display: true });
         openDollar = null;
         continue;
       }
       // 未闭合期间：本行照常按普通行渲染（行内公式不因一个手滑的 $$ 全文失效）
+      openDollar.parts.push({ text: qText, from: line.from + qOff });
       pushInline(line);
       continue;
     }
@@ -1216,9 +1222,8 @@ function scanMathSpans(doc, blocks = scanFencedBlocks(doc), structure = scanStru
     if (qText.trim() === "$$") { fences.push({ from: line.from, to: line.to, n: i, qOff }); continue; }
     // 单行块公式 $$…$$（用户实测形态：$$\sigma(X):=\{...\}$$ 整条一行）——
     // 旧扫描只认「整行只有 $$」的围栏对，单行形态整条漏渲染。
-    const one = /^\$\$(.+)\$\$\s*$/.exec(qText);
-    if (one && one[1].trim()) {
-      const content = one[1];
+    const content = singleLineDisplayTex(qText);
+    if (content && content.trim()) {
       const lead = content.length - content.trimStart().length;
       spans.push({ from: line.from, to: line.to, tex: content.trim(), display: true, texFrom: line.from + qOff + 2 + lead });
       continue;
@@ -1234,28 +1239,15 @@ function scanMathSpans(doc, blocks = scanFencedBlocks(doc), structure = scanStru
       const rest = qText.slice(om[0].length);
       /* 【#28 实测缺陷·2026-10-17】本行已有第二对 $ 时不是跨行开口（如 \`$x$ 正文\`）：
          否则扫描会一路吞到下一个以 $ 结尾的行，把正文和后续块公式一起变成 katex-error。 */
-      if (!/\$[$]/.test(rest) && !rest.trimEnd().endsWith("$")) {
-        openDollar = { from: line.from, texFrom: line.from + qOff + om[0].length, quoted: qOff > 0 };
+      if (!hasUnescapedDollar(rest)) {
+        openDollar = { from: line.from, parts: [{ text: rest, from: line.from + qOff + om[0].length }] };
         tentativeFrom = spans.length;
         continue;
       }
     }
     if (!t.includes("$")) continue;
-    // 【2026-10-07 补形态】**行中段** `$$…$$`（正文里"写着写着突然要个公式，没敲回车就打了"）。
-    // 块级 widget 只能落在行边界，故此处按**行内**渲染（display:false）——先保证"任何正确书写
-    // 的 latex 都能渲染出来"；要不要独占一行，由 autoBreakMath 的收笔换行决定（零文档改动优先）。
-    if (t.includes("$$")) {
-      const re2 = /\$\$([^$\n]+?)\$\$/g;
-      let m2;
-      while ((m2 = re2.exec(t))) {
-        const start = line.from + m2.index;
-        if (inlineCodeRanges(t).some(([a,b]) => m2.index < b && m2.index+m2[0].length > a)) continue;
-        const lead = m2[1].length - m2[1].trimStart().length;
-        /* 【#29 第二处·2026-10-17】trim 后为空就不成公式（同 pushInline 口径）。 */
-        if (!m2[1].trim()) continue;
-        spans.push({ from: start, to: start + m2[0].length, tex: m2[1].trim(), display: false, texFrom: start + 2 + lead });
-      }
-    }
+    // The shared inline parser owns both delimiter widths. Independent regex
+    // passes can overlap the closing/opening dollars of adjacent formulas.
     pushInline(line);
   }
   for (const fences of fenceGroups) for (let i = 0; i + 1 < fences.length; i += 2) {
@@ -1755,7 +1747,6 @@ function scanLineStyles(doc, blocks = scanFencedBlocks(doc), structure = null) {
   const fenceLines = []; // ``` 围栏行（阅读态压扁隐藏）
   const codeLines = [];  // 【代码块行号】{ line, n }——**内容行**（不含围栏符本身），n 从 1 起、每块重数
   let codeN = 0;         // 当前代码块的计数（进块清 0，出块也清 0 ⇒ 每个块各自从 1 开始）
-  let mathPending = false; // 正在一个 `$$…` 待闭合块内（居中稳定用，见下）
   let from = 0;
   for (const t of doc.iterLines()) {
     const code = blockAt(blocks, from);
@@ -1765,31 +1756,11 @@ function scanLineStyles(doc, blocks = scanFencedBlocks(doc), structure = null) {
       styled.push({ line, cls: 'mp-code' + qClass });
       if (line.from === code.from || line.from === code.closeFrom) { fenceLines.push(line); codeN = 0; }
       else { codeLines.push({ line, n: ++codeN }); }
-      mathPending = false;
       from += t.length + 1;
       continue;
     }
-    // 【居中稳定·2026-10-07】块公式**围栏行/待闭合行**也挂 mp-math-src：
-    // 渲染态（KaTeX displayMode）是居中，源码展开也必须居中；若只在"span 被识别"时才居中，
-    // 打字过程中会出现"居中↔左对齐"横跳（实测：单独 `$$` 左对齐、配对后居中、再补 `$$` 变
-    // `$$$$` 又退回左对齐）。判据与 scanMathSpans 同源但只做首尾轻判，**塞进本次已有遍历**，
-    // 不新增全文扫描（性能纪律）。
-    const tt = t.trim();
-    if (mathPending) {
-      styled.push({ line: doc.lineAt(from), cls: "mp-math-src" });
-      // 收尾行 或 **空行** → 结束待闭合态（否则一个手滑的 `$$` 会把其后全文都居中；
-      // 真正已闭合的多行块由 buildBlockMath 按 span 逐行居中，不依赖这里）
-      if (tt === "" || (tt.endsWith("$$") && tt.length >= 2)) mathPending = false;
-    } else if (/^\s*\$\$/.test(t) && !/^\s*\$\$.*\$\$\s*$/.test(t)) {
-      styled.push({ line: doc.lineAt(from), cls: "mp-math-src" });
-      mathPending = true;
-    } else if (/^\s*\$\$/.test(t)) {
-      // 只有**行首**就是 $$ 的行才居中（`$$x$$`、`$$…` 开围栏）。
-      // 【2026-10-07 紧急修正】原判据还含 `endsWith("$$")` ⇒ 正文段落只要行尾出现
-      // `$$s$$` 就整行居中（用户实测：一整段「终章底本…（见附录 A）。$$s$$」全被居中）＝重大衰退。
-      // 行尾收尾的围栏行由"待闭合态/已识别 span"覆盖，不需要靠 endsWith 兜。
-      styled.push({ line: doc.lineAt(from), cls: "mp-math-src" });
-    }
+    // Math alignment belongs to buildBlockMath's semantic display spans.
+    // A bare $$ is also an empty inline insertion, never evidence of a block.
     const hm = /^( {0,3})(#{1,6})([ \t]+|$)/.exec(t);
     if (hm) {
       headings.push({ from: from + hm[1].length, to: from + hm[1].length + hm[2].length + (hm[3] ? 1 : 0), level: hm[2].length });
@@ -2758,9 +2729,16 @@ function syncCellEdit(edit) {
   /* 比较必须用"格源码 → DOM 文本"映射后的形态：cellEdit.text 是 DOM 文本（`a|b`），
      而源码里字面管道是转义形态（`a\\|b`）——直接比 raw source 会把所有含管道的格误判成"陈旧"。 */
   if (cellEdit.text != null && mappedCellSource(source).text !== cellEdit.text) { resyncCellEdit(edit); return; }
-  const change = cellTextChange(source, newText);
+  const dom = cellDOMSelection(edit);
+  const guarded = newText.endsWith('\\') && view.state.doc.sliceString(cellEdit.to, cellEdit.to + 1) === '|';
+  const nextText = guarded ? newText + ' ' : newText;
+  if (guarded) {
+    edit.textContent = nextText;
+    if (dom) setCellDOMSelection(edit, dom.anchor, dom.head);
+  }
+  const change = cellTextChange(source, nextText);
   if (!change) { syncCellSelection(edit); updateCellSizer(edit); scheduleCellOverlay(true); return; }
-  const dom = cellDOMSelection(edit), mapped = mappedCellSource(change.source);
+  const mapped = mappedCellSource(change.source);
   const from = cellEdit.from;
   const selection = dom ? {
     anchor: from + cellSourceOffset(mapped, dom.anchor),
@@ -2784,7 +2762,7 @@ function syncCellEdit(edit) {
     if (cellEdit) resyncCellEdit(edit);
     return;
   }
-  cellEdit.text = newText;
+  cellEdit.text = nextText;
   cellEdit.to = from + change.source.length;
   if (embeddedImages(view.state, regionIndexField).some(region => region.from >= from && region.to <= cellEdit.to)) {
     const owner = cellEdit, sel = view.state.selection.main;
@@ -2848,7 +2826,7 @@ function historyCommand(command) {
     // range. A reversed replacement maps to a nonempty range over the new text.
     // Remember the actual current selection in the existing history at Undo's
     // command boundary, without splitting continuous typing into new groups.
-    if (applySourceHistory(target, command === redo ? 'redo' : 'undo') === true) appliedState = target.state;
+    if (liveHistoryGuard.guardedSourceHistory(target, command === redo ? 'redo' : 'undo', { notify: historyGuardNotify }) === true) appliedState = target.state;
     return true;
   });
   if (appliedState && view === target && target.state === appliedState &&
@@ -2932,8 +2910,8 @@ function ensureCellOverlay() {
   div.contentEditable = "true";
   div.spellcheck = false;
   box.appendChild(div);
-  div.addEventListener("compositionstart", () => { syncCellSelection(div); cellComposing = true; });
-  div.addEventListener("compositionend", () => { cellComposing = false; syncCellEdit(div); });
+  div.addEventListener("compositionstart", () => { syncCellSelection(div); cellComposing = true; window.__dshBridge?.composition?.(true); });
+  div.addEventListener("compositionend", () => { cellComposing = false; syncCellEdit(div); window.__dshBridge?.composition?.(false); });
   div.addEventListener('beforeinput', e => {
     if (e.inputType === 'historyUndo' || e.inputType === 'historyRedo') {
       e.preventDefault(); cellHistory(div, e.inputType === 'historyUndo' ? undo : redo); return;
@@ -2974,6 +2952,27 @@ function ensureCellOverlay() {
        keyCode 229 是"正在组字"的老口径兜底（部分输入法合成事件不带 isComposing）。 */
     if (e.isComposing || e.keyCode === 229) { e.preventDefault(); return; }
     syncCellSelection(div);
+    if (view && !cellComposing && runScopeHandlers(view, e, 'mp-cell-document')) {
+      e.preventDefault(); return;
+    }
+    /* 【editing-3616·可见 Home/End】格源码段两端的 Markdown 填充空白在覆盖层里不可见，但它们
+       就在 textContent 里：原生 End 把光标放到填充空白之后，紧接的 Backspace 吃掉的是空白
+       而非可见尾字符（真人实测 dblclick→End→Backspace→输入 3 落盘 `| … | 7423|`，本意 743）。
+       Home/End（含 Shift 伸缩、Ctrl/Meta 同义）一律对齐**可见内容边界**（cellCaretEdge：
+       trimStart/trimEnd 口径，与 cellAnchor/gotoCell、格内 Ctrl+B 收窄选区同源）。
+       只动 DOM 选区（setCellDOMSelection→syncCellSelection 走既有管道转成转义管道源码坐标），
+       不改任何 raw offset、不碰文档。Alt+Home/End 是浏览器快捷键，不拦截；
+       全空白格退化为原始两端（无可见内容可越界，保持原生可达）。 */
+    if (cellEdit && !e.altKey && (e.key === "Home" || e.key === "End")) {
+      const dom = cellDOMSelection(div);
+      if (dom) {
+        const caret = cellCaretEdge(div.textContent || '', e.key, e.shiftKey, dom.anchor);
+        setCellDOMSelection(div, caret.anchor, caret.head);
+        syncCellSelection(div);
+        e.preventDefault();
+        return;
+      }
+    }
     // The overlay lives outside contentDOM; share the toolbar search action.
     if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && /^f$/i.test(e.key) && view && cellEdit) {
       e.preventDefault();
@@ -3058,7 +3057,7 @@ function ensureCellOverlay() {
       selectCellText();
       return;
     }
-    if ((e.key === "ArrowDown" || e.key === "ArrowUp") && view && cellEdit) {
+    if (!e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && (e.key === "ArrowDown" || e.key === "ArrowUp") && view && cellEdit) {
       const ln = view.state.doc.lineAt(cellEdit.rowFrom).number;
       const blk = tableBlockOf(view.state, ln);
       if (blk && ((e.key === "ArrowDown" && ln === blk.to) || (e.key === "ArrowUp" && ln === blk.from))) {
@@ -3119,12 +3118,6 @@ function ensureCellOverlay() {
         positionCellOverlay();
         return;
       }
-      /* 覆盖层里若有非空 DOM 选区，先删掉它（与源码行路径"同格内先删"同一口径）：
-         contenteditable 的原生删除会触发 input ⇒ syncCellEdit 镜像进源码，一拍事务。 */
-      try {
-        const ds = getSelection();
-        if (ds && !ds.isCollapsed && div.contains(ds.anchorNode)) document.execCommand("delete");
-      } catch { /* 忽略：删不掉就直接下移 */ }
       moveActiveCellByKey(() => applyEnter(view));
     }
   });
@@ -3189,6 +3182,11 @@ function activateCellOverlay(rowFrom, col, cols, from, to, caretOffset, selectAl
       /* 【β1】Ctrl+E / 递进第 1 级：**全选**格内文本（不折叠）。
          折叠到末尾是"点格落点"口径，与"选格"是两件事 —— 判据锚 getSelection().toString() == 该格源码。 */
       rng.selectNodeContents(div);
+    } else if (node && node.nodeType === 3) {
+      /* 【editing-3616】默认落点＝**可见内容末尾**，不是格源码段的原始末尾：尾部填充空白不可见，
+         落在它后面再退格会吃空白。坐标与播种文本 mapped.text 同一映射口径。 */
+      rng.setStart(node, cellContentSpan(mapped.text).end);
+      rng.collapse(true);
     } else {
       rng.selectNodeContents(div);
       rng.collapse(false);
@@ -3267,7 +3265,11 @@ function moveActiveCellByKey(run) {
   const ranges = cellRangesOf(line);
   primeTableGeometry(view, view.contentDOM.querySelector(`.mp-row [data-mp-row="${rowFrom}"]`));
   view.dispatch({ effects: setActiveCell.of({ rowFrom, col }) });
-  if (ranges[col]) activateCellOverlay(rowFrom, col, ranges.length, ranges[col][0], ranges[col][1]);
+  const range = ranges[col];
+  if (range) {
+    const caret = Number.isInteger(dest.pos) ? dest.pos - range[0] : undefined;
+    activateCellOverlay(rowFrom, col, ranges.length, range[0], range[1], caret);
+  }
   else deactivateCellOverlay();
 }
 /* ══ β1 选择层级（格 → 行 → 列 → 整表 → 全文档）══
@@ -3818,7 +3820,7 @@ const mpImgTries = new Map();
 // Data URIs stay rendered and must not pin previous multi-megabyte documents here.
 const mpImgKey = (s) => s.length <= 512 ? mpImgSrc(s) : null;
 const MP_IMG_TIMEOUT_MS = 10000;
-function mpImgFailGuard(wrap, img, rawSrc, lease = null, loaded = null, previous = null, assetEpoch = mpImgPreviewEpoch) {
+function mpImgFailGuard(wrap, img, rawSrc, lease = null, loaded = null, previous = null, assetEpoch = mpImgPreviewEpoch, inputView = null) {
   if (assetEpoch !== mpImgPreviewEpoch) return () => {};
   let done = false;
   let timer = 0;
@@ -3828,19 +3830,21 @@ function mpImgFailGuard(wrap, img, rawSrc, lease = null, loaded = null, previous
     if (lease && !lease.valid(false)) return;
     done = true;
     if (timer) clearTimeout(timer);
+    const compensate = img.classList.contains('mp-img-awaiting-size') || previous ? beforeImageReveal(inputView, wrap, viewportIntent.serial) : null;
     wrap.classList.remove("is-loading");
+    img.classList.remove('mp-img-awaiting-size');
     wrap.removeAttribute("data-mp-img-state");
     if (state === "ok") {
       if (previous && previous !== img) previous.remove();
       img.classList.remove('mp-img-pending');
       wrap.classList.remove("is-failed", 'is-stale');
       wrap.querySelector('.mp-img-fallback')?.remove();
-      loaded?.(); return;
+      compensate?.(); loaded?.(); return;
     }
     wrap.classList.add("is-failed");
     wrap.classList.toggle('is-stale', !!previous);
     wrap.setAttribute("data-mp-img-state", state);          // 取证口：loading-failed / timeout
-    if (wrap.querySelector(".mp-img-fallback")) return;     // 同 src 只建一次，不狂重试
+    if (wrap.querySelector(".mp-img-fallback")) { compensate?.(); return; }     // 同 src 只建一次，不狂重试
     const fb = document.createElement("span");
     fb.className = "mp-img-fallback";
     const icon = document.createElement("span");
@@ -3854,6 +3858,7 @@ function mpImgFailGuard(wrap, img, rawSrc, lease = null, loaded = null, previous
     url.textContent = rawSrc.length > 512 ? rawSrc.slice(0, 96) + `… (${rawSrc.length.toLocaleString()} 字符)` : rawSrc;
     fb.append(icon, why, url);
     wrap.appendChild(fb);
+    compensate?.();
   };
   const key = mpImgKey(rawSrc);
   const prev = mpImgLoadState.get(key);
@@ -3939,13 +3944,17 @@ class ImageWidget extends WidgetType {
        而用户图床（华为云 WAF）**对带该 Referer 的请求直接 403**（实测：同一 URL 不带 Referer 是 200 + 34118 B webp，
        带上就 403 / 0 B）。本地 data: / 相对路径图不吃这条，保持原样。 */
     img.referrerPolicy = /^https?:/i.test(resolvedSrc) ? "no-referrer" : '';
+    // Intrinsic size can become available before load. Until the owned
+    // reveal, preserve an in-flow placeholder so lazy images still intersect.
+    img.classList.toggle('mp-img-awaiting-size', !retaining && (!this.width || !this.height) &&
+      !(img.src === resolvedSrc && img.complete && img.naturalWidth > 0));
     if (img.src !== resolvedSrc) img.src = resolvedSrc;
     if (img.parentNode !== wrap) wrap.appendChild(img);
     /* 【task-12 失败必可见】见 mpImgFailGuard：绝不允许"源码被遮住 + 图没出来"的空白态。 */
     mpImgFailGuard(wrap, img, this.src, lease, () => {
       if (region && assetEpoch === mpImgPreviewEpoch) rendererLifecycle.rememberImage(inputView, region.id, resolvedSrc, img);
       inputView.requestMeasure();
-    }, retaining, assetEpoch);
+    }, retaining, assetEpoch, inputView);
     return true;
   }
   destroy(dom) { rendererLifecycle.release(dom); }
@@ -4171,7 +4180,16 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
     /* 【HTML 注释】`<!-- … -->`：编辑面隐藏，光标进入该行显源码（沿用 F7 规则：含选区的行由派生层放开）。
      *  跨行：**一条连续区间**从头盖到尾（改前逐行各标一段 `<!--` / `-->`，中间那几行照样露在屏幕上
      *  —— 用户看到的"注释只在首尾消失、正文还在"就是这个形态）。 */
-    const cIdx = c.indexOf("<!--");
+    const huge = t.length > 20000;
+    const codeRecords = huge ? [] : inlineCodeSpans(c);
+    const codeSpans = huge ? inlineCodeRanges(c) : codeRecords.map(s => [s.from, s.to]);
+    const inCodeSpan = (a, b) => codeSpans.some(([x, y]) => a < y && b > x);
+    // A tutorial can show the literal opener in code or TeX without starting
+    // an HTML comment that hides the rest of its lesson.
+    let cIdx = c.indexOf("<!--");
+    while (cIdx >= 0 && (inCodeSpan(cIdx, cIdx + 4) || overlapsMath(line.from + qoff + cIdx, line.from + qoff + cIdx + 4))) {
+      cIdx = c.indexOf("<!--", cIdx + 4);
+    }
     let cEnd = -1, cFromOff = -1, closesMulti = -1;
     if (cmtFrom >= 0) {                                        // 续上一行的未闭合注释
       const e = c.indexOf("-->");
@@ -4224,10 +4242,10 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
        这样围栏行与普通行走同一条路径，不会因为 `inFence) continue` 被漏掉。 */
     /* 【长行护栏】本机复现的 8.13MB 文档有 20 行 5~90 万字符：逐字符转义循环＋行内标记正则
        在那种行上等于每键扫 850 万字符。图片扫描（上面已跑完）不受影响。 */
-    const huge = t.length > 20000;
+
     // 【A2-P0①补全】转义序列的「\」本身阅读态隐藏（vditor 语义：\* 显示为 *）
     for (let k = 1; !huge && k < t.length; k++) {
-      if (t[k - 1] === "\\" && "*~`[]()#_$".includes(t[k]) && !overlapsMath(line.from + k - 1, line.from + k)) {
+      if (t[k - 1] === "\\" && "*~`[]()#_$".includes(t[k]) && !inCodeSpan(k - qoff - 1, k - qoff) && !overlapsMath(line.from + k - 1, line.from + k)) {
         marks.push({ from: line.from + k - 1, to: line.from + k, hides: [[line.from + k - 1, line.from + k]] });
       }
     }
@@ -4262,8 +4280,7 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
        图片扫描在本函数里**先跑**，此刻行内代码还没被扫描 ⇒ 必须在图片扫描的 free 里**额外排除行内代码区间**，
        否则写在反引号里的 `![x](y)` 会变成真图（清单 1.17 就是这么红的）。
        注意用**独立的 codeSpans**、不调 take()：take 会把它算作已占用，后面真正的行内代码扫描就再也吃不到它了。 */
-    const codeSpans = inlineCodeRanges(c);
-    const inCodeSpan = (a, b) => codeSpans.some(([x, y]) => a < y && b > x);
+
     for (const mk of scanImageMarks(line, c, (a, b) => !inCodeSpan(a, b) && free(a, b), take, qoff)) marks.push(mk);
     const push = (a, b, hides) => marks.push({
       from: base + a, to: base + b,
@@ -4325,7 +4342,13 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
         if (pureFormat) pureFormats.add(record);
       }
     };
-    scan(/`[^`\n]+`/g, 1);            // 行内代码
+    for (const { from: a, to: b, innerFrom, innerTo } of codeRecords) {
+      // The parser owns literal escapes inside code; a backslash before its
+      // closing fence cannot turn that delimiter into prose.
+      if (consumed.some(([x, y]) => a < y && b > x) || overlapsMath(base + a, base + b)) continue;
+      push(a, b, [[a, innerFrom], [innerTo, b]]);
+      take(a, b);
+    }
     scan(/\*\*\*[^*\n]+\*\*\*/g, 3, false, true, undefined, undefined, 'strong');   // 三连星
     /* 【5.8·嵌套强调】粗体的内容类必须**允许内部单个星**（`**粗体里 *斜体* 缀**`）：
        改前是 `[^*\n]+` ⇒ 整对匹配不上 ⇒ 斜体正则从第二个星起匹配、把**内侧**两个星隐掉，
@@ -4354,7 +4377,7 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
          而且出现 span 套 span 的错乱嵌套 ✗。
          ⇒ 两条硬约束：① **不许跨行**（内文与标签里都不含 `\n` ✓）；② **内文不许含 `<`** ✗
          （否则就会"吃"到别处的标签 ✓）。这样"最近的一对 `<u>…</u>`"才唯一 ✓。 */
-      const ure = /<u(?:\s[^<>\n]*)?>([^<\n]+?)<\/u\s*>/g;
+      const ure = /<(u|sup|sub)(?:\s[^<>\n]*)?>([^<\n]+?)<\/\1\s*>/gi;
       while ((um = ure.exec(c))) {
         const a = um.index, b = a + um[0].length;
         /* 【开/闭长度都按**实际标记**算·2026-10-11】开长 = 到第一个 `>` 为止（`<u>` / `<u >` 都吃 ✓）；
@@ -4364,7 +4387,7 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
            ⇒ 内文区间落进标签、hides 与 mark 重叠 ✗（调研臂与我这边的重字形态都指向这一处 ✓）。
            用长度算**与内容无关** ✓，不存在这个歧义 ✓。 */
         const openLen = um[0].indexOf(">") + 1;                  // `<u>` / `<u >` 的实际长度 ✓
-        const innerLen = um[1].length;
+        const innerLen = um[2].length;
         /* 【长度算式要"只减一次"·2026-10-11 当场踩到】第一版写成
            `um[0].length - (innerTo - a) - (innerFrom - a)` ✗ —— 把内文长度**减了两次**
            ⇒ 收尾长度算成 2（真值 4）⇒ 只隐掉 `u>`，屏幕上留 `/` 与游离 `u` ✗。
@@ -4375,7 +4398,8 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
         if (!free(a, innerFrom) || !free(innerTo, b)) { ure.lastIndex = um.index + 1; continue; }
         push(a, b, [[a, a + openLen], [innerTo, innerTo + closeLen]]);
         const mk = marks[marks.length - 1];
-        mk.uOnly = true;
+        mk.textStyle = um[1].toLowerCase();
+        mk.uOnly = mk.textStyle === 'u';
         /* 【uInner 必须是绝对坐标·2026-10-11 实测事故】`push()` 会把 `hides` 加上 `base` ✓，
            但 `uInner` 是我**自己挂上去的附加字段** ⇒ `push` 不会管它 ✗ ——
            第一版直接存了**相对行首**的偏移 ✗ ⇒ 装饰层把它当绝对位置用 ✗
@@ -4559,30 +4583,42 @@ const imageAtomicRanges = EditorView.atomicRanges.of((view) => {
    - 拖选跨过行内公式边界（一端在内部、另一端越过另一侧）→ 整块公式进入选区；
    - Shift+点击公式用独立 userEvent 'select.pointer.glyph' 豁免，保留精确源码端点的既有契约。
    多选区安全：逐 range 修正，空选区不动。 */
+/** 单 range 吸附核心（mathPointerSelectionSnap 与浮层手势共用，判据只此一份）：
+ *  返回改写后的 range（goalColumn/bidiLevel/assoc 原样保留）；未改写（空 range、与上一选区同
+ *  range、两端无跨越、display span）返回 null。 */
+function mathSnapRange(spans, r, previousMain) {
+  if (r.empty || previousMain && previousMain.eq(r)) return null;
+  let anchor = r.anchor, head = r.head;
+  for (const s of spans) {
+    if (s.display) continue;
+    if (anchor > s.from && anchor < s.to) {
+      if (head >= s.to) anchor = s.from;
+      else if (head <= s.from) anchor = s.to;
+    }
+    if (head > s.from && head < s.to) {
+      if (anchor >= s.to) head = s.from;
+      else if (anchor <= s.from) head = s.to;
+    }
+  }
+  return anchor === r.anchor && head === r.head ? null : EditorSelection.range(anchor, head, r.goalColumn, r.bidiLevel, r.assoc);
+}
 const mathPointerSelectionSnap = EditorState.transactionFilter.of((tr) => {
   if (tr.docChanged) return tr;
   const ev = tr.annotation(Transaction.userEvent) || '';
-  if (!ev.startsWith('select') || ev === 'select.pointer.glyph') return tr;
+  if (!ev.startsWith('select') || ev === 'select.pointer.glyph' || exactFloatingClicks.has(tr.selection)) return tr;
   const sel = tr.selection;
   if (!sel || !sel.ranges.length) return tr;
   const spans = tr.state.field(mathSpansField, false)?.spans;
   if (!spans || !spans.length) return tr;
-  let changed = false;
+  let changed = false, oldIndex = 0;
+  const previous = tr.startState.selection.ranges;
   const ranges = sel.ranges.map((r) => {
-    if (r.empty) return r;
-    let anchor = r.anchor, head = r.head;
-    for (const s of spans) {
-      if (s.display) continue;
-      if (anchor > s.from && anchor < s.to) {
-        if (head >= s.to) { anchor = s.from; changed = true; }
-        else if (head <= s.from) { anchor = s.to; changed = true; }
-      }
-      if (head > s.from && head < s.to) {
-        if (anchor >= s.to) { head = s.from; changed = true; }
-        else if (anchor <= s.from) { head = s.to; changed = true; }
-      }
-    }
-    return anchor === r.anchor && head === r.head ? r : EditorSelection.range(anchor, head, r.assoc);
+    // Adding a caret must not widen an earlier precise glyph selection.
+    while (oldIndex < previous.length && previous[oldIndex].from < r.from) oldIndex++;
+    const snapped = mathSnapRange(spans, r, previous[oldIndex]);
+    if (!snapped) return r;
+    changed = true;
+    return snapped;
   });
   if (!changed) return tr;
   return [tr, { selection: EditorSelection.create(ranges, sel.mainIndex) }];
@@ -4637,7 +4673,7 @@ const inlineMarkDecorations = EditorView.decorations.compute(["selection", inlin
        ⇒ 现在这条规则走的就是通用的 `mark.hides` 分支（文件末尾那条 `for` 循环 ✓），此处**不需要特判** ✓。
        唯一额外的一步：给**内文**加一条 `mp-u` 的 mark ✓（下面的 uOnly 分支 ✓）——
        标签靠 hides 隐掉 ✓，下划线靠这条类 ✓；两者作用在不同字符上 ⇒ **互不干扰** ✓。 */
-    if (mark.uOnly && mark.uInner) {
+    if (mark.textStyle && mark.uInner) {
       /* 【类名要用 `attributes`·2026-10-11 实测】`Decoration.mark({ class })` 在这个 bundle 里
          **没把类挂上去** ✗（实测：内文那个文本节点的 parent 仍是 `.cm-line`、没有 `mp-u` 类 ✗），
          而引擎里既有写法是 `Decoration.line({ class: … })` ✓ —— 两者语义其实一致，但保险起见
@@ -4645,7 +4681,9 @@ const inlineMarkDecorations = EditorView.decorations.compute(["selection", inlin
       /* 【可辨识标记·2026-10-11】除了 `mp-u` 再挂一个 `data-mpu=from-to` ✓ ——
          先前出现"DOM 里有 mp-u 但引擎标记表里没有对应条目"的矛盾 ✗，两处口径打架时
          **必须能一眼分清"这个 span 是谁加的、它自报的区间是多少"** ✓（错-27 的自证思路 ✓）。 */
-      out.push(Decoration.mark({ attributes: { class: "mp-u", "data-mpu": mark.uInner[0] + "-" + mark.uInner[1] } }).range(mark.uInner[0], mark.uInner[1]));
+      const attributes = { class: "mp-" + mark.textStyle };
+      if (mark.uOnly) attributes["data-mpu"] = mark.uInner[0] + "-" + mark.uInner[1];
+      out.push(Decoration.mark({ attributes }).range(mark.uInner[0], mark.uInner[1]));
       /* 不 continue：继续走到末尾那条 hides 循环 ✓（标签照样隐掉 ✓）。 */
     }
     /* 【HTML 注释】F7 **按"光标进入该行"口径**（与圆点/标题的既有手感一致）：只按"选区是否相交"
@@ -4722,11 +4760,18 @@ class InlineFloatWidget extends WidgetType {
     // token（与点渲染体同一套 K10 五级判定）。此前 pointer-events:none，点击直接穿到
     // 被盖住的下一行——用户实测「点框里的 λ，光标飞到别处、公式塌回渲染态」。
     box.addEventListener("mousedown", (e) => {
-      if (lease && !lease.valid()) return;
+      if ((lease && !lease.valid()) || e.button !== 0 || e.ctrlKey || e.metaKey || e.altKey) return;
       // Native scrollbar reading must not dispatch a glyph selection or block
       // Chromium's default scrolling. Stop only CM's bubbling mouse handler.
       if (floatScrollbarHit(box, e)) { e.stopPropagation(); return; }
-      if (floatClickToSource(box, view, e)) { e.preventDefault(); e.stopPropagation(); }
+      const pos = floatSourcePosition(box, view, e);
+      if (pos == null) return;
+      if (e.detail === 1 && e.isTrusted) {
+        floatingPointerStarts.set(e, pos);
+      } else {
+        setMathPointerSelection(view, pos, { shift: e.shiftKey, anchor: view.state.selection.main.anchor });
+        e.preventDefault(); e.stopPropagation();
+      }
     });
     registerFloat(view, box, lease);
     return box;
@@ -4738,26 +4783,55 @@ class InlineFloatWidget extends WidgetType {
 /** 浮动预览框内点击 → 源码精确落位（与点渲染体同一套 K10 五级判定）。
  *  tex 与源码映射从 mathSpansField 现取；旧浮层已失去对应 span 时不写选区。
  *  命令口径一致：点 \lambda 落 `\` 与 `l` 之间（mathGlyphOffset 的既有契约）。 */
-function floatClickToSource(box, view, event) {
-  if (!view) return false;
+function floatSourcePosition(box, view, event) {
   const from = Number(box.dataset.mpFrom), to = Number(box.dataset.mpTo);
-  if (!Number.isFinite(from) || !Number.isFinite(to)) return false;
-  const spans = view.state.field(mathSpansField, false)?.spans ?? [];
-  const span = spans.find((s) => s.from === from && s.to === to) || null;
-  if (!span || !Number.isFinite(span.texFrom)) return false;
-  const tex = span.tex;
-  const base = span.texFrom;
-  let pos = base;
-  if (tex) {
-    const offset = mathGlyphOffset(box, event, tex);
-    if (offset != null) pos = mathSourcePosition(span, offset);
-  }
-  setMathPointerSelection(view, pos, { shift: event.shiftKey, anchor: view.state.selection.main.anchor });
-  return true;
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
+  const span = (view.state.field(mathSpansField, false)?.spans || []).find(s => s.from === from && s.to === to);
+  if (!span || !Number.isFinite(span.texFrom)) return null;
+  const offset = span.tex && mathGlyphOffset(box, event, span.tex);
+  return typeof offset === 'number' ? mathSourcePosition(span, offset) : span.texFrom;
 }
+
+// CM owns pointer tracking and edge scrolling; the float contributes its glyph
+// position because its pixels are painted over a different source line.
+const floatingPointerStarts = new WeakMap(), exactFloatingClicks = new WeakSet();
+/* 【浮层手势·选区所有权】get() 只向真实改写了选区、切换了文档会话（regionIndexField.epoch）
+   或进入组字的后续意图粘滞让位；裸修饰键、滚动与异步布局噪音不再取消手势，glyph→源码映射逐事件实读。 */
+const floatingSelectionStyle = EditorView.mouseSelectionStyle.of((owner, down) => {
+  const pos = floatingPointerStarts.get(down);
+  if (pos == null) return null;
+  const anchor = down.shiftKey ? owner.state.selection.main.anchor : pos;
+  const epoch = owner.state.field(regionIndexField, false)?.epoch;
+  let conceded = false, last = owner.state.selection;
+  return {
+    update() { return false; },
+    get(event) {
+      if (conceded || owner.composing || owner.state.field(regionIndexField, false)?.epoch !== epoch ||
+          !owner.state.selection.eq(last)) { conceded = true; return owner.state.selection; }
+      const box = event.target?.closest?.('.mp-inline-float');
+      const head = event === down ? pos : (box && owner.contentDOM.contains(box) ? floatSourcePosition(box, owner, event) : null)
+        ?? owner.posAtCoords({ x: event.clientX, y: event.clientY }, false);
+      const selection = EditorSelection.single(anchor, head ?? anchor);
+      // Shift+down 登记进 exactFloatingClicks ⇒ 过滤器旁路，last 记原始精确端点（不经吸附）；
+      // 其余步骤用共用核心算"预期落账"（goalColumn/bidiLevel/assoc 与过滤器产物一致），合法改写不再被误判。
+      if (event === down && down.shiftKey) {
+        exactFloatingClicks.add(selection);
+        last = selection;
+      } else {
+        const snapped = mathSnapRange(owner.state.field(mathSpansField, false)?.spans || [], selection.main, owner.state.selection.main);
+        last = snapped ? EditorSelection.create([snapped], 0) : selection;
+      }
+      return selection;
+    },
+  };
+});
 function setMathPointerSelection(view, pos, gesture) {
   const anchor = gesture?.shift ? gesture.anchor : pos;
-  view.dispatch({ selection: { anchor, head: pos }, userEvent: gesture?.shift ? 'select.pointer.glyph' : 'select.pointer' });
+  // A Ctrl-click may add, remove, or (after copying) replace a caret. Honor CM's
+  // choice and calibrate only the active point of a retained/added selection.
+  if (gesture?.multiple && view.state.selection.ranges.length < gesture.rangesBefore) return;
+  const selection = gesture?.multiple ? view.state.selection.replaceRange(EditorSelection.cursor(pos)) : { anchor, head: pos };
+  view.dispatch({ selection, userEvent: gesture?.shift ? 'select.pointer.glyph' : 'select.pointer' });
   view.focus();
 }
 function floatScrollbarHit(box, event) {
@@ -4944,6 +5018,8 @@ function positionInlineFloats(inputView) {
 const autoBreakMath = ViewPlugin.fromClass(class {
   constructor(v) { this.view = v; this.raf = 0; }
   update(u) {
+    if (!u.docChanged && !u.selectionSet) return;
+    if (this.raf) { cancelAnimationFrame(this.raf); this.raf = 0; }
     if (!u.docChanged) return;
     // 【中文输入安全·2026-10-07】只认"普通键入"这一种用户事件：
     // · 输入法组字期间 CM6 把 DOM 变更作为 `input.type.compose` 事务下发（isUserEvent("input.type")
@@ -4951,8 +5027,13 @@ const autoBreakMath = ViewPlugin.fromClass(class {
     // · 组字态另有 view.composing 闸（见 autoBreakCheck 首行），两道一起兜。
     const plainType = u.transactions.some((tr) => tr.isUserEvent("input.type") && !tr.isUserEvent("input.type.compose"));
     if (!plainType) return;
-    if (this.raf) return;
-    this.raf = requestAnimationFrame(() => { this.raf = 0; autoBreakCheck(this.view); });
+    const { doc, selection } = u.state, serial = viewportIntent.serial(this.view);
+    this.raf = requestAnimationFrame(() => {
+      this.raf = 0;
+      const v = this.view;
+      if (v.hasFocus && !v.state.readOnly && v.state.doc === doc && v.state.selection.eq(selection) &&
+          viewportIntent.serial(v) === serial) autoBreakCheck(v);
+    });
   }
   destroy() { if (this.raf) cancelAnimationFrame(this.raf); }
 });
@@ -4965,11 +5046,9 @@ function autoBreakCheck(v) {
   const line = st.doc.lineAt(head);
   const col = head - line.from;
   if (!line.text.slice(0, col).endsWith("$$")) return;          // ① 光标紧跟闭合 $$
-  const before = line.text.slice(0, col - 2);
-  const open = before.lastIndexOf("$$");
-  if (open < 0) return;
-  if (!before.slice(open + 2).trim()) return;                    // 空公式不折腾
-  if (!before.slice(0, open).trim()) return;                     // ② 行首形态：已是块
+  const atom = inlineMathSpans(line.text).find(span => span.width === 2 && span.to === col);
+  if (!atom || !line.text.slice(0, atom.from).trim()) return;    // Only a real, midline math atom.
+  const open = atom.from;
   if (/^\s*(```|~~~)/.test(line.text)) return;                   // ③ 保护块
   if (/^\s*([-*+]|\d+[.)])\s/.test(line.text)) return;
   if (!/^\s*\|/.test(line.text) && line.text.includes("|") && /^\s*\|.*\|\s*$/.test(line.text)) return;
@@ -5101,7 +5180,8 @@ const docSourceClipboard = EditorView.domEventHandlers({
        同时注册时**只有文档序里靠前的那个会被调用**（后一个 `imgCopyDiag.calls` 恒为 0，
        而 document 层监听证明 copy 事件确实派发到了 contentDOM）⇒ 图片分支必须并入这里，
        否则永远不执行。文本口味保持"文档源码"（D8 口径）不变。 */
-    if (imgCopyFill(event, view)) return true;
+    const transfer = beginNativeImageTransfer(event, view.state, view.state.field(regionIndexField));
+    if (imgCopyFill(event, view, transfer)) return true;
     const st = view.state;
     const ranges = st.selection.ranges.filter((r) => !r.empty);
     if (!ranges.length) return false;
@@ -5120,6 +5200,7 @@ const docSourceClipboard = EditorView.domEventHandlers({
   },
   cut(event, view) {
     const st = view.state;
+    beginNativeImageTransfer(event, st, st.field(regionIndexField));
     const ranges = st.selection.ranges.filter((r) => !r.empty);
     if (!ranges.length) { event.preventDefault(); return true; }
     /* 【整表剪切·2026-10-17 实测缺陷 TBL-6】整表选区（Ctrl+A 递进到"整表"）下 Ctrl+X 与 Ctrl+C 两条口径：
@@ -5601,7 +5682,7 @@ const imgPrefetchPlugin = ViewPlugin.fromClass(class {
 const imgCopyDiag = { calls: 0, imgs: 0, added: 0, lastErr: null, addedInfo: null, transport: null, writeAttempts: 0, syncResult: null, generation: 0 };
 /** 图片口味填充器（**由 docSourceClipboard.copy 调用**，见那边的说明：两个 copy 处理器只会有第一个生效）。
  *  返回 true ＝ 已写入"含图片"的剪贴板载荷（调用方据此直接收工），false ＝ 让文字路径照旧走。 */
-function imgCopyFill(event, view) {
+function imgCopyFill(event, view, transfer) {
   imgCopyDiag.calls++;
   ++imgCopyDiag.generation;
   const st = view.state;
@@ -5629,7 +5710,8 @@ function imgCopyFill(event, view) {
       });
     }).join("<br>");
   } catch { htmlBody = ""; }
-  const html = '<div data-markpilot-source="markdown">' + htmlBody + '</div>';
+  const receipt = transfer ? ' data-markpilot-image-transfer="' + transfer + '"' : '';
+  const html = '<div data-markpilot-source="markdown"' + receipt + '>' + htmlBody + '</div>';
   let chosen = null;
   for (const im of imgs) {
     const rec = imgBlobGet(mpImgSrc(im.src));
@@ -5708,6 +5790,10 @@ const clickToSource = EditorView.domEventHandlers({  mousedown(event, view) {
       view.__mpRegionGesture = { phase: 'down', id: r.id, epoch: index.epoch, serial: viewportIntent.serial(view) };
       return false;
     }
+    // Modified/secondary clicks keep CM's native selection and menu ownership.
+    view.__mpMathClick = null;
+    const modified = event.ctrlKey || event.metaKey;
+    if (event.button !== 0 || event.altKey || (modified && (event.shiftKey || event.detail > 1))) return false;
     // 【交互审计 B 修复·位级】双击（detail≥2）：落点在任一数学 span 内（含首击后
     // 已显源码的文本侧——widget 分支够不着）→ 选区钳到 span 整体，防原生 groupAt
     // 把无空格 CJK 串与公式并成一个词（「紧贴$x+a$紧贴」整段选中）。
@@ -5724,7 +5810,7 @@ const clickToSource = EditorView.domEventHandlers({  mousedown(event, view) {
     }
     // 【U-094】块公式类名是 mp-cm6-math-block——.mp-cm6-math 选择器从不匹配它，
     // 块级点击全靠原生落位彩票（落 span 内才展开，落边界外无反应）。
-    let holder = event.target && event.target.closest ? event.target.closest(".mp-cm6-math, .mp-cm6-math-block") : null;
+    let holder = event.target && event.target.closest ? event.target.closest(modified ? ".mp-cm6-math, .mp-cm6-math-block, .mp-inline-float" : ".mp-cm6-math, .mp-cm6-math-block") : null;
     if (!holder) return false;
     // 【K10 验证族①修复】溢出像素纠正：根号 surd SVG 等绝对定位溢出会盖住**上一行**
     // 公式的分母像素并赢下命中测试（event.target 落进别人的 widget），宿主盒几何
@@ -5741,10 +5827,14 @@ const clickToSource = EditorView.domEventHandlers({  mousedown(event, view) {
         if (h && inRect(h, event.clientX, event.clientY)) { holder = h; break; }
       }
     }
-    const pos0 = view.posAtDOM(holder);
+    // Adjacent formulas share a source boundary. The mounted widget's owner,
+    // rather than an inclusive position search, identifies the clicked atom.
+    const owner = view.state.field(regionIndexField).byId.get(holder.dataset.mpRegion);
+    if (owner?.kind !== 'math') return false;
     const spans = view.state.field(mathSpansField).spans;
-    const span = spans.find((s) => s.from <= pos0 && pos0 <= s.to) || null;
-    let pos = Math.max(pos0, 0) + 1;
+    const span = spans.find((s) => s.from === owner.from && s.to === owner.to);
+    if (!span) return false;
+    let pos = span.texFrom ?? span.from + 1;
     if (span && span.texFrom != null && span.tex.length) {
       const offset = mathGlyphOffset(holder, event, span.tex);
       if (offset != null) pos = mathSourcePosition(span, offset);
@@ -5755,7 +5845,8 @@ const clickToSource = EditorView.domEventHandlers({  mousedown(event, view) {
        改成 click vs drag 分离：mousedown 只**记录**落点并放行（return false）⇒ 拖拽正常；
        mouseup 时几乎没有位移（≤4px）才执行精确落位 ⇒ **单击行为与原来完全一致**。
        状态挂在 view 上（expando），不新增模块级变量。 */
-    try { view.__mpMathClick = { x: event.clientX, y: event.clientY, pos, t: Date.now(), ...view.__mpMathGesture, moved: false, scrollTop: view.scrollDOM.scrollTop }; } catch { /* 忽略 */ }
+    try { view.__mpMathClick = { x: event.clientX, y: event.clientY, pos, multiple: modified, rangesBefore: view.state.selection.ranges.length,
+      serial: viewportIntent.serial(view), ...view.__mpMathGesture, moved: false, scrollTop: view.scrollDOM.scrollTop }; } catch { /* 忽略 */ }
     return false;
   },
   mousemove(event, view) {
@@ -5792,7 +5883,8 @@ const clickToSource = EditorView.domEventHandlers({  mousedown(event, view) {
     try { p = view.__mpMathClick; view.__mpMathClick = null; } catch { p = null; }
     if (!p) return false;
     if ((event.detail || 1) !== 1) return false;                                   // 双击那段由 mousedown 负责
-    if (p.moved || view.scrollDOM.scrollTop !== p.scrollTop) return false;
+    if (event.button !== 0 || p.serial !== viewportIntent.serial(view) ||
+        p.moved || view.scrollDOM.scrollTop !== p.scrollTop) return false;
     if (Math.abs(event.clientX - p.x) + Math.abs(event.clientY - p.y) > 4) return false;  // 拖过 ⇒ 不抢选区
     try { setMathPointerSelection(view, p.pos, p); } catch { /* 忽略 */ }
     return false;                                                                  // 放行，不影响后续默认行为
@@ -5915,7 +6007,7 @@ const imageRightBlankClick = ViewPlugin.fromClass(class {
     if (!target) return;
     event.preventDefault();
     event.stopPropagation();
-    this.drag = { anchor: target.pos, head: target.pos, x: event.clientX, y: event.clientY, moved: false };
+    this.drag = { anchor: target.pos, head: target.pos, x: event.clientX, y: event.clientY, moved: false, serial: viewportIntent.serial(this.view) };
     this.view.dispatch({
       /* 显式退休：末行图片没有"下一行"时落点退化为 doc.length==region.to，
          仅靠"head 落在 region 外"的规则不会收起源码；退休效果保证任何情况下
@@ -5938,7 +6030,10 @@ const imageRightBlankClick = ViewPlugin.fromClass(class {
   }
   mousemove(event) {
     const drag = this.drag;
-    if (!drag || !(event.buttons & 1)) return;
+    if (!drag) return;
+    if (!event.isTrusted || !(event.buttons & 1) || !this.view.hasFocus || viewportIntent.serial(this.view) !== drag.serial) {
+      this.mouseup(); return;
+    }
     if (Math.abs(event.clientX - drag.x) + Math.abs(event.clientY - drag.y) > 2) drag.moved = true;
     if (!drag.moved) return;
     const pos = this.view.posAtCoords({ x: event.clientX, y: event.clientY });
@@ -6326,6 +6421,8 @@ table.mp-row th { background: var(--mp-capsule); font-weight: 500; }
    改前这里恒写 height: auto，把指定的 height 覆盖掉（实测：指定 48 却渲染成 128）。
    只在**没有** height 属性时才 auto（保持普通图的等比缩放）。 */
 .mp-img img:not([height]) { height: auto; }
+.mp-img > img.mp-img-awaiting-size:not([height]) { height: 18px; }
+.mp-img > img.mp-img-awaiting-size:not([width]) { width: 18px; }
 /* 【3.8 / 1.16】格内投影出来的行内代码与图片（cellHTML 产出，见该函数注释） */
 .mp-cell-code { font-family: var(--mp-font-mono); background: var(--mp-capsule); border-radius: 3px; padding: 0 3px; }
 .mp-cell-img { max-width: 100%; max-height: 160px; vertical-align: middle; border-radius: 3px; }
@@ -6582,6 +6679,9 @@ html[data-mp-statusbar="1"] .mp-zoom-wrap { height: calc(100% - 24px); }
    避免以后有人照着它再走一遍弯路 ✓。
    ⚠️ 本注释在 CSS 模板字符串体内，**不许出现反引号**（这是第五次踩了，写注释前先自查 ✓）。 */
 .mp-u { text-decoration: underline; text-underline-offset: .18em; text-decoration-thickness: .06em; }
+.mp-sup, .mp-sub { font-size: .75em; line-height: 0; }
+.mp-sup { vertical-align: super; }
+.mp-sub { vertical-align: sub; }
 
 /* ══ 引用区里的表格（widget 是整行块级替换 ⇒ 行类失效，竖条与缩进必须在这里补齐）══════
    padding-left 由 widget 按「--mp-q-inset + --mp-q-pad + 层级缩进 + 本行前缀字宽」内联写入。 */
@@ -6718,7 +6818,22 @@ const commands = createCommandContext({
     view.focus(); return true;
   },
   composing: () => cellComposing || !!view?.composing,
-  cancelViewport: v => viewportIntent.cancel(v),
+  cancelViewport: (v, event) => viewportIntent.cancel(v, event),
+});
+/* 【CM Live】共享文档客户端：transport 由宿主注入（桌面壳=preload IPC，DSH 插件=自有路由）。
+   远端事务 addToHistory:false + Transaction.remote —— 不进本地撤销；observe 用同一注解跳过
+   自己 apply 的增量，避免回声。对外仅 mpEngine.liveDocument（bind/unbind/flush/status/refresh）。 */
+const liveClient = createLiveDocument({
+  getView: () => view,
+  composing: () => cellComposing || !!view?.composing,
+  apply: (changes) => view.dispatch({
+    changes,
+    // liveRemoteAccepted：权威已入账的可信远端回放标记（图片删除守卫据此放行，见 image-removal.js）；
+    // marksForChanges：把远端插入/删除的落点记入 history-guard 台账（撤销保护用）。
+    effects: liveHistoryGuard.marksForChanges(changes),
+    annotations: [Transaction.addToHistory.of(false), Transaction.remote.of(true), liveRemoteAccepted.of(true)],
+    scrollIntoView: false,
+  }),
 });
 const imageRemoval = createImageRemovalGate({
   getView: () => view,
@@ -6727,6 +6842,21 @@ const imageRemoval = createImageRemovalGate({
   bypass: () => suppressChange,
   afterApply: () => { if (cellEdit && cellOverlay) resyncCellEdit(cellOverlay.querySelector('.mp-cell-overlay-text')); },
 });
+/* 【CM Live×history-guard】外部/远端正文保护：台账 StateField 记录"外部写入且仍在文档中的
+   字节区间"；危险撤销（把旧字塞回对方内容之前/删掉对方内容）以一次 view.dispatch([undo步,
+   补偿]) 收口——净文档逐字节不变，观察者（updateListener/镜像/live observe/autosave）只见
+   净结果；历史侧透明截断该段，不相交的用户编辑照常撤销/重做。接线范围：live 权威回放
+   （apply 的 marksForChanges）、同文档 reload setValue（插入段 foreignMark）；正常用户操作
+   零台账、零打扰。菜单/快捷键/单元格/工具栏的撤销全部收口在 historyCommand 一处。 */
+const liveHistoryGuard = createHistoryGuard({
+  state: { StateField, StateEffect, Transaction, EditorSelection },
+  // invertedEffects（v4 必需）：给每个历史事件存创建时的台账代数，危险判据按代数隔离。
+  commands: { undo, redo, undoDepth, invertedEffects },
+});
+const historyGuardNotify = why => {
+  const what = why?.kind === 'delete' ? '删掉其他窗口或重新载入带来的内容' : '把你删除的内容塞回到其他窗口或重新载入带来的内容之前';
+  try { window.mpExtras?.toast?.(`已跳过这一步撤销：它会把${what}（这段历史在此截断）。`); } catch { /* 提示通道异常不得反噬编辑 */ }
+};
 
 // A checkpoint owns the exact CM state, including history and region epoch.
 // Its lifetime is one synchronous turn, so a delayed reply cannot restore over
@@ -6915,6 +7045,38 @@ function tableBarTarget() {
   }
   return { table: tb, col, align: (tb.aligns && tb.aligns[col]) || null, rowFrom: active ? active.rowFrom : tb.headerBlock.from };
 }
+/** 【editing-3616·B 被当表头】浮动条表格菜单的命令锚点：把"同一张表里当前真实选中的那一格"
+ *  换算成格内一个真实文档位置（与右键菜单 anchorPosInCell 同一口径；表格是 block widget，
+ *  点格不落 CM 选区，所以必须**活动格优先**——按 rowFrom/col 的归属与坐标定位，绝不按文本
+ *  内容定位：重复内容行/列（B 行第 2 列与 A 行相同）在文本上无法区分，坐标上永远是唯一格）。
+ *  activeCell 来自 activeCellField（其 update 已在 doc 变化时 mapPos、行消失时收场 ⇒ 归属始终当前）。
+ *  无活动格时退 CM 光标所在行（commit 后 resume 会把选区放回刚提交的那一格 ⇒ 仍是真实目标；
+ *  分隔行没有自己的格，与 tableTargetOf 同口径归并到表头行）。光标也不在该表内 ⇒ 返回 null，
+ *  调用方退回 table.from 兜底——这只对纯表级操作（复制表格/删除表格）合法：它们对表内位置不敏感。
+ *  返回值恒落在选中格区间 [cr[0], cr[1]] 内：非空格＝内容首字符处，空格＝区间起点。 */
+function tableMenuAnchorPos(state, table, activeCell) {
+  if (!state || !table) return null;
+  const inTable = (pos) => pos >= table.from && pos <= table.to;
+  let rowFrom = null, col = 0;
+  if (activeCell && Number.isFinite(activeCell.rowFrom) && inTable(activeCell.rowFrom)) {
+    rowFrom = activeCell.rowFrom; col = activeCell.col;
+  } else {
+    const head = state.selection.main.head;
+    if (!inTable(head)) return null;
+    let line = state.doc.lineAt(head);
+    if (isSeparatorBody(line.text.slice(tableLead(line.text).off)) && line.number > 1) line = state.doc.line(line.number - 1);
+    rowFrom = line.from;
+    const ranges = cellRangesOf(line);
+    for (let i = 0; i < ranges.length; i++) if (head >= ranges[i][0]) col = i;
+  }
+  const line = state.doc.lineAt(rowFrom);
+  if (line.from !== rowFrom) return null;
+  const ranges = cellRangesOf(line);
+  if (!ranges.length) return null;
+  const cr = ranges[Math.max(0, Math.min(col, ranges.length - 1))];
+  if (!cr) return null;
+  return Math.max(cr[0], Math.min(cr[0] + 1, cr[1]));
+}
 function ensureTableBar() {
   if (tableBar && tableBar.isConnected) return tableBar;
   const bar = document.createElement("div");
@@ -6946,17 +7108,31 @@ function ensureTableBar() {
     b.addEventListener("mousedown", fire);
     return b;
   };
-  /* 【2026-10-10】开表格菜单的唯一入口：把**浮动条当前那张表**的 from 一起传过去。
+  /* 【2026-10-10】开表格菜单的唯一入口：把**浮动条当前那张表**的锚点位置一起传过去。
      为什么必须传：表格是 block widget —— 点它**不会**移动 CM 光标，菜单项里 tableAt(光标) 因此必空、
      直接静默 return（哨兵实测：点完「复制表格（可粘 Excel）」剪贴板里还是哨兵值），
      用户粘出来就是"上一个内容"（他剪贴板里恰好是截图时，Excel 里就出现一张整窗图）。
-     传了 from，菜单锚点就落在表内，两个复制项都能定位到正确的表。 */
+     传了锚点，菜单项就能定位到正确的表。
+     【editing-3616·B 被当表头】改前一律传 table.from（＝表头行首、第 1 列）⇒ tableOperation 用
+     lineAt(pos) 反推 rowIdx/colIdx 恒得 (表头行, 0)：B 行「上方插入行」被拒"表头行上方插不了行"
+     （table-ime-before-a/b，两臂候选都正确提交在 B 仍插不了行）；第 2 列上「删除本列」删掉的是
+     第 1 列 ID/A/B 且已落盘（column-before 真实破坏性反例）；移动/删除行同样会指向表头行。
+     现在锚到 tableMenuAnchorPos 换算出的"当前真实选中格"的格内位置（活动格优先，坐标定位）；
+     取不到（无活动格且光标不在表内）才退 table.from——纯表级操作（复制/删表）对表内位置不敏感，
+     保持原行为。菜单侧既有 ticket 冻结校验（doc/epoch 同一性）与右键路径原样保留。 */
   const openTableMenu = (b) => {
     // Resolve the toolbar table only after committing its active cell.
     if (!commands.capture()) return;
     const r = b.getBoundingClientRect();
     let tf = null;
-    try { const t = tableBarTarget(); tf = t && t.table ? t.table.from : null; } catch { /* 取不到就退化为原行为 */ }
+    try {
+      const t = tableBarTarget();
+      if (t && t.table) {
+        tf = t.table.from;
+        const anchored = tableMenuAnchorPos(view.state, t.table, view.state.field(activeCellField, false));
+        if (anchored != null) tf = anchored;
+      }
+    } catch { /* 取不到就退化为原行为 */ }
     try { window.mpExtras?.tableMenuAt?.({ clientX: r.left, clientY: r.bottom + 2 }, tf); } catch (e) { console.error("[mp] 表格菜单失败：", e); }
   };
   const left = document.createElement("div"); left.className = "mp-table-bar-l";
@@ -7272,6 +7448,7 @@ function boot(content) {
         mathCompletion(), // Open candidates have priority over structural Enter/Tab.
         asyncSyntax.extension, // Prepare native tree queries before basicSetup; math candidates stay first.
         basicSetup,
+        compositionPointerSelection(state => state.field(regionIndexField, false)?.epoch),
         EditorState.transactionExtender.of(tr => {
           const ctx = imeTableRelocate;
           if (!ctx || !tr.docChanged || !tr.isUserEvent('input.type.compose') ||
@@ -7311,9 +7488,28 @@ function boot(content) {
         regionSessionField,
         protectImagePayloads(regionIndexField, transaction => imageRemoval.filter(transaction), () => suppressChange),
         imageSessionField,
+        liveHistoryGuard.historyGuard(), // 外部/远端字节台账（撤销保护；见装配处注释）
         rendererLifecycle.extension,
         viewportIntent.extension,
+        imageReadingPoint,
         regionKeys,
+        /* 【CM Live×history-guard·native undo】@codemirror/commands 的 history() 自带
+           EditorView.domEventHandlers.beforeinput(historyUndo/historyRedo) → 直接 undo(view)，
+           会绕过 historyCommand 唯一收口（实测：Ctrl+Z 单笔插入 'A'、effects=[]，未走守卫截断；
+           菜单 role:undo / webContents.undo() 也走这条 beforeinput）。这里以更高优先级接管：
+           源编辑器内的原生撤销/重做一律改走 historyCommand → guardedSourceHistory。
+           原生文本域/单元格覆盖层的事件不进编辑器 handler（各自原生撤销保留）；
+           无历史时返回 false 保持原行为；IME 输入类型不匹配、不受影响。 */
+        Prec.highest(EditorView.domEventHandlers({
+          beforeinput(event, view) {
+            const kind = event.inputType === 'historyRedo' ? redo : event.inputType === 'historyUndo' ? undo : null;
+            if (!kind || !view.contentDOM.contains(event.target)) return false;
+            if (!(kind === undo ? undoDepth(view.state) : redoDepth(view.state))) return false;
+            event.preventDefault();
+            historyCommand(kind);
+            return true;
+          },
+        })),
         Prec.highest(keymap.of([
           { key: 'Mod-z', run: () => historyCommand(undo) },
           { key: 'Mod-Shift-z', run: () => historyCommand(redo) },
@@ -7346,6 +7542,7 @@ function boot(content) {
         nativeVerticalIntent,
         docSourceClipboard, // 选区含公式时按文档源码写剪贴板（D8 配套）
         mathPointerGesture,
+        floatingSelectionStyle,
         clickToSource,
         imageRightBlankClick, // 【图片右侧·2026-10-31】右侧空白 ⇒ 下一行行首（近/远两个入口；不展开源码、不失焦）
         kpTypesetPlugin,    // 【排版美化·2026-10-09】阅读模式 + 小文档 + 用户显式开启时，按 Knuth–Plass 整段最优断行
@@ -7354,8 +7551,11 @@ function boot(content) {
         statusBarPlugin,    // 底部状态栏（零每键 DOM 操作，见 ViewPlugin 注释）
         zoomKeys,           // Ctrl+= / Ctrl+- / Ctrl+0 → 只缩放内容区（工具岛大小独立）
         EditorView.updateListener.of((u) => {
+          const beforeSession=u.docChanged&&window.__dshBridge?.publishUpdate
+            ? {epoch:u.startState.field(regionIndexField).epoch,sourceRevision}:null;
           if (u.docChanged) sourceRevision++;
           commands.changed(u);
+          liveClient.observe(u);
           /* Reading source intent: identity staleness first, then intent-serial
            * staleness on explicit selection transactions, then the projection
            * rule — a read-only DOM readback (exact userEvent 'select', same
@@ -7385,13 +7585,15 @@ function boot(content) {
             mathPass = null; blockPassDir = 0;
             verticalIntentDiag.resets++;
           }
-          // 性能架构：轻量脏标（长度）代替每键全文克隆——250KB/键的 structured clone 是
-          // 大文档打字卡顿源之一；客户端防抖到点后 requestText 拉全文（1500ms 一次，可承受）。
-          // IME 组字门控（W1 快赢②）：组字态每笔事务只挂脏标不扰桥，compositionend 一笔补发。
+          // DSH mirrors actual change ranges, including IME transactions. The
+          // desktop and legacy host keep lightweight dirty notifications.
           if (u.docChanged || u.selectionSet) {
             if (u.docChanged && !suppressChange) {
-              if (view && view.composing) { composingDirty = true; }
-              else post("change", { len: u.state.doc.length, ...window.mpEngine?.documentSession() });
+              const mirrored=window.__dshBridge?.publishUpdate?.(u,beforeSession,cellComposing||!!view?.composing)===true;
+              if(!mirrored){
+                if (view && view.composing) { composingDirty = true; }
+                else post("change", { len: u.state.doc.length, ...window.mpEngine?.documentSession() });
+              }
             }
           }
           // activeCellField already maps the row in the current state. Derive the
@@ -7618,10 +7820,12 @@ function boot(content) {
   }, true);
   // IME 组字收尾：组字期间挂起的 change 脏标在此一笔补发（丢一笔＝保存调度失联）。
   view.dom.addEventListener("compositionend", () => {
+    if(window.__dshBridge?.composition)setTimeout(()=>window.__dshBridge?.composition?.(cellComposing||!!view?.composing),0);
     if (!composingDirty || !view) return;
     composingDirty = false;
     post("change", { len: view.state.doc.length, ...window.mpEngine?.documentSession() });
   });
+  view.dom.addEventListener('compositionstart',()=>window.__dshBridge?.composition?.(true));
   // A pending paste can be canceled even when the native history is empty.
   view.dom.addEventListener('keydown', event => {
     if ((event.ctrlKey || event.metaKey) && /^(?:z|y)$/i.test(event.key)) cancelPendingImageInsertions(view);
@@ -7650,6 +7854,9 @@ function boot(content) {
     commands,
     history: kind => historyCommand(kind === 'redo' ? redo : undo),
     documentSession: () => ({ epoch: view.state.field(regionIndexField).epoch, sourceRevision }),
+    isComposing: () => cellComposing || !!view?.composing,
+    /* 共享编辑 facade：bind(initialText,{join,exchange,leave,onError,onStatus})/unbind/flush/status/refresh */
+    liveDocument: liveClient,
     menuHistory: (cmd) => {
       if (!view || !document.hasFocus() || (cmd !== "undo" && cmd !== "redo")) return false;
       const active = document.activeElement, edit = cellOverlay?.querySelector(".mp-cell-overlay-text");
@@ -7748,6 +7955,7 @@ function boot(content) {
     },
     /* 阅读模式：真只读（readOnly + 不可编辑），选区与复制仍可用。 */
     captureReadingAnchor,
+    restoreReadingAnchor,
     setReadingMode: (on, anchor = null) => {
       if (!view || ((cellComposing || view.compositionStarted) && !!on !== view.state.readOnly)) return false;
       /* 【#26】进阅读态先收场活动格覆盖层：它是 body 级 contenteditable，不会跟着 readOnly 失效。 */
@@ -7887,9 +8095,13 @@ function boot(content) {
         const sel = ticket?.selection || view.state.selection;
         const dLen = insert.length - (endCur - start);
         const mapP = (p) => (p <= start ? p : (p >= endCur ? p + dLen : start));
+        // 同文档 reload 的远端最小 diff：与实时回放走同一条标记通道 marksForChanges
+        //（含替换右边界 zone 与纯删除点）；原 selection 映射与 addToHistory sleeve 原样保留。
+        const reloadChanges = view.state.changes({ from: start, to: endCur, insert });
         view.dispatch({
-          changes: { from: start, to: endCur, insert },
+          changes: reloadChanges,
           selection: EditorSelection.create(sel.ranges.map(r => EditorSelection.range(mapP(r.anchor), mapP(r.head))), sel.mainIndex),
+          effects: liveHistoryGuard.marksForChanges(reloadChanges),
           annotations: Transaction.addToHistory.of(false),
           scrollIntoView: false,
         });
@@ -7944,8 +8156,10 @@ function boot(content) {
        同一个 `wrap`。改前 extras 自带一份 wrapSelection：落点在定界符**之后**、且不做取消包裹，
        与工具栏按钮行为不同（AGENTS 错-4 的活体标本）。 */
     wrapInline,
+    applyImageConversion: spec => imageRemoval.dispatchWithResult(spec),
     getView: () => view,
     imageSource: mpImgSrc,
+    imageClipboardTicket: (v, ranges, token) => sourceImageTicket(v.state, v.state.field(regionIndexField), ranges, token),
     getImageAt: (pos) => {
       const images = (view?.state.field(inlineMarksField, false) || []).filter(m => m.image);
       return images.find(m => m.from === pos) || images.find(m => m.from < pos && pos <= m.to) || null;

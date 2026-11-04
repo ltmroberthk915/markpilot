@@ -69,3 +69,73 @@ test('failed load preserves old document and latest concurrent load wins',async 
 test('hard links are refused instead of silently severing shared disk identity',async t=>{
  const {dir,store,file,S}=await fixture(t);await fs.link(file,path.join(dir,'linked.md'));edit(store,S,1);await assert.rejects(save(store,S,'new',1),code('MP_FILE_LINKED'));assert.equal(await fs.readFile(file,'utf8'),'original\n');
 });
+
+test('keep-mine authorizes only the confirmed disk baseline and editor revision', async t => {
+ const {store,file,S}=await fixture(t);
+ edit(store,S,1);
+ const owner=()=>({documentId:S.documentId,filePath:S.filePath,revision:S.revision});
+ await fs.writeFile(file,'outside edit');
+ await assert.rejects(store.grantOverwrite(S,owner(),()=>false),code('MP_DOC_MISMATCH'));
+ const old=await store.grantOverwrite(S,owner());
+ edit(store,S,2);
+ await assert.rejects(save(store,S,'old local',1,old),code('MP_DOC_MISMATCH'));
+ const current=await store.grantOverwrite(S,owner());
+ await fs.writeFile(file,'newer outside edit');
+ await assert.rejects(save(store,S,'current local',2,current),code('MP_FILE_CONFLICT'));
+ assert.equal(await fs.readFile(file,'utf8'),'newer outside edit');
+ assert(S.dirty);
+ const fresh=await store.grantOverwrite(S,owner());
+ await save(store,S,'current local',2,fresh);
+ assert.equal(await fs.readFile(file,'utf8'),'current local');
+ assert(!S.dirty);
+});
+
+test('ordinary save and keep-mine refuse a directory redirected after open', async t => {
+ const {dir,store,S}=await fixture(t);
+ const active=path.join(dir,'active'),parked=path.join(dir,'parked'),other=path.join(dir,'other');
+ await fs.mkdir(active);await fs.mkdir(other);
+ const opened=path.join(active,'note.md'),unrelated=path.join(other,'note.md');
+ await fs.writeFile(opened,'same baseline');await fs.writeFile(unrelated,'same baseline');
+ await store.load(S,opened);const id=S.documentId,originalPath=S.filePath;edit(store,S,1);
+ await fs.rename(active,parked);
+ await fs.symlink(other,active,process.platform==='win32'?'junction':'dir');
+ try {
+   await assert.rejects(save(store,S,'local draft',1),code('MP_FILE_CONFLICT'));
+   await assert.rejects(store.grantOverwrite(S,{documentId:id,revision:1,filePath:originalPath}),code('MP_FILE_CONFLICT'));
+   assert.equal(S.documentId,id);assert.equal(S.filePath,originalPath);assert(S.dirty);assert.equal(S.saveAsGrant,null);
+   assert.equal(await fs.readFile(unrelated,'utf8'),'same baseline');
+   assert.equal(await fs.readFile(path.join(parked,'note.md'),'utf8'),'same baseline');
+   // An explicit Save As still grants its separately selected target.
+   const dest=path.join(dir,'explicit.md'),grant=await store.grantSaveAs(S,dest);
+   await save(store,S,'local draft',1,grant);
+   assert.equal(S.filePath,dest);assert.equal(await fs.readFile(dest,'utf8'),'local draft');
+ } finally {await fs.unlink(active);}
+});
+
+test('a new edit during confirmed overwrite preserves the external disk until reconfirmed', async t => {
+ const staged=defer(), release=defer();
+ const {store,S,file}=await fixture(t,{beforeReplace:async()=>{staged.resolve();await release.promise;}});
+ const owner=()=>({documentId:S.documentId,filePath:S.filePath,revision:S.revision});
+ await fs.writeFile(file,'external');edit(store,S,1);
+ const grant=await store.grantOverwrite(S,owner()),pending=save(store,S,'local 1',1,grant);
+ await staged.promise;edit(store,S,2);release.resolve();
+ await assert.rejects(pending,code('MP_FILE_CONFLICT'));
+ assert.equal(await fs.readFile(file,'utf8'),'external');assert(S.dirty);assert.equal(S.savedText,'original\n');
+ const latest=await store.grantOverwrite(S,owner());await save(store,S,'local 2',2,latest);
+ assert.equal(await fs.readFile(file,'utf8'),'local 2');assert(!S.dirty);
+});
+
+test('external-change detection and same-document reload retain a clean original after directory redirection',async t=>{
+ const {dir,store,S}=await fixture(t),a=path.join(dir,'active'),b=path.join(dir,'foreign'),park=path.join(dir,'parked');
+ await fs.mkdir(a);await fs.mkdir(b);const file=path.join(a,'note.md'),target=path.join(b,'note.md');
+ await fs.writeFile(file,'ORIGINAL');await fs.writeFile(target,'OTHER');await store.load(S,file);
+ const expected={documentId:S.documentId,revision:S.revision,filePath:S.filePath,loadRequest:S.loadRequest};
+ await fs.rename(a,park);await fs.symlink(b,a,process.platform==='win32'?'junction':'dir');
+ try {
+   const notice=await store.outsideChange(S,file);assert(notice.changed&&notice.relocated);
+   await assert.rejects(store.load(S,file,expected),code('MP_FILE_CONFLICT'));
+   assert.equal(S.documentId,expected.documentId);assert.equal(S.savedText,'ORIGINAL');assert.equal(S.filePath,expected.filePath);
+   const other=createSession();await store.load(other,target);assert.equal(other.savedText,'OTHER');
+   assert.equal(await fs.readFile(target,'utf8'),'OTHER');assert.equal(await fs.readFile(path.join(park,'note.md'),'utf8'),'ORIGINAL');
+ } finally {await fs.unlink(a);}
+});

@@ -55,12 +55,26 @@ const o=args(argv);
         await p.keyboard.press('Control+End');await p.keyboard.insertText(' SAVE-AS-FAIL');await p.evaluate(()=>window.mpHost.recentTestMenuClick('menu-save-as',true));await sleep(250);
         const after=await p.evaluate(()=>window.mpHost.currentDoc()),s=await snapshot(p);trace.push({before,after,state:s});assert.equal(after.filePath,before.filePath);assert(s.text.includes('SAVE-AS-FAIL'));assert(s.banner.includes('失败'));fs.rmdirSync(saveAs);await settled(p);
       });
-      await check('same-file-two-windows-conflict-keeps-both-drafts',async trace=>{
+      /* 原 3.6.15 用例目录（旧断言「两窗互不同步、保存必冲突」的历史证据，只读保留）：
+         docs/verification/data-safety-window/{positive,rollback}、docs/verification/quality-3.3.3/index.json
+         及更早 quality-3.2.x 的 source-data-safety 各轮。live 协同合入后该预期与产品行为直接矛盾，
+         本轮改为同一保护目标的协同口径：获授权两窗可协同、都看到两端文本、先后保存都精确、
+         没有静默丢稿；仅用真实键入与真实保存命令（doSave），不靠 state.dispatch 人为做 stale。
+         随后的 external 拒写负控（identical size/mtime）与外改/另存/编码用例一律不动。 */
+      await check('same-file-two-windows-collaborate-keeps-both-drafts',async trace=>{
         const file=path.join(dir,'shared.md');fs.writeFileSync(file,'SHARED BASE\n');const x=await newWindow(run,p,file),y=await newWindow(run,p,file);
         await focus(y);await y.keyboard.press('Control+End');await y.keyboard.insertText('Y-DRAFT');await y.evaluate(()=>doSave(true));await settled(y);
-        // Set the second buffer dirty before bringing its window to front, preventing clean-focus reload.
-        await x.evaluate(()=>window.mpEngine._view().dispatch({changes:{from:12,insert:'X-DRAFT'}}));await sleep(70);await focus(x);await x.keyboard.press('Control+End');await x.keyboard.insertText('!');await sleep(1200);
-        const disk=fs.readFileSync(file,'utf8'),xs=await snapshot(x),ys=await snapshot(y);trace.push({disk,x:xs,y:ys});await capture(x,'same-file-conflict');assert.equal(disk,'SHARED BASE\nY-DRAFT');assert(xs.text.includes('X-DRAFT!'));assert(xs.title.startsWith('●'));assert(xs.banner.includes('修改')&&xs.banner.includes(file),'fresh conflict identifies this file');assert.equal(ys.text,disk);
+        assert.equal(fs.readFileSync(file,'utf8'),'SHARED BASE\nY-DRAFT','first save is exact');
+        await waitUntil(()=>x.evaluate(t=>window.mpEngine.getValue()===t,'SHARED BASE\nY-DRAFT'),'X sees Y draft via live sync',4000);
+        await focus(x);await x.keyboard.press('Control+End');await x.keyboard.insertText('X-DRAFT');await x.evaluate(()=>doSave(true));await settled(x);
+        assert.equal(fs.readFileSync(file,'utf8'),'SHARED BASE\nY-DRAFTX-DRAFT','second save is exact and loses no draft');
+        await waitUntil(()=>y.evaluate(t=>window.mpEngine.getValue()===t,'SHARED BASE\nY-DRAFTX-DRAFT'),'Y sees X draft via live sync',4000);
+        const disk=fs.readFileSync(file,'utf8'),xs=await snapshot(x),ys=await snapshot(y);trace.push({disk,x:xs,y:ys});await capture(x,'same-file-collab');
+        assert.equal(xs.text,disk);assert.equal(ys.text,disk);
+        assert(xs.text.includes('Y-DRAFT')&&xs.text.includes('X-DRAFT'),'both drafts visible in X');
+        assert(ys.text.includes('Y-DRAFT')&&ys.text.includes('X-DRAFT'),'both drafts visible in Y');
+        assert(!xs.title.startsWith('●')&&!ys.title.startsWith('●'),'both windows saved clean');
+        assert(!xs.banner&&!ys.banner,'no conflict/halt banner while collaborating');
       });
       await check('external-change-with-identical-size-and-mtime-is-refused',async trace=>{
         const file=path.join(dir,'external.md');fs.writeFileSync(file,'ORIGINAL\n');const x=await newWindow(run,p,file);await focus(x);const st=fs.statSync(file);fs.writeFileSync(file,'EXTERNAL\n');fs.utimesSync(file,st.atime,st.mtime);

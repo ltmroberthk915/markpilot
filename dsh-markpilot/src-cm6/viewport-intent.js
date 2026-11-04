@@ -11,7 +11,10 @@ export function scrollViewportBounds(sc, zoom) {
 export function createViewportIntent(indexField, zoomOf) {
   const records = new WeakMap(), measureKey = {};
   const record = view => { let r = records.get(view); if (!r) records.set(view, r = { serial: 0, anchor: null }); return r; };
-  function cancel(view) { const r = record(view); r.serial++; r.anchor = null; }
+  function cancel(view, event) {
+    if (event?.type === 'keydown' && ['Shift', 'Control', 'Alt', 'Meta', 'AltGraph'].includes(event.key)) return;
+    const r = record(view); r.serial++; r.anchor = null;
+  }
   function anchorImage(view, id, top) {
     const r = record(view), index = view.state.field(indexField);
     const intent = r.anchor = { serial: ++r.serial, epoch: index.epoch, id, top };
@@ -53,7 +56,7 @@ export function createViewportIntent(indexField, zoomOf) {
   const extension = ViewPlugin.fromClass(class {
     constructor(view) {
       this.view = view;
-      this.cancel = event => { if (event.isTrusted) cancel(view); };
+      this.cancel = event => { if (event.isTrusted) cancel(view, event); };
       view.scrollDOM.addEventListener('wheel', this.cancel, { passive: true, capture: true });
       view.dom.addEventListener('keydown', this.cancel, true);
       view.dom.addEventListener('pointerdown', this.cancel, true);

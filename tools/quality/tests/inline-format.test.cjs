@@ -48,3 +48,37 @@ test('a source-style cell link preserves code, math and image projection inside 
   assert.equal(renderInline('[**标签** $z_i$ `literal_**` ![a](p.png)](#target)',options),'[<strong>标签</strong> <math>z_i</math> <code>literal_**</code> <img>](#target)');
   assert.equal(renderInline('[plain](a_b?x=1&y=2)',options),'[plain](a_b?x=1&amp;y=2)');
 });
+
+test('removing selected delimiters keeps exactly the original contents selected for the next edit', async () => {
+  const {EditorState,Transaction} = await import('../../../dsh-markpilot/node_modules/@codemirror/state/dist/index.js');
+  const {history,undo,redo} = await import('../../../dsh-markpilot/node_modules/@codemirror/commands/dist/index.js');
+  const {wrap} = await import('../../../dsh-markpilot/src-cm6/toolbar.js');
+  const prior = global.window;
+  try {
+    global.window = {};
+    for (const [doc,anchor,head] of [['**beta**',0,8],['**beta**\nNEXT',8,0]]) {
+      const view = {state:EditorState.create({doc,selection:{anchor,head},extensions:[history()]}),focus(){}};
+      view.dispatch = spec => { view.state = spec instanceof Transaction ? spec.state : view.state.update(spec).state; };
+      wrap(view,'**');
+      const unwrapped = 'beta'+doc.slice(8), replaced = 'X'+doc.slice(8);
+      assert.equal(view.state.doc.toString(),unwrapped);
+      const range = view.state.selection.main;
+      assert.deepEqual([range.anchor,range.head], anchor === 0 ? [0,4] : [4,0]);
+      view.dispatch({...view.state.replaceSelection('X'),userEvent:'input.type'});
+      assert.equal(view.state.doc.toString(),replaced);
+      assert(undo(view)); assert.equal(view.state.doc.toString(),unwrapped);
+      assert(redo(view)); assert.equal(view.state.doc.toString(),replaced);
+    }
+    // Adding formatting to a plain selection and immediately typing has always
+    // been one undo step in the split editor's context menu.
+    const view = {state:EditorState.create({doc:'beta!',selection:{anchor:0,head:4},extensions:[history()]}),focus(){}};
+    view.dispatch = spec => { view.state = spec instanceof Transaction ? spec.state : view.state.update(spec).state; };
+    wrap(view,'**');
+    view.dispatch({...view.state.replaceSelection('X'),userEvent:'input.type'});
+    assert.equal(view.state.doc.toString(),'**betaX**!');
+    assert(undo(view)); assert.equal(view.state.doc.toString(),'beta!');
+  } finally {
+    if (prior === undefined) delete global.window;
+    else global.window = prior;
+  }
+});

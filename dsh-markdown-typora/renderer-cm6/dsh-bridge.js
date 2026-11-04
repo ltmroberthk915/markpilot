@@ -1,18 +1,19 @@
-// dsh-bridge.js — MarkPilot CM6 renderer 在 DSH 右侧栏 iframe 里的宿主桥（协议 v1）。
+// dsh-bridge.js — MarkPilot CM6 renderer 在 DSH 右侧栏 iframe 里的宿主桥（文档协议 v2，兼容 v1 外壳消息）。
 //
 // 契约：
 //   上行 iframe → 父窗口：{ __dshmd:true, dir:'up',   type, content }
 //   下行 父窗口 → iframe：{ __dshmd:true, dir:'down', type, content }
 //   上行类型：bridge-ready | init | change | text | insert-to-chat | host-invoke | openLink | manual-save
+//             | live-exchange | live-leave | live-flush-result | live-error | live-status
 //   下行类型：open | setValue | requestText | theme | toast | host-result
+//             | live-bind | live-unbind | live-flush | live-refresh | live-exchange-result
 //
 // 为什么桥必须早于 cm6/app.js 加载：引擎在脚本尾部同步调用 window.handler.on("open"…)/
 // .on("setValue"…)/.on("requestText"…) 注册下行处理，并在同一尾巴里 emit("init")。桥晚到
 // 会让 open 落在没有监听者的窗口里（实测坑），所以 index.html 把本文件放在 app.js 之前。
 //
-// 单一权威：本桥**不缓存文档/选区/历史**，只做传输与皮肤级主题/提示；open/setValue/
-// requestText 原样转交引擎既有 handler。change/text 由引擎自己的 post() 直接发给父窗口，
-// 本桥不重复转发（否则父窗口收到两份脏标）。
+// 单一权威：CM6 持有正文、选区与历史。本桥以原子应用回执确认会话版本，
+// 转发连续增量和带请求身份的快照；仅保留最近一次应用请求用于幂等，不另计编辑版本。
 //
 // 皮肤级事件（theme/toast）不走 window.handler 的事件表（那是引擎的单监听表，后注册会
 // 覆盖先注册），改用 window 上的 CustomEvent：dshmd:theme / dshmd:toast。
@@ -279,11 +280,217 @@
   /** 最近一次 open 的链路自证（不缓存文档，只记"探测成没成、耗时、当时的 base"）。 */
   var openTrace = null;
 
+  var boundDocToken = null, lastApply = null, applyFlight = null;
+  var lastRequest = null, maxApplySerial = 0;
+  function sessionNow() { return window.mpEngine && window.mpEngine.documentSession(); }
+  function sameSession(a,b) { return !!a && !!b && a.epoch===b.epoch && a.sourceRevision===b.sourceRevision; }
+  function applicationResult(request,applied,reason) {
+    return {protocol:2,docToken:request.docToken,applyId:request.applyId,applied:applied,reason:reason||null,session:sessionNow()||null,composing:!!window.mpEngine?.isComposing?.()};
+  }
+  async function applyDocument(type,request) {
+    if (!request.docToken || !request.applyId || typeof request.content!=='string' || !Number.isSafeInteger(request.serial)) return;
+    var previous=lastRequest?.applyId===request.applyId?lastRequest:null;
+    if(previous){
+      if(previous.docToken===request.docToken && previous.content===request.content && previous.kind===request.kind && JSON.stringify(previous.expected)===JSON.stringify(request.expected)) send('apply-result',previous.result);
+      else send('apply-result',applicationResult(request,false,'id-reused'));
+      return;
+    }
+    if(applyFlight){
+      if(applyFlight.applyId===request.applyId) return;
+      send('apply-result',applicationResult(request,false,'busy'));return;
+    }
+    if(boundDocToken && boundDocToken!==request.docToken){send('apply-result',applicationResult(request,false,'owner'));return;}
+    if(request.serial<=maxApplySerial){send('apply-result',applicationResult(request,false,'old-serial'));return;}
+    maxApplySerial=request.serial;
+    applyFlight=request;
+    var result;
+    try{
+      if(type==='open'){
+        if(boundDocToken || window.mpEngine || request.expected!==null) throw Error('already-open');
+        var ready=await resolveImageRoute();
+        if(applyFlight!==request)throw Error('superseded');
+        applyDocBase(ready?(request.rootPath||''):'');
+        var list=handlers.open||[];
+        if(!list.length)throw Error('not-ready');
+        for(var i=0;i<list.length;i++)list[i]({content:request.content,rootPath:request.rootPath});
+        if(!window.mpEngine || !sessionNow())throw Error('boot-failed');
+        boundDocToken=request.docToken;
+        queueMicrotask(maybeApplyPendingTheme);
+      }else{
+        if(!boundDocToken || !sameSession(request.expected,sessionNow()))throw Error('stale');
+        var ticket=window.mpEngine.commands.capture({flush:false});
+        if(!ticket)throw Error('composing');
+        if(!window.mpEngine.setValue(request.content,ticket))throw Error('rejected');
+      }
+      result=applicationResult(request,true,null);
+      lastApply={applyId:request.applyId,session:result.session,kind:request.kind};
+      handshakeSatisfied=true;stopWatchdog();
+    }catch(error){result=applicationResult(request,false,String(error?.message||error));}
+    finally{applyFlight=null;}
+    lastRequest={applyId:request.applyId,docToken:request.docToken,content:request.content,kind:request.kind,expected:request.expected,result:result};
+    // Keep only the last successful/current request payload reference. Failed
+    // requests cannot later be retried under the same id after user input.
+    send('apply-result',result);
+  }
+  function sendSnapshot(request){
+    if(request.docToken!==boundDocToken || !request.id || !window.mpEngine)return;
+    send('text',{protocol:2,docToken:boundDocToken,id:request.id,session:sessionNow(),lastApply:lastApply,
+      composing:!!window.mpEngine.isComposing?.(),text:window.mpEngine.getValue()});
+  }
+  function publishUpdate(update,beforeSession,composing){
+    if(!boundDocToken || applyFlight || !update.docChanged)return false;
+    var changes=[];
+    update.changes.iterChanges(function(from,to,_a,_b,inserted){changes.push({from:from,to:to,insert:inserted.toString()});});
+    send('document-delta',{protocol:2,docToken:boundDocToken,before:beforeSession,after:sessionNow(),
+      beforeLength:update.startState.doc.length,afterLength:update.state.doc.length,changes:changes,composing:!!composing,lastApply:lastApply});
+    return true;
+  }
+  function publishComposition(composing){
+    if(boundDocToken)send('composition',{protocol:2,docToken:boundDocToken,session:sessionNow(),composing:!!composing});
+  }
+
+  /* ── live 会话中继（协议 v2；引擎 facade mpEngine.liveDocument 的传输桥）────
+   * 桥不做 OT、不建第二套协同状态机：排序/变基/撤销隔离全部由引擎 facade
+   * （desktop 房间实现，Transaction.remote + addToHistory:false 非历史项）承担。
+   * 桥的职责只有三件：
+   *   ① join 的会话票由父窗口 open(live:true) 回执供给（live-bind 下行），
+   *      transport.join() 直接兑现，不再发第二次 open；
+   *   ② exchange/leave 经 postMessage 上行、由父窗口 POST /api/live 应答，
+   *      应答归一为 facade 期望的形状（{epoch,version,...} 或 {ok:false,error:String,code}）；
+   *   ③ 引擎 facade 缺席（旧引擎构建）时上报 MP_LIVE_FACADE_MISSING，
+   *      父窗口回落单窗口安全模式 —— 绝不静默假装已同步。 */
+  var liveBound = null;   // { docToken, nextId, pending:Map<id,resolve> }
+  function liveTicketOf(content) {
+    // 房间票：epoch 是 LiveDocuments rooms.epoch 的 UUID 字符串；version 是整数。
+    // 引擎 documentSession 的数字 epoch 是另一条契约（sameSession/expected），互不混用。
+    var t = content && content.live;
+    return t && typeof t === 'object' && typeof t.client === 'string' && t.client
+      && typeof t.epoch === 'string' && t.epoch
+      && Number.isSafeInteger(t.version) ? t : null;
+  }
+  function liveNormalize(response) {
+    if (!response || typeof response !== 'object')
+      return { ok: false, error: '共享编辑服务没有响应', code: 'MP_LIVE_TRANSPORT' };
+    if (response.ok === false) {
+      var error = response.error, code = response.code;
+      if (error && typeof error === 'object') { code = code || error.code; error = error.message; }
+      return { ok: false, error: String(error || '共享编辑服务错误'), code: String(code || 'MP_LIVE_TRANSPORT') };
+    }
+    if (response.ok === true) {
+      // API.md §2 ExchangeResult：成功形状必须带 ok:true；宿主 {ok,value} 信封在此归一。
+      var inner = response.value;
+      if (!inner || typeof inner !== 'object') return { ok: false, error: '空的共享编辑回执', code: 'MP_LIVE_TRANSPORT' };
+      return inner.ok === true || inner.ok === false ? inner : Object.assign({ ok: true }, inner);
+    }
+    return response;
+  }
+  function liveSettlePending(slot, code) {
+    slot.pending.forEach(function (done) { done({ ok: false, error: 'live 会话已解绑', code: code }); });
+    slot.pending.clear();
+  }
+  function liveExchangeRelay(client, request) {
+    var slot = liveBound;
+    if (!slot) return Promise.resolve({ ok: false, error: 'live 会话已解绑', code: 'MP_LIVE_GONE' });
+    var id = 'dshlive-' + (++slot.nextId);
+    return new Promise(function (resolve) {
+      slot.pending.set(id, resolve);
+      send('live-exchange', { protocol: 2, docToken: slot.docToken, id: id, client: client, request: request });
+    });
+  }
+  function handleLiveControl(type, content) {
+    var token = content && content.docToken;
+    if (type === 'live-bind') {
+      if (!boundDocToken || token !== boundDocToken) {
+        send('live-error', { protocol: 2, docToken: token, code: 'MP_LIVE_OWNER', error: 'live 绑定不属于当前文档' });
+        return;
+      }
+      var facade = window.mpEngine && window.mpEngine.liveDocument;
+      if (!facade || typeof facade.bind !== 'function') {
+        send('live-error', { protocol: 2, docToken: token, code: 'MP_LIVE_FACADE_MISSING', error: '引擎未提供 liveDocument facade' });
+        return;
+      }
+      if (liveBound) {
+        if (liveBound.docToken === token) return;   // 幂等：同一文档重复 bind 只认第一次
+        var stale = liveBound; liveBound = null; liveSettlePending(stale, 'MP_LIVE_GONE');
+      }
+      var ticket = liveTicketOf(content);
+      var text = content && typeof content.text === 'string' ? content.text : '';
+      // 空文件（text === ''）是合法正文：只拒票不完整/正文不是字符串的情形。
+      if (!ticket || !content || typeof content.text !== 'string') {
+        send('live-error', { protocol: 2, docToken: token, code: 'MP_LIVE_JOIN', error: 'live 会话票不完整' });
+        return;
+      }
+      liveBound = { docToken: token, nextId: 0, pending: new Map() };
+      var transport = {
+        // API.md §2 JoinResult：成功形状必须带 ok:true（facade 对 join 结果按信封判定）。
+        join: function () {
+          return Promise.resolve({
+            ok: true,
+            client: ticket.client, epoch: ticket.epoch, version: ticket.version, text: text,
+            diskHash: ticket.diskHash,
+            savedVersion: Number.isSafeInteger(ticket.savedVersion) ? ticket.savedVersion : ticket.version,
+          });
+        },
+        exchange: liveExchangeRelay,
+        leave: function (client) {
+          send('live-leave', { protocol: 2, docToken: liveBound ? liveBound.docToken : token, client: client });
+          return Promise.resolve();
+        },
+        onError: function (message, code) {
+          send('live-error', { protocol: 2, docToken: token, code: String(code || 'MP_LIVE_CONFLICT'), error: String(message != null ? message : '共享编辑冲突') });
+        },
+        onStatus: function (status) { send('live-status', { protocol: 2, docToken: token, status: status }); },
+      };
+      try { Promise.resolve(facade.bind(text, transport)).catch(function () { /* 错误已由 onError 上报 */ }); }
+      catch (error) {
+        liveBound = null;
+        send('live-error', { protocol: 2, docToken: token, code: 'MP_LIVE_JOIN', error: String(error && error.message || error) });
+      }
+      return;
+    }
+    if (type === 'live-unbind') {
+      if (liveBound && (!token || liveBound.docToken === token)) {
+        var slot = liveBound, unbind = window.mpEngine && window.mpEngine.liveDocument;
+        liveBound = null;
+        liveSettlePending(slot, 'MP_LIVE_GONE');
+        try { if (unbind && typeof unbind.unbind === 'function') unbind.unbind(); } catch (error) { /* 解绑失败不阻塞 */ }
+      }
+      return;
+    }
+    if (!liveBound || token !== liveBound.docToken) return;
+    if (type === 'live-exchange-result') {
+      var done = liveBound.pending.get(content.id);
+      if (done) { liveBound.pending.delete(content.id); done(liveNormalize(content.response)); }
+      return;
+    }
+    if (type === 'live-flush') {
+      var flusher = window.mpEngine && window.mpEngine.liveDocument;
+      if (!flusher || typeof flusher.flush !== 'function') {
+        send('live-flush-result', { protocol: 2, docToken: token, id: content.id, ok: false, code: 'MP_LIVE_FACADE_MISSING', error: '引擎未提供 liveDocument facade' });
+        return;
+      }
+      Promise.resolve().then(function () { return flusher.flush(); }).then(function (result) {
+        send('live-flush-result', { protocol: 2, docToken: token, id: content.id, ok: true, result: result });
+      }, function (error) {
+        send('live-flush-result', { protocol: 2, docToken: token, id: content.id, ok: false, code: String(error && error.code || 'MP_LIVE_FLUSH'), error: String(error && error.message || error) });
+      });
+      return;
+    }
+    if (type === 'live-refresh') {
+      var refresher = window.mpEngine && window.mpEngine.liveDocument;
+      try { if (refresher && typeof refresher.refresh === 'function') void Promise.resolve(refresher.refresh()).catch(function () {}); } catch (error) { /* 刷新失败由下一轮 exchange 兜底 */ }
+      return;
+    }
+  }
+
   window.addEventListener('message', function (event) {
     var data = event.data;
-    if (!data || data.__dshmd !== true || data.dir !== 'down') return;
+    if (event.source !== window.parent || !data || data.__dshmd !== true || data.dir !== 'down') return;
     var type = data.type;
     var content = data.content;
+    if (content && content.protocol === 2 && typeof type === 'string' && type.indexOf('live-') === 0) { handleLiveControl(type, content); return; }
+    if (content && content.protocol === 2 && (type === "open" || type === "setValue")) { void applyDocument(type,content); return; }
+    if (content && content.protocol === 2 && type === "requestText") { sendSnapshot(content); return; }
 
     if (type === 'host-result') {
       if (content && hostPending.has(content.id)) {
@@ -384,6 +591,9 @@
   // 诊断/取证位（只读快照；dsh-selection 与 Electron 验收都从这里读）。
   window.__dshBridge = {
     send: send,
+    publishUpdate: publishUpdate,
+    composition: publishComposition,
+    protocolState: function(){return {docToken:boundDocToken,lastApply:lastApply,applying:!!applyFlight};},
     applyHostTheme: applyHostTheme,
     toast: showToast,
     theme: function () { return { dark: themeDark, pending: pendingThemeApply }; },
@@ -393,6 +603,7 @@
     imageRoute: function () { return IMG_ROUTE; },
     routeReady: function () { return imageRouteReady; },
     openTrace: function () { return openTrace; },
+    liveState: function () { return { bound: !!liveBound, docToken: liveBound && liveBound.docToken || null, pending: liveBound ? liveBound.pending.size : 0 }; },
   };
 
   // 首帧：若上一次宿主主题已知，直接上屏（避免深色宿主闪白/浅色宿主闪黑）。

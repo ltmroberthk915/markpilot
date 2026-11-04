@@ -3,6 +3,11 @@
  * Acorn extracts exact current function bytes; no copied implementation or GUI.
  * --baseline expects the historical liveness defect; default expects its repair.
  * --host <host.js> and --out <report.json> are optional. JSON report on stdout.
+ *
+ * Hosts carrying the newer save mechanism (STALE_AWAIT/staleBudget markers) additionally
+ * extract their real save-retry deps (staleRetries/staleScope compound declaration, STALE_AWAIT
+ * const, staleScopeKey/staleBudget/scheduleStaleRetry); hosts without those markers keep the
+ * original extraction set and run unchanged.
  */
 const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto'), vm = require('node:vm');
 const ROOT = path.resolve(__dirname, '../..');
@@ -11,16 +16,23 @@ const HOST = process.argv.includes('--host') ? path.resolve(process.argv[(proces
 const OUT = process.argv.includes('--out') ? path.resolve(process.argv[(process.argv.indexOf('--out') + 1)]) : null;
 const acorn = require(path.join(ROOT, 'tools', 'quality', 'node_modules', 'acorn'));
 const sha = b => crypto.createHash('sha256').update(b).digest('hex');
-const NAMES = ['autoTicket', 'autoCurrent', 'retireAutosave', 'saveTrace', 'saveFailure', 'syncSource', 'scheduleSave', 'doSave', 'currentText'];
-const DECLS = ['engineValue', 'SHRINK_MIN', 'SHRINK_RATIO']; // doSave references these free names; extract real declarations, never hand-copy values
 const src = fs.readFileSync(HOST, 'utf8');
+// 兼容：上一版 host 没有新保存机制（STALE_AWAIT/staleBudget 标记）时，不强制提取新增依赖；
+// 仅当被测源确实带有新机制标记时，才要求全套新函数与复合声明存在（自带新机制却缺变量 ⇒ 仍红）。
+const BASE_NAMES = ['autoTicket', 'autoCurrent', 'retireAutosave', 'saveTrace', 'saveFailure', 'syncSource', 'scheduleSave', 'doSave', 'currentText',
+  'liveHealthy']; // doSave's CM Live free name: extract the real implementation (liveBound=false/liveSession=null ⇒ disabled, the real single-window boundary)
+const BASE_DECLS = ['engineValue', 'SHRINK_MIN', 'SHRINK_RATIO', 'liveBound', 'liveSession']; // doSave/liveHealthy reference these free names; extract real declarations, never hand-copy values
+const NEW_NAMES = ['staleScopeKey', 'staleBudget', 'scheduleStaleRetry']; // 新机制的退避组件（仅新机制源提取）
+const NEW_DECLS = ['staleRetries', 'staleScope', 'STALE_AWAIT']; // 新机制的预算/哨兵声明（仅新机制源提取）
+const NEW_MECHANISM = /STALE_AWAIT|staleBudget/.test(src);
+const NAMES = [...BASE_NAMES, ...(NEW_MECHANISM ? NEW_NAMES : [])];
+const DECLS = [...BASE_DECLS, ...(NEW_MECHANISM ? NEW_DECLS : [])];
 const ast = acorn.parse(src, { ecmaVersion: 'latest', locations: true });
 const found = {};
 for (const n of ast.body) {
   if (n.type === 'FunctionDeclaration' && NAMES.includes(n.id.name)) found[n.id.name] = n;
-  if (n.type === 'VariableDeclaration' && n.declarations.length === 1) {
-    const d = n.declarations[0];
-    if (DECLS.includes(d.id.name) && d.init) found[d.id.name] = n;
+  if (n.type === 'VariableDeclaration' && n.declarations.length && n.declarations.every(d => d.init)) {
+    for (const d of n.declarations) if (DECLS.includes(d.id.name)) found[d.id.name] = n; // 复合声明（let staleRetries=0, staleScope=null）逐名归节点
   }
 }
 const missing = [...NAMES, ...DECLS].filter(n => !found[n]);
@@ -46,6 +58,7 @@ function makeSandbox() {
       dispatchEvent: () => {},
     },
     showBanner: (text, actions) => { banners.push({ at: now, text, actions: (actions || []).map(a => a.label) }); },
+    showSourceRecovery: (text, actions) => { banners.push({ at: now, text, actions: (actions || []).map(a => a.label), recovery: true }); },
     hideBanner: () => {}, refreshTitle: () => {}, publishDocDir: () => {},
     saveAsFlow: async () => false, reloadDocument: async () => ({ ok: false }), down: () => {}, up: () => {},
   };
@@ -54,7 +67,9 @@ function makeSandbox() {
     saveBlocked=false, lastSaveError=null, observedSource=null, recoverySerial=0, saveAsSerial=0, autoGeneration=0,
     savePolicy={enabled:true,intervalMs:1000}, knownLen=0, charCount=0, textWaiters=[];`;
   vm.createContext(ctx);
-  vm.runInContext(state + '\n' + ALL.map(n => extracted[n]).join('\n'), ctx, { filename: 'host-extract.js' });
+  // 复合声明的同一节点只会拼接一次（按源码起点去重），避免重复声明 SyntaxError。
+  const stmts = [...new Map(ALL.map(n => [found[n].start, src.slice(found[n].start, found[n].end)])).values()];
+  vm.runInContext(state + '\n' + stmts.join('\n'), ctx, { filename: 'host-extract.js' });
   const io = {
     api, saves, banners, timerCount: () => timers.size,
     get: expr => vm.runInContext('(' + expr + ')', ctx),

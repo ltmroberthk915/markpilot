@@ -14,12 +14,16 @@ import { EditorSelection } from '@codemirror/state';
 import { SearchQuery, getSearchQuery, setSearchQuery } from '@codemirror/search';
 import { reserveImageInsertion, captureImageDocument } from './image-insertion.js';
 import { mathSourcePosition } from './math-source-map.js';
-import { collectImageRefs, decodeImageAttribute } from './resource-images.js';
-import { renderInline, renderInlineSegment } from './inline-format.js';
+import { collectImageRefs, decodeImageAttribute, scanSourceImageRefs } from './resource-images.js';
+import { renderInline, renderInlineSegment, codeSpanMarkers, inlineCodeSpans, hasUnescapedDollar, singleLineDisplayTex } from './inline-format.js';
 import { FONT_ROLES, normalizeFontPreferences, fontPreferenceCss } from './font-preferences.cjs';
-import { planDataImages } from './data-images.cjs';
+import { planDataImages, planAssetDataImages, imageExtension } from './data-images.cjs';
 import { selectedLines } from './selection-lines.js';
+import { clipboardFormula, clipboardStyle, serializeClipboardRuns } from './rich-clipboard.js';
 import { embedImageRefs } from './image-export.js';
+import { localImagePath } from './image-path.js';
+import { applyImageTransfer, finishNativeImageTransfer, imageTransferFlavor, readImageTransfer, reconcilePastedDefinitions } from './image-transfer.js';
+import { deleteGrapheme } from './grapheme-delete.js';
 /* 【Typora 社区主题·2026-10-09】用户想直接用 Typora 的主题 CSS。
    改写逻辑**不在这里另写一份**：2.x 线早有一份纯函数实现（`user-theme.mjs` 的 adaptTyporaTheme）
    ——`#write` → 我们的写作区、`:root` 变量挂到作用域属性上、带相对 url() 的 @font-face 丢掉、
@@ -357,6 +361,13 @@ export function installExtras(deps) {
   /** 【剪贴板写入·2026-10-10】三级：壳层 clipboard.write → navigator.clipboard → textarea+execCommand。
       为什么要壳层那一级：渲染进程的 navigator.clipboard 需要手势/权限，实测"点菜单项"这条路会失败，
       而失败是**静默**的（剪贴板留着旧内容，用户粘出来是上一个东西）。 */
+  function sourceTextPayload(text, transfer = null) {
+    // Host menu commands use the existing plain/HTML clipboard transport.
+    // Only ambiguous tabular source needs the additional literal HTML flavor.
+    if (!transfer && (!/[\r\n]/.test(text) || (!text.includes('\t') && !/^\s*\|/m.test(text)))) return { text };
+    const receipt = transfer ? ' data-markpilot-image-transfer="' + transfer + '"' : '';
+    return { text, html: '<pre data-markpilot-source="markdown"' + receipt + '>' + esc(text) + '</pre>' };
+  }
   async function writeClip(payload, token) {
     const text = String((payload && payload.text) || "");
     const html = (payload && payload.html) ? String(payload.html) : "";
@@ -376,6 +387,7 @@ export function installExtras(deps) {
       await navigator.clipboard.write([item]);
       return true;
     } catch { /* 落到兜底 */ }
+    if (html.includes('data-markpilot-image-transfer=')) return false; // A text-only fallback would discard the image's source receipt.
     try {
       const ta = document.createElement("textarea");
       ta.value = text; document.body.appendChild(ta); ta.select();
@@ -559,7 +571,11 @@ export function installExtras(deps) {
     /* 【#46·2026-10-18 实测缺陷 M5】拒收无修饰键的组合（除 F1-F24）：高优先级 keymap 带
        preventDefault，录成单字母后该字母在正文被全局吞掉；同时中和旧版已落盘脏键位（升级自愈）。 */
     const usableCombo = (c) => /(^|-)Mod(-|$)|(^|-)Alt(-|$)/.test(c) || /^F([1-9]|1[0-9]|2[0-4])$/.test(c);
-    const bindings = Object.entries(cfg).filter(([a, c]) => Object.hasOwn(ACTIONS, a) && typeof c === 'string' && c && usableCombo(c)).map(([a, c]) => ({ key: c, run: (view) => { const fn = ACTIONS[a]; if (!fn) return false; return window.mpEngine.commands.run(() => fn(view)) !== false; }, preventDefault: true }));
+    const bindings = Object.entries(cfg).filter(([a, c]) => Object.hasOwn(ACTIONS, a) && typeof c === 'string' && c && usableCombo(c)).map(([action, key]) => ({
+      key, scope: action === 'save' ? 'editor mp-cell-document' : 'editor',
+      run: view => window.mpEngine.commands.run(() => ACTIONS[action](view)) !== false,
+      preventDefault: true,
+    }));
     /* 【必须 Prec.high·2026-10-10 实测】默认优先级的 keymap 会被 basicSetup 的 defaultKeymap
        （`Mod-i` = selectParentSyntax）与语言 keymap 抢先；用 high 之后本表排在最前，
        与 tableKeys / zoomKeys 同级且**注册更早** ⇒ 只有它们的显式键位能覆盖这里，逐字节可控。 */
@@ -1043,7 +1059,8 @@ export function installExtras(deps) {
        当正文）。判据与 markdown-context.inFrontMatter 同一正则；不匹配则原样输出。 */
     const frontMatter = nested ? null : /^\uFEFF?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(md);
     const bodyMd = frontMatter ? md.slice(frontMatter[0].length) : md;
-    const lines = bodyMd.split('\n'), codeStarts = new Map(scanFenceLines(lines).map(b => [b.startLine - 1, b]));
+    const lines = bodyMd.split('\n'), structure = {};
+    const codeStarts = new Map(scanFenceLines(lines, structure).map(b => [b.startLine - 1, b]));
     let buf = [], size = 0;
     const take = () => { if (!buf.length) return null; const s = buf.join('\n') + '\n'; buf = []; size = 0; return s; };
     const push = s => { buf.push(s); size += s.length + 1; };
@@ -1124,18 +1141,24 @@ export function installExtras(deps) {
        文档上是 O(n²)。这里倒序一遍算出"每个位置之后最近的闭合行"（围栏形态与带内容形态各一份），
        并把围栏代码块当作屏障（跨代码块的公式不许合并）。O(n) 一次，与文档大小线性。 */
     const nLines = lines.length;
-    const nextFenceClose = new Int32Array(nLines).fill(-1);
-    const nextTailClose = new Int32Array(nLines).fill(-1);
+    const nextFenceClose = new Int32Array(nLines), nextTailClose = new Int32Array(nLines), nextSingleClose = new Int32Array(nLines);
     {
-      let fence = -1, tail = -1;
+      let fence = -1, tail = -1, single = -1, nextOwner = null;
+      let end = bodyMd.length, recordIndex = structure.records.length - 1;
       for (let k = nLines - 1; k >= 0; k--) {
-        if (codeStarts.has(k)) { fence = -1; tail = -1; }
+        const from = end - lines[k].length;
+        const record = structure.records[recordIndex];
+        const owner = record && record.from === from ? structure.records[recordIndex--].path.at(-1) : null;
+        if (owner !== nextOwner) fence = tail = single = -1;
+        nextFenceClose[k] = fence; nextTailClose[k] = tail; nextSingleClose[k] = single;
+        if (codeStarts.has(k)) fence = tail = single = -1;
         else {
           if (isMathClose(lines[k])) fence = k;
           if (/\$\$\s*$/.test(lines[k])) tail = k;
+          if (!lines[k].trim()) single = -1;
+          else if (/[$][ \t]*$/.test(lines[k])) single = k;
         }
-        nextFenceClose[k] = fence;
-        nextTailClose[k] = tail;
+        nextOwner = owner; end = from - 1;
       }
     }
     /* 【#65】引用容器内层渲染：列表/标题/嵌套引用/任务列表按块结构输出（旧实现把每条引用行
@@ -1280,11 +1303,11 @@ export function installExtras(deps) {
           if (lead.q) push('</blockquote>');
         } else if (/^\s*\$\$/.test(line)) {
           closeList();
-          const single = /^\s*\$\$(.+)\$\$\s*$/.exec(line);
-          if (single) push(blockHtml(single[1].trim()));
+          const single = singleLineDisplayTex(line.trimStart());
+          if (single) push(blockHtml(single.trim()));
           else {
             const rest = line.slice(/^\s*\$\$/.exec(line)[0].length), tail = !!rest.trim();
-            const close = tail ? nextTailClose[i + 1] : nextFenceClose[i + 1];
+            const close = tail && hasUnescapedDollar(rest) ? -1 : tail ? nextTailClose[i] : nextFenceClose[i];
             if (close < 0) push(`<p>${inlineMd(line, srcMap, math)}</p>`);
             else {
               const parts = [rest, ...lines.slice(i + 1, close)];
@@ -1302,11 +1325,7 @@ export function installExtras(deps) {
           if (sameLine > 0 && /^\s*$/.test(open.slice(sameLine + 1))) {
             push(blockHtml(open.slice(1, sameLine).trim()));
           } else {
-            let close = -1;
-            for (let k = i + 1; k < lines.length; k++) {
-              if (codeStarts.has(k)) break;
-              if (/[$][ \t]*$/.test(lines[k])) { close = k; break; }
-            }
+            const close = nextSingleClose[i];
             if (close < 0) push(`<p>${inlineMd(line, srcMap, math)}</p>`);
             else {
               const parts = [open.slice(1)];
@@ -1664,7 +1683,7 @@ export function installExtras(deps) {
     for (let n = a; n <= b; n++) rows.push(v.state.doc.line(n));
     return { rows, fromLine: a, toLine: b, lead: span.lead };
   }
-  const splitRow = (text) => text.slice(tableLead(text).off).trim().replace(/^\||\|$/g, '').split(/(?<!\\)\|/).map((c) => c.trim());
+  const splitRow = (text) => text.slice(tableLead(text).off).trim().replace(/^\||(?<!\\)\|$/g, '').split(/(?<!\\)\|/).map((c) => c.trim());
   const isSepBody = text => isSeparatorBody(text.slice(tableLead(text).off));
   const isSep = isSepBody;
   /** 新行第一个格内容的源码偏移（剥引用前缀后再找第一个 `|`）：光标落回表内用。 */
@@ -1683,20 +1702,67 @@ export function installExtras(deps) {
     const body = '-'.repeat(Math.max(3, w, n));
     return (left ? ':' : '') + body + (right ? ':' : '');
   };
-  function rewriteTable(view, rows, fromLine, toLine, newRows, caretRow) {
-    const le = tableLead(rows[0] || '');
+  // Pretty-print ordinary short tables, but alignment must never multiply
+  // the largest URL, image payload or ragged row across every other row.
+  function alignTableColumns(rows, prefix) {
     const widths = [];
-    for (const r of newRows) { if (isSepBody(r)) continue; splitRow(r).forEach((c, i) => { widths[i] = Math.max(widths[i] || 3, c.length); }); }
-    const out = newRows.map((r) => {
-      /* 【β2·A5/A6】分隔行输出**保留每一列自己的冒号形态**（`:--`/`:-:`/`--:` 逐字保留；
-         短横个数允许被列宽重排 —— 复核 §6.4 更正的口径）。移动列时新行数组里的分隔行格已经跟着搬过，
-         所以这里按"该行自己的格"取冒号形态，对齐标签就跟着列走。 */
-      if (isSepBody(r)) return withTableLead(le.q, '| ' + widths.map((w, i) => sepCellOut(splitRow(r)[i], w)).join(' | ') + ' |');
-      const cells = splitRow(r);
-      while (cells.length < widths.length) cells.push('');
-      return withTableLead(le.q, '| ' + cells.map((c, i) => c + ' '.repeat(Math.max(0, (widths[i] || 3) - c.length))).join(' | ') + ' |');
+    let sourceChars = 0;
+    for (const row of rows) {
+      sourceChars += row.length;
+      if (isSepBody(row)) continue;
+      splitRow(row).forEach((cell, i) => { widths[i] = Math.max(widths[i] || 3, cell.length); });
+    }
+    const rowWidth = prefix.length + 1 + widths.reduce((sum, width) => sum + width + 5, 0);
+    const formattingBudget = Math.min(64 * 1024, Math.max(256, sourceChars));
+    if (rowWidth * rows.length > sourceChars + formattingBudget) return rows;
+    return rows.map(row => {
+      const cells = splitRow(row);
+      const formatted = isSepBody(row)
+        ? widths.map((width, i) => sepCellOut(cells[i], width))
+        : widths.map((width, i) => (cells[i] || '').padEnd(width, ' '));
+      return withTableLead(prefix, '| ' + formatted.join(' | ') + ' |');
     });
-    const from = view.state.doc.line(fromLine).from, to = view.state.doc.line(toLine).to;
+  }
+  // Preserve unchanged source in the CM change set as well as in the final
+  // text. In particular, one new row has one insertion and Undo entry.
+  function tableChanges(doc, startLine, rows, out) {
+    if (rows.length === out.length) {
+      const changes = [];
+      for (let i = 0; i < rows.length; i++) {
+        const old = rows[i], next = out[i];
+        if (old === next) continue;
+        // A moved image must remain a whole source atom for the ordinary
+        // protection/confirmation filter, even if two data URLs share a prefix.
+        if (/data:image\//i.test(old)) {
+          const line = doc.line(startLine + i);
+          changes.push({from:line.from,to:line.to,insert:next}); continue;
+        }
+        const shared = Math.min(old.length, next.length);
+        let from = 0, suffix = 0;
+        while (from < shared && old[from] === next[from]) from++;
+        while (suffix < shared - from && old[old.length - suffix - 1] === next[next.length - suffix - 1]) suffix++;
+        const offset = doc.line(startLine + i).from;
+        changes.push({from:offset + from,to:offset + old.length - suffix,insert:next.slice(from,next.length - suffix)});
+      }
+      return changes;
+    }
+    let first = 0, suffix = 0;
+    const shared = Math.min(rows.length, out.length);
+    while (first < shared && rows[first] === out[first]) first++;
+    while (suffix < shared - first && rows[rows.length - suffix - 1] === out[out.length - suffix - 1]) suffix++;
+    const added = out.slice(first, out.length - suffix);
+    // Row insertion/deletion always retains the table header and separator.
+    if (first > 0) {
+      const from = doc.line(startLine + first - 1).to;
+      const to = doc.line(startLine + rows.length - suffix - 1).to;
+      return {from,to,insert:added.length ? '\n' + added.join('\n') : ''};
+    }
+    const to = suffix ? doc.line(startLine + rows.length - suffix).from : doc.line(startLine + rows.length - 1).to;
+    return {from:doc.line(startLine).from,to,insert:added.join('\n') + (suffix && added.length ? '\n' : '')};
+  }
+  function rewriteTable(view, rows, fromLine, toLine, newRows, caretRow, alignColumns) {
+    // Row commands splice or permute original source rows, without reformatting them.
+    const out = alignColumns ? alignTableColumns(newRows, tableLead(rows[0]).q) : newRows;
     // 【必须同事务给选区】整表被替换后，落在表内的旧光标会被映射到替换区间**边界**（= 表格外），
     // 于是"连续做第二个表格操作"会报"光标不在表格内"（实测只有第一个操作成功）。所以一次 dispatch 里
     // 就把光标放回表内（同一数据行的首格附近）。引用区表格要把 `> ` 前缀算进去，否则落点跑到格前。
@@ -1708,7 +1774,7 @@ export function installExtras(deps) {
     const kRow = Math.max(0, Math.min(Number.isFinite(caretRow) ? caretRow : 0, out.length - 1));
     let off = 0;
     for (let i = 0; i < kRow; i++) off += (out[i] || '').length + 1;   // +1 ＝ 行间换行
-    view.dispatch({ changes: { from, to, insert: out.join('\n') }, selection: { anchor: after + off + firstCellOffset(out[kRow] || '') }, userEvent: 'input.table' });
+    view.dispatch({ changes: tableChanges(view.state.doc, fromLine, rows, out), selection: { anchor: after + off + firstCellOffset(out[kRow] || '') }, userEvent: 'input.table' });
     return true;
   }
   function tableOp(op, target = null) {
@@ -1825,7 +1891,7 @@ export function installExtras(deps) {
     else if (op === 'row-delete') caretRow = Math.min(dataRow, Math.max(0, next.length - 1));
     else if (op === 'row-move-up') caretRow = Math.max(0, dataRow - 1);
     else if (op === 'row-move-down') caretRow = Math.min(next.length - 1, dataRow + 1);
-    rewriteTable(v, rows, fromLine, toLine, next, caretRow);
+    rewriteTable(v, rows, fromLine, toLine, next, caretRow, op.startsWith('col-'));
     toast({
       'row-above': '上方插入行', 'row-below': '下方插入行', 'row-delete': '删除本行',
       'col-left': '左侧插入列', 'col-right': '右侧插入列', 'col-delete': '删除本列',
@@ -2297,7 +2363,7 @@ export function installExtras(deps) {
       const ticket = commands?.capture(), v = getView(), selection = ticket?.selection || v?.state.selection;
       const text = selection && selSource(selection);
       if (!text) { toast("没有选中内容"); return; }
-      if (!(await writeClip({text}, cutToken))) { toast("剪切失败：剪贴板不可用"); return; }
+      if (!(await writeClip(sourceTextPayload(text, deps.imageClipboardTicket(v, selection.ranges.filter(r => !r.empty), cutToken)), cutToken))) { toast("剪切失败：剪贴板不可用"); return; }
       if (!ticket || !commands.valid(ticket) || !v.state.selection.eq(selection)) { toast("选区已改变，已复制原选区，本次未剪切"); return; }
       v.dispatch({...v.state.replaceSelection(""),userEvent:'delete.cut'});
       commands.resume(ticket);
@@ -2319,7 +2385,7 @@ export function installExtras(deps) {
       const ticket = commands?.capture(), selection = ticket?.selection || getView()?.state.selection;
       const text = selection && selSource(selection);
       if (!text) { toast("没有选中内容"); return; }
-      const ok = await writeClip({text}, copyToken); toast(ok ? "已复制" : "复制失败：剪贴板不可用");
+      const ok = await writeClip(sourceTextPayload(text, deps.imageClipboardTicket(getView(), selection.ranges.filter(r => !r.empty), copyToken)), copyToken); toast(ok ? "已复制" : "复制失败：剪贴板不可用");
       if (ticket && ok) commands.resume(ticket);
     }, "Ctrl+C");
     const pasteFromMenu = (plain = false) => {
@@ -2494,7 +2560,7 @@ export function installExtras(deps) {
     const cur = tableAt(pos);
     if (!cur) { toast('光标不在表格内'); return false; }
     const text = cur.rows.map((r) => r.text).join('\n');
-    if (await writeClip({ text }, srcToken)) { toast('已复制表格源码（Markdown）'); return true; }
+    if (await writeClip(sourceTextPayload(text, deps.imageClipboardTicket(v, [{from:cur.rows[0].from, to:cur.rows.at(-1).to}], srcToken)), srcToken)) { toast('已复制表格源码（Markdown）'); return true; }
     toast('复制失败'); return false;
   }
 
@@ -3000,6 +3066,19 @@ export function installExtras(deps) {
     // An explicit reading palette takes precedence while reading is active.
     if (document.documentElement.dataset.mpReading === '1') applyReading();
   }
+  async function resetAppearance(dark) {
+    const prefs = Object.keys(window.mpPrefs.get());
+    for (const key of [...prefs.map(id => 'mp-pref-' + id), 'mp-surfaces', 'mp-reading', 'mp-reading-palette', TYPO_KEY, FONT_CACHE, APPEARANCE_CACHE]) {
+      localStorage.removeItem(key);
+    }
+    themeApply(dark ? 'telari-dark' : 'telari-light');
+    applySurfaces();
+    window.mpEngine.applyPrefs();
+    window.mpPrefs.notify(prefs);
+    applyTypography();
+    applyReading(false);
+    return refreshAppearance();
+  }
   async function refreshAppearance() {
     const epoch = ++appearanceRequest, h = window.mpHost;
     if (!h?.themeRead) { renderAppearance(); return { ok: true }; }
@@ -3148,7 +3227,7 @@ export function installExtras(deps) {
       '--mp-faint': '#7c8f7e', '--mp-border': '#a7bca4', '--mp-primary': '#245c68', '--mp-codeBg': '#d5e2d2',
       '--mp-capsule': '#d5e2d2', '--mp-quoteBg': '#dde8da', '--mp-quoteBar': '#a7bca4', '--mp-sel': 'rgba(36,92,104,0.22)' } },
   ];
-  const readingOn = () => { try { return localStorage.getItem('mp-reading') === '1'; } catch { return false; } };
+  const readingOn = () => document.documentElement.dataset.mpReading === '1';
   const readingPalette = () => { try { return localStorage.getItem('mp-reading-palette') || 'theme'; } catch { return 'theme'; } };
   /* 【排版美化·2026-10-09】段落断行方式：css（浏览器两端对齐，默认） / kp（Knuth–Plass 整段最优）。
      只在**阅读模式**下生效，且只对**小文档**（引擎侧 KP_MAX_CHARS = 30 万字符）生效 —— 三条闸门见
@@ -3184,10 +3263,10 @@ export function installExtras(deps) {
       toast('排版美化：浏览器两端对齐');
     }
   }
-  function applyReading() {
-    const on = readingOn();
+  function applyReading(on = readingOn()) {
     let anchor = null;
     try { anchor = window.mpEngine?.captureReadingAnchor?.(on) || null; } catch { /* 引擎未就绪 */ }
+    if (window.mpEngine?.setReadingMode && !window.mpEngine.setReadingMode(on)) return false;
     document.documentElement.dataset.mpReading = on ? '1' : '';
     const pal = READING_PALETTES.find((p) => p.id === readingPalette()) || READING_PALETTES[0];
     // 【判据踩过的坑】必须**先判阅读态**：否则退出时会把专用配色又写回去（实测 --mp-bg 停在 #f4efdf 不还原）。
@@ -3198,13 +3277,13 @@ export function installExtras(deps) {
     if (pill) pill.textContent = on ? '退出 Esc' : '';
     if (pill) pill.title = on ? `退出阅读模式（当前配色：${pal.name}）` : '';
     if (on) applyTypography();
-    /* 【真只读·2026-10-17】阅读模式在引擎侧同时置只读（D-01：此前仅有 CSS，键入会静默改稿）。 */
-    try { window.mpEngine?.setReadingMode?.(on, anchor); } catch { /* 引擎未就绪 */ }
+    if (anchor) window.mpEngine?.restoreReadingAnchor?.(anchor);
+    return true;
   }
   function toggleReading(force) {
     const next = typeof force === 'boolean' ? force : !readingOn();
+    if (!applyReading(next)) { toast('请先完成当前输入再切换阅读模式'); return; }
     try { localStorage.setItem('mp-reading', next ? '1' : '0'); } catch { }
-    applyReading();
     if (next) toast('已进入阅读模式：Esc 或右上角胶囊退出');
     else toast('已退出阅读模式');
   }
@@ -3248,7 +3327,7 @@ export function installExtras(deps) {
          全局键只负责"新窗口启动时继承偏好"（applyReading 在 boot 时读一次）。 */
       if (e.key === 'Escape' && document.documentElement.dataset.mpReading === '1') { toggleReading(false); e.preventDefault(); }
     }, true);
-    applyReading();
+    applyReading(window.mpEngine?._view()?.state.readOnly ?? readingOn());
   })();
 
   function dialog(title, bodyHtml, onClose = null) {
@@ -3350,38 +3429,7 @@ export function installExtras(deps) {
      粒度把整个字素簇一次删掉。只在"光标贴着簇边界且簇长 > 1 码点"时接管，其余一律 return false
      ⇒ 默认语义（含行首合并行、行尾、有选区）**逐字节不变**。
      成本：只看**光标所在行**的文本（字素簇不跨行）⇒ 与文档总长无关，巨行也不额外扫描。 */
-  const mpGraphemeSeg = (() => { try { return new Intl.Segmenter(undefined, { granularity: 'grapheme' }); } catch { return null; } })();
-  const mpClusterFrom = (lineText, rel) => {
-    if (!mpGraphemeSeg || rel <= 0) return null;
-    let start = rel - 1;
-    for (const s of mpGraphemeSeg.segment(lineText.slice(0, rel))) start = s.index;
-    return start < rel ? start : null;
-  };
-  const mpClusterTo = (lineText, rel) => {
-    if (!mpGraphemeSeg || rel >= lineText.length) return null;
-    for (const s of mpGraphemeSeg.segment(lineText.slice(rel))) if (s.index === 0) return rel + s.segment.length;
-    return null;
-  };
-  const mpDelCluster = (dir) => (v) => {
-    try {
-      const sel = v.state.selection.main;
-      if (!sel.empty) return false;                          // 有选区：默认语义
-      const line = v.state.doc.lineAt(sel.head);
-      const rel = sel.head - line.from;
-      if (dir < 0) {
-        if (rel <= 0) return false;                          // 行首：交给默认（合并上一行）
-        const s = mpClusterFrom(line.text, rel);
-        if (s == null || rel - s <= 1) return false;         // 只有一个码点：交给默认
-        v.dispatch({ changes: { from: line.from + s, to: sel.head }, selection: { anchor: line.from + s } });
-        return true;
-      }
-      if (rel >= line.text.length) return false;             // 行尾：交给默认
-      const e = mpClusterTo(line.text, rel);
-      if (e == null || e - rel <= 1) return false;
-      v.dispatch({ changes: { from: sel.head, to: line.from + e }, selection: { anchor: sel.head } });
-      return true;
-    } catch { return false; }
-  };
+  const mpDelCluster = deleteGrapheme;
   const tableKeys = deps.Prec.high(deps.keymap.of([
     { key: 'Backspace', run: mpDelCluster(-1) },
     { key: 'Delete', run: mpDelCluster(1) },
@@ -3527,29 +3575,58 @@ export function installExtras(deps) {
    * 这里按"先看内容再决定"：格内单行 ⇒ 交回默认（行为不变）；格内多行/表格 ⇒ 拒绝 + 提示；
    * 文档里 TSV / markdown 管道表 / 剪贴板 HTML <table> ⇒ 生成 markdown 表；单行 HTML 行内格式 ⇒ 白名单转 markdown。
    * 挂 document（capture）：活动格的覆盖层挂在 body 上，CM6 的处理器（挂 contentDOM）根本收不到它的粘贴。 */
-  const INLINE_MARKS = { B: '**', STRONG: '**', I: '*', EM: '*', CODE: '`', DEL: '~~', S: '~~' };
-  function htmlInlineNodeToMd(child) {
-    if (child.nodeType === 3) return child.nodeValue.replace(/\s+/g, ' ');
-    if (child.nodeType !== 1) return '';
-    const tag = child.tagName;
-    if (tag === 'BR') return ' ';
-    /* 【#48·2026-10-18 实测缺陷 NX4】网页富文本里的段内图片：改前白名单没有 IMG 分支，
-       <img> 落到 return inner（IMG 无子文本）⇒ 图片在粘贴时**静默消失**（实测 HTML
-       <p>前<img src=… alt=图>后</p> 粘出 "前后"，只剩 alt 文本都没有）。按 Markdown 图片语法还原。 */
-    if (tag === 'IMG') {
-      const src = child.getAttribute('src') || '';
-      if (!src) return '';
-      const alt = (child.getAttribute('alt') || '').replace(/[\[\]]/g, '');
-      return '![' + alt + '](' + src + ')';
-    }
-    const inner = htmlInlineToMd(child);
-    const mark = INLINE_MARKS[tag];
-    if (mark) return mark + inner + mark;
-    if (tag === 'A') return '[' + inner + '](' + anchorDestination(child.getAttribute('href') || '') + ')';
-    return inner;
+  function clipboardCodeText(node) {
+    if (node.nodeType === 3) return node.nodeValue;
+    if (node.nodeType !== 1) return '';
+    if (node.tagName === 'BR') return '\n';
+    return [...node.childNodes].map(clipboardCodeText).join('');
   }
-  function htmlInlineToMd(node) {
-    return [...node.childNodes].map(htmlInlineNodeToMd).join('');
+  function htmlInlineNodesToMd(nodes, inLabel = false, inherited = '') {
+    const runs = [];
+    function append(text, style, probe = null) {
+      if (!text) return;
+      const prior = runs.at(-1);
+      if (prior && prior.style === style && !prior.probe && !probe) prior.text += text;
+      else runs.push({text, style, probe});
+    }
+    function visit(child, inherited) {
+      if (child.nodeType === 3) {
+        const text = child.nodeValue.replace(/\s+/g, ' ');
+        append(inLabel ? text.replace(/[\\[\]]/g, '\\$&') : text, inherited);
+        return;
+      }
+      if (child.nodeType !== 1) return;
+      const tag = child.tagName, style = clipboardStyle(child, inherited);
+      const formula = clipboardFormula(child);
+      if (formula !== null) { append(formula, formula.startsWith('\n') ? '' : style); return; }
+      if (tag === 'BR') { append('  \n', ''); return; }
+      if (tag === 'IMG') {
+        const src = child.getAttribute('src') || '';
+        const alt = (child.getAttribute('alt') || '').replace(/[\[\]]/g, '');
+        if (src) append('![' + alt + '](' + src + ')', style, /^data:image\//i.test(src) ? '![](image)' : null);
+        return;
+      }
+      if (tag === 'CODE') {
+        const text = clipboardCodeText(child).replace(/\r\n?|\n/g, ' ');
+        const {open, close} = codeSpanMarkers(text);
+        if (text) append(open + text + close, style);
+        return;
+      }
+      if (tag === 'A') {
+        const label = htmlInlineNodesToMd(child.childNodes, true, style);
+        append('[' + label + '](' + anchorDestination(child.getAttribute('href') || '') + ')', '');
+        return;
+      }
+      for (const node of child.childNodes) visit(node, style);
+    }
+    for (const node of nodes) visit(node, inherited);
+    return serializeClipboardRuns(runs);
+  }
+  function htmlInlineNodeToMd(child) {
+    return htmlInlineNodesToMd([child]);
+  }
+  function htmlInlineToMd(node, inLabel = false, inherited = '') {
+    return htmlInlineNodesToMd(node.childNodes, inLabel, clipboardStyle(node, inherited));
   }
   const HTML_BLOCKS = 'h1,h2,h3,h4,h5,h6,p,div,section,article,main,aside,header,footer,figure,figcaption,address,ul,ol,li,blockquote,hr,pre,table,dl,dt,dd';
   function anchorDestination(href) {
@@ -3578,26 +3655,36 @@ export function installExtras(deps) {
     flush();
     return segments.length && segments.some(s => s.block) ? segments : null;
   }
-  function blockAnchorMd(a, href) {
+  function blockAnchorMd(a, href, inherited) {
     const segments = blockAnchorSegments(a);
     if (!segments) return null;
     const dest = anchorDestination(href);
-    return segments.map(s => (s.block ? htmlInlineToMd(s.block) : s.nodes.map(htmlInlineNodeToMd).join('')).trim())
+    const style = clipboardStyle(a, inherited);
+    return segments.map(s => (s.block ? htmlInlineToMd(s.block, true, style) : htmlInlineNodesToMd(s.nodes, true, style)).trim())
       .filter(label => label.length > 0).map(label => '[' + label + '](' + dest + ')').join('\n\n');
   }
   /* 一个 DOM 按 childNodes 顺序转换；表格在原位置输出，包装层和裸文本也保序。 */
-  function htmlRichToMd(body) {
-    const blocks = []; let inline = '';
-    const flush = () => { if (inline.trim()) blocks.push(inline.trim()); inline = ''; };
+  function htmlRichToMd(body, inherited = '') {
+    const blocks = [], inline = [], style = clipboardStyle(body, inherited);
+    const flush = () => {
+      const text = htmlInlineNodesToMd(inline, false, style).trim();
+      if (text) blocks.push(text);
+      inline.length = 0;
+    };
     for (const el of body.childNodes) {
-      if (el.nodeType !== 1) { inline += htmlInlineNodeToMd(el); continue; }
+      if (el.nodeType !== 1) { inline.push(el); continue; }
       const T = el.tagName;
-      if (!el.matches(HTML_BLOCKS) && !el.querySelector(HTML_BLOCKS)) {
-        inline += htmlInlineNodeToMd(el); continue;
+      const math = el.localName === 'math' || (el.classList?.contains('katex') || el.classList?.contains('katex-display')) && el.querySelector('math');
+      if (math || !el.matches(HTML_BLOCKS) && !el.querySelector(HTML_BLOCKS)) {
+        inline.push(el); continue;
       }
       flush();
-      if (T === 'TABLE') blocks.push(rowsToMdTable(tableRowsFromElement(el)));
-      else if (/^H[1-6]$/.test(T)) blocks.push('#'.repeat(Number(T[1])) + ' ' + htmlInlineToMd(el).trim());
+      if (T === 'TABLE') {
+        if (el.caption) blocks.push(htmlRichToMd(el.caption, clipboardStyle(el, style)));
+        const complex = el.querySelector?.('table,[rowspan]:not([rowspan="1"]),[colspan]:not([colspan="1"])');
+        blocks.push(complex ? structuredClipboardTable(el, style) : rowsToMdTable(tableRowsFromElement(el, style)));
+      }
+      else if (/^H[1-6]$/.test(T)) blocks.push('#'.repeat(Number(T[1])) + ' ' + htmlInlineToMd(el, false, style).trim());
       else if (T === 'UL' || T === 'OL') {
         const items = [...el.children].filter(c => c.tagName === 'LI');
         const startsBlock = (li) => {
@@ -3612,7 +3699,7 @@ export function installExtras(deps) {
           return false;
         };
         const formatItem = (li, marker, kind) => {
-          const content = htmlRichToMd(li);
+          const content = htmlRichToMd(li, clipboardStyle(el, style));
           if (!content) return marker.trimEnd();
           if (kind === 'native') {
             if (startsBlock(li)) {
@@ -3672,7 +3759,7 @@ export function installExtras(deps) {
             blocks.push(items.map((li, i) => formatItem(li, nums[i] + String.fromCharCode(92) + '. ', 'fallback')).join('\n\n'));
           }
         }
-      } else if (T === 'BLOCKQUOTE') blocks.push(htmlRichToMd(el).split('\n').map(line => '> ' + line).join('\n'));
+      } else if (T === 'BLOCKQUOTE') blocks.push(htmlRichToMd(el, style).split('\n').map(line => '> ' + line).join('\n'));
       else if (T === 'HR') blocks.push('---');
       else if (T === 'PRE') {
         const codeEl = [...el.children].find(c => c.tagName === 'CODE');
@@ -3682,7 +3769,7 @@ export function installExtras(deps) {
           const m = /^(?:language|lang)-([^\s`]+)$/u.exec(cls);
           if (m) { lang = m[1]; break; }
         }
-        const text = String(el.textContent || '');
+        const text = clipboardCodeText(el);
         let run = 0, maxRun = 0;
         for (const ch of text) { if (ch === '`') { run++; if (run > maxRun) maxRun = run; } else run = 0; }
         const fence = '`'.repeat(Math.max(3, maxRun + 1));
@@ -3691,20 +3778,73 @@ export function installExtras(deps) {
       }
       else if (T === 'A') {
         const href = el.getAttribute('href') || '';
-        const blockMd = blockAnchorMd(el, href);
-        blocks.push(blockMd == null ? htmlRichToMd(el) : blockMd);
-      } else blocks.push(htmlRichToMd(el));
+        const blockMd = blockAnchorMd(el, href, style);
+        blocks.push(blockMd == null ? htmlRichToMd(el, style) : blockMd);
+      } else blocks.push(htmlRichToMd(el, style));
     }
     flush();
     return blocks.filter((b) => b.length).join('\n\n');
   }
-  function tableRowsFromElement(t) {
-    // Markdown 表格无法表示嵌套表或合并单元格；由调用者回退完整纯文本。
-    if (t.querySelector('table,[rowspan]:not([rowspan="1"]),[colspan]:not([colspan="1"])')) throw new Error('unsupported HTML table');
+  function structuredClipboardTable(table, inherited) {
+    const tableStyle = clipboardStyle(table, inherited);
+    const entries = Array.from(table.rows, tr => {
+      const rowStyle = clipboardStyle(tr, clipboardStyle(tr.parentElement, tableStyle));
+      return Array.from(tr.cells, cell => ({
+        text: htmlRichToMd(cell, rowStyle).trim(), width: cell.colSpan, height: cell.rowSpan,
+      }));
+    });
+    // A nested table is a separate logical table. Expanding huge/malformed
+    // spans could invent columns or inflate one cell into megabytes. Describe
+    // the authored rows and spans without discarding surrounding content.
+    const outline = () => entries.map((cells, i) => {
+      const values = cells.map((cell, j) => {
+        const spans = [cell.height === 0 ? '跨到本组末行' : cell.height > 1 ? '跨' + cell.height + '行' : '',
+          cell.width > 1 ? '跨' + cell.width + '列' : ''].filter(Boolean);
+        const label = '单元格 ' + (j + 1) + (spans.length ? '（' + spans.join('、') + '）' : '');
+        return '  - ' + label + '　' + cell.text.replace(/\n/g, '\n    ');
+      });
+      return ['- 第 ' + (i + 1) + ' 行', ...values].join('\n');
+    }).join('\n');
+    if (table.querySelector('table')) return outline();
+    const grid = [], ranges = [], occupied = [];
+    const authored = entries.reduce((n, row) => n + row.length, 0);
+    const limit = Math.min(32000, Math.max(256, authored * 8));
+    const rows = Array.from(table.rows);
+    let slots = 0, groupEnd = 0;
+    for (let r = 0; r < entries.length; r++) {
+      if (r >= groupEnd) {
+        groupEnd = r + 1;
+        while (groupEnd < rows.length && rows[groupEnd].parentElement === rows[r].parentElement) groupEnd++;
+      }
+      const line = [];
+      for (const cell of entries[r]) {
+        while (occupied[line.length] > r) line.push('');
+        const col = line.length, right = col + cell.width;
+        if (slots + right > limit) return outline();
+        const bottom = Math.min(groupEnd, cell.height === 0 ? groupEnd : r + cell.height);
+        for (let c = col; c < right; c++) {
+          if (occupied[c] > r) return outline();
+          occupied[c] = bottom;
+          line.push(c === col ? cell.text.replace(/\s*\n+\s*/g, '<br>') : '');
+        }
+        if (right > col + 1 || bottom > r + 1) ranges.push('R' + (r + 1) + 'C' + (col + 1) + ':R' + bottom + 'C' + right);
+      }
+      slots += line.length;
+      grid.push(line.length ? line : ['']);
+    }
+    if (!grid.length) return '';
+    const legend = ranges.length ? '\n\n合并单元格：' + ranges.join('、') : '';
+    return rowsToMdTable(grid) + legend;
+  }
+  function tableRowsFromElement(t, inherited = '') {
     const rows = [];
+    const tableStyle = clipboardStyle(t, inherited);
     for (const tr of t.querySelectorAll('tr')) {
       if (tr.closest('table') !== t) continue;
-      const cells = [...tr.children].filter(cell => cell.tagName === 'TH' || cell.tagName === 'TD').map(cell => htmlInlineToMd(cell).trim());
+      const group = tr.parentElement === t ? null : tr.parentElement;
+      const rowStyle = clipboardStyle(tr, clipboardStyle(group, tableStyle));
+      const cells = [...tr.children].filter(cell => cell.tagName === 'TH' || cell.tagName === 'TD').map(cell =>
+        htmlRichToMd(cell, rowStyle).trim().replace(/\s*\n+\s*/g, '<br>'));
       if (cells.length) rows.push(cells);
     }
     if (!rows.length) throw new Error('empty HTML table');
@@ -3716,19 +3856,40 @@ export function installExtras(deps) {
     if (lines.length < 2) return null;
     if (lines.every((l) => l.indexOf('\t') >= 0)) return lines.map((l) => l.split('\t').map((c) => c.trim()));
     if (lines.every((l) => /^\s*\|/.test(l))) {
-      const rows = lines.map((l) => l.trim().replace(/^\||\|$/g, '').split(/(?<!\\)\|/).map((c) => c.trim()));
+      /* 【editing-3616】markdown 格文本里已有 `\|` 转义；不还原就交给 rowsToMdTable 会**二次转义**
+         （`x \| y` → `x \\| y`）。先还原成 `|`，由 emit 统一转义一次，`a\\|b`（字面反斜杠+管道）
+         也逐字节往返。成形表已改走 markdownTableVerbatim 逐字保真，这条只服务
+         "无分隔行的管道行 → 自动补分隔行成表"的旧路径。 */
+      const rows = lines.map((l) => l.trim().replace(/^\||\|$/g, '').split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|')));
       const body = rows.filter((r) => !(r.length && r.every((c) => /^:?-{2,}:?$/.test(c))));   // 丢掉原表分隔行
       return body.length >= 2 ? body : null;
     }
     return null;
   }
+  /** 【editing-3616·纯 markdown 表保真】整块剪贴板文本已是**成形 markdown 表**（表头行 + 紧邻合法
+   *  分隔行 + 至少一条数据行，所有行以可选空白+`|` 起手）时返回其原文（仅统一行尾为 \n），
+   *  粘贴时逐字插入：`解析→再编码`会二次转义 `\|`（`P(A|B)` 重开渲染成 `P(A∥B)`、代码格多出
+   *  `\`，table-plain-before 实测），还会把 `:--- | :---: | ---:` 的对齐冒号洗成无对齐 `---`。
+   *  判据与 tableFromPlain / 渲染层 scanTables 同向（表头+紧邻分隔行）；引用区表（行首 `>`）、
+   *  TSV、无分隔行的管道行都返回 null，保持原有路径不动。 */
+  function markdownTableVerbatim(plain) {
+    const lines = String(plain).replace(/\r\n?/g, '\n').replace(/\n+$/, '').split('\n');
+    if (lines.length < 3 || lines.some((l) => !/^\s*\|/.test(l))) return null;
+    if (lines.every((l) => l.indexOf('\t') >= 0)) return null;      // TSV 形态仍走原路径
+    const sepCells = lines[1].trim().replace(/^\||\|$/g, '').split(/(?<!\\)\|/).map((c) => c.trim());
+    if (!sepCells.length || !sepCells.every((c) => /^:?-{2,}:?$/.test(c))) return null;
+    return lines.join('\n');
+  }
   function rowsToMdTable(rows) {
     /* IN-C7：13 万行 TSV 用展开参数会抛 Maximum call stack size exceeded，改 reduce。 */
     const cols = rows.reduce((m, r) => Math.max(m, r.length), 0);
+    const cellCount = rows.reduce((count, row) => count + row.length, 0);
+    const paddingCost = (cols * rows.length - cellCount) * 3;
+    const padBody = paddingCost <= Math.min(64 * 1024, Math.max(256, cellCount * 3));
     const pad = (r) => { const c = r.slice(); while (c.length < cols) c.push(''); return c; };
     const line = (cs) => '| ' + cs.map((c) => String(c).replace(/\|/g, '\\|')).join(' | ') + ' |';
     const head = pad(rows[0]);
-    return [line(head), '| ' + head.map(() => '---').join(' | ') + ' |', ...rows.slice(1).map((r) => line(pad(r)))].join('\n');
+    return [line(head), '| ' + head.map(() => '---').join(' | ') + ' |', ...rows.slice(1).map((r) => line(padBody ? pad(r) : r))].join('\n');
   }
 
   /* ══ task-13：读 front-matter 里的 mp-image-mode ══════════════════════════════════════
@@ -3826,7 +3987,7 @@ export function installExtras(deps) {
     if (!base64) throw new Error('图片是空的');
     if (!await current()) return null;
     const mime = /^image\//i.test(file?.type || '') ? file.type : 'image/png';
-    const ext = (mime.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '') || 'png';
+    const ext = (imageExtension(mime) || '.png').slice(1);
     const inline = 'data:' + mime + ';base64,' + base64;
     let warning = '';
     if (mode === 'assets') {
@@ -3850,6 +4011,7 @@ export function installExtras(deps) {
   }
 
   function imageTargetError(view, range) {
+    if (view.state.readOnly) return '当前为阅读模式';
     if (!range) return '插入位置已变化';
     const head = range.head;
     if (tableSpanOf(view.state, view.state.doc.lineAt(head).number)) return '格内不能放图片，请粘到表格外';
@@ -3895,17 +4057,17 @@ export function installExtras(deps) {
     if (view.state.selection.ranges.length !== 1) { toast('含图片的粘贴请只选择一个正文位置'); return; }
     const issue = imageTargetError(view, view.state.selection.main);
     if (issue) { toast(issue); return; }
-    const body = htmlDoc.body.cloneNode(true), images = [...body.querySelectorAll('img')];
+    const body = htmlDoc.body.cloneNode(true), images = [...body.querySelectorAll('img')].filter(img => !img.closest?.('math'));
     const prefix = 'MP_PASTE_IMAGE_' + crypto.randomUUID().replace(/-/g, '') + '_';
     const originals = images.map((image, i) => {
       const src = image.getAttribute('src') || '', token = prefix + i + '_END';
       image.setAttribute('src', token);
-      return { src, token };
+      return { image, src, token };
     });
-    let template;
+    const hasText = !!body.textContent.trim();
     try {
-      template = htmlRichToMd(body);
-      if (originals.some(({ src, token }) => !src || template.split(token).length !== 2)) throw new Error('图片所在格式暂不支持');
+      const template = htmlRichToMd(body);
+      if (originals.some(({ token }) => template.split(token).length !== 2)) throw new Error('图片所在格式暂不支持');
     } catch (e) { toast('未粘贴：' + (e?.message || e)); return; }
     const ticket = reserveImageInsertion(view);
     if (!ticket) { toast('当前无法插入图片'); return; }
@@ -3923,14 +4085,31 @@ export function installExtras(deps) {
         return !!ticket.current();
       };
       const canceled = () => toast('插入位置或文档已变化，图片粘贴已取消');
-      let text = template; const warnings = [];
-      for (const { src, token } of originals) {
+      const warnings = [];
+      let missing = 0;
+      for (const { image: element, src } of originals) {
         if (!await current()) { canceled(); return; }
-        const file = await imageFileFromSource(src, host, current);
-        if (!file || !await current()) { canceled(); return; }
-        const prepared = await prepareImageFileSource(file, mode, origin, host, current);
-        if (!prepared) { canceled(); return; }
-        text = text.replace(token, () => prepared.src);
+        let prepared;
+        try {
+          const file = await imageFileFromSource(src, host, current);
+          if (!file || !await current()) { canceled(); return; }
+          prepared = await prepareImageFileSource(file, mode, origin, host, current);
+          if (!prepared) { canceled(); return; }
+        } catch {
+          if (!await current()) { canceled(); return; }
+          const alt = (element.getAttribute('alt') || '').trim();
+          const label = alt ? '【图片：' + alt + '】' : '【图片】';
+          if (/[\\*_~$\x60!\[\]<>|]/.test(alt)) {
+            // An unreadable picture's alt is literal text, including inside a
+            // link label. Serialize it through the existing code-span encoder.
+            const literal = element.ownerDocument.createElement('code');
+            literal.textContent = label;
+            element.replaceWith(literal);
+          } else element.replaceWith(label);
+          missing++;
+          continue;
+        }
+        element.setAttribute('src', prepared.src);
         if (prepared.warning) warnings.push(prepared.warning);
         const image = new Image(); let timer;
         try {
@@ -3941,6 +4120,9 @@ export function installExtras(deps) {
       if (!await current()) { canceled(); return; }
       const finalIssue = imageTargetError(view, ticket.current());
       if (finalIssue) { toast('图片粘贴已取消：' + finalIssue); return; }
+      if (missing === originals.length && !hasText) { toast('图片无法读取，原选区已保留'); return; }
+      if (missing) warnings.push(missing + ' 张图片无法读取，已保留文字说明');
+      const text = htmlRichToMd(body);
       const insert = pasteTextAtRange(view.state, ticket.current(), text, !!body.querySelector(HTML_BLOCKS));
       if (ticket.commit(insert, 'input.paste')) toast(warnings.length ? [...new Set(warnings)].join('；') : '已粘贴富文本和图片');
     }).catch(e => toast('未粘贴：' + (e?.message || e))).finally(() => ticket.cancel());
@@ -3960,53 +4142,11 @@ export function installExtras(deps) {
        下载**之后** ⇒ 用户在这段时间里选中一段正文，图片就把那段正文替换掉（实测 ALPHA 消失）。
        允许调用方在发起请求时就占票、并把票传进来；任何提前返回都要把这张票撤回（否则留下幽灵插入位）。 */
     const abandonReserved = () => { if (reserved) { try { reserved.cancel(); } catch { /* 忽略 */ } } };
-    const el = document.activeElement;
-    const inCell = !!(el && el.classList && el.classList.contains("mp-cell-overlay-text"));
-    if (inCell) { abandonReserved(); toast("格内不能放图片，请粘到表格外"); return; }   // 明确拒绝，绝不静默
-    /* 【#39·2026-10-18 实测缺陷 N5】位图粘贴分支在文本 inTableAt 守卫之前就 return（见 onDocPaste），
-       而本函数只拦"格覆盖层内"：光标停在表行边界（无覆盖层）时粘截图，实测得到
-       ![](assets/pasted-image.png)| a1 | a2 | —— 行首管道被顶掉、该行不再是表行。
-       与"格内不能放图片"同一句拒绝（单元格/表行都不支持块级图片）。 */
-    {
-      const v0 = getView();
-      if (v0 && tableSpanOf(v0.state, v0.state.doc.lineAt(v0.state.selection.main.head).number)) {
-        abandonReserved();
-        toast("格内不能放图片，请粘到表格外");
-        return;
-      }
-    }
-    /* 【front-matter 保护】光标在文档头部信息区（开头那段 --- 块）内 ⇒ 明确拒绝：
-       否则会把 ![]() 插进 YAML、把闭合的 --- 挤到行尾，**破坏文档结构**。
-       与"格内拒绝"同族：宁可明确拒绝，也不静默破坏。此处已在函数入口 preventDefault，故不会漏进默认行为。 */
-    {
-      const v0 = getView();
-      if (v0 && inFrontMatter(v0.state.doc.toString(), v0.state.selection.main.head)) {
-        abandonReserved();
-        toast("光标在文档头部信息区，请移到正文再粘贴");
-        return;
-      }
-    }
-    /* 图片是块级对象：reserved 有效时用原 ticket 的 mapped head 作为语境；
-       无 reserved 时只按 single-range 当前 head。multi 保持 reserveImageInsertion 原拒绝。 */
-    {
-      const v0 = getView();
-      if (v0) {
-        const reservedInfo = reserved && typeof reserved.current === 'function' ? reserved.current() : null;
-        let sourceHead = null;
-        if (reserved) {
-          if (reservedInfo) sourceHead = reservedInfo.head;
-        } else if (v0.state.selection.ranges.length === 1) {
-          sourceHead = v0.state.selection.main.head;
-        }
-        if (sourceHead != null) {
-          if (codeBlockAt(v0.state, sourceHead)) { abandonReserved(); toast("代码块内不能粘贴图片"); return; }
-          const spans = v0.state.field(mathSpansField, false)?.spans || [];
-          if (spans.some((s) => sourceHead >= s.from && (sourceHead < s.to || (s.display && sourceHead === s.to)))) { abandonReserved(); toast("公式内不能粘贴图片"); return; }
-        }
-      }
-    }
     const v = getView();
-    if (!v) { abandonReserved(); toast("当前无法插入图片"); return; }
+    if (!v || v.state.readOnly) { abandonReserved(); toast('当前无法插入图片'); return; }
+    const target = reserved ? reserved.current() : v.state.selection.ranges.length === 1 ? v.state.selection.main : null;
+    const issue = imageTargetError(v, target);
+    if (issue) { abandonReserved(); toast(issue); return; }
     const ticket = reserved || reserveImageInsertion(v);
     if (!ticket) { abandonReserved(); toast('请只选择一个插入位置再粘贴图片'); return; }
     const mode = imageModeOf(v.state.doc.toString());
@@ -4014,7 +4154,6 @@ export function installExtras(deps) {
     const originRequest = host && typeof host.docInfo === 'function'
       ? imageHostCall(host.docInfo()).catch(() => null) : Promise.resolve(null);
     const mime = /^image\//i.test((file && file.type) || "") ? file.type : "image/png";
-    const ext = (mime.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "") || "png";
     const work = imageInsertionQueue.then(async () => {
     if (!ticket.current()) return;
     const origin = await originRequest;
@@ -4151,6 +4290,12 @@ export function installExtras(deps) {
     if (!h || typeof h.pickImages !== 'function') { toast('插入图片需要桌面版'); return; }
     const current = imageRequestOrigin();
     if (!current) return;
+    // Own the source range before either the picker or file IO yields. Forks
+    // retain that mapped range and selected-file order, regardless of focus.
+    const reserved = reserveImageInsertion(getView());
+    if (!reserved) { toast('请只选择一个插入位置再插入图片'); return; }
+    const tickets = [reserved];
+    try {
     let r;
     try { r = await h.pickImages({ multiple: true }); }
     catch (error) { if (current()) toast('读取图片失败：' + (error?.message || error)); else imageRequestCanceled(); return; }
@@ -4158,16 +4303,22 @@ export function installExtras(deps) {
     if (!r || r.canceled) return;
     const list = (r.files || []).filter(Boolean);
     if (!list.length) return;
+    for (let i = 1; i < list.length; i++) tickets.push(reserved.fork());
     let ok = 0;
-    for (const p of list) {
+    for (const [index, p] of list.entries()) {
+      const ticket = tickets[index];
+      if (!ticket?.current()) { imageRequestCanceled(); return; }
       const f = await imageFileFromPath(p, current);
       if (!current()) { imageRequestCanceled(); return; }
-      if (!f) continue;
-      await insertImageFile(f, list.length, 'input.upload');
+      if (!f) { ticket.cancel(); continue; }
+      await insertImageFile(f, list.length, 'input.upload', ticket);
       if (!current()) { imageRequestCanceled(); return; }
       ok++;
     }
     if (!ok) toast('没有可插入的图片');
+    } finally {
+      for (const ticket of tickets) ticket?.cancel();
+    }
   }
 
   /** 「从浏览器打开」：弹地址输入 → **主进程代取**（渲染进程零网络）→ 取回后走同一条插入路径。
@@ -4208,17 +4359,10 @@ export function installExtras(deps) {
          （关键是不重新编码：落盘写原字节、内联读回同一 mime ⇒ base64 不变）；
        · 两条命令都**只改图片的 target**，alt 与其余文本一字不动。 */
 
-  /** 扫描文档里的 `![alt](target)`（只认最朴素形态：目标不含空格/右括号）。 */
   function scanImageRefs(text) {
-    const out = [];
-    const re = /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
-    let m;
-    while ((m = re.exec(text))) {
-      const open = m[0].indexOf("](");
-      const tFrom = m.index + open + 2;
-      out.push({ from: tFrom, to: tFrom + m[2].length, alt: m[1], target: m[2] });
-    }
-    return out;
+    const spans = getView()?.state.field(mathSpansField, false)?.spans || [];
+    return scanSourceImageRefs(text).filter(ref => !inFrontMatter(text, ref.imageFrom)
+      && !spans.some(span => ref.imageFrom < span.to && ref.imageTo > span.from));
   }
 
   /** 文档所在目录（相对路径的基准）；无路径 ⇒ null。 */
@@ -4233,12 +4377,7 @@ export function installExtras(deps) {
   }
 
   /** 相对/本地路径 → 绝对路径（URL 与 data: 由调用方先排除）。 */
-  function absImagePath(dir, target) {
-    const t = String(target).replace(/^</, "").replace(/>$/, "");
-    if (/^[A-Za-z]:[\\/]/.test(t) || t.slice(0, 2) === "\\\\") return t;
-    if (!dir) return null;
-    return dir + "\\" + t.replace(/\//g, "\\");
-  }
+  const absImagePath = (dir, target) => localImagePath(target, dir);
 
   /** 「内联全部图片」：本地路径 → data URI（外链保持原样）。 */
   async function inlineAllImages() {
@@ -4252,7 +4391,7 @@ export function installExtras(deps) {
     const changes = []; let remote = 0, failed = 0;
     for (const r of refs) {
       if (/^data:/i.test(r.target)) continue;
-      if (/^(https?|file):/i.test(r.target)) { remote++; continue; }   // 外链不动
+      if (/^(?:https?:|\/\/)/i.test(r.target)) { remote++; continue; }   // 外链不动
       const abs = absImagePath(dir, r.target);
       if (!abs) { failed++; continue; }
       let res = null;
@@ -4262,7 +4401,7 @@ export function installExtras(deps) {
       changes.push({ from: r.from, to: r.to, insert: "data:" + (res.mime || "image/png") + ";base64," + res.base64 });
     }
     if (!changes.length) {
-      toast(remote ? ("没有可内联的本地图片（" + remote + " 张外链保持原样）") : "文档里没有可内联的本地图片");
+      toast((remote ? ("没有可内联的本地图片（" + remote + " 张外链保持原样）") : "文档里没有可内联的本地图片") + (failed ? "，" + failed + " 张读不到已跳过" : ""));
       return;
     }
     v.dispatch({ changes, userEvent: "input.inline-all-images" });      // 一次 ⇒ 一次撤销
@@ -4283,22 +4422,26 @@ export function installExtras(deps) {
     if (!docPath) { toast("请先把文档保存到磁盘，再抽出图片（否则不知道 assets 该放哪）"); return; }
     const refs = scanImageRefs(v.state.doc.toString()).filter((r) => /^data:/i.test(r.target));
     if (!refs.length) { toast("文档里没有可抽出的内联图片"); return; }
+    let plans;
+    try { plans=planAssetDataImages(refs.map(r=>r.target)); }
+    catch(error){toast(error.message);return;}
+    const source=v.state.doc;
     const changes = []; let failed = 0, idx = 0;
     for (const r of refs) {
-      const m = /^data:([^;,]+)(;base64)?,(.*)$/i.exec(r.target);
-      if (!m) { failed++; continue; }
-      const mime = m[1] || "image/png";
-      const ext = (mime.split("/")[1] || "png").replace(/[^a-z0-9]/gi, "") || "png";
+      const plan=plans.get(r.target);
+      if (!plan) { failed++; continue; }
       idx++;
       let res = null;
-      try { res = await h.saveImageToAssets({ docPath, base64: m[3] || "", mime, fileName: "inline-" + idx + "." + ext }); } catch (e) { res = null; }
+      try { res = await h.saveImageToAssets({ docPath, dataUri:r.target, mime:plan.mime, fileName: "inline-" + idx + plan.ext }); } catch (e) { res = null; }
       if (getView() !== v || !current()) { toast('文档已变化，图片转换已取消'); return; }
       const rel = res && (res.relPath || res.rel);
-      if (!res || res.ok === false || !rel) { failed++; continue; }
-      changes.push({ from: r.from, to: r.to, insert: rel });
+      if (!res || res.ok === false || !rel || res.bytes!==plan.bytes) { failed++; continue; }
+      changes.push({ from:r.imageFrom, to:r.imageTo,
+        insert:source.sliceString(r.imageFrom,r.from)+rel+source.sliceString(r.to,r.imageTo) });
     }
     if (!changes.length) { toast("抽出失败：没有一张图片落盘成功"); return; }
-    v.dispatch({ changes, userEvent: "input.extract-images" });         // 一次 ⇒ 一次撤销
+    const applied=await deps.applyImageConversion({changes,userEvent:"input.extract-images"});
+    if(!applied){toast('图片转换已取消，原文已保留');return;}
     toast("已抽出 " + changes.length + " 张图片到 assets/"
       + (failed ? "（" + failed + " 张失败已跳过）" : ""));
   }
@@ -4358,6 +4501,20 @@ export function installExtras(deps) {
     const cellText = String(cell.textContent || '').replace(/\s+/g, ' ').trim();
     return { text, cellText };
   }
+  const sourceFlavor = 'application/x-markpilot-markdown';
+  // CodeMirror writes its plain-text payload and maintains line-copy state
+  // on contentDOM. Add provenance while that same event bubbles, after its
+  // clearData(), without changing the native source, linewise or image flavors.
+  function markNativeSource(event) {
+    const cd = event.clipboardData, view = getView();
+    if (!event.isTrusted || !event.defaultPrevented || !view?.contentDOM.contains(event.target) || !cd) return;
+    if (!cd.types.includes('text/plain') || cd.types.includes('text/html')) return;
+    try { cd.setData(sourceFlavor, '1'); } catch { /* Hosts that only support plain text keep the native payload. */ }
+  }
+  document.addEventListener('copy', markNativeSource);
+  document.addEventListener('cut', markNativeSource);
+  document.addEventListener('copy', finishNativeImageTransfer);
+  document.addEventListener('cut', finishNativeImageTransfer);
   function onDocPaste(event) {
     const cd = event.clipboardData; if (!cd) return;
     const v = getView(), active = document.activeElement;
@@ -4370,8 +4527,15 @@ export function installExtras(deps) {
     let htmlDoc = null;
     if (html) { try { htmlDoc = new DOMParser().parseFromString(html, 'text/html'); } catch { /* 完整纯文本回退 */ } }
     const fragment = htmlDoc ? clipboardFragment(htmlDoc) : null;
-    const sourceClipboard = plain !== '' && !!fragment && (fragment.source || !!fragment.node.querySelector('[data-markpilot-source="markdown"]'));
-    const htmlHasTable = !!htmlDoc?.body.querySelector('table');
+    const sourceClipboard = plain !== '' && (cd.getData(sourceFlavor) === '1' ||
+      !!fragment && (fragment.source || !!fragment.node.querySelector('[data-markpilot-source="markdown"]')));
+    const imageTicket = sourceClipboard && (cd.getData(imageTransferFlavor) ||
+      htmlDoc?.querySelector('[data-markpilot-source="markdown"][data-markpilot-image-transfer]')?.getAttribute('data-markpilot-image-transfer'));
+    const recoverImages = () => readImageTransfer(imageTicket, plain);
+    const unavailableImages = () => toast('无法确认所复制内容（图片/链接）的来源，已保留选区；如需原文请使用纯文本粘贴');
+    const htmlHasTable = !!htmlDoc && [...htmlDoc.body.querySelectorAll('table')].some(table => !table.closest('math'));
+    const htmlHasMath = !!htmlDoc?.body.querySelector('math');
+    const htmlHasImage = !!htmlDoc && [...htmlDoc.body.querySelectorAll('img')].some(img => !img.closest('math'));
     // A bitmap may be an additional representation of a whole text fragment.
     // Even whitespace-only plain text owns its paste. HTML containing prose or
     // a table keeps the rich-text route; an image-only fragment uses the bitmap.
@@ -4385,7 +4549,7 @@ export function installExtras(deps) {
     const el = document.activeElement;
     const inCell = !!(el && el.classList && el.classList.contains('mp-cell-overlay-text'));
     if (inCell) {
-      if (!sourceClipboard && htmlDoc?.body.querySelector('img')) {
+      if (!sourceClipboard && htmlHasImage) {
         event.preventDefault(); toast('格内不能放图片，请粘到表格外'); return;
       }
       /* ① 多行先拒绝；② 1x1 HTML 单 cell 解包；③ 其余表格仍拒绝。 */
@@ -4415,8 +4579,10 @@ export function installExtras(deps) {
       }
       if (sourceClipboard) {
         event.preventDefault();
-        el.__mpCellForceInputType = 'insertFromPaste';   /* #60：转换粘贴单独成撤销组 */
-        document.execCommand('insertText', false, plain);
+        const moved = imageTicket && recoverImages();
+        if (imageTicket && !moved) { unavailableImages(); return; }
+        el.__mpCellForceInputType = 'insertFromPaste';
+        document.execCommand('insertText', false, moved ? moved.text : plain);
         return;
       }
       // Literal pipes stay visible in the DOM; the cell codec encodes the source.
@@ -4488,14 +4654,18 @@ export function installExtras(deps) {
       }
       return;
     }
-    if (!sourceClipboard && htmlDoc?.body.querySelector('img') && !allRanges.every(literalRange)) {
+    if (!sourceClipboard && htmlHasImage && !allRanges.every(literalRange)) {
       event.preventDefault(); pasteRichImages(v, htmlDoc); return;
     }
     const plainBare = String(plain || '').replace(/\r\n?/g, '\n').trim();
     const linesNonEmpty = plainBare ? plainBare.split('\n').filter((l) => l.trim()) : [];
     const plainIsTableOnly = linesNonEmpty.length > 0 && linesNonEmpty.every((l) => /\t/.test(l) || /^\s*\|/.test(l));
     const rows = sourceClipboard ? null : tableFromPlain(plain);
-    const convertHtml = !sourceClipboard && !!htmlDoc && (htmlHasTable || !plainIsTableOnly);
+    /* 【editing-3616·纯 markdown 表保真】text/plain 且整块已是成形 markdown 表 ⇒ 逐字保真。
+       TSV / 复杂 HTML（convertHtml 臂）/ 应用内部剪贴板（sourceClipboard）不走这里：
+       TSV 形态下 markdownTableVerbatim 返回 null，仍走 rowsToMdTable 原路径。 */
+    const mdVerbatim = (!sourceClipboard && rows && markdownTableVerbatim(plain)) || null;
+    const convertHtml = !sourceClipboard && !!htmlDoc && (htmlHasTable || htmlHasMath || !plainIsTableOnly);
     if (!convertHtml && !rows && !sourceClipboard) return;
     /* 【P0-4·2026-10-10 由"表格日常"普查查出（剪贴板可用后复验为真缺陷）】
        ① 光标停在**表格行内**（但没有格覆盖层，例如点表格左侧空白 / 表头行）时，多行 TSV 会走
@@ -4517,13 +4687,45 @@ export function installExtras(deps) {
       toast('格内不支持多行粘贴（会把表格切开）—— 请粘到表格外');
       return;
     }
-    if (sourceClipboard) return; // CM owns exact plain source, selection and history.
+    if (sourceClipboard) {
+      if (imageTicket) {
+        const literalImageRange = range => {
+          if (literalRange(range)) return true;
+          const line = v.state.doc.lineAt(range.from);
+          return range.to <= line.to && inlineCodeSpans(line.text).some(s =>
+            range.from >= line.from + s.innerFrom && range.to <= line.from + s.innerTo);
+        };
+        if (allRanges.every(literalImageRange)) return;
+        const moved = recoverImages(), original = plain.replace(/\r\n?/g, '\n');
+        if (!moved) { event.preventDefault(); unavailableImages(); return; }
+        /* 【同目录≠同一文件】票据的 crossDocument 以真实文件身份判定：同目录两份笔记资源相对
+           路径即使不变，搬来的定义仍要按本文档调解标签；只有同一文件的本地复制逐字不动。 */
+        const settled = moved.crossDocument ? reconcilePastedDefinitions(moved.text, v.state.doc, allRanges) : moved.text;
+        if (settled !== original) {
+          event.preventDefault();
+          /* 【引用定义随选区搬运】换不冲突标签后单事务插入，一次撤销还原整个粘贴。 */
+          applyImageTransfer(v, original, settled === moved.text ? moved : {...moved, text: settled},
+            literalImageRange, EditorSelection);
+        }
+      }
+      return; // Unchanged source keeps native CM selection and history semantics.
+    }
     let text;
     if (convertHtml) {
-      try { text = htmlRichToMd(htmlDoc.body); }
+      try {
+        text = htmlRichToMd(htmlDoc.body);
+        if (rows && htmlHasMath && !htmlHasTable && linesNonEmpty.every(line => line.includes('\t'))) {
+          // A scientific fragment can carry a separate TSV representation.
+          // If it contains other values, do not guess which column owns a formula.
+          const visible = htmlDoc.body.cloneNode(true);
+          for (const alternate of visible.querySelectorAll('annotation,annotation-xml,[aria-hidden="true"]')) alternate.remove();
+          if (visible.textContent.replace(/\s+/g, '') !== plain.replace(/\s+/g, ''))
+            text = rowsToMdTable(rows) + '\n\n附带的富文本\n\n' + text;
+        }
+      }
       catch { text = plain || htmlDoc.body.textContent || ''; }
       if (!text.trim()) text = plain;
-    } else text = rowsToMdTable(rows);
+    } else text = mdVerbatim || rowsToMdTable(rows);
     if (!text) return;
     event.preventDefault();
     const sel = v.state.selection.main;
@@ -4836,7 +5038,7 @@ export function installExtras(deps) {
     outlineMathStat: () => ({ items: outlineMathCache.size, bytes: outlineMathBytes, hits: outlineMathHits, misses: outlineMathMisses }),
     /* 【Typora 社区主题】安装/移除/读数：`installTyporaThemeFromText` 是**核心**（对话框与探针同源），
        `installTyporaTheme` 走壳层选文件；`userThemeInfo` 供设置面板与取证读当前状态。 */
-    installTyporaTheme, installTyporaThemeFromText, removeTyporaTheme, userThemeInfo, refreshAppearance,
+    installTyporaTheme, installTyporaThemeFromText, removeTyporaTheme, userThemeInfo, refreshAppearance, resetAppearance,
     setFontPreference, fontPreferences: () => ({ ...fontPreferences }), settingsDialog,
     /* 【图片命令导出·2026-10-10】对齐/缩放/范围解析：探针与后续的自定义百分比输入都用这两个。 */
     setImageAlignAt, setImageScaleAt, imageRangeAt,

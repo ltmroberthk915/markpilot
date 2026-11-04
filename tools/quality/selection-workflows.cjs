@@ -2,6 +2,15 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {args,launch,acquireSlot,sleep}=require('./lifecycle.cjs');
 const {outputDir,snapshot,frame,recorder,waitUntil,newWindow}=require('./harness.cjs');
+// 纯读盘轮询：Windows 上 commit lease 的瞬态 open/read EBUSY 视为“尚未就绪”，
+// 其余错误（含非 Windows）原样抛出；等待仍由既有 waitUntil 严格裁决。
+function diskBytesEqual(file,expected){
+ const want=Buffer.from(expected,'utf8');
+ try{return fs.readFileSync(file).equals(want);}catch(error){
+  if(process.platform==='win32'&&error?.code==='EBUSY'&&(error.syscall==='open'||error.syscall==='read'))return false;
+  throw error;
+ }
+}
 const clipboard=require('./clipboard.cjs');
 async function watchCellActivation(page,name){
  await page.evaluate(name=>{window[name]=[];const read=(kind,event)=>{const el=document.querySelector('.mp-cell-overlay-text'),s=getSelection();let textOffset=null;if(el&&s?.focusNode&&el.contains(s.focusNode)){const r=document.createRange();r.selectNodeContents(el);r.setEnd(s.focusNode,s.focusOffset);textOffset=r.toString().length;}window[name].push({kind,key:event?.key,type:event?.inputType,trusted:event?.isTrusted,at:performance.now(),focus:document.hasFocus()&&document.activeElement===el,text:el?.textContent,head:s?.focusOffset,anchor:s?.anchorOffset,nodeType:s?.focusNode?.nodeType,textOffset});};document.addEventListener('keyup',e=>{if(e.key==='Tab'||e.key==='Home')read('keyup',e);},{capture:true});document.addEventListener('beforeinput',e=>read('beforeinput',e),{capture:true});document.addEventListener('selectionchange',()=>read('selectionchange'),{capture:true});},name);
@@ -29,7 +38,7 @@ async function main(){
    const from=Math.min(anchor,head),to=Math.max(anchor,head),expected=text.slice(from,to),written=await p.evaluate(()=>window.mpHost.writeClipboard({text:'QUALITY_SELECTION_ARM'}, window.mpHost.beginClipboardIntent('copy')));const armed=clipboard.verifyText('QUALITY_SELECTION_ARM');trace.push({name:'clipboard-arm',written,...armed});assert(written.ok&&armed.matches);
    await p.keyboard.press('Control+c');const copied=clipboard.verifyText(expected);trace.push({name:'copied-exact-source',...copied});assert(copied.matches);
    await p.keyboard.press('Delete');const deleted=text.slice(0,from)+text.slice(to);assert.equal((await snapshot(p)).text,deleted);await capture(p,trace,'shift-'+kind+'-03-delete');
-   await p.keyboard.press('Control+z');assert.equal((await snapshot(p)).text,text);await p.keyboard.press('Control+y');assert.equal((await snapshot(p)).text,deleted);await waitUntil(()=>fs.readFileSync(file,'utf8')===deleted,'selected deletion saved');return{anchor,head,copy:true,undoRedo:true};
+   await p.keyboard.press('Control+z');assert.equal((await snapshot(p)).text,text);await p.keyboard.press('Control+y');assert.equal((await snapshot(p)).text,deleted);await waitUntil(()=>diskBytesEqual(file,deleted),'selected deletion saved');return{anchor,head,copy:true,undoRedo:true};
   });
   const table='Before\n\n|H|K|\n|---|---|\n|ab|KEEP|\n\nAfter\n';
   for(const action of ['copy','cut'])for(const eol of ['lf','crlf'])await test('selection-'+action+'-after-line-copy-pastes-at-caret'+(eol==='lf'?'':'-crlf-file'),async trace=>{
@@ -46,7 +55,7 @@ async function main(){
   });
   await test('cell-typed-pipe-keeps-character-on-following-input',async trace=>{
    const {p,file}=await fresh('cell-pipe',table);await openCell(p,trace);assert((await cellState(p)).focus);await p.keyboard.press('Shift+Backslash');await captureCell(p,trace,'cell-pipe-01');assert.equal((await cellState(p)).text,table.replace('|ab|KEEP|','|a\\|b|KEEP|'));
-   assert((await cellState(p)).focus);await p.keyboard.insertText('X');const actual=await captureCell(p,trace,'cell-pipe-02');assert.equal(actual.cellText,'a|Xb');assert.equal(actual.text,table.replace('|ab|KEEP|','|a\\|Xb|KEEP|'),'following character retains the escaped literal pipe and all surrounding text');await waitUntil(()=>fs.readFileSync(file,'utf8')===actual.text,'pipe input saved');
+   assert((await cellState(p)).focus);await p.keyboard.insertText('X');const actual=await captureCell(p,trace,'cell-pipe-02');assert.equal(actual.cellText,'a|Xb');assert.equal(actual.text,table.replace('|ab|KEEP|','|a\\|Xb|KEEP|'),'following character retains the escaped literal pipe and all surrounding text');await waitUntil(()=>diskBytesEqual(file,actual.text),'pipe input saved');
   });
   await test('active-cell-undo-redo-keeps-source-and-overlay-in-sync',async trace=>{
    const {p}=await fresh('cell-history',table);await openCell(p,trace);await p.keyboard.insertText('X');const edited=table.replace('|ab|KEEP|','|aXb|KEEP|');assert.equal((await cellState(p)).text,edited);await captureCell(p,trace,'cell-history-00-edited');
@@ -106,7 +115,7 @@ async function main(){
    await p.keyboard.press('Control+e');assert.equal(await p.evaluate(()=>getSelection().toString()),'K79','CtrlE selects the current cell after reverse navigation');
    await p.keyboard.insertText('R');const selected=await captureCell(p,trace,'cell-last-row-02-selected-replaced');
    const expected=added.replace(last,'|r79|R|');assert.equal(selected.text,expected,'selected-cell replacement preserves all 79 preceding rows and new row');assert(selected.focus);
-   await waitUntil(()=>fs.readFileSync(file,'utf8')===expected,'exact long-table source saved');return{originalRows:80,newRows:1,reverseNavigation:true,selectCell:true};
+   await waitUntil(()=>diskBytesEqual(file,expected),'exact long-table source saved');return{originalRows:80,newRows:1,reverseNavigation:true,selectCell:true};
   });
   for(const empty of [false,true])await test('cell-'+(empty?'empty':'end')+'-boundary-undo-redo-retains-owner',async trace=>{
    const initial=empty?table.replace('|ab|KEEP|','||KEEP|'):table,{p}=await fresh('cell-boundary-'+empty,initial);await openCell(p,trace,true,empty?'':'ab');await p.keyboard.press('End');await p.keyboard.insertText('X');await p.keyboard.press('Control+z');const undone=await captureCell(p,trace,'cell-boundary-'+empty+'-01-undo');assert.equal(undone.text,initial);assert.equal(undone.cellText,empty?'':'ab');assert(undone.focus&&undone.overlayVisible,'cell-end and empty-cell boundaries belong to their cell');await p.keyboard.press('Control+y');const redone=await captureCell(p,trace,'cell-boundary-'+empty+'-02-redo');assert.equal(redone.cellText,empty?'X':'abX');assert(redone.focus);await p.keyboard.insertText('Y');assert.equal((await cellState(p)).text,table.replace('|ab|KEEP|',empty?'|XY|KEEP|':'|abXY|KEEP|'));

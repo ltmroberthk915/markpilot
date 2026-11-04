@@ -243,7 +243,8 @@ function appendRowAtEnd(view, col, extraChanges) {
   if (!span) return null;
   const lastLine = state.doc.line(span.block.to);
   const text = newRowText(span);
-  const newFrom = lastLine.to + 1;
+  const deletion = extraChanges?.changes ? state.changes(extraChanges.changes) : null;
+  const newFrom = (deletion ? deletion.mapPos(lastLine.to) : lastLine.to) + 1;
   /* 落点用**与 cellRanges 同一套扫描**算（不写死 +3）：把新行当作一条"虚拟行"喂进去。 */
   const ranges = cellRanges({ text, from: newFrom });
   const idx = Math.max(0, Math.min(col, ranges.length - 1));
@@ -285,11 +286,13 @@ function runEnterPlan(view, plan, extraChanges) {
   const idx = Math.max(0, Math.min(plan.col, ranges.length - 1));
   const [a, b] = ranges[idx];
   const seg = line.text.slice(a - line.from, b - line.from);
-  const pos = a + (seg.length - seg.trimStart().length);
+  const deletion = extraChanges?.changes ? state.changes(extraChanges.changes) : null;
+  const oldPos = a + (seg.length - seg.trimStart().length);
+  const pos = deletion ? deletion.mapPos(oldPos) : oldPos;
   const spec = { selection: EditorSelection.cursor(pos), scrollIntoView: true, userEvent: "input.table" };
   if (extraChanges && extraChanges.changes) spec.changes = extraChanges.changes;
   view.dispatch(spec);
-  return { rowFrom: line.from, col: idx, cols: ranges.length, moved: true, pos };
+  return { rowFrom: deletion ? deletion.mapPos(line.from) : line.from, col: idx, cols: ranges.length, moved: true, pos };
 }
 
 /** 【裸 Enter】表内下移一格 / 末条格行补行；表外返回 null（调用方把键让回默认键位）。
@@ -297,6 +300,7 @@ function runEnterPlan(view, plan, extraChanges) {
  *  一次按键绝不改管道数（结构安全优先于逐字对齐 Typora）。 */
 export function applyEnter(view) {
   const state = view.state;
+  if (state.readOnly) return null;
   const sel = state.selection.main;
   const line = state.doc.lineAt(sel.head);
   const span = tableSpanOf(state, line.number);
@@ -328,6 +332,7 @@ let tableHint = null;
 export function setTableHint(fn) { tableHint = typeof fn === "function" ? fn : null; }
 export function applyEnterBr(view) {
   const state = view.state;
+  if (state.readOnly) return null;
   const sel = state.selection.main;
   const line = state.doc.lineAt(sel.head);
   const span = tableSpanOf(state, line.number);
@@ -338,6 +343,10 @@ export function applyEnterBr(view) {
   }
   const cells = cellRanges(line);
   const idx = cellIndexAt(cells, sel.head);
+  if (!sel.empty && !(cells[idx] && sel.from >= cells[idx][0] && sel.to <= cells[idx][1])) {
+    tableHint?.("格内换行只支持一个单元格");
+    return { rowFrom: line.from, rejected: true };
+  }
   const insert = "<br>";
   view.dispatch({
     changes: { from: sel.from, to: sel.to, insert },
@@ -350,6 +359,7 @@ export function applyEnterBr(view) {
 /** 【Tab / Shift+Tab】dir=+1 下一格、dir=-1 上一格；跨行跳过分隔行；末条格行追加一行；
  *  反向到表头 ⇒ 消费掉但不动（零改动、焦点不出编辑器）。表外返回 null（把键让回去）。 */
 export function applyTab(view, dir) {
+  if (view.state.readOnly) return null;
   const state = view.state;
   const sel = state.selection.main;
   const line = state.doc.lineAt(sel.head);
@@ -382,6 +392,7 @@ const enterBrKey = (view) => applyEnterBr(view) != null;
 /** 【A1】表尾出路：光标在表格**最后一行**时按 ↓ ⇒ 跳到表格后面那一行；表格就是文末时补一个空行。
  *  没有这条，A1 把"表内回车"消费掉之后，位于文档末尾的表格就再也出不来（对抗复核点名的陷阱）。 */
 function exitTableDown(view) {
+  if (view.state.readOnly) return false;
   const ctx = isTableContext(view.state);
   if (!ctx || !ctx.block) return false;
   if (ctx.line.number !== ctx.block.to) return false;   // 只在最后一行接管，其余位置让给默认

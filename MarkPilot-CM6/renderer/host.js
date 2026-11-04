@@ -58,11 +58,126 @@ let documentId = null;
 let revision = 0;
 let saveBlocked = false;
 let lastSaveError = null;
+let sourceRecovery = null;
 let observedSource = null;
 let recoverySerial = 0;
 let saveAsSerial = 0;
+let staleRetries = 0, staleScope = null; // 可自愈暂态计数+作用域（文档/路径/恢复序号/live epoch），切换即重置
+const STALE_AWAIT = Symbol('stale-await'); // 显式保存等待哨兵（私有 Symbol；ticket 对象每次调用独立携带 scope+depth）
 let reloadPending = null;
 const consumedReloads = new Set();
+
+/* ── CM Live：共享文档（同文件多窗口实时协同）────────────────────────────
+ * 引擎 facade（window.mpEngine.liveDocument）+ 主进程 live:* IPC。
+ * 契约：bind(initialText,{join,exchange,leave,onError,onStatus}) / unbind / flush / status / refresh。
+ * 单窗口、未绑定、引擎不支持时零行为变化（liveHealthy() 恒 false）。
+ * 纪律：远端 savedVersion 前进**绝不单独消脏**——只有 version===savedVersion &&
+ * pending===0 且无错误（正文与权威对齐、无未上行修改）才允许清脏。 */
+let liveBound = false;      // facade 已绑定（halt 后仍 true，但 liveHealthy()=false）
+let liveSession = null;     // 最近一次 onStatus 快照（null=未绑/无快照）
+function liveHealthy() { return !!(liveBound && liveSession && !liveSession.error && liveSession.client); }
+function liveUnbind() {
+  if (!liveBound) return;
+  liveBound = false; liveSession = null;
+  try { window.mpEngine?.liveDocument?.unbind(); } catch { /* 引擎未就绪时忽略 */ }
+}
+function bannerSig(text, actions, info) {
+  return (info ? '1' : '0') + '\u0000' + text + '\u0000' + (actions || []).map(a => a.label).join('\u0001');
+}
+function liveError(message, code) {
+  if (!dirty) { dirty = true; refreshTitle(); }
+  /* 同文档强恢复横幅优先：仅当该横幅仍是当前可见、同文档的显示票据时才压住较弱的
+     live 冲突通知；真实按压期间替换横幅会把按钮从指针下抽走，pointerup 落到新 DIV，
+     click 被吞。横幅已隐藏/被其他通知替换时不得压制——必须重新给出恢复入口。 */
+  if (code === 'MP_FILE_CONFLICT' && (saveBlocked || lastSaveError) && sourceRecovery?.documentId === documentId
+      && bannerIdentity?.ticket === sourceRecovery.bannerTicket && bannerIdentity.docId === documentId) return;
+  const text = message || '共享编辑已停止，当前草稿已保留。';
+  const actions = [
+    { label: '另存为…', run: () => { void saveAsFlow(); } },
+    { label: '重新载入（丢弃未同步修改）', run: () => { void reloadDocument({ origin: 'live-conflict' }); } },
+  ];
+  /* 同文档（含协同代际与文件路径）/同恢复代际/同文案与动作的重复 live 通知幂等：
+     DOM 与按钮节点保持不变，真实单击与拖出取消不被重复渲染破坏；不跨文档去重。 */
+  if (bannerIdentity && bannerIdentity.sig === bannerSig(text, actions, false)
+      && bannerIdentity.docId === documentId && bannerIdentity.recoverySerial === recoverySerial
+      && bannerIdentity.liveGeneration === liveGeneration && bannerIdentity.filePath === filePath) return;
+  showBanner(text, actions);
+}
+let liveGeneration = 0;    // 绑定代际：旧代际的回调/横幅一律失效（防另存为后旧房间迟到报错）
+/* 重载观测点（只读；GUI 探针读 window.__liveReloadProbe）：每次 reload 入口的等待/脏标/
+   权威三元组轨迹，稳定字段 {at,phase,origin,dirty,pending,version,savedVersion,error}。 */
+window.__liveReloadProbe = { history: [], last: null };
+function reloadProbe(phase, origin) {
+  try {
+    const s = window.mpEngine?.liveDocument?.status?.() || null;
+    const rec = { at: Date.now(), phase, origin, dirty, pending: s?.pending ?? null,
+      version: s?.version ?? null, savedVersion: s?.savedVersion ?? null, error: s?.error ?? null };
+    window.__liveReloadProbe.history.push(rec);
+    window.__liveReloadProbe.last = rec;
+    if (window.__liveReloadProbe.history.length > 40) window.__liveReloadProbe.history.shift();
+  } catch { /* 观测点不得反噬 */ }
+}
+/* 等待在途 refresh/flush 的 CLEAN 回执落定（有界 700ms/40ms 轮询）：
+   仅当 live 健康、pending===0 且 version===savedVersion（残迹脏签名）时等待；
+   真本地未保存或会话异常立即返回，走既有确认流。 */
+async function liveQuietForReload(deadlineMs = 700) {
+  if (!liveHealthy()) return;
+  const t0 = Date.now();
+  for (;;) {
+    const s = window.mpEngine.liveDocument.status();
+    if (!s || s.error || s.pending > 0 || s.version !== s.savedVersion) return;
+    if (!dirty) return;                        // CLEAN 回执已落定
+    if (Date.now() - t0 >= deadlineMs) return; // 有界等待，不悬挂重载
+    await new Promise(r => setTimeout(r, 40));
+  }
+}
+async function bindLive(text, { info = false } = {}) {
+  const engine = window.mpEngine, path = filePath;
+  const gen = ++liveGeneration;
+  if (!engine?.liveDocument || !path || typeof text !== 'string') return;
+  liveUnbind();
+  liveBound = true;
+  try {
+    await engine.liveDocument.bind(text, {
+      join: () => window.mpHost.liveJoin({ filePath: path, text }),
+      exchange: (client, request) => window.mpHost.liveExchange(client, request),
+      leave: (client) => window.mpHost.liveLeave(client),
+      /* 恢复副本（加入票 recovered）：facade 已按 (recoveryPath,sha256,at) 全局去重，这里
+         只做展示——原文件未被草稿覆盖；路径完整可定位/可复制；不自动打开、不覆盖原件、
+         不经任何新 IPC 授予 renderer 路径访问（打开走既有「文件 → 打开」人工通道）。 */
+      onRecovered: (entries) => {
+        if (gen !== liveGeneration || !Array.isArray(entries) || !entries.length) return;
+        const paths = entries.map(e => e.recoveryPath).filter(Boolean);
+        if (!paths.length) return;
+        showBanner(`原文件 ${path} 未被草稿覆盖。共享编辑服务保留了 ${paths.length} 份恢复副本：\n${paths.join('\n')}\n副本不会被自动打开，原文件不会被改动；可用「文件 → 打开」手动打开副本。`, [
+          { label: '复制副本路径', run: () => { try { void navigator.clipboard.writeText(paths.join('\r\n')); } catch { /* 路径已在横幅中可选中复制 */ } } },
+          { label: '关闭', run: () => { hideBanner(); } },
+        ], true);
+      },
+      onError: (message, code) => { if (gen === liveGeneration) liveError(message, code); },
+      onStatus: (status) => {
+        if (gen !== liveGeneration || !status) return;
+        liveSession = status;
+        // 消脏唯一条件（见块首纪律）；清脏凭据带精确房间三元组（client/epoch/version），
+        // 主进程按 cleanAt 对房间核销——裸 true 不再接受；相邻新编辑（pending>0）天然不满足条件。
+        if (!status.error && status.client && status.version === status.savedVersion && status.pending === 0 && dirty) {
+          dirty = false; refreshTitle();
+          void window.mpHost.docDirty(false, { documentId, revision, liveClean: { client: status.client, epoch: status.epoch, version: status.version } }).catch(() => {});
+        }
+      },
+    });
+  } catch (error) {
+    if (gen !== liveGeneration) return; // 旧代际的失败不展示（已被新绑定/解绑取代）
+    liveBound = false;
+    if (info) {
+      // 另存为成功后的重绑失败：文件已保存，仅共享加入未成——如实说明，不吓人、不丢输入。
+      showBanner(`已保存到 ${path}，但未能加入该文件的共享编辑（${error?.message || '未知原因'}）。当前内容可继续编辑，保存不受影响。`, [
+        { label: '重试加入', run: () => { void bindLive(window.mpEngine?.getValue?.() || text, { info: true }); } },
+        { label: '关闭', run: () => { hideBanner(); } },
+      ], true);
+    } else liveError(error?.message || '无法加入共享编辑会话', error?.code);
+  }
+}
 let savePolicy = MarkPilotSavePolicy.normalize(false, undefined);
 let autoGeneration = 0, policyReadSerial = 0;
 function autoTicket() { return { generation: autoGeneration, documentId }; }
@@ -91,6 +206,7 @@ window.mpHost.onSetting?.(payload => {
   window.mpEngine?.applyPrefs?.();
 });
 window.addEventListener('pagehide', retireAutosave);
+window.addEventListener('pagehide', () => liveUnbind()); // CM Live：尽力 leave；崩溃残留由主进程按 webContents 清理
 /* 【体积骤降守卫·2026-10-09】当前文档的"已知体积"：装载时=文件长度，每次成功保存后=写入长度。
    为什么要它：实测到过一次**磁盘级数据丢失**的形态——换文档时旧的非空选区被映射拉成整篇，
    用户敲的第一个字把整篇替换掉，500ms 去抖的自动保存**如实**把那几个字节写回原路径
@@ -116,10 +232,12 @@ const down = (type, content) => { const fn = bus[type]; if (fn) { try { fn(conte
  *  否则 init→applyDoc→hideBanner 会在 banner=null 上抛错，引擎的 open 收不到、永远不 boot。 */
 const bannerEl = () => document.getElementById('mp-banner');
 let bannerSerial = 0;
+let bannerIdentity = null; // 当前可见横幅 {ticket,sig,docId,recoverySerial,liveGeneration,filePath}
 function showBanner(text, actions = [], info = false) {
   const ticket = ++bannerSerial;
   const banner = bannerEl();
   if (!banner) return ticket;
+  bannerIdentity = { ticket, sig: bannerSig(text, actions, info), docId: documentId, recoverySerial, liveGeneration, filePath };
   banner.className = info ? 'info' : '';
   banner.textContent = text;
   for (const a of actions) {
@@ -134,6 +252,7 @@ function showBanner(text, actions = [], info = false) {
 function hideBanner(expectedSerial) {
   if (expectedSerial !== undefined && expectedSerial !== bannerSerial) return false;
   bannerSerial++;
+  bannerIdentity = null;
   const b = bannerEl();
   if (!b) return false;
   b.style.display = 'none'; b.textContent = ''; return true;
@@ -174,7 +293,7 @@ function publishDocDir(filePathForDir) {
 function checkpointRendererDocument() {
   const engine = window.mpEngine?.checkpointDocument?.();
   if (booted && !engine) throw new Error('请先完成当前输入');
-  const old = { booted, documentId, revision, saveBlocked, filePath, lastSaveError, charCount, knownLen, observedSource, dirty };
+  const old = { booted, documentId, revision, saveBlocked, filePath, lastSaveError, sourceRecovery, charCount, knownLen, observedSource, dirty };
   let active = true;
   return {
     commit() { if (!active) return false; if (engine && !engine.commit()) throw new Error('文档提交事务已过期'); active = false; return true; },
@@ -187,8 +306,8 @@ function checkpointRendererDocument() {
         publishDocDir(old.filePath);
         if (engine && !engine.rollback()) throw new Error('文档恢复事务已过期');
       }
-      catch (error) { saveBlocked = true; lastSaveError = error.message; throw error; }
-      ({ booted, documentId, revision, saveBlocked, filePath, lastSaveError, charCount, knownLen, observedSource, dirty } = old);
+      catch (error) { saveBlocked = true; lastSaveError = error.message; sourceRecovery = null; throw error; }
+      ({ booted, documentId, revision, saveBlocked, filePath, lastSaveError, sourceRecovery, charCount, knownLen, observedSource, dirty } = old);
       publishDocDir(filePath); refreshTitle(); scheduleSave();
     },
   };
@@ -196,6 +315,7 @@ function checkpointRendererDocument() {
 function applyDoc(text, path, id, loadedRevision = 0, loadKind = 'replace', ticket = null, keepOwnerOnFailure = false, transaction = null) {
   let checkpoint;
   retireAutosave();
+  liveUnbind(); // 换文档/重载/关闭前先离开共享房间（草稿保持现状）
   // Supply the resource base before mounting. Commit metadata only after the
   // source was accepted; an engine failure must keep the existing buffer.
   try {
@@ -211,10 +331,11 @@ function applyDoc(text, path, id, loadedRevision = 0, loadKind = 'replace', tick
     documentId = id; revision = loadedRevision; saveBlocked = false;
     filePath = path || null;
     publishDocDir(filePath);
-    hideBanner(); lastSaveError = null;
+    hideBanner(); lastSaveError = null; sourceRecovery = null;
     charCount = knownLen = text.length;
     observedSource = window.mpEngine?.documentSession?.() || null;
     dirty = false; refreshTitle();
+    if (filePath) void bindLive(text); // CM Live：挂载成功即加入共享房间
     if (!transaction) checkpoint.commit();
     return true;
   } catch (e) {
@@ -247,7 +368,7 @@ function retainBufferAfterRead(payload, reason) {
   observedSource = window.mpEngine?.documentSession?.() || null;
   dirty = true; saveBlocked = true; recoverySerial++;
   lastSaveError = reason; refreshTitle();
-  showBanner('读取期间继续编辑，已保留当前内容。', [
+  showSourceRecovery('读取期间继续编辑，已保留当前内容。', [
     { label: '另存为…', run: () => { void saveAsFlow(); } },
     { label: '载入磁盘版本', run: () => { void reloadDocument({ origin: 'disk' }); } },
   ]);
@@ -273,12 +394,22 @@ async function reloadDocument({ origin = 'toolbar' } = {}) {
   const engine = window.mpEngine, ticket = engine?.commands.capture();
   if (!ticket) return { ok: false, code: 'MP_COMPOSING', error: '请完成当前输入后再读取文件' };
   if (reloadPending) return { ok: false, code: 'MP_RELOAD_BUSY', error: '正在读取当前文档' };
+  /* 【CM Live×reload 竞态·external 臂】点击/聚焦触发的外部采用（live:refresh）先以远端回声
+     短暂置脏，CLEAN 回执（下一次交换周期）才消脏——此刻发起 reload 会与 dirty 确认相竞，
+     主进程按 dirty 弹确认/取消。入口先等在途周期落定，再重验 ticket/dirty：
+     只有"权威已齐平（version===savedVersion）且无未上行本端增量（pending===0）"的残迹脏才等；
+     真本地未保存（pending>0 或权威未存盘）不等待、不替用户抢同意。观测点见 __liveReloadProbe。 */
+  reloadProbe('quiet-wait-begin', origin);
+  await liveQuietForReload();
+  reloadProbe('quiet-wait-end', origin);
+  if (!engine.commands.valid(ticket, { intent: false })) return { ok: false, code: 'MP_DOC_MISMATCH', error: '编辑版本已改变，重载已取消' };
   const pending = reloadPending = { requestId: crypto.randomUUID(), documentId, filePath, ticket, origin, result: null };
   try {
     if (origin === 'toolbar') await flushSave();
     if (documentId !== pending.documentId || filePath !== pending.filePath || !engine.commands.valid(ticket, { intent: false })) return { ok: false, code: 'MP_DOC_MISMATCH', error: '编辑版本已改变，重载已取消' };
     if (!(await syncDirty())) return { ok: false, code: 'MP_DOC_MISMATCH', error: '文档版本同步失败' };
     if (!engine.commands.valid(ticket, { intent: false })) return { ok: false, code: 'MP_DOC_MISMATCH', error: '编辑版本已改变，重载已取消' };
+    reloadProbe('dispatch', origin);
     const r = await window.mpHost.reload({ requestId: pending.requestId, documentId, revision, filePath, origin });
     if (r?.ok && !pending.result) consumeReload(r, pending);
     if (!r?.ok) engine.commands.resume(ticket);
@@ -299,7 +430,7 @@ window.mpCancelOpen = ({ requestId }) => { if (pendingOpen?.requestId === reques
 function commitOpenedDoc(payload) {
   const pending = pendingOpen, engine = window.mpEngine;
   const valid = pending?.requestId === payload.requestId && pending.documentId === documentId && pending.engine === engine
-    && engine.commands.valid(pending.ticket, { intent: false }) && !engine._view().composing;
+    && engine.commands.valid(pending.ticket, { intent: false }) && !(engine.isComposing?.() || engine._view().composing);
   if (!valid) {
     window.mpHost.commitOpen({ requestId: payload.requestId, phase: 'reject' });
     showBanner('读取期间有新修改，已保留原文档。'); return false;
@@ -318,7 +449,7 @@ function commitOpenedDoc(payload) {
     if (!finished?.ok) throw new Error('文档打开提交未确认');
     checkpoint.commit(); pendingOpen = null; return true;
   } catch (error) {
-    try { checkpoint?.rollback(); } catch (restoreError) { saveBlocked = true; lastSaveError = restoreError.message; }
+    try { checkpoint?.rollback(); } catch (restoreError) { saveBlocked = true; lastSaveError = restoreError.message; sourceRecovery = null; }
     window.mpHost.commitOpen({ requestId: payload.requestId, phase: 'rollback' });
     showBanner(saveBlocked ? '文档状态未能恢复，已暂停保存。请复制正文备份。' : '新文档未能打开，已保留原稿：' + error.message);
     return false;
@@ -370,6 +501,28 @@ function scheduleSave() {
   const ticket = autoTicket();
   saveTimer = setTimeout(() => { saveTimer = 0; if (autoCurrent(ticket)) void doSave(false, null, null, ticket); }, savePolicy.intervalMs);
 }
+/* 可自愈暂态（同窗连续版本 MP_LIVE_STALE / 写序互斥忙 MP_SAVE_BUSY / 输入与 flush 竞速）：
+   pure autosave 专用退避，与常规 autosave 合并为同一待写（saveTimer 单槽）；票据绑定
+   文档/自动代/文件路径/恢复序号/live epoch，目标或 epoch 一变即作废（不接手旧写入）；
+   预算按 staleScope 有界；耗尽或真实冲突走显式失败路径（保留草稿与既有横幅）。 */
+function staleScopeKey() { return documentId + '\u0000' + (filePath || '') + '\u0000' + recoverySerial + '\u0000' + (liveSession?.epoch || ''); }
+function staleBudget() {
+  const key = staleScopeKey();
+  if (staleScope !== key) { staleScope = key; staleRetries = 0; }
+  return ++staleRetries <= 8;
+}
+function scheduleStaleRetry(note) {
+  clearTimeout(saveTimer); saveTimer = 0;
+  const ticket = { ...autoTicket(), filePath, recoverySerial: recoverySerial, epoch: liveSession?.epoch || '' };
+  saveTimer = setTimeout(() => {
+    saveTimer = 0;
+    if (ticket.generation === autoGeneration && ticket.documentId === documentId &&
+        ticket.filePath === filePath && ticket.recoverySerial === recoverySerial &&
+        ticket.epoch === (liveSession?.epoch || ''))
+      void doSave(false, null, null, ticket);
+  }, 350);
+  return note;
+}
 async function flushSave() {
   window.mpEngine?.commands.capture(); syncSource();
   const ticket = autoTicket();
@@ -380,16 +533,48 @@ async function flushSave() {
   return pending;
 }
 window.mpFlushSave = flushSave;
+function showSourceRecovery(text, actions) {
+  const bannerTicket = showBanner(text, actions);
+  sourceRecovery = { documentId, text, actions, bannerTicket };
+}
+function saveAsFailure(r, path) {
+  const recovery = (saveBlocked || lastSaveError) && sourceRecovery?.documentId === documentId ? sourceRecovery : null;
+  const text = '另存为失败：' + (r?.error || '未知错误') + (path ? '（' + path + '）' : '');
+  if (recovery) {
+    /* 恢复横幅重绘后同步“显示票据”：否则下一次较弱 live 冲突通知会以票据失配为由替换
+       DOM，吞掉用户正在按的“重新选择位置/另存为”。recovery.text 保持原文不递归增长，
+       原动作原样保留。 */
+    const bannerTicket = showBanner(text + '。' + recovery.text, recovery.actions);
+    recovery.bannerTicket = bannerTicket;
+  } else showBanner(text, [{ label: '重新选择位置…', run: () => { void saveAsFlow(); } }]);
+}
 function saveFailure(r, path) {
   lastSaveError = r?.error || '未知错误';
   if (['MP_FILE_CONFLICT', 'MP_FILE_MISSING', 'MP_FILE_LINKED'].includes(r?.code)) saveBlocked = true;
-  showBanner('保存失败：' + lastSaveError + '（' + path + '）', [
+  showSourceRecovery('保存失败：' + lastSaveError + '（' + path + '）', [
     { label: '另存为…', run: () => { void saveAsFlow(); } },
     { label: '重新加载', run: () => { void reloadDocument({ origin: 'disk' }); } },
+    ...(r?.code==='MP_FILE_CONFLICT' ? [{label:'保留我的修改',run:()=>{void keepMine();}}] : []),
     ...(!saveBlocked ? [{ label: '重试', run: () => { void doSave(true); } }] : []),
   ]);
 }
-async function doSave(force = false, grant = null, saveAsOperation = null, automatic = null) {
+async function keepMine() {
+  const engine=window.mpEngine,ticket=engine?.commands.capture();
+  if(!ticket){showBanner('请先完成当前输入，再保留修改。');return false;}
+  if(!(await syncDirty()))return false;
+  // 保留我的修改 = 把**本窗正文**覆盖到盘。多窗共享时先把本窗未上行编辑推给权威，
+  // 让房间正文与本窗一致；权威写盘前还会再核一次正文，落后就如实失败、草稿不动。
+  if(liveHealthy()){
+    try{ await engine.liveDocument.flush(); }
+    catch(error){ saveFailure({code:error?.code||'MP_LIVE_FLUSH',error:'共享同步未能在保留修改前完成，当前草稿已保留：'+(error?.message||'未知原因')},filePath); return false; }
+  }
+  const expected={documentId,revision,filePath};
+  const grant=await window.mpHost.prepareOverwrite(expected);
+  if(documentId!==expected.documentId||revision!==expected.revision||filePath!==expected.filePath||!engine.commands.valid(ticket,{intent:false}))return false;
+  if(!grant?.ok){saveFailure(grant,filePath);return false;}
+  return doSave(true,grant);
+}
+async function doSave(force = false, grant = null, saveAsOperation = null, automatic = null, staleDepth = 0) {
   const operationCurrent = () => saveAsOperation === null || saveAsOperation === saveAsSerial;
   if (!operationCurrent() || (!force && (!automatic || !autoCurrent(automatic)))) return false;
   if (window.mpEngine?.commands && !window.mpEngine.commands.capture()) {
@@ -412,15 +597,59 @@ async function doSave(force = false, grant = null, saveAsOperation = null, autom
   }
   if (saveBlocked && !grant) return false;
   clearTimeout(saveTimer); saveTimer = 0;
-  const capture = { documentId, revision, recoverySerial, filePath: grant?.filePath || filePath };
+  // sourcePath：保存开始时的**源**文件（当前协同房间所在文件）。grant 的目标从一开始就在
+  // capture.filePath 里，拿它判"是否换了目标"永远相等（实测踩坑：另存为后从未重绑新房间）。
+  const capture = { documentId, revision, recoverySerial, filePath: grant?.filePath || filePath, sourcePath: filePath };
+  // 显式等待的意图 scope 在入口一次性固定：尝试期间换文档/目标/恢复序号/live epoch 即安全失败。
+  const staleIntent = { documentId, filePath, recoverySerial, epoch: liveSession?.epoch || '' };
   if (grant && grant.documentId !== capture.documentId) return false;
   saveInFlight = true;
   saveTrace('doSave:start', capture);
-  saveTask = Promise.resolve().then(async () => {
+  const task = saveTask = Promise.resolve().then(async () => {
     try {
       const immediate = engineValue();
-      const text = typeof immediate === 'string' ? immediate : await currentText();
-      if (documentId !== capture.documentId || revision !== capture.revision || !operationCurrent() || (!force && !autoCurrent(automatic))) return false;
+      let text = typeof immediate === 'string' ? immediate : await currentText();
+      // CM Live：健康会话先 flush（把本端增量推给权威——含"另存为"前的未上行修改，
+      // 源房间的其他窗口也要收到这些编辑）。live 身份只随**普通同路径保存**携带；
+      // 另存为/覆盖确认（grant）走原有一次性授权，不把源房间的 token 当目标凭据。
+      // 主进程按 grant 目标独立做跨进程写序与房间保护（见 API 文档 §3.4）。
+      let liveMeta = null;
+      const liveActive = liveHealthy();
+      if (liveActive) {
+        try {
+          await window.mpEngine.liveDocument.flush();
+          if (!grant) {
+            // flush 之后同步取「权威头+正文」同一瞬间快照：flush 期间的新键入已上行，
+            // 此刻的正文才等于 materialize(version)；否则同窗连续版本会让 live:save 以
+            // MP_LIVE_STALE 拒绝旧正文（9248 第19组：屏显 AftR1er、盘停 AftRer）。
+            const head = window.mpEngine.liveDocument.status();
+            const fresh = engineValue();
+            if (head?.client && head.pending !== 0) {
+              if (force && !grant && staleDepth < 8) {
+                // 本次调用私有 ticket（意图 scope 在入口固定 + depth），只被本函数外层识别。
+                return { [STALE_AWAIT]: true, scope: staleIntent, depth: staleDepth + 1 };
+              }
+              if (staleBudget()) { scheduleStaleRetry('pending-race'); return false; }
+              saveFailure({ code: 'MP_LIVE_FLUSH', error: '共享同步未能在重试内完成，已保留当前稿，请再次保存' }, capture.filePath);
+              return false;
+            }
+            if (!head?.client || typeof fresh !== 'string') {
+              // live 已绑定却拿不到可靠「票据+正文」：显式失败保留原稿，绝不回退为非 live 裸写。
+              saveFailure({ code: 'MP_LIVE_TICKET', error: '无法取得共享保存票据，已保留当前稿，请重试保存' }, capture.filePath);
+              return false;
+            }
+            liveMeta = { live: { client: head.client, epoch: head.epoch, version: head.version } };
+            text = fresh;
+          }
+        } catch (liveFault) {
+          if (liveFault?.code === 'MP_LIVE_COMPOSING' || liveFault?.code === 'MP_LIVE_SWITCH') {
+            if (!force && automatic && autoCurrent(automatic)) scheduleSave();
+            return false;
+          }
+          throw liveFault;
+        }
+      }
+      if (documentId !== capture.documentId || (!liveActive && revision !== capture.revision) || !operationCurrent() || (!force && !autoCurrent(automatic))) return false;
       if (typeof text !== 'string') throw new Error('取不到文档内容');
       if (!force && knownLen >= SHRINK_MIN && text.length < knownLen * SHRINK_RATIO) {
         showBanner('自动保存被拦下：文档从 ' + knownLen + ' 字骤降到 ' + text.length + ' 字。确认这是你要的结果吗？', [
@@ -428,28 +657,72 @@ async function doSave(force = false, grant = null, saveAsOperation = null, autom
           { label: '放弃这次自动保存', run: () => {} },
         ]); return false;
       }
-      const r = await window.mpHost.save(capture.filePath, text, { documentId: capture.documentId, revision: capture.revision, ...(!force ? { automatic: true } : {}), ...(grant ? { saveAsToken: grant.saveAsToken } : {}) });
+      const r = await window.mpHost.save(capture.filePath, text, { documentId: capture.documentId, revision: capture.revision, ...(!force ? { automatic: true } : {}), ...(grant ? { saveAsToken: grant.saveAsToken } : {}), ...(liveMeta || {}) });
       saveTrace('doSave:saved', { filePath: capture.filePath, ok: !!r?.ok, revision: capture.revision, code: r?.code, error: r?.error });
       if (documentId !== capture.documentId || recoverySerial !== capture.recoverySerial) return false;
       // A later Save As intent can cancel a picker, but cannot undo a completed
       // disk commit. Reconcile that receipt before the next queued intent runs.
-      if (!r?.ok) { if (operationCurrent() && r?.code !== 'MP_AUTOSAVE_DISABLED') saveFailure(r, capture.filePath); return false; }
+      if (!r?.ok) {
+        const recoverable = operationCurrent() && saveAsOperation === null && !saveBlocked && !lastSaveError &&
+          (r?.code === 'MP_LIVE_STALE' || r?.code === 'MP_SAVE_BUSY');
+        if (recoverable && force && !grant && staleDepth < 8) {
+          // 显式保存（Ctrl+S / 关闭保存 / saveThenReload；另存为除外）：本次调用私有 ticket
+          // （意图 scope 入口固定 + depth），由外层在本笔 saveTask 结清后按同一作用域有界
+          // 等待真实结果（并发互不覆盖）。
+          return { [STALE_AWAIT]: true, scope: staleIntent, depth: staleDepth + 1 };
+        }
+        if (recoverable && !force && automatic && autoCurrent(automatic) && staleBudget()) {
+          scheduleStaleRetry(r?.code); // pure autosave：仍走单一 saveTimer 槽
+          return false;
+        }
+        staleScope = null; staleRetries = 0;
+        if (operationCurrent() && r?.code !== 'MP_AUTOSAVE_DISABLED') {
+          if (saveAsOperation !== null) saveAsFailure(r, capture.filePath);
+          else saveFailure(r, capture.filePath);
+        }
+        return false;
+      }
       if (!r.current) return false;
       filePath = r.filePath; publishDocDir(filePath); knownLen = text.length;
       dirty = revision !== capture.revision;
-      lastSaveError = null; saveBlocked = false;
+      // CM Live：成功保存到**不同目标**（另存为）⇒ 无条件结束旧代际（旧房间的 token 已被主进程
+      // 退役，迟到回调一律作废），再绑到**回执确认后的新文件**；重绑期间的后续键入由 facade 的
+      // pending 捕获兜住，重绑失败也不影响已保存状态（info 横幅，可重试加入）。
+      // 正常同路径保存**不**重复加入房间。
+      if (window.mpEngine?.liveDocument && r.filePath !== capture.sourcePath) {
+        liveUnbind();                                // 立即换代：防旧会话迟到报错/错横幅
+        void bindLive(text, { info: true });
+      }
+      lastSaveError = null; saveBlocked = false; sourceRecovery = null;
+      staleScope = null; staleRetries = 0;
       hideBanner(); refreshTitle();
       await window.mpHost.docSaved(filePath, r);
       return true;
     } catch (e) {
-      if (documentId === capture.documentId && recoverySerial === capture.recoverySerial && operationCurrent()) saveFailure({ error: e.message }, capture.filePath);
+      if (documentId === capture.documentId && recoverySerial === capture.recoverySerial && operationCurrent()) {
+        if (saveAsOperation !== null) saveAsFailure({ error: e.message }, capture.filePath);
+        else saveFailure({ error: e.message }, capture.filePath);
+      }
       return false;
     } finally {
       saveInFlight = false; saveTask = null;
       scheduleSave();
     }
   });
-  return saveTask;
+  const outcome = await task;
+  if (outcome && outcome[STALE_AWAIT]) {
+    // 显式等待：本次调用的私有 ticket（scope+depth）；上一笔 task 已结清（saveInFlight=false），
+    // 不会等待自身 saveTask 造成死锁；嵌套 retry 仍绑定原意图；换文档/目标/恢复序号/epoch、
+    // 另存换代或出现失败横幅即安全失败，不接手旧写入。
+    const { scope, depth } = outcome;
+    const sameScope = () => scope.documentId === documentId && scope.filePath === filePath &&
+      scope.recoverySerial === recoverySerial && scope.epoch === (liveSession?.epoch || '');
+    if (!sameScope() || !operationCurrent() || saveBlocked || lastSaveError) return false;
+    await new Promise(resolve => setTimeout(resolve, 350));
+    if (!sameScope() || !operationCurrent() || saveBlocked || lastSaveError) return false;
+    return doSave(true, null, null, null, depth);
+  }
+  return outcome;
 }
 async function saveAsFlow() {
   const operation = ++saveAsSerial, id = documentId, engine = window.mpEngine, commands = engine?.commands;
@@ -463,12 +736,12 @@ async function saveAsFlow() {
     saveTrace('saveAsFlow:result', grant);
     if (documentId !== id || operation !== saveAsSerial) return false;
     if (!grant?.ok) {
-      if (grant?.error) saveFailure(grant, filePath || '未命名文档');
+      if (grant?.error) saveAsFailure(grant);
       return false;
     }
     return await doSave(true, grant, operation);
   } catch (error) {
-    if (documentId === id && operation === saveAsSerial) saveFailure({error:error.message},filePath || '未命名文档');
+    if (documentId === id && operation === saveAsSerial) saveAsFailure({error:error.message});
     return false;
   } finally {
     if (commands && documentId === id && operation === saveAsSerial && window.mpEngine === engine && document.hasFocus()) {
@@ -484,14 +757,13 @@ async function newDocument({ replace = false } = {}) {
     if (!r?.ok) showBanner(r?.error || '新建窗口失败');
     return !!r?.ok;
   }
-  const id = documentId;
-  if (dirty && !(await confirmDiscard())) return false;
-  if (documentId !== id) return false;
-  const r = await window.mpHost.docPath(null, { documentId: id });
-  if (documentId !== id) return false;
-  if (!r?.ok) { showBanner(r?.error || '新建失败'); return false; }
-  applyDoc('', null, r.documentId);
-  window.mpEngine?.focus?.(); return true;
+  const engine = window.mpEngine;
+  if (engine?.commands && !engine.commands.capture()) return false;
+  syncSource();
+  const expected = { documentId, revision };
+  const result = await window.mpHost.docPath(null, expected);
+  if (!result?.ok && !result?.canceled && documentId === expected.documentId) showBanner(result?.error || '关闭失败，已保留原文档');
+  return result?.ok === true && result.documentId === documentId;
 }
 
 /* ── 上行事件（任何异常都不许打断引擎：包一层，错进 console） ── */
@@ -568,25 +840,17 @@ window.mpHost.onMenu(async (cmd) => {
       if (!r || !r.ok) showBanner('全选失败：' + ((r && r.error) || '未知错误'));
       break;
     }
-    /* 【设置真源·S1·2026-10-10（settings-truth 族）】用户"删掉 settings.json"后**仍看到**工具岛
-       透明度/版心/内容缩放/状态栏开关全都还在 ✗ —— 因为渲染侧偏好是**另一套存储**：
-       `localStorage` 的 mp-pref-* / mp-surfaces / mp-reading* / editor-theme…，删配置文件清不动它。
-       这里补上这一半：一次清掉本进程**全部 mp-\* 键**，再 reload 让界面以干净状态重起。
-       （壳层那套由删 settings.json / 设置面板负责 ✓ 这里不重复、也不猜它各键的默认值 ✗。） */
     case 'resetAll': {
+      if (!window.mpExtras?.resetAppearance) { showBanner('编辑器尚未就绪，请稍后再恢复外观。'); return; }
       const removed = await window.mpHost.themeRemove();
       const defaults = Object.fromEntries(['body','h1','h2','h3','h4','h5','h6','italic','bold','code'].map(id => [id,'']));
       const fonts = await window.mpHost.fontSave(defaults);
       if (!removed.ok || !fonts.ok) { showBanner('恢复外观默认失败：' + (removed.error || fonts.error)); return; }
-      let cleared = 0;
       try {
-        const keys = [];
-        for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.indexOf('mp-') === 0) keys.push(k); }
-        for (const k of keys) { localStorage.removeItem(k); cleared++; }
-        localStorage.removeItem('editor-theme'); localStorage.removeItem('dark');
-      } catch { /* 忽略 */ }
-      try { console.log('[resetAll] 已清渲染侧偏好键 ' + cleared + ' 个，即将重载'); } catch { /* 忽略 */ }
-      try { location.reload(); } catch { /* 忽略 */ }
+        const mode = await window.mpHost.themeGet();
+        const refreshed = await window.mpExtras.resetAppearance(mode.dark);
+        if (refreshed?.ok === false) showBanner('恢复外观默认失败：' + (refreshed.error || '外观更新失败'));
+      } catch (error) { showBanner('恢复外观默认失败：' + error.message); }
       return;
     }
     case 'new': await newDocument(); break;
@@ -716,10 +980,6 @@ async function exportPdfFlow() {
   }
 }
 
-async function confirmDiscard() {
-  return window.confirm('当前文档有未保存的修改，确定放弃吗？');
-}
-
 /* 菜单缩放 → 引擎的内容缩放（工具岛不跟着变）。引擎没就位时退回壳层整页缩放（不静默）。 */
 function zoomVia(kind, v) {
   const z = window.mpZoom;
@@ -796,11 +1056,19 @@ window.addEventListener('focus', async () => {
   const origin = { documentId, filePath };
   const r = await window.mpHost.outsideChange(origin.filePath);
   if (documentId !== origin.documentId || filePath !== origin.filePath) return;
+  /* CM Live：会话健康时外改由主进程 live:refresh 采用并回放为远端增量，这里只催一次
+     立即交换；不走"整篇重载"旧路（那会丢弃未上行修改）。冲突按共享冲突 UI 呈现。 */
+  if (liveHealthy()) {
+    if (r?.code === 'MP_FILE_CONFLICT' || r?.live?.conflict) { liveError(r?.error || '磁盘与共享草稿均已改变，已保留当前草稿。', 'MP_FILE_CONFLICT'); return; }
+    try { window.mpEngine.liveDocument.refresh().catch(() => {}); } catch { /* 空转 */ }
+    return;
+  }
   if (!r || !r.changed) return;
   // A late disk notice cannot replace the current document's recovery actions.
   // outsideChange is read-only; later focus still compares the actual disk.
   if (saveBlocked || lastSaveError) return;
-  if (r.missing) { saveBlocked = true; showBanner('磁盘上的文件已不在，请另存为保留当前内容。', [{ label: '另存为…', run: () => { void saveAsFlow(); } }]); return; }
+  if (r.relocated) { showBanner('原文件位置已改变，已保留当前文档。', [{ label: '另存为…', run: () => { void saveAsFlow(); } }]); return; }
+  if (r.missing) { saveBlocked = true; showSourceRecovery('磁盘上的文件已不在，请另存为保留当前内容。', [{ label: '另存为…', run: () => { void saveAsFlow(); } }]); return; }
   /* 【第二波·cross-window 缺陷·2026-10-10】这里原来调 `openPath(filePath)`：
      openPath **不带落点**时用主会话 + 最后创建的窗口收尾 ⇒ 多窗口下"自动重载"会把内容灌进
      别的窗口（实测：只改 A 的 mtime、点 B 再点 A ⇒ B 自报变成 A 的文档）。
@@ -811,7 +1079,7 @@ window.addEventListener('focus', async () => {
   } else {
     showBanner('磁盘上的文件已被其他程序修改。', [
       { label: '载入磁盘版本', run: async () => { await reloadDocument({ origin: 'disk' }); } },
-      { label: '保留我的修改', run: () => { void doSave(true); } },
+      { label: '保留我的修改', run: () => { void keepMine(); } },
     ]);
   }
 }, true);

@@ -104,6 +104,7 @@ function escapeHtml(s) {
 }
 
 function close() {
+  if (raf) { cancelAnimationFrame(raf); raf = 0; }
   if (box) box.style.display = "none";
   rows = []; active = 0;
 }
@@ -115,24 +116,30 @@ function move(delta) {
 }
 
 function accept(index) {
-  if (!view || !rows.length) { close(); return; }
-  const row = rows[Math.max(0, Math.min(index, rows.length - 1))];
+  if (!view?.hasFocus || view.state.readOnly || view.composing || !rows.length) { close(); return false; }
+  const selected = rows[Math.max(0, Math.min(index, rows.length - 1))];
+  // Input can change the token before its scheduled menu repaint. Use live
+  // bounds and preserve the particular suggestion the user actually chose.
+  const hit = candidatesFor(view.state, true);
+  const row = hit?.from === tokenFrom && hit.rows.find(item => item.label === selected.label);
+  if (!row) { close(); return false; }
   const insert = row.text;
   // 【替换区间契约】`before` = 光标左侧属于本 token 的字符数；`after` = 右侧仍属于本 token 的
   // 字符数（例：`\fr|ac{x}{y}` 里 ac 要一起换掉，才不会留下 `\frac{}{}ac{x}{y}`）。
-  const from = tokenTo - (row.before || 0);
-  const to = tokenTo + (row.after || 0);
+  const from = hit.head - (row.before || 0);
+  const to = hit.head + (row.after || 0);
   // 插入串里的空花括号：光标落进去（`\mathbb{}` → 光标在 {} 中间）
   const caretIn = insert.indexOf("{}");
   const anchor = caretIn >= 0 ? from + caretIn + 1 : from + insert.length;
   close();
   view.dispatch({
-    changes: { from, to, insert },
+    changes: view.state.sliceDoc(from, to) === insert ? undefined : { from, to, insert },
     selection: { anchor },
     scrollIntoView: true,
     userEvent: "input.complete",
   });
   view.focus();
+  return true;
 }
 
 /** token → 候选。返回 null 表示"当前不该有菜单"。 */
@@ -159,12 +166,13 @@ function candidatesFor(state, manual) {
   // 本地源（命令/片段）照实弹（:228 `items = [...localCandidates(prefix, context), …]`）。
   // 故这里不再做二次门控——有没有候选完全由 localCandidates 决定（它在公式里对 `/` 返回空，
   // 天然把"公式里没有块片段"这条互斥做掉了）。manual（Ctrl+Space）保留给后续 AI 源用。
-  const list = localCandidates(prefix, { kind, mathBefore: ctx.mathBefore || "", mathAfter });
+  const list = localCandidates(prefix, { kind, mathBefore: ctx.mathBefore || "", mathAfter, suffix: mathAfter, after: mathAfter });
   if (!list.length) return null;
   return { rows: list, from: head - prefix.length, head };
 }
 
 function refresh(v, manual) {
+  if (!v.hasFocus || v.state.readOnly || v.composing) { close(); return; }
   try {
     const hit = candidatesFor(v.state, manual);
     if (!hit) { close(); return; }
@@ -184,8 +192,8 @@ function schedule(v, manual) {
 const keyHandlers = [
   { key: "ArrowDown", run: () => (rows.length ? (move(1), true) : false) },
   { key: "ArrowUp", run: () => (rows.length ? (move(-1), true) : false) },
-  { key: "Enter", run: () => (rows.length ? (accept(active), true) : false) },
-  { key: "Tab", run: () => (rows.length ? (accept(active), true) : false) },
+  { key: "Enter", run: () => !!rows.length && accept(active) },
+  { key: "Tab", run: () => !!rows.length && accept(active) },
   { key: "Escape", run: () => (rows.length ? (close(), true) : false) },
   { key: "Ctrl-Space", run: (v) => { refresh(v, true); return !!rows.length; } },
 ];

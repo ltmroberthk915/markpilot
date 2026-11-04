@@ -6,8 +6,8 @@
 //
 // 架构（见 README.md）：引擎 0 改动，插件只做 DSH 皮/桥/文件 IO。
 //   · 静态资源来自插件根 renderer-cm6/（core-sync 从 EXE 构建产物逐字节同步）；
-//   · 所有写都走 ctx.fs 的版本守卫（FS_STALE_VERSION 拒绝盲写，冲突不覆盖）；
-//   · save 的 baseVersion 必填 —— 关 tab 的 keepalive flush 也一样，服务端不做"缺版本就无条件写"；
+//   · 同一文件的写入排队校验 ctx.fs 版本，本地文件使用桌面壳的原子写入与编码处理；
+//   · 每次 save 都要求 baseVersion，版本冲突返回 FS_STALE_VERSION；
 //   · 写成功后向所有 SSE 连接广播 version（客户端按 path 过滤 + 脏缓冲不覆盖）。
 //
 // 保留的既有不变量：
@@ -17,10 +17,291 @@
 //      unhandled rejection + watcher 泄漏。这里 await 捕获并幂等 close。
 //   4. 每个 async 分支都有 try/catch，错误以 {ok:false,error:{code,message}} 返回，code 原样透传。
 
-import { readFile, stat as fsStat, writeFile as fsWriteFile } from 'node:fs/promises';
+import { readFile, stat as fsStat, realpath } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
+// 下面三个静态导入**只保留 HMR 依赖边**（host/*.js 变更 ⇒ dsh-hmr 把插件条目一并重启），
+// 实例不直接消费：DSH HMR 的替换计划只驱逐「变更模块 + 其 importer」（planReplacement
+// 只向上闭包，不向下含依赖），协同更新分批到达时 host/ 的 CJS 三件会混代 ——
+// 新 document-store 顶层解构旧 live-documents 的导出 ⇒ “liveCommitDirectory is not a
+// function”（real-manager-enable-r1 实证）。消费实例一律经 loadHostModules() 以
+// 「整组驱逐 + 同代重载」取得：document-store 与 live-documents 永远来自同一代磁盘内容，
+// 不降级、不换目录、共享房间/原子写语义不变。
+import rawDiskStore from '../host/document-store.js';
+import rawLiveStore from '../host/live-documents.js';
+import rawTextCodec from '../host/text-codec.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize, sep, extname } from 'node:path';
+
+const requirePlugin = createRequire(import.meta.url);
+const nodeFs = requirePlugin('node:fs');
+const nodeModule = requirePlugin('node:module');
+/** loader 代际（ABI）：图记录若由不带本代「局部 require 所有权」的旧 loader 建立
+ *  （同 digest 的旧 CCB slot 仍在活进程里），一律**不复用**：显式重建一代，
+ *  旧 owner 交由其自己的 close/退休路径排空；重建后的同代码热载才稳定复用。 */
+const HOST_GRAPH_ABI = 2;
+/** 本代 Module → 原始 require（WeakMap：模块可回收，不积累强引用）。 */
+const OWNED_ORIGINALS = new WeakMap();
+/* ── host 运行时图（digest 整组复用/重载；进程级注册表，realpath 归一）────────────
+ * 真实 HMR 实测（real-hmr-worker-count-r2）：每代无条件驱逐 ⇒ 每代一个 file-worker。
+ * 方案（v3，按完整 host 清单而非手维护依赖图）：
+ *   ① digest = host/ 全部源成员（含 native-worker-lease.js、native-worker-path.ps1、
+ *      native/ 子树、package.json）的 rel+字节哈希，目录键走 fs.realpath（junction 拼写归一）；
+ *   ② 相同 digest ⇒ 整组复用（不 require、不碰缓存）——worker、SQLite databases、
+ *      beforeExit 全部延续；未变 native 写逻辑不可能被旧 writer 顶替；
+ *   ③ digest 变 ⇒ 先**预载+验证**新图（拓扑序 require 四入口、导出面形状校验），
+ *      全部成功才原子发布；失败则还原被逐出的缓存键并抛出 —— 旧图不被提前退休、
+ *      不 shutdown、原样可用；缺文件在读清单时即硬错误（无 sentinel、无静默复用）；
+ *   ④ 发布后旧图进 retiredList：其活跃 host 归零时调用**旧代自身**的
+ *      shutdownFileWorker（worker 为该模块实例独占；在途写由其内部 operations 排空），
+ *      然后清空 modules 引用并移除记录 —— exports/连接不再被注册表持有，模块可被
+ *      GC（含其模块级 SQLite databases）；新代冷启不受旧代 closing 影响；
+ *   ⑤ 同代多 host/多 live 窗口共享一张图：单 host.close 只减计数，最后一个才释放。
+ * 不降级、不换目录、共享房间/原子写语义不变。 */
+const HOST_GRAPH_KEY = Symbol.for('dsh-markdown-typora:host-graph');
+const HOST_ENTRY_ORDER = ['text-codec.js', 'safe-file.js', 'live-documents.js', 'document-store.js'];   // 依赖拓扑序
+function hostGraphSlot(hostDir) {
+  const root = (globalThis[HOST_GRAPH_KEY] ??= new Map());
+  let slot = root.get(hostDir);
+  if (!slot) { slot = { current: null, retiredList: [] }; root.set(hostDir, slot); }
+  return slot;
+}
+const HOST_GRAPH_REQUIRED = new Set(['document-store.js', 'live-documents.js', 'text-codec.js', 'safe-file.js',
+  'native-worker-lease.js', 'native-worker-path.ps1', 'native/file-worker.exe', 'native/file-worker.exe.build.json']);
+function readHostGraph(hostDir) {
+  // 真实 sync-host 约定：manifest 在**插件根**（host/ 上一级）的 host.json。
+  // 逐条校验：相对路径、无绝对/..、realpath 后仍在 canonical host 根内（防 symlink 逃逸）、
+  // bytes/sha256 与声明一致；必需成员（4 个 JS + native 脚本/二进制 + build manifest）必须声明。
+  // 任一不满足 ⇒ 硬失败（publish 之前），旧图保活。
+  const manifestPath = join(dirname(hostDir), 'host.json');
+  let manifest;
+  try { manifest = JSON.parse(nodeFs.readFileSync(manifestPath, 'utf8')); }
+  catch (error) { throw Object.assign(new Error('host graph manifest 不可读: ' + manifestPath), { cause: error }); }
+  if (!manifest || !Array.isArray(manifest.files) || manifest.files.length === 0)
+    throw new Error('host graph manifest 形状无效（files 为空）: ' + manifestPath);
+  const seen = new Set();
+  const members = [];
+  for (const entry of manifest.files) {
+    if (!entry || typeof entry.path !== 'string' || !entry.path) throw new Error('host graph manifest 条目无效');
+    const rel = entry.path;
+    if (pathIsAbsoluteShim(rel) || rel.split('/').some((segment) => segment === '..'))
+      throw new Error('host graph manifest 条目必须为 host 内相对路径: ' + rel);
+    if (seen.has(rel)) throw new Error('host graph manifest 重复条目: ' + rel);
+    seen.add(rel);
+    const real = nodeFs.realpathSync(join(hostDir, rel));       // 缺失/坏链 ⇒ throw（硬失败）
+    if (real !== hostDir && !real.startsWith(hostDir + sep))    // canonical 核对：不许 symlink 指到 host 外
+      throw new Error('host graph 成员逃逸 canonical 根: ' + rel + ' → ' + real);
+    const bytes = nodeFs.readFileSync(real);
+    const digest = createHash('sha256').update(bytes).digest('hex');
+    if (bytes.length !== entry.bytes || digest !== entry.sha256)
+      throw new Error(`host graph 成员与 manifest 不匹配: ${rel}（期望 ${entry.bytes}B/${String(entry.sha256).slice(0, 12)}，实际 ${bytes.length}B/${digest.slice(0, 12)}）`);
+    members.push({ rel, real, bytes });
+  }
+  for (const required of HOST_GRAPH_REQUIRED)
+    if (!seen.has(required)) throw new Error('host graph manifest 缺少必需成员: ' + required);
+  members.sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
+  const graph = createHash('sha256');
+  for (const member of members) {
+    graph.update(member.rel); graph.update('\0');
+    graph.update(createHash('sha256').update(member.bytes).digest());
+  }
+  return { digest: graph.digest('hex'), members };
+}
+function pathIsAbsoluteShim(p) { return p.startsWith('/') || /^[A-Za-z]:/.test(p) || p.startsWith('\\\\'); }
+function evictHostCacheKeys(members) {
+  // 只逐 .js 成员；缓存键 = realpath。还原函数**先清空本次全部成员键**（含装载新产生、
+  // 原先不存在的条目），再放回快照 —— 失败后旧 host 的延迟 require 只见旧实例，不混代。
+  const backup = [];
+  const keys = [];
+  for (const member of members) {
+    if (!member.rel.endsWith('.js')) continue;
+    keys.push(member.real);
+    const existing = requirePlugin.cache[member.real];
+    if (existing !== undefined) backup.push([member.real, existing]);
+    try { delete requirePlugin.cache[member.real]; } catch { /* 原本不在 */ }
+  }
+  return () => {
+    for (const key of keys) { try { delete requirePlugin.cache[key]; } catch { /* 已不在 */ } }
+    for (const [key, mod] of backup) requirePlugin.cache[key] = mod;
+  };
+}
+function finalizeHostRetirement(slot, record) {
+  // 顺序约定（transport）：先旧代 retireLiveStorage()（仍有会话/在途 ⇒ MP_LIVE_ACTIVE，
+  // 此时**不算已清理**——保持 pending，绝不误判 done），再旧代 safeFile.shutdownFileWorker()
+  //（成功后自行移除 beforeExit 监听）。全部完成才清引用、移除记录。
+  if (record.retired === 'done') return;         // 幂等：跨代/跨路径重复触发只收一次
+  const live = record.modules.get('live-documents.js');
+  try {
+    const retired = live?.retireLiveStorage?.();
+    if (retired && retired.ok !== true) return scheduleRetirementRetry(slot, record);
+  } catch (error) {
+    if (error?.code === 'MP_LIVE_ACTIVE') return scheduleRetirementRetry(slot, record);
+    /* 其它错误：存储未收口也要继续收 worker/引用 —— 进程退出兜底仍在 */
+  }
+  const safeFile = record.modules.get('safe-file.js');
+  try { void Promise.resolve(safeFile?.shutdownFileWorker?.()).catch(() => { /* 旧代关停失败不阻塞；退出 hook 兜底 */ }); }
+  catch { /* 旧代关停失败不阻塞 */ }
+  record.retired = 'done';
+  // 解除本代模块的局部 require 所有权：恢复原 mod.require（不碰全局行为），之后其惰性
+  // require 回到普通解析；本代记录随后清引用。
+  unbindOwnedRequires(record);
+  record.modules.clear();                       // 释放引用：旧模块（含模块级 worker/SQLite 状态）可被 GC
+  const at = slot.retiredList.indexOf(record);
+  if (at !== -1) slot.retiredList.splice(at, 1);   // 记录不复留：不持有 exports/连接
+}
+function scheduleRetirementRetry(slot, record) {
+  // MP_LIVE_ACTIVE：仍有在途操作/在场会话 —— 稍后重试一次；仍活跃则留 pending（退出兜底）。
+  if (record.retireRetry) return;
+  record.retireRetry = setTimeout(() => {
+    record.retireRetry = null;
+    if (record.retired === 'pending' && record.hosts.size === 0) finalizeHostRetirement(slot, record);
+  }, 300);
+  record.retireRetry.unref?.();
+}
+function loadHostGraph() {
+  // import.meta.url 可能带 HMR 查询串（?g=…）——取文件本体路径。
+  const here = dirname(fileURLToPath(import.meta.url.split('?')[0]));
+  const hostDir = nodeFs.realpathSync(normalize(join(here, '..', 'host')));   // 缺失 ⇒ 硬错误
+  const slot = hostGraphSlot(hostDir);
+  const graph = readHostGraph(hostDir);           // 任一成员缺/不可读 ⇒ 硬错误（无 sentinel）
+  // 复用条件必须同时满足 digest 与 **loader 代际**：活进程里可能已有同 digest 的旧 CCB slot
+  //（不带本代「局部 require 所有权」）—— 它不能无条件复用，须显式按本代重建一次。
+  if (slot.current && slot.current.digest === graph.digest && slot.current.abi === HOST_GRAPH_ABI) {
+    const current = slot.current;
+    return { live: current.modules.get('live-documents.js'), disk: current.modules.get('document-store.js'),
+      codec: current.modules.get('text-codec.js'), graph: current };
+  }
+  // 预载新图：逐出本图 .js 成员缓存键（含 native-worker-lease 等），拓扑序 require，形状验证。
+  const restore = evictHostCacheKeys(graph.members);
+  const loaded = new Map();
+  const cjsModules = new Map();
+  const cjsByFile = new Map();
+  try {
+    for (const name of HOST_ENTRY_ORDER) {
+      loaded.set(name, requirePlugin('../host/' + name));
+      // 捕获本代模块的 CJS Module 对象（供局部 resolver 用；**不写全局 require.cache**）。
+      try {
+        const resolved = requirePlugin.resolve('../host/' + name);
+        const real = nodeFs.realpathSync(resolved);
+        const mod = requirePlugin.cache[real] || requirePlugin.cache[resolved] || null;
+        cjsModules.set(name, mod);
+        if (mod) {
+          cjsByFile.set(mod.filename, mod);
+          if (real !== mod.filename) cjsByFile.set(real, mod);
+        }
+      } catch { cjsModules.set(name, null); }
+    }
+    const live = loaded.get('live-documents.js'), disk = loaded.get('document-store.js');
+    if (typeof live?.LiveDocuments !== 'function' || typeof live?.withFileCommit !== 'function'
+      || typeof disk?.DocumentStore !== 'function' || typeof disk?.createSession !== 'function'
+      || typeof loaded.get('text-codec.js')?.decodeDocument !== 'function'
+      || typeof loaded.get('safe-file.js')?.prepareFile !== 'function')
+      throw new Error('host graph 新代导出面不完整（digest=' + graph.digest.slice(0, 12) + '）');
+  } catch (error) {
+    restore();                                    // 回滚缓存：旧图成员（含懒 require 路径）原位、不被破坏
+    throw error;
+  }
+  // ① 发布前校验（绑定/导出一致性）——失败 ⇒ 回滚并抛出；**旧图不退休、不 shutdown**。
+  try {
+    validateOwnedGraph(loaded, cjsModules);
+  } catch (error) {
+    restore();
+    throw error;
+  }
+  // ② 在图记录建立后、对外发布前完成逐 Module 实例的 require 绑定；绑定失败同样回滚。
+  const nextGraph = { dir: hostDir, abi: HOST_GRAPH_ABI, digest: graph.digest, modules: loaded, cjs: cjsModules, cjsByFile, hosts: new Set(), retired: 'active', generation: (slot.current?.generation ?? 0) + 1 };
+  try {
+    bindOwnedRequires(nextGraph);
+  } catch (error) {
+    unbindOwnedRequires(nextGraph);
+    restore();
+    throw error;
+  }
+  // ③ 原子发布：旧图记账退休（host 归零才真正释放），新图上桌。
+  const previous = slot.current;
+  if (previous) {
+    previous.retired = previous.hosts.size === 0 ? 'done' : 'pending';
+    slot.retiredList.push(previous);
+    if (previous.retired === 'done') finalizeHostRetirement(slot, previous);
+  }
+  slot.current = nextGraph;
+  return { live: loaded.get('live-documents.js'), disk: loaded.get('document-store.js'),
+    codec: loaded.get('text-codec.js'), graph: slot.current };
+}
+/** 发布前绑定/导出一致性校验：真实 Module 对象缺失或 exports 形状不符 ⇒ 直接失败（不静默放过）。 */
+function validateOwnedGraph(loaded, cjsModules) {
+  for (const name of HOST_ENTRY_ORDER) {
+    const mod = cjsModules.get(name);
+    if (!mod || !mod.exports || mod.exports !== loaded.get(name))
+      throw new Error('host graph 校验失败：成员 Module 缺失或 exports 不匹配（' + name + '）');
+  }
+  const live = loaded.get('live-documents.js'), disk = loaded.get('document-store.js');
+  if (typeof live?.defaultDirectory !== 'function')
+    throw new Error('host graph 校验失败：live-documents.defaultDirectory 非函数（混代绑定）');
+  if (typeof live?.LiveDocuments !== 'function' || typeof live?.withFileCommit !== 'function')
+    throw new Error('host graph 校验失败：live-documents 导出面不完整');
+  if (typeof disk?.DocumentStore !== 'function' || typeof disk?.createSession !== 'function')
+    throw new Error('host graph 校验失败：document-store 导出面不完整');
+  // 只读构造探针：document-store 构造函数仅赋值（无 IO），defaultDirectory 混代时必抛
+  // liveCommitDirectory is not a function —— 这正是发布前要拦下的形态。
+  const probe = new disk.DocumentStore();
+  if (!probe || typeof probe.snapshot !== 'function' || typeof probe.commitDirectory !== 'string' || !probe.commitDirectory)
+    throw new Error('host graph 校验失败：DocumentStore 构造绑定异常');
+  probe.jobs?.clear?.();
+}
+/** 逐 Module 实例安装本代 require（WeakMap 保存原 require；非 prototype、非 _load）。 */
+function bindOwnedRequires(graph) {
+  for (const [name, mod] of graph.cjs) {
+    if (!mod || typeof mod.require !== 'function' || !mod.exports)
+      throw new Error('host graph 绑定失败：成员 Module 不可用（' + name + '）');
+    if (OWNED_ORIGINALS.has(mod)) continue;                     // 已绑定（同代重复发布不应发生）
+    const original = mod.require;
+    const owned = graph.cjsByFile;
+    const wrapped = function ownedRequire(request) {
+      if (typeof request === 'string' && request[0] === '.' && owned) {
+        let filename = null;
+        try { filename = nodeModule._resolveFilename(request, mod, false); } catch { /* 交给原 require 报错 */ }
+        if (filename) {
+          const hit = owned.get(filename);
+          if (hit) return hit.exports;
+        }
+      }
+      return original.call(mod, request);
+    };
+    OWNED_ORIGINALS.set(mod, original);
+    mod.require = wrapped;
+  }
+}
+/** 恢复本代模块的原 require（退役路径）；重复调用安全。 */
+function unbindOwnedRequires(record) {
+  if (!record || !record.cjs) return;
+  for (const [, mod] of record.cjs) {
+    const original = OWNED_ORIGINALS.get(mod);
+    if (original) { try { mod.require = original; } catch { /* 已冻结则忽略 */ } OWNED_ORIGINALS.delete(mod); }
+  }
+}
+// 无兜底：装载失败就让它失败（绝不回落到可能混代的 raw* 实例掩盖问题）。
+const hostModules = loadHostGraph();
+const diskStore = hostModules.disk;
+const liveStore = hostModules.live;
+const textCodec = hostModules.codec;
+const activeHostGraph = hostModules.graph;
+function registerHost(token) { activeHostGraph.hosts.add(token); }
+function scheduleHostRetirement(ownerGraph) {
+  // 已接纳的异步 save 排空后才允许关闭旧代资源（worker/连接）；期间另一 active host
+  // 不受任何影响（owners 已归零才会走到这里，且只作用于被顶代的图）。
+  const here = dirname(fileURLToPath(import.meta.url.split('?')[0]));
+  const hostDir = nodeFs.realpathSync(normalize(join(here, '..', 'host')));
+  void Promise.allSettled([...saveJobs.values()]).then(() => {
+    if (ownerGraph.hosts.size === 0 && ownerGraph.retired === 'pending') finalizeHostRetirement(hostGraphSlot(hostDir), ownerGraph);
+  }).catch(() => { /* 排空失败不阻塞 */ });
+}
+function unregisterHost(token) {
+  const ownerGraph = activeHostGraph;
+  if (ownerGraph.hosts.delete(token) && ownerGraph.hosts.size === 0 && ownerGraph.retired === 'pending') scheduleHostRetirement(ownerGraph);
+}
+void rawDiskStore; void rawLiveStore; void rawTextCodec;
 
 export const name = 'dsh-markdown-typora';
 
@@ -30,9 +311,12 @@ export const inject = ['webServer', 'fs'];
 const ROUTE_PREFIX = '/dsh-markdown-typora';
 const STATIC_PREFIX = ROUTE_PREFIX + '/renderer-cm6/';
 const API_PREFIX = ROUTE_PREFIX + '/api/';
+// Only the editor's explicit local-file actions use its native file capability.
+// The model tool must use the host filesystem's read projection and write policy.
+const MODEL_TOOL = Symbol('markdown model tool');
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live']);
 const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '::1']);
 
 /** 请求体上限：64MB。含内联图文档常见 10MB+；上限之外明确 413，不静默截断。 */
@@ -43,8 +327,23 @@ const WATCH_DEBOUNCE_MS = 120;
 const WATCH_PROBE_MS = 2000;
 const SSE_HEARTBEAT_MS = 15000;
 
-const HERE = dirname(fileURLToPath(import.meta.url));
+const HERE = dirname(fileURLToPath(import.meta.url.split('?')[0]));
 export const PLUGIN_ROOT = normalize(join(HERE, '..'));
+const localDocuments = new diskStore.DocumentStore();
+// Shared by all createHost instances in this process. Failures do not poison
+// subsequent saves; a queued request must validate its version on admission.
+const saveJobs = new Map();
+const pathKey = p => process.platform === 'win32' ? normalize(p).toLowerCase() : normalize(p);
+async function canonicalTarget(target) {
+  const p=nativeTargetPath(target);
+  try {return await realpath(p);} catch(error) {if(error.code!=='ENOENT')throw error;return p;}
+}
+function queueSave(key, action) {
+  const job=(saveJobs.get(key)||Promise.resolve()).catch(()=>{}).then(action);
+  saveJobs.set(key,job);
+  const done=()=>{if(saveJobs.get(key)===job)saveJobs.delete(key);};job.then(done,done);
+  return job;
+}
 
 /** 静态资源 MIME 表（含 CM6 引擎实际用到的 woff/woff2/ttf/wasm/map，以及 mermaid 的 svg/png）。 */
 export const MIME_BY_EXT = {
@@ -313,35 +612,29 @@ function versionOfBigInt(info) {
 }
 
 /**
- * 沙箱拒绝写入时的原生 fs 回退。保留版本守卫：先读 ctx.fs.stat（读路径在
- * workspace-write 下仍可用），baseVersion 不匹配照样报 FS_STALE_VERSION；
- * 写后优先用 ctx.fs.stat 的新版本，读不到才用同形的 bigint 版本。
- *
- * 注意：这是用户明确要求的“绕过 DSH 文件策略”，只对 Markdown 文档保存生效，
- * 不改变插件其它 fs 能力；OS 权限错误不会被吞掉。
+ * Local Markdown saves share the desktop's stable snapshot, encoding and
+ * staged native replacement. Never truncate the destination before commit.
+ * The UI's existing explicit local-file write capability remains scoped here.
  */
-async function directWriteText(fs, target, text, baseVersion) {
-  const path = nativeTargetPath(target);
-  if (!path) throw codedError('FS_IO_ERROR', 'direct write: target has no native path');
-  let before = null;
-  try { before = await fs.stat(target); } catch { before = null; }
-  if (before) {
-    if (String(before.version) !== String(baseVersion)) {
-      throw codedError('FS_STALE_VERSION', 'file changed since read');
-    }
-  } else {
-    const info = await fsStat(path, { bigint: true }).catch(() => null);
-    if (!info) throw codedError('FS_NOT_FOUND', `not found: ${target.displayPath ?? path}`);
-    if (versionOfBigInt(info) !== String(baseVersion)) {
-      throw codedError('FS_STALE_VERSION', 'file changed since read');
-    }
+async function directWriteText(fs, target, text, baseVersion, diskHash) {
+  const file=nativeTargetPath(target),session=diskStore.createSession();
+  if(!file)throw codedError('FS_IO_ERROR','direct write: target has no native path');
+  const version=async()=>{const info=await fs.stat(target);if(!info)throw codedError('FS_NOT_FOUND','file no longer exists');return String(info.version);};
+  try {
+    if(await version()!==baseVersion)throw codedError('FS_STALE_VERSION','file changed since read');
+    await localDocuments.load(session,file);
+    if(diskHash && session.baseline.sha256!==diskHash)throw codedError('FS_STALE_VERSION','file changed since the synchronized revision');
+    if(await version()!==baseVersion)throw codedError('FS_STALE_VERSION','file changed while preparing save');
+    const expected=textCodec.encodeDocument(text,session),expectedHash=createHash('sha256').update(expected).digest('hex');
+    localDocuments.markDirty(session,{documentId:session.documentId,revision:1,dirty:true});
+    await localDocuments.save(session,{filePath:session.filePath,text,documentId:session.documentId,revision:1});
+    const before=await version(),saved=await localDocuments.snapshot(session.filePath),after=await version();
+    if(before!==after||saved.baseline.sha256!==expectedHash)throw codedError('FS_STALE_VERSION','file changed after save; draft retained');
+    return {version:after,displayPath:target.displayPath,size:saved.bytes.length};
+  } catch(error) {
+    if(['MP_FILE_CONFLICT','MP_FILE_MISSING'].includes(error.code))error.code='FS_STALE_VERSION';
+    throw error;
   }
-  await fsWriteFile(path, String(text), 'utf8');
-  let after = null;
-  try { after = await fs.stat(target); } catch { after = null; }
-  if (after) return { version: after.version, displayPath: target.displayPath };
-  const info = await fsStat(path, { bigint: true });
-  return { version: versionOfBigInt(info), displayPath: target.displayPath };
 }
 
 
@@ -457,7 +750,29 @@ export function createHost(options = {}) {
 
   /** 每个被观察文件一条 entry；refs 计数到 0 才释放（SSE 多 tab 共享）。 */
   const watchers = new Map();
-  /** 所有活着的 SSE 连接：{ res, targetKey }。广播按"所有连接"发出，客户端按 path 过滤。 */
+  const live = options.liveDocuments ?? new liveStore.LiveDocuments();
+  const leases = new Map();
+  let closed = false;
+
+  function leaseOf(client) {
+    const lease = typeof client === 'string' && leases.get(client);
+    if (!lease) throw codedError('MP_LIVE_LEASE', '编辑同步会话已过期，当前草稿已保留');
+    return lease;
+  }
+  function releaseLive(client) {
+    if (!leases.delete(client)) return;
+    live.leave(client);
+  }
+  function liveEndpoint(payload) {
+    leaseOf(payload.client);
+    if (payload.action === 'leave') {
+      releaseLive(payload.client);
+      return {ok:true,value:null};
+    }
+    if (payload.action !== 'exchange') return badRequest('unknown live action');
+    return Promise.resolve(live.exchange(payload.client,payload.request)).then(value=>({ok:true,value}));
+  }
+  /** Persisted-file notifications are scoped to the watched target. Unsaved edits use independent document leases. */
   const liveStreams = new Set();
 
   function watchKeyOf(target) {
@@ -473,6 +788,7 @@ export function createHost(options = {}) {
     };
     const frame = `event: change\ndata: ${JSON.stringify(data)}\n\n`;
     for (const stream of liveStreams) {
+      if(stream.targetKey !== watchKeyOf(target))continue;
       try {
         stream.res.write(frame);
       } catch { /* 连接已断，close 事件会清理 */ }
@@ -693,22 +1009,43 @@ export function createHost(options = {}) {
     } catch { /* 已断 */ }
   }
 
-  function resolveOptions(payload) {
-    const cwd = payload?.cwd;
-    return typeof cwd === 'string' && cwd.length > 0 ? { cwd } : undefined;
+  function resolveOptions(payload, invocation) {
+    const cwd = invocation?.cwd ?? payload?.cwd;
+    return { ...(typeof cwd === 'string' && cwd ? {cwd} : {}), ...(invocation?.signal ? {signal:invocation.signal} : {}) };
   }
 
-  async function apiOpen(payload) {
+  async function apiOpen(payload, authority, resolvedTarget, invocation) {
     const path = typeof payload?.path === 'string' ? payload.path : '';
     if (!path) return badRequest('path is required');
-    const target = await fs.resolve(path, resolveOptions(payload));
-    const info = await fs.stat(target);
-    if (!info) return { ok: false, error: { code: 'FS_NOT_FOUND', message: `not found: ${target.displayPath}` } };
-    if (info.type !== 'file') {
-      return { ok: false, error: { code: 'FS_NOT_REGULAR_FILE', message: `not a regular file: ${target.displayPath}` } };
+    const target = resolvedTarget ?? await fs.resolve(path, resolveOptions(payload, invocation));
+    for(let attempt=0;attempt<3;attempt++) {
+      const info=await fs.stat(target, invocation?.signal);
+      if(!info)throw codedError('FS_NOT_FOUND',`not found: ${target.displayPath}`);
+      if(info.type!=='file')throw codedError('FS_NOT_REGULAR_FILE',`not a regular file: ${target.displayPath}`);
+      let text, baseline;
+      // The local provider's version identifies native bytes. Use the same
+      // strict BOM/EOL decoder as its writer; virtual providers keep their API.
+      const native=authority===MODEL_TOOL ? null : await fsStat(nativeTargetPath(target),{bigint:true}).catch(e=>{if(e.code!=='ENOENT')throw e;return null;});
+      if(native&&versionOfBigInt(native)===String(info.version)) {
+        try {const snapshot=await localDocuments.snapshot(nativeTargetPath(target)); baseline=snapshot.baseline.sha256; text=textCodec.decodeDocument(snapshot.bytes,target.displayPath).text;}
+        catch(error){if(error.code==='MP_FILE_CONFLICT')continue;throw error;}
+      } else text=await fs.readText(target, invocation?.signal);
+      const after=await fs.stat(target, invocation?.signal);
+      if(!after||String(after.version)!==String(info.version))continue;
+      const value={text,version:after.version,displayPath:target.displayPath,size:after.size,type:after.type};
+      if (payload.live === true && baseline && authority !== MODEL_TOOL) {
+        const canonical=await canonicalTarget(target);
+        const seed=text.replace(/\r\n?/g,'\n');
+        const joined=await live.join(canonical,seed,baseline);
+        if (closed) { live.leave(joined.client);throw codedError('MP_LIVE_CLOSED','editor host stopped'); }
+        leases.set(joined.client,{canonical:pathKey(canonical)});
+        value.live={client:joined.client,epoch:joined.epoch,version:joined.version,diskHash:joined.diskHash,dirty:joined.text!==seed,savedVersion:joined.savedVersion,
+          ...(Array.isArray(joined.recovered)?{recovered:joined.recovered}:{})};
+        value.text=joined.text;
+      }
+      return {ok:true,value};
     }
-    const text = await fs.readText(target);
-    return { ok: true, value: { text, version: info.version, displayPath: target.displayPath, size: info.size, type: info.type } };
+    throw codedError('FS_STALE_VERSION','file changed during read; retry after the external write finishes');
   }
 
   async function apiSave(payload) {
@@ -718,23 +1055,51 @@ export function createHost(options = {}) {
     if (!path) return badRequest('path is required');
     if (text === null) return badRequest('text is required');
     if (!baseVersion) return badRequest('baseVersion is required — refusing to overwrite without a version guard');
-    const target = await fs.resolve(path, resolveOptions(payload));
-    let result;
-    try {
-      result = await fs.writeText(target, text, { kind: 'replaceIfVersion', version: baseVersion });
-    } catch (error) {
-      if (!isSandboxWriteDenied(error)) throw error;
-      try {
-        log.warn?.('%s: DSH 文件策略拒绝写入 %s；按配置回退原生 fs 写入', name, target?.displayPath ?? path);
-      } catch { /* 日志失败不阻塞保存 */ }
-      result = await directWriteText(fs, target, text, baseVersion);
-    }
-    const version = result?.version;
-    broadcastChange(target, version);
-    return {
-      ok: true,
-      value: { version, displayPath: target.displayPath, size: Buffer.byteLength(text, 'utf8') },
-    };
+    const target = await fs.resolve(path, resolveOptions(payload)),key=pathKey(await canonicalTarget(target));
+    return queueSave(key,async()=>{
+      const current=await fs.resolve(path,resolveOptions(payload));
+      if(pathKey(await canonicalTarget(current))!==key)throw codedError('FS_STALE_VERSION','save target changed while queued');
+      const before=await fs.stat(current);
+      if(!before)throw codedError('FS_STALE_VERSION','file no longer exists');
+      let result;
+      const native=await fsStat(nativeTargetPath(current),{bigint:true}).catch(e=>{if(e.code!=='ENOENT')throw e;return null;});
+      const local=!!native && versionOfBigInt(native)===String(before.version);
+      if (payload.live) {
+        const ticket=payload.live;
+        if(!local||leaseOf(ticket.client).canonical!==key)throw codedError('MP_LIVE_LEASE','synchronized save target changed');
+        let writerVersion;
+        result=await live.save(ticket.client,{epoch:ticket.epoch,version:ticket.version,text},async({diskHash})=>{
+          const version=await fs.stat(current);
+          const identity=await fsStat(nativeTargetPath(current),{bigint:true});
+          if (!version || versionOfBigInt(identity)!==String(version.version) || pathKey(await canonicalTarget(await fs.resolve(path,resolveOptions(payload))))!==key)
+            throw codedError('FS_STALE_VERSION','file identity changed while waiting to save');
+          const receipt=await directWriteText(fs,current,text,String(version.version),diskHash);
+          writerVersion=receipt.version;
+          return receipt;
+        });
+        // 内核最终契约：写者回执保持权威（provider.version 原样），live 元数据以
+        // liveVersion/savedVersion/diskHash/epoch 另列。此防御兼容过渡期旧形状
+        // （旧内核把 head.version 并进回执盖掉写者版本）—— 两种形状下客户端拿到的
+        // version 都是盘版本、房间版本都在 liveVersion。
+        if(writerVersion!==undefined&&result&&typeof result==='object'&&String(result.version)!==String(writerVersion))
+          result={...result,liveVersion:result.version,version:writerVersion};
+      }else if(String(before.version)!==baseVersion)throw codedError('FS_STALE_VERSION','file changed since read');
+      else if(local)result=await live.external(nativeTargetPath(current),()=>directWriteText(fs,current,text,baseVersion));
+      else try {result=await fs.writeText(current,text,{kind:'replaceIfVersion',version:baseVersion});}
+      catch(error){if(!isSandboxWriteDenied(error))throw error;result=await directWriteText(fs,current,text,baseVersion);}
+      const version=result?.version;broadcastChange(current,version);
+      const value={version,displayPath:current.displayPath,size:result.size??Buffer.byteLength(text,'utf8')};
+      if(payload.live&&result&&typeof result==='object'){
+        // 已授权 live 保存专属：按客户端 applyLiveReceipt 约定透传最小 live 元数据
+        // （savedVersion/liveVersion/epoch/diskHash；provider version 保持权威）。
+        // 普通旧保存与模型写不走此分支 —— live capabilities 不外泄。
+        if(Number.isSafeInteger(result.savedVersion))value.savedVersion=result.savedVersion;
+        if(Number.isSafeInteger(result.liveVersion))value.liveVersion=result.liveVersion;
+        if(typeof result.epoch==='string'&&result.epoch)value.epoch=result.epoch;
+        if(typeof result.diskHash==='string'&&result.diskHash)value.diskHash=result.diskHash;
+      }
+      return {ok:true,value};
+    });
   }
 
   async function apiStat(payload) {
@@ -746,40 +1111,53 @@ export function createHost(options = {}) {
     return { ok: true, value: { version: info.version, size: info.size, type: info.type, displayPath: target.displayPath } };
   }
 
-  async function apiEdit(payload) {
+  async function apiEdit(payload, invocation) {
     const path = typeof payload?.path === 'string' ? payload.path : '';
     const oldString = typeof payload?.oldString === 'string' ? payload.oldString : null;
     const newString = typeof payload?.newString === 'string' ? payload.newString : null;
     if (!path) return badRequest('path is required');
     if (oldString === null || newString === null) return badRequest('oldString and newString are required');
-    const target = await fs.resolve(path, resolveOptions(payload));
-    const expected = typeof payload?.baseVersion === 'string' && payload.baseVersion.length > 0
-      ? { version: payload.baseVersion }
-      : undefined;
-    const result = await fs.editText(target, {
-      oldString,
-      newString,
-      replaceAll: payload?.replaceAll === true,
-    }, expected);
-    const version = result?.version;
-    broadcastChange(target, version, { oldString, newString });
-    return {
-      ok: true,
-      value: {
-        version,
-        displayPath: target.displayPath,
-        changed: result?.before !== result?.after,
-      },
-    };
+    if(!oldString)return badRequest('oldString must not be empty');
+    const resolution=resolveOptions(payload, invocation);
+    const target=await fs.resolve(path,resolution),key=pathKey(await canonicalTarget(target));
+    return queueSave(key,async()=>{
+      invocation?.signal?.throwIfAborted();
+      const current=await fs.resolve(path,resolution);
+      if(pathKey(await canonicalTarget(current))!==key)throw codedError('FS_STALE_VERSION','edit target changed while queued');
+      const opened=await apiOpen(payload,MODEL_TOOL,current,invocation),value=opened.value;
+      if(!opened.ok)return opened;
+      if(payload.baseVersion&&payload.baseVersion!==value.version)throw codedError('FS_STALE_VERSION','file changed since read');
+      const first=value.text.indexOf(oldString);
+      if(first<0)throw codedError('FS_EDIT_NOT_FOUND','old_string was not found');
+      if(payload.replaceAll!==true && value.text.includes(oldString,first+oldString.length))throw codedError('FS_AMBIGUOUS_EDIT','ambiguous edit');
+      const write=()=>fs.editText(current,{oldString,newString,replaceAll:payload.replaceAll===true},{version:value.version},invocation?.signal,invocation?.policy);
+      const native=await fsStat(nativeTargetPath(current),{bigint:true}).catch(e=>{if(e.code!=='ENOENT')throw e;return null;});
+      const result=native && versionOfBigInt(native)===String(value.version)
+        ? await live.external(nativeTargetPath(current),write) : await write();
+      broadcastChange(current,result.version,{oldString,newString});
+      return {ok:true,value:{version:result.version,displayPath:current.displayPath,changed:newString!==oldString}};
+    });
   }
 
-  async function dispatch(endpoint, payload) {
+  async function dispatch(endpoint, payload, authority, execution) {
     try {
+      let invocation;
+      if (authority === MODEL_TOOL) {
+        const session = execution?.agent?.session;
+        let policy;
+        if (endpoint === 'edit' && fs.sandboxMode !== undefined) {
+          policy = await options.sandboxPolicy?.()?.resolve(session ? {session} : {});
+          if (!policy?.mode) throw codedError('FS_SANDBOX_DENIED', 'Cannot resolve filesystem policy for this tool call');
+        }
+        invocation = {signal: execution?.signal, cwd: policy?.workspaceRoot ?? session?.header?.cwd, policy};
+        invocation.signal?.throwIfAborted();
+      }
       switch (endpoint) {
-        case 'open': return await apiOpen(payload);
+        case 'open': return await apiOpen(payload, authority, undefined, invocation);
         case 'save': return await apiSave(payload);
         case 'stat': return await apiStat(payload);
-        case 'edit': return await apiEdit(payload);
+        case 'live': return authority === MODEL_TOOL ? badRequest('editor lease required') : await liveEndpoint(payload);
+        case 'edit': return await apiEdit(payload, invocation);
         default: return badRequest(`unknown endpoint: ${String(endpoint)}`);
       }
     } catch (error) {
@@ -897,6 +1275,10 @@ export function createHost(options = {}) {
   };
 
   function close() {
+    closed=true;
+    // 先放本 host 自己的资源（leases → SSE → watchers），再离场代际计数：
+    // 已接纳的异步 save 排空后才可能触发旧代资源关闭（scheduleHostRetirement）。
+    for(const client of leases.keys())releaseLive(client);
     for (const stream of liveStreams) {
       try { stream.res.end(); } catch { /* 已断 */ }
     }
@@ -913,8 +1295,11 @@ export function createHost(options = {}) {
       }
     }
     watchers.clear();
+    unregisterHost(hostToken);   // 代际生命周期：最后一步离场；同代其它 host 不受影响
   }
 
+  const hostToken = {};
+  registerHost(hostToken);
   return { route, dispatch, close, broadcastChange, _internals: { watchers, liveStreams } };
 }
 
@@ -950,6 +1335,7 @@ export function apply(ctx) {
       fs: fsService,
       log,
       rootDir: PLUGIN_ROOT,
+      sandboxPolicy: () => safeGet(ctx, 'sandboxPolicy'),
       connectionProvider: () => safeGet(ctx, 'connection'),
     });
   } catch (error) {
@@ -1035,11 +1421,11 @@ export function createMarkdownToolDefinition(dispatch) {
         return textBlock(`已应用编辑：${value.displayPath ?? ''}${value.changed === false ? '（oldString 与 newString 相同，内容未变）' : ''}，新版本 ${String(value.version ?? '').slice(0, 12)}…`);
       },
     },
-    async execute(args) {
+    async execute(args, execution) {
       const action = args?.action === 'edit' ? 'edit' : 'read';
       try {
         if (action === 'read') {
-          const result = await dispatch('open', { path: args?.path, cwd: args?.cwd });
+          const result = await dispatch('open', { path: args?.path, cwd: args?.cwd }, MODEL_TOOL, execution);
           if (result.ok !== true) return { ok: false, action, error: result.error };
           return {
             ok: true,
@@ -1056,7 +1442,7 @@ export function createMarkdownToolDefinition(dispatch) {
           newString: args?.newString,
           replaceAll: args?.replaceAll === true,
           baseVersion: args?.baseVersion,
-        });
+        }, MODEL_TOOL, execution);
         if (result.ok !== true) return { ok: false, action, error: result.error };
         return {
           ok: true,

@@ -238,3 +238,22 @@ test('reversed selection retains its mapped original head', () => {
   assert.equal(t.commit('I'),true);
   assert.equal(text(v),'QabIxy');
 });
+
+test('replacing the original insertion point cancels a delayed image, while adjacent deletes keep it', () => {
+  for (const at of [0,5,10]) {
+    const view = makeView('left|right',at), ticket = reserveImageInsertion(view);
+    view.dispatch({changes:{from:0,to:10,insert:'UPDATED'},selection:{anchor:7},userEvent:'input.type'});
+    assert.equal(ticket.current(),null);
+    assert.equal(ticket.commit('I'),false);
+    assert.equal(text(view),'UPDATED');
+  }
+  for (const [from,to,expected] of [[1,5,'lIright'],[5,8,'left|Iht']]) {
+    const neighbor = makeView('left|right',5), pending = reserveImageInsertion(neighbor);
+    neighbor.dispatch({changes:{from,to},userEvent:'delete.selection'});
+    assert(pending.commit('I')); assert.equal(text(neighbor),expected);
+  }
+  const local = makeView('outside\nleft|right\ntail',13), pending = reserveImageInsertion(local);
+  local.dispatch({changes:{from:8,to:18,insert:'UPDATED'},userEvent:'input.type'});
+  assert.equal(pending.commit('I'),false);
+  assert.equal(text(local),'outside\nUPDATED\ntail');
+});

@@ -23,8 +23,8 @@ async function main(){
       ['rich-no-table','<h2>PRE_SENTINEL</h2><p>A <strong>A_HEAD</strong> word</p><p>POST_SENTINEL</p>',['PRE_SENTINEL','A_HEAD','POST_SENTINEL']],
       ['paragraph-bare-text','<p>PRE_SENTINEL</p>MID_SENTINEL'+tableA+'<p>POST_SENTINEL</p>',['PRE_SENTINEL','MID_SENTINEL','A_HEAD','A_LABEL','A_CELL','A_VALUE','POST_SENTINEL']],
       ['uppercase',mixed.replace(/table/g,'TABLE'),['PRE_SENTINEL','A_HEAD','A_LABEL','A_CELL','A_VALUE','MID_SENTINEL','B_HEAD','B_LABEL','B_CELL','B_VALUE','POST_SENTINEL']],
-      ['nested-fallback','<p>PRE_SENTINEL</p><table><tr><td>OUTER_SENTINEL'+tableA+'</td></tr></table>'+tableB+'<p>POST_SENTINEL</p>',['PRE_SENTINEL','OUTER_SENTINEL','A_HEAD','A_LABEL','A_CELL','A_VALUE','B_HEAD','B_LABEL','B_CELL','B_VALUE','POST_SENTINEL'],{plainFallback:true}],
-      ['merged-fallback','<p>PRE_SENTINEL</p><table><tr><td colspan="2">MERGED_SENTINEL</td></tr></table>'+tableB+'<p>POST_SENTINEL</p>',['PRE_SENTINEL','MERGED_SENTINEL','B_HEAD','B_LABEL','B_CELL','B_VALUE','POST_SENTINEL'],{plainFallback:true}],
+      ['nested-table','<p>PRE_SENTINEL</p><table><tr><td>OUTER_SENTINEL'+tableA+'</td></tr></table>'+tableB+'<p>POST_SENTINEL</p>',['PRE_SENTINEL','OUTER_SENTINEL','A_HEAD','A_LABEL','A_CELL','A_VALUE','B_HEAD','B_LABEL','B_CELL','B_VALUE','POST_SENTINEL'],{nested:true,fragment:'单元格 1　OUTER_SENTINEL'}],
+      ['merged-header','<p>PRE_SENTINEL</p><table><tr><td colspan="2">MERGED_SENTINEL</td></tr></table>'+tableB+'<p>POST_SENTINEL</p>',['PRE_SENTINEL','MERGED_SENTINEL','B_HEAD','B_LABEL','B_CELL','B_VALUE','POST_SENTINEL'],{fragment:'合并单元格：R1C1:R1C2'}],
       ['one-row','<table><tr><th>ONLY_HEADER</th><th>ONLY_LABEL</th></tr></table>',['ONLY_HEADER','ONLY_LABEL'],{fragment:'| ONLY_HEADER | ONLY_LABEL |\n| --- | --- |'}],
       ['plain-tsv','',['TSV_HEAD','TSV_LABEL','TSV_CELL','TSV_VALUE'],{plain:'TSV_HEAD\tTSV_LABEL\nTSV_CELL\tTSV_VALUE',fragment:'| TSV_HEAD | TSV_LABEL |\n| --- | --- |\n| TSV_CELL | TSV_VALUE |'}],
       ['code-literal',mixed,['PRE_SENTINEL','A_HEAD','A_LABEL','A_CELL','A_VALUE','MID_SENTINEL','B_HEAD','B_LABEL','B_CELL','B_VALUE','POST_SENTINEL'],{initial:'Start\n```text\n\n```\nEnd\n',code:true,literal:true}],
@@ -52,9 +52,10 @@ async function main(){
       const positions=tokens.map(t=>pasted.text.indexOf(t));trace.push({name:'order',tokens,positions});
       assert(positions.every(n=>n>=0),'every table and surrounding paragraph must survive');
       assert(positions.every((n,i)=>!i||n>positions[i-1]),'all source nodes retain document order');
-      if(config.plainFallback||config.literal){assert(pasted.text.includes(plain),'whole clipboard plain text survives unchanged');assert(!pasted.text.includes('| --- |'),'fallback and literal paths do not build partial tables');}
+      if(config.literal){assert(pasted.text.includes(plain),'whole clipboard plain text survives unchanged');assert(!pasted.text.includes('| --- |'),'literal paths do not build partial tables');}
       else{
-        if(html.includes('A_CELL'))assert(pasted.text.includes('| A_HEAD | A_LABEL |\n| --- | --- |\n| A_CELL | A_VALUE |'),'first complete Markdown table');
+        const member=config.nested?pasted.text.replace(/\n {4}(?=\|)/g,'\n'):pasted.text;
+        if(html.includes('A_CELL'))assert(member.includes('| A_HEAD | A_LABEL |\n| --- | --- |\n| A_CELL | A_VALUE |'),'first complete Markdown table');
         if(html.includes('B_CELL'))assert(pasted.text.includes('| B_HEAD | B_LABEL |\n| --- | --- |\n| B_CELL | B_VALUE |'),'second complete Markdown table');
         if(config.fragment)assert(pasted.text.includes(config.fragment),'expected structured Markdown');
       }

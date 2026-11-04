@@ -6,14 +6,14 @@ const cancelTicket = StateEffect.define();
 const commitTicket = StateEffect.define();
 export const cancelImageInsertions = StateEffect.define();
 
-function selectedTextChanged(ticket, changes) {
-  if (ticket.from === ticket.to) return false;
-  let touched = false;
-  changes.iterChanges((from, to, _fromB, _toB, inserted) => {
-    if (from < ticket.to && to > ticket.from ||
-        from === to && inserted.length > 0 && from > ticket.from && from < ticket.to) touched = true;
+function reservationOverwritten(ticket, changes) {
+  let overwritten = false;
+  changes.iterChangedRanges((from, to) => {
+    // Replacing the entire old draft also retires reservations at its endpoints.
+    if ((from === 0 && to === changes.length && to > 0) ||
+        (from < ticket.to && to > ticket.from)) overwritten = true;
   });
-  return touched;
+  return overwritten;
 }
 
 // All pending positions belong to the document state and follow CM6 changes.
@@ -38,7 +38,7 @@ export const imageInsertions = StateField.define({
           ? tr.changes.mapPos(owner.to, 1)
           : tr.changes.mapPos(owner.from, -1);
         next.push({ id: ticket.id, from: at, to: at });
-      } else if (!selectedTextChanged(ticket, tr.changes)) {
+      } else if (!reservationOverwritten(ticket, tr.changes)) {
         const from = tr.changes.mapPos(ticket.from, ticket.from === ticket.to ? -1 : 1);
         const to = ticket.from === ticket.to ? from : tr.changes.mapPos(ticket.to, -1);
         next.push({ id: ticket.id, from, to });
@@ -59,8 +59,13 @@ export function captureImageDocument(view) {
 // Reserve before reading the image or asking the host to write a file.
 export function reserveImageInsertion(view) {
   const ranges = view.state.selection.ranges;
-  if (ranges.length !== 1 || !view.state.field(imageInsertions, false)) return null;
-  const id = {}, range = ranges[0];
+  if (ranges.length !== 1) return null;
+  return reserveImageRange(view, ranges[0]);
+}
+
+function reserveImageRange(view, range) {
+  if (!range || view.state.readOnly || !view.state.field(imageInsertions, false)) return null;
+  const id = {};
   const headAtStart = range.head === range.from;
   view.dispatch({ effects: reserveTicket.of({ id, from: range.from, to: range.to }), annotations: Transaction.addToHistory.of(false) });
   const current = () => {
@@ -69,8 +74,9 @@ export function reserveImageInsertion(view) {
   };
   return {
     current,
+    fork: () => reserveImageRange(view, current()),
     commit(md, userEvent = 'input.paste') {
-      if (typeof md !== 'string' || !md.length) return false;
+      if (view.state.readOnly || typeof md !== 'string' || !md.length) return false;
       const ticket = current();
       if (!ticket) return false;
       const selections = view.state.selection.ranges;

@@ -50,10 +50,20 @@ async function main() {
       { name:'quoted-block-emphasis',key:'Control+v',kind:'block',initial:'TOP\n> $$\n> x+y\n> $$\nEND\n',payload:{text:'Q',html:'<p><em>Q</em></p>'} },
       { name:'cross-formula-rich',key:'Control+v',cross:true,glyph:'b',initial:'PRE $x+y$ MID $a+b$ POST\nTAIL\n',literal:'**Q**\n',payload:{text:'Q',html:'<p><strong>Q</strong></p>'} },
     ];
-    const checkClipboard = arm => {
-      const text = clipboard.verifyText(arm.payload.text), htmlCheck = clipboard.verifyHtml(arm.payload.html || '');
-      return { text, html: htmlCheck, expectedHTML: !!arm.payload.html,
-        matches: text.matches && (arm.payload.html ? htmlCheck.matches : htmlCheck.length === 0) };
+    // Same-data READ-ONLY re-verify only for the one observed transient (text already
+    // correct + expected HTML still absent); every thrown read error propagates as-is.
+    const checkClipboard = async arm => {
+      const readBack = () => {
+        const text = clipboard.verifyText(arm.payload.text), htmlCheck = clipboard.verifyHtml(arm.payload.html || '');
+        return { text, html: htmlCheck, expectedHTML: !!arm.payload.html,
+          matches: text.matches && (arm.payload.html ? htmlCheck.matches : htmlCheck.length === 0) };
+      };
+      const first = readBack();
+      if (first.matches) return first;
+      if (!(first.text.matches && arm.payload.html && first.html.length === 0)) return first;
+      let last = first, retries = 0;
+      for (; retries < 4 && !last.matches; retries++) { await sleep(150); last = readBack(); }
+      return { ...last, firstReadBack: first, attempts: 1 + retries };
     };
     const capture = async (p, trace, name) => {
       const state = await snapshot(p);
@@ -122,8 +132,8 @@ async function main() {
       assert.deepEqual(selected.selection, arm.cross?{anchor:0,head:to}:arm.collapsed?{anchor:to,head:to}:{anchor:to,head:tokenFrom}, 'ENTRY_UNCONFIRMED: actual intended source range');
 
       entry.stage = 'clipboard-and-paste-entry';
-      const written = await p.evaluate(payload => window.mpHost.writeClipboard(payload), arm.payload);
-      const beforeClipboard = checkClipboard(arm);
+      const written = await p.evaluate(payload => window.mpHost.writeClipboard(payload, window.mpHost.beginClipboardIntent('copy')), arm.payload);
+      const beforeClipboard = await checkClipboard(arm);
       trace.push({ name: 'clipboard-before', key: arm.key, fixturePayload: arm.payload, written, ...beforeClipboard });
       assert(written?.ok && beforeClipboard.matches, 'ENTRY_UNCONFIRMED: actual OS clipboard text/HTML readback');
       await p.keyboard.press(arm.key);
@@ -134,7 +144,7 @@ async function main() {
       await sleep(150);
       const pasted = await capture(p, trace, arm.name + '-04-pasted');
       const evidence = await p.evaluate(() => window.__qualityInlineRich);
-      const afterClipboard = checkClipboard(arm);
+      const afterClipboard = await checkClipboard(arm);
       trace.push({ name: 'paste-entry-and-clipboard-after', ...evidence, clipboard: afterClipboard });
       const shortcut = evidence.keys.some(k => k.trusted && k.ctrl && k.key.toLowerCase() === 'v' && k.shift === arm.key.includes('Shift'));
       const paste = evidence.paste;
@@ -164,7 +174,13 @@ async function main() {
       assert.equal(continued.text, continuedExpected, 'continued R edits after Q, keeping PRE/POST/TAIL and both delimiters exact');
       assert(pasted.focus && undone.focus && redone.focus && continuation.focus && continued.focus, 'real editor retains focus through the complete chain');
       assert(continued.screenshot.caret, 'continued edit has a measurable actual editor caret');
-      await waitUntil(() => fs.readFileSync(file, 'utf8') === continuedExpected, 'final exact source autosaved');
+      // Windows may briefly hold the just-autosaved file (indexer/AV) ⇒ transient
+      // EBUSY. Only EBUSY retries inside the wait; every other I/O error —
+      // including ENOENT — propagates immediately, never swallowed.
+      await waitUntil(() => {
+        try { return fs.readFileSync(file, 'utf8') === continuedExpected; }
+        catch (error) { if (error?.code === 'EBUSY') return false; throw error; }
+      }, 'final exact source autosaved');
       entry.stage = 'complete';
       return { key: arm.key, tokenFrom,from,to,literal,collapsed:!!arm.collapsed,crossFormula:!!arm.cross,expectedSource: expected, continuedExpected, foldedRedo,
         entryConfirmed: true, electronAcceleratorVerified: false, undoRedo: 'CM commands through renderer keys' };

@@ -2,10 +2,12 @@
 // Shared preflight runs before renderer IPC and again before native staging.
 const LIMITS = Object.freeze({ imageBytes: 16 * 1024 * 1024, totalBytes: 64 * 1024 * 1024, imageChars: 48 * 1024 * 1024, totalChars: 192 * 1024 * 1024 });
 const extensions = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/gif': '.gif', 'image/webp': '.webp', 'image/bmp': '.bmp', 'image/svg+xml': '.svg', 'image/avif': '.avif', 'image/x-icon': '.ico', 'image/tiff': '.tif' };
+const ASSET_LIMITS = Object.freeze({ ...LIMITS, imageBytes: 32 * 1024 * 1024, imageChars: 96 * 1024 * 1024 });
+function imageExtension(mime) { const key=String(mime || '').split(';')[0].trim().toLowerCase();return Object.hasOwn(extensions,key)?extensions[key]:null; }
 const fail = message => { throw Object.assign(new Error(message), { code: 'MP_EXPORT_DATA_IMAGE' }); };
 const whitespace = c => c === 9 || c === 10 || c === 12 || c === 13 || c === 32;
-function planDataImages(refs, limits = LIMITS) {
-  const cap = Object.fromEntries(Object.keys(LIMITS).map(k => [k, Math.min(LIMITS[k], limits[k] ?? LIMITS[k])]));
+function planImages(refs, limits, ceiling) {
+  const cap = Object.fromEntries(Object.keys(ceiling).map(k => [k, Math.min(ceiling[k], limits[k] ?? ceiling[k])]));
   const plans = new Map(); let totalBytes = 0, totalChars = 0;
   for (const raw of refs || []) {
     const text = String(raw).trim();
@@ -15,7 +17,7 @@ function planDataImages(refs, limits = LIMITS) {
     totalChars += src.length;
     const comma = src.indexOf(',');
     if (comma < 0 || comma > 256) fail('内联图片地址无效');
-    const meta = src.slice(5, comma).split(';'), mime = meta[0].toLowerCase(), ext = Object.hasOwn(extensions, mime) ? extensions[mime] : null;
+    const meta = src.slice(5, comma).split(';'), mime = meta[0].toLowerCase(), ext = imageExtension(mime);
     if (!ext) fail('不支持的内联图片类型：' + mime);
     const base64 = meta.slice(1).some(p => p.toLowerCase() === 'base64'), body = src.slice(comma + 1);
     let bytes = 0;
@@ -42,9 +44,11 @@ function planDataImages(refs, limits = LIMITS) {
       }
     }
     if (!bytes) fail('内联图片为空');
-    if (bytes > cap.imageBytes || bytes > cap.totalBytes - totalBytes) fail('内联图片超过导出上限（单图 16 MB，总计 64 MB）');
-    totalBytes += bytes; plans.set(src, { src, body, base64, bytes, ext });
+    if (bytes > cap.imageBytes || bytes > cap.totalBytes - totalBytes) fail('内联图片超过上限（单图 ' + cap.imageBytes / 1048576 + ' MB，总计 ' + cap.totalBytes / 1048576 + ' MB）');
+    totalBytes += bytes; plans.set(src, { src, body, base64, bytes, ext, mime });
   }
   return plans;
 }
-module.exports = { LIMITS, planDataImages };
+const planDataImages = (refs, limits = LIMITS) => planImages(refs, limits, LIMITS);
+const planAssetDataImages = (refs, limits = ASSET_LIMITS) => planImages(refs, limits, ASSET_LIMITS);
+module.exports = { LIMITS, planDataImages, planAssetDataImages, imageExtension };

@@ -1,12 +1,13 @@
 // Run: node tools/quality/host-startup.mjs [--artifact <manifest>] [--out <empty directory>]
 // Exact current source, headless only. No Electron, clipboard, GUI, or document IO.
-// DocumentStore.load/reset and the complete renderer host are real. DOM, timers,
-// disk snapshots, and IPC delivery are controlled. No candidate source rewrites.
+// The complete renderer, main open transaction, synchronous receipt handler and
+// DocumentStore are real. Disk, engine view, user choices and IPC are controlled.
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import {EventEmitter} from 'node:events';
 import {fileURLToPath} from 'node:url';
 import {createRequire} from 'node:module';
 
@@ -36,7 +37,7 @@ const deferred = () => {
   const promise = new Promise((a, b) => { resolve = a; reject = b; });
   return {promise, resolve, reject};
 };
-const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
+const flush = async () => { for (let i = 0; i < 100; i++) await Promise.resolve(); };
 
 function exactHandler(name) {
   const start = mainSource.indexOf(`handle('${name}',`);
@@ -46,11 +47,13 @@ function exactHandler(name) {
   return mainSource.slice(start, end + 4);
 }
 
-function fixture({holdReady = false, holdPath = false, themeReady = false} = {}) {
-  const store = new DocumentStore(), S = createSession(), W = {__pendingClose: null};
-  const e = {sender: {id: 1}}, events = {}, calls = [], errors = [], readyReplies = [], pathReplies = [];
+function fixture({holdReady = false, holdPath = false, holdCandidate = false, themeReady = false} = {}) {
+  const store = new DocumentStore(), S = createSession(), W = new EventEmitter();
+  W.webContents = new EventEmitter(); W.webContents.id = 1; W.isDestroyed = W.webContents.isDestroyed = () => false;
+  const e = {sender:W.webContents}, events = {}, calls = [], errors = [], readyReplies = [], pathReplies = [], candidates = [];
   const snapshots = new Map(), currentReply = deferred(), themeReply = deferred();
   const mainHandlers = {};
+  let confirmChoice = () => true, composing = false, rejectReplace = false, epoch = 0, sourceRevision = 0;
   let resetCount = 0, currentCalls = 0, docPathCalls = 0, readyCalls = 0, text = null;
   const originalReset = store.reset.bind(store);
   store.reset = session => { resetCount++; return originalReset(session); };
@@ -60,13 +63,25 @@ function fixture({holdReady = false, holdPath = false, themeReady = false} = {})
     return snapshots.get(file).promise;
   };
   const sendTo = (_window, channel, payload) => {
-    if (channel === 'doc' && events.onDoc) events.onDoc(payload);
+    if (channel === 'doc' && events.onDoc) {
+      if (holdCandidate && payload.loadKind === 'open') candidates.push(payload);
+      else events.onDoc(payload);
+    }
     return true;
   };
-  // Only these current main handlers are evaluated; importing main would launch Electron.
-  new Function('handle', 'documents', 'sessionOf', 'windowOf', 'sendTo', 'syncPathUi', 'pdfActive',
-    exactHandler('doc:ready') + '\n' + exactHandler('doc:path'))(
-    (name, fn) => { mainHandlers[name] = fn; }, store, () => S, () => W, sendTo, () => {}, null);
+  // Execute the actual main prepare/accept/rollback transaction in a VM. The
+  // document travels through the renderer's real onDoc handler; no stub calls
+  // store.reset to simulate a successful acknowledgement.
+  const registerMain = (name, fn) => { mainHandlers[name] = fn; };
+  const mainContext=vm.createContext({documents:store, createSession, crypto, path, state:S, dbg(){}, handle:registerMain,
+    require:createRequire(path.join(root,'MarkPilot-CM6/main.js')),
+    ipcMain:{on:registerMain}, sessionOf:()=>S, windowOf:()=>W, activeWindow:()=>W, sendTo,
+    syncPathUi(){}, pushRecent(){}, pdfActive:null, setTimeout, clearTimeout,
+    process:{env:{}}, dialog:{showMessageBox:async()=>({response:await confirmChoice()?0:1}),showErrorBox:(...args)=>errors.push(args)},
+    failure:(code,message)=>Object.assign(Error(message),{code})});
+  const begin=mainSource.indexOf('async function confirmReplace('),end=mainSource.indexOf('/* ── IPC：file:reload',begin);
+  assert(begin>=0&&end>begin,'actual main open transaction exists');
+  vm.runInContext(mainSource.slice(begin,end)+'\n'+exactHandler('doc:ready')+'\n'+exactHandler('doc:path'),mainContext);
   const mpHost = {
     settingGet: key => Promise.resolve({ value: key === 'autosaveEnabled' ? false : 30000 }),
     themeGet: () => themeReply.promise,
@@ -77,13 +92,14 @@ function fixture({holdReady = false, holdPath = false, themeReady = false} = {})
       if (!holdReady) return Promise.resolve(result);
       const d = deferred(); readyReplies.push({d, result}); return d.promise;
     },
-    docPath: (file, metadata) => {
+    docPath: async (file, metadata) => {
       docPathCalls++;
-      const result = mainHandlers['doc:path'](e, file, metadata);
+      const result = await mainHandlers['doc:path'](e, file, metadata);
       if (!holdPath) return Promise.resolve(result);
       const d = deferred(); pathReplies.push({d, result}); return d.promise;
     },
-    docDirty: (dirty, metadata) => store.markDirty(S, {...metadata, dirty}),
+    docDirty: (dirty, metadata) => ({ok:store.markDirty(S, {...metadata, dirty}),documentId:S.documentId,revision:S.revision,dirty:S.dirty}),
+    commitOpen: request => {const event={sender:e.sender};mainHandlers['doc:commit-open'](event,request);return event.returnValue;},
     onDoc: fn => { events.onDoc = fn; },
     onMenu: fn => { events.onMenu = fn; },
     onTheme: fn => { events.onTheme = fn; },
@@ -99,19 +115,22 @@ function fixture({holdReady = false, holdPath = false, themeReady = false} = {})
     console: {log() {}, error: (...args) => errors.push(args)},
     setTimeout: () => 0, clearTimeout() {}, Date,
   });
+  W.webContents.executeJavaScript = expression => Promise.resolve(vm.runInContext(expression,context));
   // This suffix only exposes read-only state and the existing command to tests.
   vm.runInContext(read('shell/save-policy.js'), context);
   vm.runInContext(hostSource + '\nglobalThis.inspect = () => ({booted,pendingDoc,filePath,documentId,revision,dirty,charCount}); globalThis.newDoc = newDocument;', context);
   if (themeReady) themeReply.resolve({dark: false});
   function register() {
     window.handler.on('open', ({content}) => {
-      text = content; calls.push({kind: 'open', text});
+      text = content; epoch++; sourceRevision=0; calls.push({kind: 'open', text});
       window.mpEngine = {focus() {}, getValue: () => text,
-        checkpointDocument: () => { const previous=text;let active=true;return {commit(){if(!active)return false;active=false;return true;},rollback(){if(!active)return false;active=false;text=previous;return true;}}; }};
+        commands:{capture:()=>composing?null:{epoch,sourceRevision},valid:ticket=>!!ticket&&ticket.epoch===epoch&&ticket.sourceRevision===sourceRevision,resume(){}},
+        _view:()=>({composing}),isComposing:()=>composing,documentSession:()=>({epoch,sourceRevision}),
+        checkpointDocument: () => { const previous={text,epoch,sourceRevision};let active=true;return {commit(){if(!active)return false;active=false;return true;},rollback(){if(!active)return false;active=false;({text,epoch,sourceRevision}=previous);return true;}}; }};
     }).on('setValue', value => {
-      if (window.mpEngine) { text = value; calls.push({kind: 'setValue', text}); }
+      if (window.mpEngine) { text = value; sourceRevision++; calls.push({kind: 'setValue', text}); }
     }).on('replaceDocument', value => {
-      if (window.mpEngine) { text = value; calls.push({kind: 'replaceDocument', text}); }
+      if (window.mpEngine) { if(rejectReplace)return false;text = value; epoch++;sourceRevision=0;calls.push({kind: 'replaceDocument', text}); }
     });
   }
   function startLoad(file, body) {
@@ -128,8 +147,9 @@ function fixture({holdReady = false, holdPath = false, themeReady = false} = {})
   return {
     store, S, e, W, events, mpHost, calls, errors, register, startLoad, currentReply, themeReply, readyReplies, pathReplies,
     init: () => window.handler.emit('init'), receive: doc => events.onDoc(doc), inspect: context.inspect,
-    newDoc: context.newDoc, confirm: fn => { window.confirm = fn; },
-    edit: value => { text = value; window.handler.emit('change', {len: value.length}); },
+    newDoc: context.newDoc, confirm: fn => { confirmChoice=fn;window.confirm = fn; },candidates,
+    deliver:()=>{assert.equal(candidates.length,1);events.onDoc(candidates.shift());}, setComposing:value=>{composing=value;},rejectReplacement:()=>{rejectReplace=true;},
+    edit: value => { text = value; sourceRevision++;window.handler.emit('change', {len:value.length,epoch,sourceRevision}); },
     get text() { return text; }, get resets() { return resetCount; },
     get currentCalls() { return currentCalls; }, get docPathCalls() { return docPathCalls; },
     get readyCalls() { return readyCalls; },
@@ -192,7 +212,7 @@ const newCancelsTest = async h => {
   h.register(); h.init(); const ready = h.readyReplies[0];
   h.receive(h.store.metadata(h.S));
   const load = h.startLoad('D:/controlled/A.md', 'A body'); await flush(); assert.equal(h.S.loadRequest, 1);
-  assert.equal(await h.newDoc(), true); assert.equal(h.resets, 1); assert.equal(h.S.loadRequest, 2);
+  assert.equal(await h.newDoc(), true); assert.equal(h.resets, 0); assert.equal(h.S.loadRequest, 2);
   const newId = h.inspect().documentId; ready.d.resolve(ready.result); load.finish();
   assert.equal((await load.job).code, 'MP_DOC_MISMATCH'); await flush();
   assert.equal(h.text, ''); assert.equal(h.inspect().documentId, newId);
@@ -201,10 +221,10 @@ newCancelsTest.options = {holdReady: true};
 await test('explicit new cancels old load while late blank ready cannot overwrite new id', newCancelsTest);
 await test('stale discard confirmation cannot reset a subsequently pushed document', async h => {
   h.register(); h.receive(h.store.metadata(h.S)); h.edit('dirty A');
-  const c = deferred(); h.confirm(() => c.promise); const run = h.newDoc({replace: true});
+  const c = deferred();let asked=false;h.confirm(() => {asked=true;return c.promise;});const run = h.newDoc({replace:true});await flush();assert(asked,'entered actual main discard confirmation before changing owners');
   h.store.reset(h.S); h.S.filePath = 'D:/controlled/B.md'; h.S.savedText = 'B'; h.receive(h.store.metadata(h.S));
   c.resolve(true); assert.equal(await run, false); assert.equal(h.text, 'B');
-  assert.equal(h.resets, 1); assert.equal(h.docPathCalls, 0);
+  assert.equal(h.resets, 1); assert.equal(h.docPathCalls, 1);
 });
 await test('main null reset rejects missing/old id even with explicit=true', async h => {
   const id = h.S.documentId;
@@ -223,6 +243,30 @@ const delayedNewTest = async h => {
 };
 delayedNewTest.options = {holdPath: true};
 await test('delayed successful new reply cannot apply its blank content over newer B', delayedNewTest);
+const lateEditTest = async h => {
+  h.register(); h.S.filePath='D:/controlled/A.md';h.S.savedText='A';h.receive(h.store.metadata(h.S));const id=h.S.documentId;
+  const close=h.newDoc({replace:true});await flush();assert.equal(h.candidates.length,1,'candidate sent after prepare and confirmation');
+  assert.equal(h.S.documentId,id,'preparation cannot reset the active session');
+  h.edit('A newer');h.deliver();assert.equal(await close,false);assert.equal(h.S.documentId,id);assert.equal(h.inspect().documentId,id);
+  assert.equal(h.text,'A newer');assert(h.S.dirty);assert(h.inspect().dirty);
+};
+lateEditTest.options={holdCandidate:true};
+await test('new input after candidate send survives close-file handoff',lateEditTest);
+const lateImeTest = async h => {
+  h.register();h.receive(h.store.metadata(h.S));const id=h.S.documentId;
+  const close=h.newDoc({replace:true});await flush();assert.equal(h.candidates.length,1);
+  h.setComposing(true);h.deliver();assert.equal(await close,false);assert.equal(h.S.documentId,id);assert.equal(h.inspect().documentId,id);
+};
+lateImeTest.options={holdCandidate:true};
+await test('composition beginning during blank handoff vetoes adoption',lateImeTest);
+await test('canceling discard of an unnamed draft retains its owner and source',async h=>{
+  h.register();h.receive(h.store.metadata(h.S));h.edit('untitled draft');const id=h.S.documentId;h.confirm(()=>false);
+  assert.equal(await h.newDoc({replace:true}),false);assert.equal(h.S.documentId,id);assert.equal(h.inspect().documentId,id);assert.equal(h.text,'untitled draft');assert(h.S.dirty);
+});
+await test('failed blank apply rolls main and renderer back to the old document',async h=>{
+  h.register();h.S.filePath='D:/controlled/A.md';h.S.savedText='A';h.receive(h.store.metadata(h.S));const id=h.S.documentId;
+  h.rejectReplacement();assert.equal(await h.newDoc({replace:true}),false);assert.equal(h.S.documentId,id);assert.equal(h.inspect().documentId,id);assert.equal(h.text,'A');
+});
 await test('clean file ready still pushes and returns complete owner metadata', async h => {
   h.S.filePath = 'D:/controlled/A.md'; h.S.savedText = 'A saved'; h.S.revision = 7; h.S.lastSavedRevision = 7;
   const id = h.S.documentId; h.register(); h.init(); await flush();
@@ -259,8 +303,8 @@ await test('only explicit reload keeps the incremental setValue protocol despite
 });
 
 const report = { schema:1, at:new Date().toISOString(),
-  scope: 'exact disk host and main handlers; real DocumentStore.load/reset; controlled IO/IPC/DOM; no source rewrites or GUI',
-  hashes, artifactMatches, passed: results.length === 14 && results.every(r=>r.passed), total: results.length, results,
+  scope: 'exact renderer, main document transaction and DocumentStore; controlled IO/IPC/DOM; no product source rewrites or GUI',
+  hashes, artifactMatches, passed: results.length === 18 && results.every(r=>r.passed), total: results.length, results,
 };
 if(options.out){const dir=require('./harness.cjs').outputDir(options.out,'host-startup');fs.writeFileSync(path.join(dir,'result.json'),JSON.stringify(report,null,2));}
 console.log(JSON.stringify(report,null,2));

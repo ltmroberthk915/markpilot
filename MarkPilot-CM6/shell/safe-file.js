@@ -82,20 +82,29 @@ async function prepareFile(...args) {
     };
   } catch(error){done();throw error;}
 }
+// 具名 handler：显式 shutdown 成功后由 shutdownFileWorker 移除同一 handler，
+// 失败（关闭超时等）保留至进程退出兜底重试；HMR 旧代不再挂匿名监听。
+function beforeExitShutdown(){void shutdownFileWorker().catch(error=>console.error('MarkPilot worker shutdown:',String(error)));}
+process.once('beforeExit',beforeExitShutdown);
 function shutdownFileWorker() {
   if(shutdown)return shutdown;
   closing=true;
-  shutdown=(async()=>{
+  const job=(async()=>{
     // Accepted transactions (including asynchronous startup) retain commit/abort admission.
     if(operations)await new Promise(resolve=>idleWaiters.add(resolve));
     if(starting)await starting.catch(()=>{});
     const current=worker;
     return current?current.stop():null;
   })();
+  shutdown=job.then(result=>{process.removeListener('beforeExit',beforeExitShutdown);return result;});
   return shutdown;
 }
+// 后台预热与输入重叠；保存仍等待同一已校验工作进程。仅 Windows；关闭开始后 no-op。
+function prepareFileWorker() {
+  if(closing||process.platform!=='win32')return Promise.resolve();
+  return nativeWorker().then(()=>{},()=>{});
+}
 // Standalone Node tests/tools also close the unref'ed helper on a normal exit.
-process.once('beforeExit',()=>{void shutdownFileWorker().catch(error=>console.error('MarkPilot worker shutdown:',String(error)));});
 function nativeFailure(reply,temp,backup) {
   const error=Object.assign(Error('无法安全替换文件，当前草稿已保留：'+(reply.error||'未知错误')),{code:reply.code||'MP_REPLACE_FAILED',preserveTemp:!!reply.preserveTemp});
   if(error.preserveTemp)error.recoveryPaths={temp,backup};return error;
@@ -125,4 +134,4 @@ async function prepareFileImpl(target,temp,{baseline,output}={}) {
     async abort(){if(done||recovery)return;const reply=await native.rpc({action:'abort',id});if(!reply?.ok)throw nativeFailure(reply||{},temp,backup);done=true;},
   };
 }
-module.exports={prepareFile,shutdownFileWorker};
+module.exports={prepareFile,shutdownFileWorker,prepareFileWorker};

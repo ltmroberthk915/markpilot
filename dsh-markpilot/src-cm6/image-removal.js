@@ -1,5 +1,6 @@
 import { Transaction } from '@codemirror/state';
 import { historyField } from '@codemirror/commands';
+import { liveRemoteAccepted } from './live-document.js';
 
 // Count occurrences, so removing one of two identical images still asks. The
 // backup itself can safely share one file for their identical bytes.
@@ -67,7 +68,7 @@ export function imageRemovalDialog({ count, filePath, backup, valid, finish }) {
 // before view.update. Neither path mutates the document before the user's choice.
 export function createImageRemovalGate({ getView, images, identity, bypass, afterApply,
   host = () => window.mpHost, path = () => window.__mpDocPath || null, prompt = imageRemovalDialog }) {
-  let pending = null;
+  let pending = null, activeCompletion = null;
   const lost = transactions => removedImageSources(images(transactions[0].startState), images(transactions.at(-1).state));
   const valid = job => {
     const view = getView(), state = view?.state;
@@ -75,12 +76,12 @@ export function createImageRemovalGate({ getView, images, identity, bypass, afte
       state.doc === job.doc && state.selection.eq(job.selection) &&
       state.field(historyField, false) === job.history && identity(state) === job.identity && path() === job.filePath;
   };
-  const cancel = () => { const job = pending; pending = null; job?.close?.(); };
+  const cancel = () => { const job = pending; pending = null; job?.close?.(); job?.completion?.(false); };
   function defer(transactions, sources) {
     const view = getView(), start = transactions[0].startState;
     if (!view || view.state.doc !== start.doc || pending) return;
     const job = pending = { view, transactions, sources, doc: start.doc, selection: start.selection,
-      history: start.field(historyField, false), identity: identity(start), filePath: path(), close: null };
+      history: start.field(historyField, false), identity: identity(start), filePath: path(), close: null, completion:activeCompletion };
     queueMicrotask(async () => {
       if (!valid(job)) { if (pending === job) cancel(); return; }
       // Capture the host document identity before showing a choice. A replaced
@@ -96,7 +97,7 @@ export function createImageRemovalGate({ getView, images, identity, bypass, afte
         backup: () => host()?.backupEmbeddedImages?.({ documentId, filePath: job.filePath, sources: [...new Set(sources)] }),
         finish: (proceed, receipt) => {
           const current = valid(job); if (pending === job) pending = null;
-          if (!current) return;
+          if (!current) {job.completion?.(false);return;}
           if (proceed) {
             let state = view.state;
             const replay = transactions.map(original => {
@@ -106,20 +107,44 @@ export function createImageRemovalGate({ getView, images, identity, bypass, afte
               state = next.state; return next;
             });
             // A single private replay consumes this choice; no public bypass token.
-            if (!state.doc.eq(transactions.at(-1).newDoc)) return;
-            view.update(replay); afterApply?.();
+            if (!state.doc.eq(transactions.at(-1).newDoc)) {job.completion?.(false);return;}
+            try {view.update(replay);job.completion?.(view.state.doc.eq(state.doc));}
+            catch(error){job.completion?.(false);throw error;}
+            try {afterApply?.();}catch(error){console.error('[mp] image conversion projection:',error);}
             if (receipt?.ok) window.mpExtras?.toast?.(`已备份 ${receipt.files.length} 张图片到 assets 图片文件夹`);
-          }
+          } else job.completion?.(false);
           view.focus();
         },
       });
     });
   }
+  // 【CM Live】可信远端：源窗口已按完整三选项（备份/直接/取消）确认过、authority 已入账的
+  // 共享增量回放。接收端放行、不弹重复对话框；任何 pending 的本地删除作业（旧对话框）因
+  // 文档已变化而失效，不会在已变化文档上重放。普通本地事务不放宽 bypass、不改原有选项。
+  const trustedRemote = transaction => transaction.annotation(liveRemoteAccepted) === true;
   return {
     cancel,
+    // Observe a resource conversion through the same filters and user choice.
+    // The callback is private to this dispatch; it never grants a bypass.
+    dispatchWithResult(spec) {
+      const view=getView();
+      if(!view||!view.dom.isConnected||view.state.readOnly||pending||activeCompletion)return Promise.resolve(false);
+      return new Promise(resolve=>{
+        let settled=false;
+        const done=ok=>{if(!settled){settled=true;resolve(ok);}};
+        activeCompletion=done;
+        try {
+          const expected=view.state.changes(spec.changes).apply(view.state.doc);
+          view.dispatch(spec);
+          if(pending?.completion!==done)done(view.state.doc.eq(expected));
+        }catch(error){done(false);}
+        finally{activeCompletion=null;}
+      });
+    },
     filter(transaction) {
       if (!transaction.docChanged) return transaction;
       if (bypass()) { cancel(); return transaction; }
+      if (trustedRemote(transaction)) return transaction;
       if (pending) return [];
       const sources = lost([transaction]);
       if (!sources.length) return transaction;
@@ -127,6 +152,12 @@ export function createImageRemovalGate({ getView, images, identity, bypass, afte
     },
     dispatch(transactions, view) {
       if (bypass()) { cancel(); view.update(transactions); return; }
+      // 【CM Live】整批可信远端放行（与 filter 层同判据；混批按不可信处理）。
+      if (transactions.some(trustedRemote) && transactions.every(tr => !tr.docChanged || trustedRemote(tr))) {
+        view.update(transactions);
+        if (pending && !valid(pending)) cancel(); // 失效旧本地 pending（对话框作业）
+        return;
+      }
       if (transactions.some(transaction => transaction.docChanged)) {
         const sources = pending ? [] : lost(transactions);
         if (pending || sources.length) {

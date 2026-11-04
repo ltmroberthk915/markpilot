@@ -14,9 +14,10 @@
  *  实现纪律：所有动作走 `view.dispatch`（撤销栈/版本守卫/桥同步自动成立），不碰 DOM 文本。
  */
 
-import { undo, redo } from "@codemirror/commands";
+import { undo, redo, isolateHistory } from "@codemirror/commands";
 import { openSearchPanel } from "@codemirror/search";
 import { EditorSelection } from "@codemirror/state";
+import { codeSpanMarkers, inlineCodeSpans, inlineEmphasisSpans } from './inline-format.js';
 import { selectedLines } from './selection-lines.js';
 import { quoteLead, codeBlockAt, inFrontMatter, listMarkerOf } from './markdown-context.js';
 import { tableSpanOf } from './tables.js';
@@ -151,9 +152,21 @@ function escapedAt(doc, pos) {
 }
 
 /** 选区外侧那一对定界符的长度（含"多包一层"的修正）；没有则 0。 */
+function ownsItalicPair(doc, from, to) {
+  const line = doc.lineAt(from);
+  if (to > line.to) return false;
+  const start = from - line.from, end = to - line.from;
+  if (end === start + 2) return line.text[start - 1] !== '*' && line.text[end] !== '*';
+  return inlineEmphasisSpans(line.text).some(span => span.width === 1 &&
+    span.from <= start && span.to >= end &&
+    /^\*+$/.test(line.text.slice(span.from, start + 1)) &&
+    /^\*+$/.test(line.text.slice(end - 1, span.to)));
+}
+
 function wrapDelimLen(doc, from, to, open, close) {
   if (to > from && close === open && doc.sliceString(to, to + open.length) !== open) return 0;
   const l = doc.sliceString(Math.max(0, from - open.length), from), r = doc.sliceString(to, to + close.length);
+  if (open === '*' && l === open && r === close) return ownsItalicPair(doc, from - 1, to + 1) ? 1 : 0;
   if (open === '**') {
     if (l === '**' && r === '**') return 2;
     if (l === '***' && r === '***') return 3;              // 粗斜体整体取消
@@ -177,7 +190,37 @@ export function wrap(view, open, close = open) {
   const command = window.mpEngine?.commands;
   return command ? command.run(() => wrapSource(view, open, close)) : wrapSource(view, open, close);
 }
+function wrapInlineCode(view) {
+  const state = view.state;
+  let isolate = false;
+  const spec = state.changeByRange(r => {
+    const doc = state.doc, start = doc.lineAt(r.from).from, end = doc.lineAt(r.to).to;
+    const source = doc.sliceString(start, end);
+    const a = r.from - start, b = r.to - start;
+    const spans = inlineCodeSpans(source);
+    const hit = spans.find(s => s.from === a && s.to === b || s.innerFrom === a && s.innerTo === b);
+    if (hit) {
+      const from = start + hit.from, to = from + hit.innerTo - hit.innerFrom;
+      const whole = a === hit.from;
+      isolate ||= whole;
+      return { changes: [{ from, to: start + hit.innerFrom }, { from: start + hit.innerTo, to: start + hit.to }],
+        range: whole ? EditorSelection.range(r.anchor <= r.head ? from : to, r.anchor <= r.head ? to : from) : EditorSelection.cursor(from) };
+    }
+    // Toggle the empty placeholder before its first real character is typed.
+    if (r.empty && source[a - 1] === '`' && source[a] === '`' &&
+        source[a - 2] !== '`' && source[a + 1] !== '`' && !escapedAt(doc, r.from - 1) &&
+        !spans.some(s => s.from < a && s.to > a))
+      return { changes: { from: r.from - 1, to: r.to + 1 }, range: EditorSelection.cursor(r.from - 1) };
+    const text = doc.sliceString(r.from, r.to), { open, close } = codeSpanMarkers(text);
+    return { changes: { from: r.from, to: r.to, insert: open + text + close },
+      range: EditorSelection.cursor(r.from + open.length + (r.anchor <= r.head ? text.length : 0)) };
+  });
+  view.dispatch({ ...spec, ...(isolate ? { annotations: isolateHistory.of('full') } : {}), userEvent: 'input.format', scrollIntoView: true });
+  view.focus();
+  return true;
+}
 function wrapSource(view, open, close) {
+  if (open === "`" && close === "`") return wrapInlineCode(view);
   const ranges = view.state.selection.ranges;
   if (ranges.length === 1) return wrapSingle(view, open, close);
   return wrapMulti(view, open, close, ranges);
@@ -190,7 +233,8 @@ function wrapPlan(doc, r, open, close) {
   const span = enclosingSpan(doc, r.from, r.to, open, close);
   if (!span) {
     const outer = open.length + close.length;
-    if (sel.length >= outer && sel.startsWith(open) && sel.endsWith(close) && !escapedAt(doc, r.from)) {
+    if (sel.length >= outer && sel.startsWith(open) && sel.endsWith(close) && !escapedAt(doc, r.from) &&
+        (open !== '*' || ownsItalicPair(doc, r.from, r.to))) {
       const innerFrom = r.from + open.length, innerTo = r.to - close.length;
       return { changes: [{ from: r.from, to: innerFrom, insert: '' }, { from: innerTo, to: r.to, insert: '' }], caret: r.from, delta: 0 };
     }
@@ -211,11 +255,14 @@ function wrapMulti(view, open, close, ranges) {
     changes.push(...p.changes);
     plans.push(p);
   }
-  let tr;
-  try { tr = view.state.update({ changes, userEvent: 'input.format', scrollIntoView: true }); } catch { return false; }
-  const carets = plans.map((p) => EditorSelection.cursor(tr.changes.mapPos(p.caret, -1) + p.delta));
-  view.dispatch(tr);
-  try { view.dispatch({ selection: EditorSelection.create(carets, ranges.mainIndex) }); } catch { /* 极端重叠时保序兜底 */ }
+  let transaction;
+  try {
+    const mapped = view.state.changes(changes);
+    const carets = plans.map(p => EditorSelection.cursor(mapped.mapPos(p.caret, -1) + p.delta));
+    transaction = view.state.update({ changes: mapped, selection: EditorSelection.create(carets, view.state.selection.mainIndex),
+      userEvent: 'input.format', scrollIntoView: true });
+  } catch { return false; }
+  view.dispatch(transaction);
   view.focus();
   return true;
 }
@@ -230,12 +277,15 @@ function wrapSingle(view, open, close) {
      补一条：选区文本本身以 open 开头、以 close 结尾 ⇒ 只删这两个定界符，内容与撤销都正常。 */
   if (!span) {
     const outer = open.length + close.length;
-    if (sel.length >= outer && sel.startsWith(open) && sel.endsWith(close) && !escapedAt(doc, r.from)) {
+    if (sel.length >= outer && sel.startsWith(open) && sel.endsWith(close) && !escapedAt(doc, r.from) &&
+        (open !== '*' || ownsItalicPair(doc, r.from, r.to))) {
       const innerFrom = r.from + open.length, innerTo = r.to - close.length;
       view.dispatch({
         changes: [{ from: r.from, to: innerFrom, insert: '' }, { from: innerTo, to: r.to, insert: '' }],
-        selection: { anchor: innerFrom, head: innerFrom + Math.max(0, innerTo - innerFrom) },
-        userEvent: 'input.format', scrollIntoView: true,
+        selection: r.anchor <= r.head
+          ? { anchor: r.from, head: r.from + innerTo - innerFrom }
+          : { anchor: r.from + innerTo - innerFrom, head: r.from },
+        annotations: isolateHistory.of('full'), userEvent: 'input.format', scrollIntoView: true,
       });
       view.focus();
       return true;
@@ -559,6 +609,7 @@ export function installToolbar(view) {
         TOOLBAR_ACTIONS[item.id]?.(view);
       };
       btn.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
         e.preventDefault(); e.stopPropagation();
         runItem();
       });
@@ -581,7 +632,10 @@ export function installToolbar(view) {
       btn.disabled = false;
       btn.classList.remove("is-todo");
       btn.title = "收起工具栏";
-      btn.addEventListener("mousedown", (e) => { e.preventDefault(); e.stopPropagation(); setFolded(bar, !bar.classList.contains("is-folded")); });
+      btn.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault(); e.stopPropagation(); setFolded(bar, !bar.classList.contains("is-folded"));
+      });
       /* 【键盘可达·2026-10-09】折叠原先只绑 mousedown，而键盘激活 <button>（Enter/Space）走的是 click
          ⇒ 键盘用户**根本折不动**（实测：聚焦后 Enter/Space 三次 folded 都是 true）。
          这里只接"键盘产生的 click"：键盘激活的 click `detail === 0`、鼠标点击 `detail >= 1`

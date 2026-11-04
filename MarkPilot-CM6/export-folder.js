@@ -16,36 +16,7 @@ const crypto = require('node:crypto');
 const { Transform, Readable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const { planDataImages } = require('./shell/data-images.cjs');
-
-function* dataImageChunks(info) {
-  if (info.base64) {
-    let part = '';
-    for (let i = 0; i < info.body.length; i += 32768) {
-      part += info.body.slice(i, i + 32768).replace(/[ \t\r\n\f]/g, '');
-      const complete = part.length - part.length % 4;
-      if (complete) { yield Buffer.from(part.slice(0, complete), 'base64'); part = part.slice(complete); }
-    }
-    if (part) yield Buffer.from(part, 'base64');
-    return;
-  }
-  let buffer = Buffer.allocUnsafe(32768), offset = 0;
-  for (let i = 0; i < info.body.length; i++) {
-    const c = info.body.charCodeAt(i);
-    if (c === 37 || c < 128) {
-      buffer[offset++] = c === 37 ? parseInt(info.body.slice(i + 1, i + 3), 16) : c;
-      if (c === 37) i += 2;
-      if (offset === buffer.length) { yield buffer; buffer = Buffer.allocUnsafe(32768); offset = 0; }
-      continue;
-    }
-    const cp = info.body.codePointAt(i), piece = Buffer.from(String.fromCodePoint(cp));
-    if (cp > 0xffff) i++;
-    for (const byte of piece) {
-      buffer[offset++] = byte;
-      if (offset === buffer.length) { yield buffer; buffer = Buffer.allocUnsafe(32768); offset = 0; }
-    }
-  }
-  if (offset) yield buffer.subarray(0, offset);
-}
+const { dataImageChunks } = require('./shell/data-image-bytes');
 
 const ILLEGAL = /[\\/:*?"<>|]/g;
 /** Windows 文件名净化（导出目录名 / assets 里的文件名都过这里） */

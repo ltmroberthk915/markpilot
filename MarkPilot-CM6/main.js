@@ -83,10 +83,15 @@ const APP_ICON = path.join(__dirname, 'build', 'icon.ico');
  * 否则 shell 只能拿 exe 路径猜身份，同一个应用在不同形态下会变成好几个名字。
  * 取值与 build.appId 一致（package.json）。 */
 const APP_USER_MODEL_ID = 'app.personal.markpilot.cm6';
+/* 测试隔离：MP_TEST_HOOKS=1 且显式非空 --user-data-dir（私有 profile）的自动化窗口使用
+   独立测试 AUMID，且不触碰系统最近文件/跳转列表（见 pushRecent/clearRecent/mpSyncJumpList）。 */
+const TEST_APP_USER_MODEL_ID = 'app.personal.markpilot.cm6.test';
+function mpTestIsolated() { return MP_TEST_HOOKS === true && app.commandLine.getSwitchValue('user-data-dir') !== ''; }
 function mpSetAppUserModelId() {
-  try { app.setAppUserModelId(APP_USER_MODEL_ID); }
+  const id = mpTestIsolated() ? TEST_APP_USER_MODEL_ID : APP_USER_MODEL_ID;
+  try { app.setAppUserModelId(id); }
   catch (e) { dbg('aumid:set-failed', String(e && e.message || e)); }
-  return APP_USER_MODEL_ID;
+  return id;
 }
 
 /* ── 最近打开（自持久化 MRU，最多 10 条）─────────────────────────────────────
@@ -122,7 +127,9 @@ function pushRecent(filePath) {
   }
   if (r.skipped === 'missing') { buildMenu(); return; }   // 死条目照旧灰着，但要重建菜单
   // ① Windows「最近使用的文档」：Recent 文件夹里的 .lnk + 任务栏 Jump List 的"最近"一节
-  try { app.addRecentDocument(r.list[0]); dbg('recent:addRecentDocument', r.list[0]); }
+  //    （隔离测试跳过 OS 写入，recents.json/菜单照常）
+  if (mpTestIsolated()) dbg('recent:add-skipped-test-isolated', r.list[0]);
+  else try { app.addRecentDocument(r.list[0]); dbg('recent:addRecentDocument', r.list[0]); }
   catch (e) { dbg('recent:addRecentDocument-failed', e.message); }
   buildMenu();
 }
@@ -131,7 +138,9 @@ function clearRecent() {
   const n = Array.isArray(state.settings.recentFiles) ? state.settings.recentFiles.length : 0;
   state.settings.recentFiles = recents.clear().list;
   try { mpSaveRecents([]); } catch (e) { dbg('recent:clear-save-failed', e.message); }
-  try { app.clearRecentDocuments(); } catch (e) { dbg('recent:clear-system-failed', e.message); }
+  /* 隔离测试跳过系统级清理；profile 自身清单已在上面清空并落盘。 */
+  if (mpTestIsolated()) dbg('recent:clear-system-skipped-test-isolated');
+  else try { app.clearRecentDocuments(); } catch (e) { dbg('recent:clear-system-failed', e.message); }
   // 3.0.5 的旧副本（迁移来源）也清掉：留着的话下次启动会把已清除的条目又搬回来
   if (Array.isArray(state.settings.recent) && state.settings.recent.length) {
     state.settings.recent = [];
@@ -145,6 +154,8 @@ function clearRecent() {
 /** 系统级的「最近」一节：只对真正注册过身份的安装版有意义（便携版没有开始菜单快捷方式，
  *  shell 会返回错误码 —— 如实记进日志，不抛给用户）。 */
 function mpSyncJumpList() {
+  /* 隔离测试（含启动路径）不触碰系统跳转列表，如实回 skipped。 */
+  if (mpTestIsolated()) { const skipped = { skipped: 'test-isolated', aumid: TEST_APP_USER_MODEL_ID }; dbg('jumplist:set-skipped-test-isolated', skipped); return skipped; }
   try {
     const r = app.setJumpList([{ type: 'recent' }]);
     dbg('jumplist:set', { result: r, packaged: app.isPackaged });
@@ -501,10 +512,7 @@ function buildMenu() {
          * 主进程的路径已经变成新文件，下一次外改探测会拿新文件的 mtime 比旧文件，出现假"外部改动"。
          * 实测证据：按 Ctrl+Shift+S 后 main-debug.log 只有 `pickSaveAs:env`，没有 file:save/doc:saved。 */
         { id: 'menu-save-as', label: '另存为…', accelerator: 'CmdOrCtrl+Shift+S', click: (_item, W) => send('menu', 'saveAs', activeWindow(W)) },
-    /* 【设置真源·S1·2026-10-10（settings-truth 族）】「恢复所有默认…」：用户删掉 settings.json 后
-       **仍看到**工具岛透明度/版心/内容缩放/状态栏开关还在 ✗ —— 渲染侧偏好是另一套存储
-       （localStorage 的 mp-pref-* / mp-surfaces / mp-reading* / editor-theme…）。这一项发命令给渲染侧，
-       由 host.js 的 `case 'resetAll'` 一次清掉**全部 mp-\* 键**并重载 ⇒ 两套存储都能被一个动作覆盖。 */
+    // Reset the appearance stores in place so the current editing session survives.
     { id: 'menu-reset-all', label: '恢复编辑器外观默认…', click: (_item, W) => send('menu', 'resetAll', activeWindow(W)) },
         { type: 'separator' },
         // 导出为 PDF：壳层入口。渲染侧调 window.mpHost.exportPdf()（引擎侧的 ⋯ 菜单项以后走同一个名字）
@@ -611,16 +619,25 @@ async function pickSaveAs(S, W) {
     return await documents.grantSaveAs(S, file, request);
   } catch (e) { return { ok: false, error: e.message, code: e.code }; }
 }
-async function confirmReplace(S, W) {
+async function confirmReplace(S, W, closingFile = false) {
   if (!S.dirty) return true;
   if (process.env.MP_TEST_HOOKS === '1' && process.env.MP_TEST_REPLACE_RESPONSE === 'discard') return true;
   if (process.env.MP_TEST_NO_DIALOG === '1') return false;
-  const r = await dialog.showMessageBox(W, { type: 'warning', buttons: ['放弃修改并打开', '取消'], defaultId: 1, cancelId: 1, message: '还有未保存的修改', detail: S.filePath || '未命名文档' });
+  const r = await dialog.showMessageBox(W, { type: 'warning', buttons: [closingFile ? '放弃修改并关闭文件' : '放弃修改并打开', '取消'], defaultId: 1, cancelId: 1, message: '还有未保存的修改', detail: S.filePath || '未命名文档' });
   return r.response === 0 && !W.isDestroyed();
 }
 
 const openTransactions = new Map();
-function pdfTargetHeld(file){return !!(file&&pdfActive?.publicationHeld&&documents.key(file)===pdfActive.outputKey);}
+const {captureExportTarget,publishImage}=require('./shell/export-target');
+const heldExportTargets=new Set();
+function exportTargetHeld(file){return file && heldExportTargets.has(documents.key(file));}
+function chooseExportTarget(file,current) {
+  return captureExportTarget(file,{documents,held:heldExportTargets,check(key){
+    if(!current())throw failure('MP_EXPORT_STALE','文档已切换或导出已取消');
+    for(const doc of sessions.values())if(doc.filePath && (documents.key(doc.filePath)===key || documents.key(doc.filePath)===documents.key(path.resolve(file))))throw failure('MP_EXPORT_TARGET','导出不能覆盖正在编辑的文档，请选择其他路径');
+    if(documentOpens.has(key)||[...openTransactions.values()].some(op=>op.targetKey===key || op.candidate?.filePath && documents.key(op.candidate.filePath)===key))throw failure('MP_EXPORT_TARGET','该保存目标正在打开，原文件已保留');
+  }});
+}
 const documentFields = Object.keys(createSession());
 async function rendererState(W, method, payload = null) {
   let timer;
@@ -637,7 +654,7 @@ ipcMain.on('doc:commit-open', (event, reply = {}) => {
   if (reply.phase === 'reject') { op.settle({ ok: false, code: 'MP_OPEN_NEWER_INPUT', error: '读取期间有新修改，已保留原文档' }); return event.returnValue = { ok: true }; }
   if (reply.phase === 'adopt') {
     if (!op.candidate || op.phase !== 'ready' || S.documentId !== op.origin || reply.documentId !== op.origin) return reject('MP_DOC_MISMATCH');
-    if(pdfTargetHeld(op.candidate.filePath))return reject('MP_EXPORT_TARGET');
+    if(exportTargetHeld(op.candidate.filePath))return reject('MP_EXPORT_TARGET');
     op.previous = Object.fromEntries(documentFields.map(key => [key, S[key]]));
     Object.assign(S, op.candidate, { pendingSaves: S.pendingSaves, loadRequest: S.loadRequest + 1 });
     // Once the renderer is applying a document, only its synchronous finish or
@@ -655,7 +672,7 @@ ipcMain.on('doc:commit-open', (event, reply = {}) => {
   return reject('MP_OPEN_STALE');
 });
 
-async function openPath(p, target = null) {   // 【文件多开·批 B2】target={win,session} 可指定落点；不传＝老行为
+async function openPath(p, target = null, closingDocument = null) {
   dbg('openPath:start', p);
   const W = target?.win || activeWindow();
   if (!W) return { ok: false, error: '没有可用的编辑窗口' };
@@ -676,11 +693,16 @@ async function openPath(p, target = null) {   // 【文件多开·批 B2】targe
   try {
     const prepared = await rendererState(W, 'mpPrepareOpen', { requestId: op.id });
     if (!prepared?.ok || prepared.documentId !== op.origin || openTransactions.get(W.webContents.id) !== op) return { ok: false, code: prepared?.code || 'MP_OPEN_STALE', canceled: true };
-    if (!(await confirmReplace(S, W))) return { ok: false, canceled: true };
+    if (closingDocument && (prepared.documentId !== closingDocument.documentId || prepared.revision !== closingDocument.revision)) {
+      return { ok: false, code: 'MP_OPEN_NEWER_INPUT', error: '关闭期间有新修改，已保留原文档' };
+    }
+    if (!(await confirmReplace(S, W, !!closingDocument))) return { ok: false, canceled: true };
     await documents.pending(S);
     const candidate = createSession();
-    op.targetKey=documents.key(await documents.canonical(p));
-    await documents.load(candidate, p);
+    if (!closingDocument) {
+      op.targetKey=documents.key(await documents.canonical(p));
+      await documents.load(candidate, p);
+    }
     if (W.isDestroyed() || openTransactions.get(W.webContents.id) !== op || S.documentId !== op.origin) return { ok: false, code: 'MP_OPEN_STALE' };
     op.candidate = candidate; op.phase = 'ready';
     const doc = { ...documents.metadata(candidate), loadKind: 'open', requestId: op.id };
@@ -691,9 +713,12 @@ async function openPath(p, target = null) {   // 【文件多开·批 B2】targe
     op.timer = setTimeout(() => { if (op.phase === 'ready') { op.phase = 'expired'; op.settle({ ok: false, code: 'MP_OPEN_TIMEOUT', error: '新文档未能开始应用，原稿已保留' }); } }, 5000);
     const accepted = await op.done;
     if (!accepted.ok) return accepted;
-    syncPathUi(S, W); pushRecent(S.filePath);
+    if (S.documentId !== candidate.documentId) return { ok: false, code: 'MP_OPEN_STALE' };
+    syncPathUi(S, W);
+    if (closingDocument) W.__pendingClose = null;
+    else pushRecent(S.filePath);
     dbg('openPath:pushed');
-    return { ok: true };
+    return { ok: true, documentId: candidate.documentId };
   } catch (e) {
     dbg('openPath:error', e.message);
     if (W && !W.isDestroyed() && process.env.MP_TEST_NO_DIALOG !== '1') {
@@ -754,6 +779,9 @@ async function reloadDoc(opts, S, W) {
   if (pending) return pending.requestId === requestId && pending.path === p ? pending.job : { ok: false, code: 'MP_RELOAD_BUSY', error: '正在读取当前文档' };
   const job = Promise.resolve().then(async () => {
     try {
+      /* H2：合法原生确认之前，先核对已入权威的 current head / 同一来源的目标操作是否 clean
+         （见 liveSettledClean）——transient dirty 落定后 confirmReplace 自然放行。 */
+      if (S.dirty) await liveSettledClean(W && W.webContents, S);
       if (!(await confirmReplace(S, W))) return { ok: false, canceled: true, requestId };
       // Bounded test-only transport/IO delays make revision and response races
       // reproducible while retaining the actual handler and store adoption.
@@ -790,7 +818,7 @@ async function openInNewWindow(filePath) {
     // Read before creating a renderer: an unreadable file leaves every existing
     // window intact and does not create an empty failed document.
     if (filePath) await readDoc(filePath, S);
-    if(pdfTargetHeld(S.filePath))throw failure('MP_EXPORT_TARGET','PDF 正在完成保存，请稍后打开此目标');
+    if(exportTargetHeld(S.filePath))throw failure('MP_EXPORT_TARGET','导出正在完成保存，请稍后打开此目标');
     const W = createWindow(S);          // 3a 已参数化：窗口与会话一一对应
     createdWindow = W;
     try { S.__tag = 'newwin-' + Date.now(); dbg('newwin:session', { tag: S.__tag, isPrimary: S === state, wcId: W.webContents.id }); } catch { }
@@ -817,16 +845,16 @@ async function openDocument(filePath) {
   try {
     if (typeof filePath !== 'string' || !filePath) throw failure('MP_BAD_PATH', '没有指定文件路径');
     const canonical = await documents.canonical(filePath), key = documents.key(canonical);
-    if(pdfTargetHeld(key))throw failure('MP_EXPORT_TARGET','PDF 正在完成保存，请稍后打开此目标');
+    if(exportTargetHeld(key))throw failure('MP_EXPORT_TARGET','导出正在完成保存，请稍后打开此目标');
     if (documentOpens.has(key)) return documentOpens.get(key);
     const job = (async () => {
       for (const W of BrowserWindow.getAllWindows()) {
         if (W.isDestroyed() || !sessions.has(W.webContents.id)) continue;
         const S = sessionOf(W.webContents);
         if (!S.filePath) continue;
-        const identity = { documentId: S.documentId, filePath: S.filePath };
-        const candidate = documents.key(await documents.canonical(identity.filePath));
-        if (candidate !== key || W.isDestroyed() || S.documentId !== identity.documentId || S.filePath !== identity.filePath) continue;
+        // Sessions own the physical path adopted at load. Resolving that name
+        // again could select a different file after a directory was redirected.
+        if (documents.key(S.filePath) !== key) continue;
         if (W.isMinimized()) W.restore(); W.show(); W.focus();
         pushRecent(S.filePath);
         return { ok: true, existing: true, windowId: W.id, documentId: S.documentId };
@@ -873,6 +901,9 @@ function createWindow(session = state) {   // 【文件多开·第 3 步·3a】�
      ② 用关窗前捕获的 id 注销会话 —— webContents 销毁后取不到 id，会话会泄漏（实测 sessionsLeft 停在 2）。 */
   try { if (!win || win.isDestroyed()) { const alive = BrowserWindow.getAllWindows().filter((x) => !x.isDestroyed()); win = alive.length ? alive[0] : win; } } catch { }
   try { if (__wcId != null) sessions.delete(__wcId); else unregisterSession(W.webContents); } catch { }
+  /* live owner 清理：窗口关了，它名下的协同 client 就地 leave（房间最后一个 client
+     离开时房间随之回收，未保存草稿不悬空成“永远拒写”的幽灵房间）。 */
+  try { liveLeaveOwned(entry => __wcId != null ? entry.senderId === __wcId : entry.sender === W.webContents, 'window-closed'); } catch { }
   try { retireClipboardIntentFor(W.webContents); } catch { }
 });
   } catch (e) { dbg("session:register-failed", String((e && e.message) || e)); }
@@ -906,6 +937,15 @@ function createWindow(session = state) {   // 【文件多开·第 3 步·3a】�
   /* copy intent：每个 WebContents 挂一次 did-start-navigation —— 主框架非同文档导航退休起源意图，
      同文档/子框架不退休（见 clipboardIntentOnNavigation 的 legacy/details 双形态解析）。 */
   clipboardIntentOnNavigation(W);
+  /* live owner 清理：主框架非同文档导航（reload/整页换址）后，旧页的 live 客户端不可能
+     再来 exchange——就地 leave；新页会重新 join。解析口径与 clipboardIntentOnNavigation
+     相同（legacy 三参 / details 对象双形态）。 */
+  W.webContents.on('did-start-navigation', (_e, ...args) => {
+    let isMainFrame = false, isSameDocument = false;
+    if (args.length && args[0] && typeof args[0] === 'object') { isMainFrame = !!args[0].isMainFrame; isSameDocument = !!args[0].isSameDocument; }
+    else { isSameDocument = !!args[1]; isMainFrame = !!args[2]; }
+    if (isMainFrame && !isSameDocument) liveLeaveOwned(entry => entry.sender === W.webContents, 'navigation');
+  });
   W.on('responsive', () => {
     if (!state.unresponsiveAt) return;
     const ms = Date.now() - state.unresponsiveAt;
@@ -1018,6 +1058,9 @@ try {
     if (!workerQuitPromise) workerQuitPromise = Promise.all([
       (async()=>{const s=pdfActive;if(s){if(!s.publishing){s.canceled=true;s.abort.abort();s.waiter.resolve({ok:false,canceled:true});}await s.finished.promise;}await pdfProcess.shutdownPdfWorkers();})(),
       require('./shell/safe-file').shutdownFileWorker(),
+      /* live 收尾：退出前把本进程名下的协同 client 全部 leave（房间回收、不占 sqlite 租约）；
+         从未用过协同时 owners 为空，零开销。 */
+      (async()=>{ liveLeaveOwned(() => true, 'app-quit'); })(),
     ])
       .then(results => { if (results[1]?.cleanupError) dbg('file-worker:cleanup-error', results[1]); })
       .catch(error => dbg('file-worker:shutdown-error', String(error)))
@@ -1286,15 +1329,331 @@ function watchIpc(channel, handler) {
   });
 }
 watchIpc('file:saveAs', e => pickSaveAs(sessionOf(e.sender), windowOf(e)));
+handle('file:prepareOverwrite', async (e, expected) => {
+  const owner=e.sender,S=sessionOf(owner);
+  try {return await documents.grantOverwrite(S,expected,()=>!owner.isDestroyed()&&sessions.get(owner.id)===S);}
+  catch(error){return {ok:false,code:error.code,error:error.message};}
+});
 handle('file:requestSave', e => { sendTo(windowOf(e), 'menu', 'save'); return { ok: true }; });
+/* ── IPC：live 协同（desktop/API.md §3）：四条 transport 通道 + file:save 的 live/external 写入 ──
+ * 权威实现在 shell/live-documents.js（跨进程共享房间，sqlite 记账）。这一段只做三件事：
+ *   ① transport：join/exchange/leave/refresh 四条 invoke，错误一律 { ok:false, error, code }，
+ *      不跨 IPC 抛异常（§3.1）；
+ *   ② 归属校验：client 绑定创建它的 webContents + 会话对象 + documentId + 主框架，
+ *      换文档/重载/关窗后旧 client 一律失效——renderer 不能自述任意路径加入房间，
+ *      也不能拿别的窗口的 client 读草稿（窗口代际绑定）；
+ *   ③ file:save 两条 lane（§3.3）：带 metadata.live 且目标就是协同房间那份文件 ⇒
+ *      LiveDocuments.save（房间 CAS + writer 内真正的 store.save）；目标文件有活跃房间
+ *      但没有 live 凭据 ⇒ LiveDocuments.external 包住 writeDoc（房间有未保存协同草稿时
+ *      拒绝写入 MP_FILE_CONFLICT、两边保留；房间干净则放行并 adopt 磁盘）。
+ *      无房间时保持原有保存路径逐字节不变（普通未命名文档的原保存不取消）。 */
+let liveDocumentsService;                       // undefined=未探测；null=不可用（模块缺失不拖垮主进程）
+function liveService() {
+  if (liveDocumentsService === undefined) {
+    try {
+      const { LiveDocuments } = require('./shell/live-documents');
+      liveDocumentsService = new LiveDocuments();
+    } catch (e) {
+      liveDocumentsService = null;
+      dbg('live:service-unavailable', String((e && e.message) || e));
+    }
+  }
+  return liveDocumentsService;
+}
+const liveOwners = new Map();                   // client -> { senderId, sender, session, documentId, mainFrame, file, fileKey, version }
+const LIVE_UNAVAILABLE = { ok: false, error: '本版本未提供协同编辑支持', code: 'MP_LIVE_UNAVAILABLE' };
+function liveReply(err) { return { ok: false, error: String((err && err.message) || err), code: err && err.code }; }
+/* 宽松归属（只看窗口存活与所有权）：供 leave 这类“尽力而为”的清理通道使用。 */
+function liveEntryOwned(sender, client) {
+  const entry = typeof client === 'string' ? liveOwners.get(client) : null;
+  if (!entry || entry.sender !== sender) return null;
+  try { if (!sender || sender.isDestroyed()) return null; } catch { return null; }
+  return entry;
+}
+/* 真实主框架校验：事件必须来自该 webContents **当前**的主框架——子框架不允许使用协同通道，
+ * 也不允许拿旧代页面的 frame 冒充（frame 对象在整页导航后必不相等）。 */
+function liveMainFrameOk(e) {
+  try { return !!(e && e.sender && e.senderFrame && e.senderFrame === e.sender.mainFrame); } catch { return false; }
+}
+/* 严格归属：窗口 + 会话对象 + documentId + 会话路径 + 主框架都未变，client 才可用（窗口代际绑定）。
+ * 路径这条覆盖「另存为换了目标但 documentId 未变」——旧 token 必须随之失效。 */
+function liveEntryFor(sender, client) {
+  const entry = liveEntryOwned(sender, client);
+  if (!entry) return null;
+  if (sessions.get(sender.id) !== entry.session) return null;      // 会话已换绑
+  if (entry.session.documentId !== entry.documentId) return null;  // 文档已切换（open/reload/replace）
+  if (!entry.session.filePath || documents.key(entry.session.filePath) !== entry.fileKey) return null; // 另存为换了路径
+  let frame = null; try { frame = sender.mainFrame; } catch { frame = null; }
+  if (!frame || frame !== entry.mainFrame) return null;            // 页面已重载/换代
+  return entry;
+}
+/* join 的两个 await（canonical / 权威 join）之后逐一复验捕获快照；返回失效原因或 null。 */
+function liveJoinStaleReason(c) {
+  try {
+    if (!c.sender || c.sender.isDestroyed()) return 'sender-closed';
+    if (sessions.get(c.senderId) !== c.session) return 'session-rebound';
+    if (c.session.documentId !== c.documentId) return 'document-switched';
+    if (!c.session.filePath || documents.key(c.session.filePath) !== documents.key(c.filePath)) return 'path-changed';
+    if (((c.session.baseline && c.session.baseline.sha256) || null) !== c.baselineSha) return 'baseline-changed';
+    let frame = null; try { frame = c.sender.mainFrame; } catch { frame = null; }
+    if (!frame || frame !== c.mainFrame) return 'frame-changed';
+  } catch { return 'check-failed'; }
+  return null;
+}
+/* owner 清理：关窗 / 主框架整页导航 / 退出时，把该窗口名下的 client 全部 leave
+ * （房间最后一个 client 离开时房间随之回收，草稿不悬空）。 */
+function liveLeaveOwned(filter, why) {
+  for (const [client, entry] of [...liveOwners]) {
+    if (!filter(entry)) continue;
+    liveOwners.delete(client);
+    if (liveDocumentsService) { try { liveDocumentsService.leave(client); } catch (e) { dbg('live:retire-leave-error', String((e && e.message) || e)); } }
+    dbg('live:retired', { why, epoch: entry.epoch });
+  }
+}
+function liveRoomActive(fileKey) {
+  for (const entry of liveOwners.values()) if (entry.fileKey === fileKey) return true;
+  return false;
+}
+/* 主进程亲历的「authority 已保存」标记：只有主进程自己经手的房间头 version===savedVersion 才记
+ * （已验证 live save 的回执、peer exchange 的头、外改采用后的头）。renderer 的任何自称都不产
+ * 生 cleanAt——它是 doc:dirty 干净校准的唯一权威证据源。 */
+function liveNoteHead(entry, head) {
+  if (!entry || !head || head.epoch !== entry.epoch) return;
+  if (Number.isSafeInteger(head.version) && head.version === head.savedVersion) entry.cleanAt = { epoch: entry.epoch, version: head.version };
+}
+/* 任一房间写入成功后，把同一文件其它窗口会话的 savedText/baseline 对齐新盘态（§3.3 末条）：
+ * 它们随后的普通保存 / 外改探测才不会把“同房他窗刚保存的内容”误判成外部改动。 */
+async function liveAlignSiblingSessions(target, saverSession) {
+  try {
+    const canonical = await documents.canonical(target), key = documents.key(canonical);
+    const siblings = [...sessions.values()].filter(S => S !== saverSession && S.filePath && documents.key(S.filePath) === key);
+    if (!siblings.length) return;
+    const snap = await documents.snapshot(canonical, { allowMissing: true });
+    if (!snap) return;
+    const decoded = require('./shell/text-codec').decodeDocument(snap.bytes, canonical);
+    for (const S of siblings) {
+      S.savedText = decoded.text; S.baseline = snap.baseline; S.diskMtime = snap.baseline.mtimeMs;
+      S.bom = decoded.bom; S.eol = decoded.eol; S.encoding = decoded.encoding;
+    }
+    dbg('live:aligned-siblings', { key, count: siblings.length });
+  } catch (e) { dbg('live:align-siblings-error', String((e && e.message) || e)); }
+}
+/* 本窗口对某文件的健康 live 租约（外改探测改走权威采用时用）。 */
+function liveLeaseFor(sender, filePath) {
+  if (!sender || typeof filePath !== 'string' || !filePath) return null;
+  const key = documents.key(filePath);
+  for (const [client, entry] of liveOwners) {
+    if (entry.sender !== sender || entry.fileKey !== key) continue;
+    if (liveEntryFor(sender, client)) return { client, entry };
+  }
+  return null;
+}
+/* CM Live 外改采用（transport overlay 契约）：盘变 ⇒ 经 provider 的 external 以「无操作 writer」
+ * 走一次跨进程 CAS——房间干净时把盘差收编为 'disk' 远端增量（peers 经 exchange 回放）；
+ * 盘与未保存协同草稿均已改变 ⇒ MP_FILE_CONFLICT（渲染侧按共享冲突 UI 呈现）；
+ * 盘未变 ⇒ 零写入，只回房间头。文件缺失/读取不稳时不采用，如实回 missing/changed。 */
+async function liveAdoptExternal(client, entry) {
+  const svc = liveService();
+  if (!svc) return null;
+  const head = svc.exchange(client, { epoch: entry.epoch, version: entry.version });
+  if (Number.isSafeInteger(head.version)) entry.version = head.version;
+  liveNoteHead(entry, head);
+  let snap = null;
+  try { snap = await documents.snapshot(entry.file, { allowMissing: true }); } catch (err) { snap = null; }
+  if (!snap) return { changed: true, missing: true, head };
+  if (snap.baseline.sha256 === head.diskHash) return { changed: false, head };
+  await svc.external(entry.file, async () => ({ ok: true, adopted: true }));
+  const after = svc.exchange(client, { epoch: entry.epoch, version: entry.version });
+  if (Number.isSafeInteger(after.version)) entry.version = after.version;
+  liveNoteHead(entry, after);
+  return { changed: true, head: after };
+}
+/* H2 边界（reload-overlap-h2-slot）：点击触发的 focus watcher 让「外改采用 + 远端应用」先后
+ * 到达——主进程可能先收 transient markDirty(true)，clean 校准晚一个节拍。原生未保存确认之前
+ * 用它核对该来源已入权威的 current head 是否 clean：
+ *   租约有效 + 房间此刻 version===savedVersion 且与 entry/cleanAt 完全一致 + 校准后无新输入
+ *   （entry.cleanRevision === S.revision）⇒ 有界等待（≤400ms、40ms 节拍）dirty 落定，落定即真干净；
+ *   房间不干净 / 版本已前进 / revision 已前进 / 超时 ⇒ 返回 false，原生确认照旧——真实新输入
+ *   绝不压制，重载权限与确认语义不变。 */
+async function liveSettledClean(sender, S) {
+  const lease = liveLeaseFor(sender, S.filePath);
+  if (!lease) return false;
+  const { entry } = lease;
+  const svc = liveService();
+  if (!svc) return false;
+  const deadline = Date.now() + 400;
+  for (;;) {
+    let evidenceOk = false;
+    try {
+      const head = svc.exchange(lease.client, { epoch: entry.epoch, version: entry.version });
+      if (Number.isSafeInteger(head.version)) entry.version = head.version;
+      liveNoteHead(entry, head);
+      evidenceOk = head.epoch === entry.epoch && head.version === head.savedVersion
+        && !!entry.cleanAt && entry.cleanAt.version === entry.version
+        && entry.cleanRevision === S.revision;
+    } catch (err) { return false; }
+    if (evidenceOk && !S.dirty) return true;
+    if (!evidenceOk || Date.now() >= deadline) return false;
+    await new Promise(resolve => setTimeout(resolve, 40));
+  }
+}
+handle('live:join', async (e, payload = {}) => {
+  const svc = liveService();
+  if (!svc) return { ...LIVE_UNAVAILABLE };
+  try {
+    if (!liveMainFrameOk(e)) return { ok: false, error: '协同通道只接受主框架调用', code: 'MP_LIVE_SESSION' };
+    const S = sessionOf(e.sender);
+    if (typeof payload.filePath !== 'string' || !payload.filePath || typeof payload.text !== 'string')
+      return { ok: false, error: '缺少文件路径或正文，无法加入协同', code: 'MP_LIVE_JOIN' };
+    if (payload.rawSha !== undefined && typeof payload.rawSha !== 'string')
+      return { ok: false, error: '磁盘校验值形状无效', code: 'MP_LIVE_JOIN' };
+    /* 归属校验（§3.1）：只能加入**本窗口会话已打开**的那份文档——renderer 不能自述任意路径，
+       也就读不到本窗口没打开的文件的草稿。 */
+    /* 先捕获快照再 await（sender/主框架/会话对象/documentId/路径/基线 hash）：canonical 与权威
+       join 期间文档可能被换掉；join 完成后逐一复验，失效就立刻 leave 新 token——
+       绝不把新 client 绑到已变化的文档上。 */
+    const captured = { sender: e.sender, senderId: e.sender.id, session: S, documentId: S.documentId,
+      filePath: S.filePath, baselineSha: (S.baseline && S.baseline.sha256) || null, mainFrame: e.sender.mainFrame };
+    const file = await documents.canonical(payload.filePath), key = documents.key(file);
+    if (!S.filePath || documents.key(S.filePath) !== key)
+      return { ok: false, error: '只能加入当前窗口已打开文档的协同', code: 'MP_DOC_MISMATCH' };
+    const joined = await svc.join(payload.filePath, payload.text, payload.rawSha);
+    const stale = liveJoinStaleReason(captured);
+    if (stale) {
+      try { svc.leave(joined.client); } catch (err) { dbg('live:join:stale-leave-error', String((err && err.message) || err)); }
+      dbg('live:join:stale', { reason: stale });
+      return { ok: false, error: '加入协同期间文档已变化，已退出房间并保留当前稿，请重试', code: 'MP_DOC_MISMATCH' };
+    }
+    liveOwners.set(joined.client, { senderId: captured.senderId, sender: captured.sender, session: captured.session,
+      documentId: captured.documentId, mainFrame: captured.mainFrame, file, fileKey: key, epoch: joined.epoch, version: joined.version });
+    dbg('live:join', { client: String(joined.client).slice(0, 8), epoch: joined.epoch, version: joined.version });
+    return { ok: true, ...joined };
+  } catch (err) { dbg('live:join:error', { error: String((err && err.message) || err) }); return liveReply(err); }
+});
+handle('live:exchange', async (e, payload = {}) => {
+  const svc = liveService();
+  if (!svc) return { ...LIVE_UNAVAILABLE };
+  try {
+    if (!liveMainFrameOk(e)) return { ok: false, error: '协同通道只接受主框架调用', code: 'MP_LIVE_SESSION' };
+    const entry = liveEntryFor(e.sender, payload.client);
+    if (!entry) return { ok: false, error: '协同会话不属于当前窗口或已失效', code: 'MP_LIVE_SESSION' };
+    const request = payload.request;
+    if (!request || typeof request !== 'object' || request.epoch !== entry.epoch || !Number.isSafeInteger(request.version))
+      return { ok: false, error: '协同请求的会话标识无效', code: 'MP_LIVE_SESSION' };
+    const head = svc.exchange(payload.client, request);
+    if (Number.isSafeInteger(head.version)) entry.version = head.version;
+    liveNoteHead(entry, head);
+    return { ok: true, ...head };
+  } catch (err) { return liveReply(err); }
+});
+handle('live:leave', (e, client) => {
+  const svc = liveService();
+  if (!svc) return { ok: true, noop: true };
+  try {
+    if (!liveMainFrameOk(e)) return { ok: false, error: '协同通道只接受主框架调用', code: 'MP_LIVE_SESSION' };
+    const entry = liveEntryOwned(e.sender, client);
+    if (!entry) return { ok: false, error: '协同会话不属于当前窗口或已失效', code: 'MP_LIVE_SESSION' };
+    liveOwners.delete(client);
+    try { svc.leave(client); } catch (err) { dbg('live:leave-error', String((err && err.message) || err)); }
+    return { ok: true };
+  } catch (err) { return liveReply(err); }
+});
+handle('live:refresh', async (e, payload = {}) => {
+  const svc = liveService();
+  if (!svc) return { ...LIVE_UNAVAILABLE };
+  try {
+    if (!liveMainFrameOk(e)) return { ok: false, error: '协同通道只接受主框架调用', code: 'MP_LIVE_SESSION' };
+    const entry = liveEntryFor(e.sender, payload.client);
+    if (!entry) return { ok: false, error: '协同会话不属于当前窗口或已失效', code: 'MP_LIVE_SESSION' };
+    if (payload.epoch !== entry.epoch) return { ok: false, error: '协同会话标识不匹配', code: 'MP_LIVE_SESSION' };
+    if (typeof svc.refresh === 'function') {
+      const out = await svc.refresh(payload.client, payload.epoch);
+      if (out && Number.isSafeInteger(out.version)) entry.version = out.version;
+      liveNoteHead(entry, out);
+      return { ok: true, ...out };
+    }
+    /* authority 未提供 refresh 时的主进程回退：只读 exchange 拿房间头 + 真实盘字节 hash 对账。
+     * 比 { ok:true, unsupported:true } 让宿主退回 mtime 探测更强；错误仍走 { ok:false, code }。 */
+    const head = svc.exchange(payload.client, { epoch: entry.epoch, version: entry.version });
+    if (Number.isSafeInteger(head.version)) entry.version = head.version;
+    liveNoteHead(entry, head);
+    let snap = null, unstable = false;
+    try { snap = await documents.snapshot(entry.file, { allowMissing: true }); }
+    catch (err) { unstable = true; }
+    const changed = unstable || !snap || snap.baseline.sha256 !== head.diskHash;
+    dbg('live:refresh', { changed, unstable });
+    return { ok: true, changed, missing: !snap && !unstable, ...(snap ? { mtimeMs: snap.baseline.mtimeMs, size: snap.baseline.size } : {}), epoch: head.epoch, version: head.version, savedVersion: head.savedVersion, diskHash: head.diskHash };
+  } catch (err) { return liveReply(err); }
+});
 handle('file:save', async (e, { filePath, text, ...metadata }) => {
   try {
     if (metadata.automatic && state.settings.autosaveEnabled !== true) return { ok: false, code: 'MP_AUTOSAVE_DISABLED' };
     const S = sessionOf(e.sender);
     const owner=e.sender;
-    const r = await writeDoc(filePath, text, S, { ...metadata, ownerCurrent:()=>!owner.isDestroyed()&&sessions.get(owner.id)===S });
+    const { live: liveMeta, ...rest } = metadata;
+    const ownerCurrent=()=>!owner.isDestroyed()&&sessions.get(owner.id)===S;
+    const targetKey = documents.key(await documents.canonical(filePath));
+    const grantLane = rest.saveAsToken !== undefined && rest.saveAsToken !== null;
+    /* 「保留我的修改」专用车道：一次性覆盖 grant（overwriteRevision）且目标就是本文档自己的
+     * 文件时，才可能把本房间的未保存草稿写盘。前提还要有**本窗在该文件房间里的健康 live
+     * 租约**——别窗/插件的草稿、或本窗从未加入的房间，一律仍走 external 的草稿保护拒绝。
+     * shell/live-documents.js 在写盘前再核正文==房间权威正文，落后即失败，草稿不动。 */
+    const overwriteGrant = grantLane && !!S.saveAsGrant && S.saveAsGrant.overwriteRevision !== undefined
+      && !!S.filePath && documents.key(S.filePath) === targetKey;
+    const keepLease = overwriteGrant ? liveLeaseFor(owner, S.filePath) : null;
+    let r, liveLaneUsed = false;
+    if (liveMeta !== undefined && liveMeta !== null && !grantLane) {
+      /* 带 live 凭据的保存（§3.3）：凭据非法一律**拒绝**，绝不静默降级成普通保存——那会绕开
+       * 协同房间误写他窗草稿；全部校验通过才走权威 CAS 保存（writer 内是真正的 store.save）。 */
+      const svc = liveService();
+      if (!liveMainFrameOk(e)) return { ok: false, error: '协同保存只接受主框架调用，修改已保留', code: 'MP_LIVE_SESSION' };
+      if (!svc) return { ...LIVE_UNAVAILABLE };
+      const shapeOk = typeof liveMeta === 'object' && typeof liveMeta.client === 'string' && !!liveMeta.client
+        && typeof liveMeta.epoch === 'string' && !!liveMeta.epoch && Number.isSafeInteger(liveMeta.version);
+      if (!shapeOk) return { ok: false, error: '协同保存凭据形状无效，修改已保留；请同步后重试', code: 'MP_LIVE_SESSION' };
+      const entry = liveEntryFor(owner, liveMeta.client);
+      if (!entry) return { ok: false, error: '协同会话不属于当前窗口或已失效，修改已保留；请同步后重试', code: 'MP_LIVE_SESSION' };
+      if (liveMeta.epoch !== entry.epoch) return { ok: false, error: '协同保存的会话标识不匹配，修改已保留；请同步后重试', code: 'MP_LIVE_SESSION' };
+      if (entry.fileKey !== targetKey) return { ok: false, error: '保存目标与协同房间不是同一文件；换路径保存请走另存为', code: 'MP_SAVE_TARGET' };
+      const out = await svc.save(liveMeta.client, { epoch: liveMeta.epoch, version: liveMeta.version, text }, async ({ diskHash }) => {
+        /* 写入前把会话 baseline 对齐权威担保的盘态（§3.3）：同房他窗刚保存的内容不误判外改。 */
+        if (typeof diskHash === 'string' && S.baseline && S.baseline.sha256 !== diskHash) {
+          try {
+            const snap = await documents.snapshot(entry.file, { allowMissing: true });
+            if (snap && snap.baseline.sha256 === diskHash) { S.baseline = snap.baseline; S.diskMtime = snap.baseline.mtimeMs; }
+          } catch (err) { dbg('live:save-baseline-align-error', String((err && err.message) || err)); }
+        }
+        return writeDoc(filePath, text, S, { ...rest, ownerCurrent });
+      });
+      if (!out || out.ok === false) return out;                    // writer 回执原样透传（含失败，可读）
+      if (Number.isSafeInteger(out.version)) entry.version = out.version;
+      liveNoteHead(entry, out);
+      r = { ...out, liveVersion: out.version };                    // 原 writer 回执 + live 头（liveVersion/savedVersion/diskHash/epoch）
+      liveLaneUsed = true;
+    } else {
+      const svc = liveService();
+      const writer = () => writeDoc(filePath, text, S, { ...rest, ownerCurrent });
+      if (liveMeta && grantLane) dbg('live:save-as-grant-lane', { note: '源房间租约不是目标凭据；目标由一次性 grant + 跨进程 external CAS 把关' });
+      /* 无本房凭据（含另存为：源房间 token 不当作目标凭据）⇒ 一律经共享 external/跨进程写锁：
+       * 目标房间有未保存协同草稿（**含仅插件进程持有的房间**）⇒ 拒写 MP_FILE_CONFLICT、两边保留
+       * （grant 未消费，源脏稿与目标草稿都原样）；干净/无房 ⇒ 原样写盘并 adopt 磁盘。
+       * 唯一例外是本窗对**本文件**房间的显式保留：传 keepMineText 让权威确认正文一致后把自己
+       * 的草稿落盘并清房；正文落后/成员失效仍是明确失败，不会静默降级为裸写。 */
+      const keepMine = keepLease ? { client: keepLease.client, keepMineText: text } : null;
+      r = svc ? await svc.external(filePath, writer, keepMine || {}) : await writer();
+      if (keepMine && r && r.ok !== false && Number.isSafeInteger(r.liveVersion)) {
+        keepLease.entry.version = r.liveVersion;
+        liveNoteHead(keepLease.entry, r);
+      }
+      if (r && r.ok !== false && grantLane) {
+        /* 另存成功落到新目标：本窗口绑在**其它**文件的 live 租约就地退役（旧房间 client leave、
+           按最后离场回收；新目标的绑定由渲染侧重绑 join 完成——不保留原页 token）。 */
+        liveLeaveOwned(entry => entry.sender === owner && entry.fileKey !== targetKey, 'save-as-moved');
+      }
+    }
     if (r.current) syncPathUi(S, windowOf(e));
-    dbg('file:save', { filePath, bytes: r.bytes });
+    if (r.ok !== false && (liveLaneUsed || liveRoomActive(targetKey))) void liveAlignSiblingSessions(filePath, S);
+    dbg('file:save', { filePath, bytes: r.bytes, live: liveLaneUsed });
     return r;
   }
   catch (e) { dbg('file:save:error', { filePath, error: e.message }); return { ok: false, error: e.message, code: e.code }; }
@@ -1354,12 +1713,12 @@ async function imgReadCapped(p) {
   if (st.size > IMG_MAX_BYTES) {
     return { ok: false, error: `图片过大：${p} 有 ${(st.size / 1048576).toFixed(1)} MB，超过单张 ${IMG_MAX_BYTES / 1048576} MB 上限`, code: 'E_TOO_LARGE', bytes: st.size };
   }
-  const buf = await fsp.readFile(p);
+  const buf = await require('./shell/capped-read').readCappedFile(p,IMG_MAX_BYTES);
   return { ok: true, buf, bytes: buf.length, mime: imgMimeOf(p) };
 }
 /** 落盘到 <文档目录>/assets/ 并回相对路径（重名去重规则由引擎定、这里执行）：
  *  同名 + 字节相同 ⇒ 复用已有文件；同名 + 字节不同 ⇒ a-1.png、a-2.png… */
-async function imgSaveToAssets({ docPath, srcPath, base64, mime, fileName } = {}) {
+async function imgSaveToAssets({ docPath, srcPath, base64, dataUri, mime, fileName } = {}) {
   if (!docPath || typeof docPath !== 'string') return { ok: false, error: '缺少 docPath（不知道文档在哪，无法决定 assets 落点）' };
   const docDir = path.dirname(path.resolve(docPath));
   const assetsDir = path.join(docDir, 'assets');
@@ -1368,7 +1727,13 @@ async function imgSaveToAssets({ docPath, srcPath, base64, mime, fileName } = {}
     const r = await imgReadCapped(srcPath).catch((e) => (e && e.__img) || { ok: false, error: String((e && e.message) || e) });
     if (!r.ok) return r;
     buf = r.buf; from = srcPath;
+  } else if(typeof dataUri==='string') {
+    try {
+      ({buf,mime}=require('./shell/data-image-bytes').decodeAssetImage(dataUri));
+      from='(data URI)';
+    }catch(error){return {ok:false,error:error.message,code:error.code||'E_DATA_IMAGE'};}
   } else if (typeof base64 === 'string' && base64) {
+    if(base64.length>Math.ceil(IMG_MAX_BYTES/3)*4)return {ok:false,error:'图片编码超过单张32 MB上限',code:'E_TOO_LARGE'};
     buf = Buffer.from(base64, 'base64');
     if (!buf.length) return { ok: false, error: 'base64 解出来是空的（传入内容可能被截断）' };
     if (buf.length > IMG_MAX_BYTES) return { ok: false, error: `图片过大：${(buf.length / 1048576).toFixed(1)} MB，超过单张 ${IMG_MAX_BYTES / 1048576} MB 上限`, code: 'E_TOO_LARGE' };
@@ -1416,19 +1781,20 @@ async function imgDownload({ url, fileNameHint } = {}) {
   const target = path.join(cacheDir, `${crypto.createHash('sha1').update(u.href).digest('hex').slice(0, 12)}-${slug.slice(0, 60)}.${ext}`);
   if (fs.existsSync(target)) {
     const st = fs.statSync(target);
+    if (!st.isFile()) return { ok: false, error: '图片缓存不是文件', code: 'EISDIR' };
+    if (st.size > IMG_MAX_BYTES) return { ok: false, error: '图片缓存超过单张32 MB上限', code: 'E_TOO_LARGE', bytes: st.size };
     return { ok: true, absPath: target, cachePath: target, mime: imgMimeOf(target), bytes: st.size, fromCache: true, url: u.href };
   }
   try { await fsp.mkdir(cacheDir, { recursive: true }); } catch (e) { return imgFsError(e, cacheDir); }
   let res = null, buf = null;
+  const controller=new AbortController(),deadline=setTimeout(()=>controller.abort(),30000);
   try {
-    res = await net.fetch(u.href, { redirect: 'follow' });
+    res = await net.fetch(u.href, { redirect: 'follow', signal:controller.signal });
     if (!res.ok) return { ok: false, error: `下载失败：HTTP ${res.status} ${res.statusText}（${u.href}）`, code: `HTTP_${res.status}` };
-    const len = Number(res.headers.get('content-length') || 0);
-    if (len > IMG_MAX_BYTES) return { ok: false, error: `图片过大：远端声明 ${(len / 1048576).toFixed(1)} MB，超过单张 ${IMG_MAX_BYTES / 1048576} MB 上限`, code: 'E_TOO_LARGE' };
-    buf = Buffer.from(await res.arrayBuffer());
+    buf = await require('./shell/capped-read').readCappedResponse(res,IMG_MAX_BYTES);
   } catch (e) {
     return { ok: false, error: `下载失败：${(e && e.message) || e}（${u.href}）`, code: (e && e.code) || 'E_NET' };
-  }
+  } finally {clearTimeout(deadline);controller.abort();}
   if (buf.length > IMG_MAX_BYTES) return { ok: false, error: `图片过大：${(buf.length / 1048576).toFixed(1)} MB，超过单张 ${IMG_MAX_BYTES / 1048576} MB 上限`, code: 'E_TOO_LARGE' };
   if (!buf.length) return { ok: false, error: `下载回来的内容是空的（${u.href}）` };
   try { await imgAtomicWrite(target, buf); } catch (e) { return imgFsError(e, target); }
@@ -1443,7 +1809,7 @@ handle('file:readBase64', async (_e, p, options = {}) => {
     if (!st.isFile()) return { ok: false, error: `不是文件：${p}`, code: 'EISDIR' };
     const limit = Number.isSafeInteger(options.maxBytes) && options.maxBytes > 0 ? Math.min(IMG_MAX_BYTES, options.maxBytes) : IMG_MAX_BYTES;
     if (st.size > limit) return { ok: false, error: `文件过大：${(st.size / 1048576).toFixed(1)} MB > ${(limit / 1048576).toFixed(1)} MB`, code: 'E_TOO_LARGE', bytes: st.size };
-    const buf = await fsp.readFile(p);
+    const buf = await require('./shell/capped-read').readCappedFile(p,limit);
     return { ok: true, base64: buf.toString('base64'), bytes: buf.length, mime: imgMimeOf(p), path: path.resolve(p) };
   } catch (e) { const f = imgFsError(e, p); return { ok: false, error: f.error, code: f.code }; }
 });
@@ -1640,12 +2006,8 @@ async function imgSourceBytes(src, docPath) {
   const value = String(src || '');
   if (!value) return { ok: false, error: '图片地址为空' };
   if (/^data:/i.test(value)) {
-    const comma = value.indexOf(','), meta = value.slice(5, comma);
-    if (comma < 0 || !/^image\//i.test(meta)) return { ok: false, error: '不是图片数据' };
-    const data = value.slice(comma + 1);
-    const buf = /;base64(?:;|$)/i.test(meta) ? Buffer.from(data, 'base64') : Buffer.from(decodeURIComponent(data));
-    if (!buf.length || buf.length > IMG_MAX_BYTES) return { ok: false, error: '图片为空或超过单张大小上限' };
-    return { ok: true, buf, bytes: buf.length, mime: meta.split(';')[0] };
+    try { return require('./shell/data-image-bytes').decodeAssetImage(value); }
+    catch (error) { return {ok:false,error:error.message,code:error.code||'E_DATA_IMAGE'}; }
   }
   if (/^https?:/i.test(value)) {
     const downloaded = await imgDownload({ url: value });
@@ -1759,7 +2121,9 @@ handle('clipboard:writeImage', async (e, payload = {}, token) => {
 });
 handle('image:saveAs', async (e, payload = {}) => {
   try {
-    const owner = BrowserWindow.fromWebContents(e.sender), docPath = sessionOf(e.sender).filePath;
+    const owner = BrowserWindow.fromWebContents(e.sender), session = sessionOf(e.sender);
+    const docPath=session.filePath, docId=session.documentId, frame=e.sender.mainFrame;
+    const current=()=>!!owner && !owner.isDestroyed() && !e.sender.isDestroyed() && e.sender.mainFrame===frame && sessions.get(e.sender.id)===session && session.documentId===docId && session.filePath===docPath;
     const suggest = imgSafeName(payload.fileName || 'image.png');
     const source = await imgSourceBytes(payload.src, docPath);
     if (!source.ok) return source;
@@ -1768,9 +2132,10 @@ handle('image:saveAs', async (e, payload = {}) => {
     else if (process.env.MP_TEST_NO_DIALOG === '1') r = { canceled: true };
     else r = await dialog.showSaveDialog(owner, { title: "图片另存为", defaultPath: path.join(app.getPath("pictures"), suggest) });
     if (r.canceled || !r.filePath) return { ok: false, canceled: true };
-    await fsp.writeFile(r.filePath, source.buf);
+    const grant=await chooseExportTarget(r.filePath,current);
+    await publishImage(grant,source.buf);
     return { ok: true, path: r.filePath, bytes: source.bytes };
-  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+  } catch (e) { return { ok: false, error: String((e && e.message) || e),code:e.code }; }
 });
 let clipboardWriteSerial = 0;
 /* ── copy intent（host178v2）：应用全局唯一最新意图 ─────────────────────────────
@@ -1905,6 +2270,24 @@ function clipboardIntentOnNavigation(W) {
     if (isMainFrame && !isSameDocument) retireClipboardIntentFor(W.webContents);
   });
 }
+const { rememberImageSource, recoverImageSource } = require('./shell/clipboard-image-source.cjs');
+ipcMain.on('clipboard:rememberImageSource', (event, token, payload) => {
+  let result = null;
+  try {
+    if (event.senderFrame && event.senderFrame === event.sender.mainFrame && clipboardIntentCurrent(event.sender, token))
+      result = rememberImageSource(sessions.get(event.sender.id).filePath, payload);
+  } catch { /* No origin can be registered for this transfer. */ }
+  event.returnValue = result;
+});
+ipcMain.on('clipboard:recoverImageSource', (event, id, length, hash) => {
+  let result = null;
+  try {
+    const session = sessions.get(event.sender.id);
+    if (session && event.senderFrame && event.senderFrame === event.sender.mainFrame)
+      result = recoverImageSource(session.filePath, id, length, hash);
+  } catch { /* Unknown/invalid transfer leaves the destination untouched. */ }
+  event.returnValue = result;
+});
 const CLIPBOARD_IMAGE_SYNC_MAX_BYTES = 48 * 1024 * 1024;
 const CLIPBOARD_IMAGE_SYNC_MAX_PIXELS = 64000000;
 ipcMain.on('clipboard:writeImageSync', async (event, payload = {}, token) => {
@@ -2123,7 +2506,39 @@ handle('doc:dirty', (e, payload) => {
   const S = sessionOf(e.sender), W = windowOf(e);
   let accepted;
   if (typeof payload === 'boolean' && MP_TEST_HOOKS) { S.dirty = payload; accepted = true; }
-  else accepted = documents.markDirty(S, payload || {});
+  else {
+    accepted = documents.markDirty(S, payload || {});
+    /* CM Live 干净校准（peer-overlap / reload-overlap 阻断修复）：renderer 自称 liveClean 不
+       直接采信，主进程证据链齐全才对齐 lastSavedRevision——
+         ① client 严格归属（liveEntryFor：窗口/会话对象/documentId/会话路径/主框架全未变）；
+           对象式 liveClean:{client,epoch,version} 逐字段与 entry 比对；布尔式 liveClean:true
+           不提供任何待信事实，client 由主进程按会话路径自行查找（liveLeaseFor）；
+         ② 主进程亲历的 cleanAt（version===savedVersion 的房间头，由已验证 live save /
+            peer exchange / 外改采用产生），且 cleanAt.version === entry.version（房间此刻干净）；
+         ③ 自称版本必须与 cleanAt/entry 完全一致——房间有任何更新活动或 renderer 落后一轮，
+           一律视为竞态，保守不校准；
+         ④ payload.revision 与校准时刻的 S.revision 一致且不回退（新输入竞态保守）。
+       校准 ⇒ S.dirty=false、S.lastSavedRevision=S.revision：随后 syncDirty(false) 自然保持
+       干净（revision===lastSavedRevision），新输入立刻恢复脏标；任何不满足 ⇒ 原 dirty 数学
+       原样，不削弱未保存/外改保护。 */
+    const lc = payload && payload.liveClean;
+    if (accepted && payload && payload.dirty === false && (lc === true || (lc && typeof lc === 'object'))) {
+      let entry = null;
+      if (typeof lc.client === 'string') entry = liveEntryFor(e.sender, lc.client);
+      else if (lc === true) { const lease = liveLeaseFor(e.sender, S.filePath); entry = lease && lease.entry; }
+      const clean = entry && entry.cleanAt;
+      const epochOk = !entry || !lc.epoch || typeof lc.epoch !== 'string' || lc.epoch === entry.epoch;
+      const versionOk = !Number.isSafeInteger(lc.version) || lc.version === clean?.version;
+      if (entry && clean && epochOk && versionOk && clean.epoch === entry.epoch
+        && clean.version === entry.version
+        && Number.isSafeInteger(payload.revision) && payload.revision === S.revision
+        && payload.revision >= S.lastSavedRevision) {
+        S.lastSavedRevision = S.revision; S.dirty = false;
+        entry.cleanRevision = S.revision;                           // 校准时刻的 local revision：H2 落定核对用
+        dbg('live:clean-calibrated', { epoch: entry.epoch, version: clean.version, revision: S.revision });
+      }
+    }
+  }
   updateTitle(S, W); return { ok: accepted, documentId: S.documentId, revision: S.revision, dirty: S.dirty };
 });
 handle('doc:path', (e, filePath, metadata = {}) => {
@@ -2131,7 +2546,8 @@ handle('doc:path', (e, filePath, metadata = {}) => {
   if (filePath === null) {
     if (metadata.documentId !== S.documentId) return { ok: false, code: 'MP_DOC_MISMATCH' };
     if (pdfActive?.owner === e.sender.id) return { ok: false, error: 'PDF 正在导出，请完成或取消后再新建文档' };
-    documents.reset(S); W.__pendingClose = null;
+    if (!Number.isSafeInteger(metadata.revision)) return { ok: false, code: 'MP_DOC_MISMATCH' };
+    return openPath(null, {win: W, session: S}, {documentId: metadata.documentId, revision: metadata.revision});
   } else if (filePath !== S.filePath || (metadata.documentId && metadata.documentId !== S.documentId)) return { ok: false, code: 'MP_DOC_MISMATCH' };
   syncPathUi(S, W); return { ok: true, ...documents.metadata(S) };
 });
@@ -2143,7 +2559,26 @@ handle('doc:saved', (e, receipt = {}) => {
   return true;
 });
 handle('doc:outside-change', async (e, { filePath }) => {
-  try { return await documents.outsideChange(sessionOf(e.sender), filePath); }
+  try {
+    const S = sessionOf(e.sender);
+    /* CM Live（transport overlay 契约）：本窗口持有该文件的健康 live 租约时，外改探测改走
+       权威采用——盘变由房间以远端增量收编（peers 回放为共享编辑）；盘与未保存协同草稿均已
+       改变 ⇒ MP_FILE_CONFLICT；未变只回房间头。无租约/失败回退原 mtime/hash 探测。 */
+    const lease = liveLeaseFor(e.sender, filePath);
+    if (lease) {
+      try {
+        const adopted = await liveAdoptExternal(lease.client, lease.entry);
+        if (adopted && adopted.head && adopted.head.epoch === lease.entry.epoch) {
+          return { changed: !!adopted.changed, ...(adopted.missing ? { missing: true } : {}),
+            live: { epoch: adopted.head.epoch, version: adopted.head.version, savedVersion: adopted.head.savedVersion, diskHash: adopted.head.diskHash } };
+        }
+      } catch (err) {
+        if (err && err.code === 'MP_FILE_CONFLICT') return { changed: false, error: err.message, code: 'MP_FILE_CONFLICT' };
+        dbg('live:outside-adopt-error', { error: String((err && err.message) || err), code: err && err.code });
+      }
+    }
+    return await documents.outsideChange(S, filePath);
+  }
   catch (err) { return { changed: false, error: err.message }; }
 });
 
@@ -2311,16 +2746,7 @@ handle('export:pdf', async (e, opts = {}) => {
     }
     if (session.canceled || S.documentId !== session.documentId) { progress({ phase: 'canceled' }); return { ok: false, canceled: true }; }
     outFile = path.resolve(outFile);
-    const outputKey = documents.key(await documents.canonical(outFile));
-    session.outputKey=outputKey;
-    const validatePdfTarget=async()=>{
-      if(documents.key(await documents.canonical(outFile))!==outputKey)throw failure('MP_EXPORT_TARGET','PDF 保存位置已改变，请重新选择');
-      // DocumentStore only publishes canonical filePath values. Check without
-      // yielding while its target queue / short shared commit fence is held.
-      for(const doc of sessions.values())if(doc.filePath&&documents.key(doc.filePath)===outputKey)throw failure('MP_EXPORT_TARGET','PDF 不能覆盖正在编辑的文档，请选择其他路径');
-      if(documentOpens.has(outputKey)||[...openTransactions.values()].some(op=>op.targetKey===outputKey||op.candidate?.filePath&&documents.key(op.candidate.filePath)===outputKey))throw failure('MP_EXPORT_TARGET','该保存目标正在打开，PDF 未覆盖原文件');
-    };
-    await validatePdfTarget();
+    const outputGrant=await chooseExportTarget(outFile,()=>!session.canceled && !e.sender.isDestroyed() && S.documentId===session.documentId);
     await fsp.mkdir(path.dirname(outFile), { recursive: true });
     session.tempRoot = await fsp.realpath(app.getPath('temp'));
     dir = await fsp.mkdtemp(path.join(session.tempRoot, 'markpilot-pdf-')); session.dir = dir;
@@ -2353,8 +2779,7 @@ handle('export:pdf', async (e, opts = {}) => {
     dbg('export:pdf:mathCss', { source: session.mathCssSource, bytes: extraCss.length });
     const r = await pdfProcess.printInWorker({
       app,BrowserWindow, ipcMain, htmlFile: html.file, outFile,signal:session.abort.signal,onPublishing:()=>{session.publishing=true;},
-      validateTarget:validatePdfTarget,withPublication:task=>documents.queue(outputKey,async()=>{session.publicationHeld=true;try{return await task();}finally{session.publicationHeld=false;}}),
-      commitPublication:commit=>documents.commit(async()=>{await validatePdfTarget();return commit();}),
+      outputGrant,validateTarget:outputGrant.validate,withPublication:outputGrant.withPublication,commitPublication:outputGrant.commitPublication,
       extraCss,
       /* 【诊断口·2026-10-11】export-pdf.js 的 `o.css` 注释里写明"undefined=用 PRINT_CSS，''/null=不注入"，
          但主进程一直没把它透进来 ✗ ⇒ 只能改代码才能做"打印期样式"的对照臂 ✗。

@@ -6,12 +6,16 @@ function repositoryRoot(start){let p=fs.realpathSync(start);for(;;){if(fs.exists
 const ROOT=repositoryRoot(__dirname),HOST=path.join(ROOT,'MarkPilot-CM6/renderer/host.js');
 const bytes=fs.readFileSync(HOST),hash=b=>crypto.createHash('sha256').update(b).digest('hex'),hostSha=hash(bytes),source=bytes.toString('utf8');
 const mode=process.argv[2]||'off';assert(['on','off'].includes(mode),'Use node save-as-carry.test.cjs on|off');
-const startAnchor='async function doSave(force = false, grant = null, saveAsOperation = null, automatic = null) {',endAnchor='async function saveAsFlow() {';
+const startAnchor='async function doSave(force = false, grant = null, saveAsOperation = null, automatic = null',endAnchor='async function saveAsFlow() {';
 assert.equal(source.split(startAnchor).length,2,'Unique production doSave start');assert.equal(source.split(endAnchor).length,2,'Unique following production function');
 const start=source.indexOf(startAnchor),end=source.indexOf(endAnchor,start);assert(end>start);
 const original=source.slice(start,end).trim();assert(original.endsWith('}'),'Exact function end');
 const carry='return doSave(force, grant, saveAsOperation, automatic);';assert.equal(original.split(carry).length,2,'Unique recursive carry anchor');
 assert(original.includes('await saveTask;')&&original.includes('await currentText()')&&original.includes('!operationCurrent()'),'Production await/guard sanity');
+// doSave's real CM Live free name: extract the real liveHealthy declaration; the rig supplies
+// liveBound/liveSession with their real initializers (false/null ⇒ live disabled boundary).
+const liveAnchor='function liveHealthy() { return !!(liveBound && liveSession && !liveSession.error && liveSession.client); }';
+assert.equal(source.split(liveAnchor).length,2,'Unique real liveHealthy declaration');
 const extracted=mode==='on'?original.replace(carry,'return doSave(force, grant);'):original;
 assert.equal(hash(fs.readFileSync(HOST)),hostSha,'String mutation leaves production exact bytes unchanged');
 after(()=>assert.equal(hash(fs.readFileSync(HOST)),hostSha,'Production file still byte-identical after models'));
@@ -21,11 +25,16 @@ function rig(){
  const env={initialTask:initial.promise,currentText:()=>{events.push('recursive-currentText-entered');entered.resolve();return text.promise;},engineValue:()=>null,syncSource:()=>events.push('capture-source'),saveTrace:(stage)=>events.push(stage),saveFailure:e=>failures.push(e),scheduleSave:()=>events.push('schedule-save'),window:{mpEngine:{commands:{capture:()=>({owner:'cm'})}},mpHost:{save:async(file,body,metadata)=>{writes.push({file,body,metadata});return{ok:true,current:true,filePath:file};},docSaved:async()=>events.push('docSaved')}}};
  const host=new Function('env','"use strict";\n'+
   'let saveAsSerial=1,documentId="same-doc",filePath="primary.md",revision=7,recoverySerial=0;\n'+
-  'let saveInFlight=true,saveTask=env.initialTask,saveBlocked=false,saveTimer=0,dirty=true,lastSaveError=null,knownLen=20;\n'+
+  'let saveInFlight=true,saveTask=env.initialTask,saveBlocked=false,saveTimer=0,dirty=true,lastSaveError=null,sourceRecovery=null,knownLen=20;\n'+
+  'let liveBound=false,liveSession=null;\n'+
+  'let staleRetries=0,staleScope=null; const STALE_AWAIT=Symbol("stale-await");\n'+  // r3 显式等待/预算依赖（真实 doSave 引用）
+  'const staleScopeKey=()=>"";\n'+                                          // 桩：本 rig 不触发自动退避分支
+  'const staleBudget=()=>false; const scheduleStaleRetry=()=>{};\n'+
   'const SHRINK_MIN=1000,SHRINK_RATIO=.5,window=env.window;\n'+
-  'const {currentText,engineValue,syncSource,saveTrace,saveFailure,scheduleSave}=env;\n'+
+  'const {currentText,engineValue,syncSource,saveTrace,saveFailure,scheduleSave}=env, saveAsFailure=env.saveFailure;\n'+
   'const publishDocDir=()=>{},hideBanner=()=>{},refreshTitle=()=>{},showBanner=()=>{throw Error("Unexpected shrink banner");};\n'+
-  'const saveAsFlow=()=>{throw Error("Unexpected Save As entry");};\n'+extracted+'\n'+
+  'const saveAsFlow=()=>{throw Error("Unexpected Save As entry");};\n'+
+  liveAnchor+'\n'+extracted+'\n'+
   'return {doSave,finishInitial:()=>{saveInFlight=false;saveTask=null;},supersede:()=>{saveAsSerial++;},snapshot:()=>({saveAsSerial,documentId,filePath,revision,saveInFlight,dirty,lastSaveError})};')(env);
  return{host,initial,text,entered,events,writes,failures};
 }

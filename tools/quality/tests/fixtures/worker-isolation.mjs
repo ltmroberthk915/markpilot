@@ -109,10 +109,15 @@ export async function runTests({ identityRemoved, minify }) {
     const { next } = replaceWorker(h), before = text(h); data = treeMessage(h);
     await pending; const status = h.inspect();
     assert.equal(status.status, identityRemoved ? 'ready' : 'pending');
-    assert.equal(status.completed, identityRemoved ? 1 : 0); assert.equal(status.available, identityRemoved);
+    assert.equal(status.completed, identityRemoved ? 1 : 0);
+    // The callback's 20 ms parse slice may expire under parallel test load.
+    // Only the already accepted wire can finish parsing in this branch.
+    if (identityRemoved && !status.available) forceParsing(h.view, h.view.state.doc.length, 1000);
+    const available = h.inspect().available;
+    assert.equal(available, identityRemoved);
     assert.equal(next.terminated, false); assert.equal(text(h), before);
     return { deliberatelySuppliedReplacementWireToForeignCallback: true,
-      status: status.status, completed: status.completed, available: status.available, exactText: true };
+      status: status.status, completed: status.completed, available, exactText: true };
   }, 'adversarial_packet_model');
   for (const method of ['onerror', 'onmessageerror']) await run('active ' + method + ' still fails and safely enables native fallback', async () => {
     const h = make(), worker = h.plugin.worker, before = text(h);

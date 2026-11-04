@@ -21,3 +21,14 @@ export function resolveImageSource(src, directory) {
 }
 
 export const hasImageCandidate = text => /!\[|<img\b/i.test(text);
+
+// Resolve using the same URL rules as display, then cross the file-system
+// boundary exactly once. Native paths with literal '%' are encoded above.
+export function localImagePath(src, directory) {
+  try {
+    const url = new URL(resolveImageSource(src, directory));
+    if (url.protocol !== 'file:') return null;
+    const pathname = decodeURIComponent(url.pathname);
+    return url.hostname ? '//' + url.hostname + pathname : pathname.replace(/^\/([A-Za-z]:\/)/, '$1');
+  } catch { return null; }
+}

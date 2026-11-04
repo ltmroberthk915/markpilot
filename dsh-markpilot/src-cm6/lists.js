@@ -15,17 +15,18 @@ const BULLET_RE = /^(\s*)([-*+]|\d+[.)])\s+/;
 const CHECK_RE = /^(\s*)([-*+])\s+\[([ xX])\]/;
 
 class CheckboxWidget extends WidgetType {
-  constructor(checked, from, to) { super(); this.checked = checked; this.from = from; this.to = to; }
+  constructor(checked, from, to, readOnly) { super(); this.checked = checked; this.from = from; this.to = to; this.readOnly = readOnly; }
   /* 【P0-2·2026-10-10 由"人类常用操作普查"查出，会毁正文】原来只比 checked：
      `from/to` 也烘进了 DOM dataset（toDOM 里 mpFrom/mpTo），两者不同就意味着**这是另一处复选框**，
      必须重建 DOM。只比 checked 时 CM6 会复用旧 DOM，点击处理器读到的还是位移前的 dataset，
      于是按**陈旧区间**改写文档——实测「甲」整段消失、widget 也没了（6/6 复现）。
      位置参与 eq 是 CM6 widget 的硬性要求。 */
-  eq(other) { return other.checked === this.checked && other.from === this.from && other.to === this.to; }
+  eq(other) { return other.checked === this.checked && other.from === this.from && other.to === this.to && other.readOnly === this.readOnly; }
   toDOM(view) {
     const box = document.createElement("input");
     box.type = "checkbox";
     box.checked = this.checked;
+    box.disabled = this.readOnly;
     box.className = "mp-cm6-check";
     box.dataset.mpFrom = String(this.from);
     box.dataset.mpTo = String(this.to);
@@ -43,11 +44,11 @@ function buildCheckboxes(view) {
       const line = doc.lineAt(pos);
       const m = CHECK_RE.exec(line.text);
       if (m && !codeBlockAt(view.state, line.from)) {
-        const start = line.from + m[1].length + m[2].length + 1; // '[' 的位置
+        const start = line.from + m[0].length - 3; // '[' 的位置；标记后的空白可以多于一个字符
         const end = start + 3;
         const inSel = view.state.selection.ranges.some((r) => r.from <= end && r.to >= start);
         if (!inSel) {
-          out.push(Decoration.replace({ widget: new CheckboxWidget(m[3] !== " ", start, end) }).range(start, end));
+          out.push(Decoration.replace({ widget: new CheckboxWidget(m[3] !== " ", start, end, view.state.readOnly) }).range(start, end));
         }
       }
       pos = line.to + 1;
@@ -128,6 +129,7 @@ function conflictingNewlinePlans(state, plans) {
 }
 function enterContinueList(view) {
   const state = view.state;
+  if (state.readOnly || view.composing || view.compositionStarted) return false;
   const ranges = state.selection.ranges;
   const eligible = ranges.map(r => {
     const ctx = listContext(state, r.from);
@@ -142,7 +144,6 @@ function enterContinueList(view) {
     return true;
   }
   // 混态（eligible>=1 且 ineligible>=1）：新路径。
-  if (state.readOnly || view.composing) return false;
   let spec;
   try {
     const plans = ranges.map(r => {
@@ -165,6 +166,7 @@ function enterContinueList(view) {
  *  【#42·2026-10-18 实测缺陷 NX3】多光标下同样要吃键：逐光标按各自行缩进，CM6 自动映射多选区；
  *  任一光标不在列表项 ⇒ 维持原行为（让位给代码块/表格/焦点遍历）。 */
 function tabIndentList(view) {
+  if (view.state.readOnly || view.composing || view.compositionStarted) return false;
   const ranges = view.state.selection.ranges;
   if (!ranges.length || ranges.some((r) => !r.empty)) return false;
   const changes = [], seen = new Set();
@@ -181,6 +183,7 @@ function tabIndentList(view) {
 
 /** Shift-Tab：反缩进（最多去两空位）。多光标同口径（#42）。 */
 function shiftTabOutdentList(view) {
+  if (view.state.readOnly || view.composing || view.compositionStarted) return false;
   const ranges = view.state.selection.ranges;
   if (!ranges.length || ranges.some((r) => !r.empty)) return false;
   const changes = [];
@@ -199,12 +202,13 @@ function shiftTabOutdentList(view) {
 const checkboxClick = EditorView.domEventHandlers({
   mousedown(event, view) {
     const holder = event.target && event.target.closest ? event.target.closest(".mp-cm6-check") : null;
-    if (!holder) return false;
+    if (!holder || event.button !== 0 || view.state.readOnly || view.composing || view.compositionStarted) return false;
     const from = Number(holder.dataset.mpFrom);
     const to = Number(holder.dataset.mpTo);
     if (!Number.isFinite(from) || !Number.isFinite(to)) return false;
-    event.preventDefault();
     const cur = view.state.sliceDoc(from, to);
+    if (!/^\[[ xX]\]$/.test(cur)) return false;
+    event.preventDefault();
     view.dispatch({ changes: { from, to, insert: /\[x\]/i.test(cur) ? "[ ]" : "[x]" } });
     return true;
   },

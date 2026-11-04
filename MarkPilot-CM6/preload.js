@@ -3,6 +3,7 @@
 const { contextBridge, ipcRenderer, webUtils, webFrame } = require('electron');
 
 /* MP_COPY_INTENT_BEGIN */
+const imageSourceHash = plain => require('node:crypto').createHash('sha256').update(plain, 'utf16le').digest('hex');
 const CLIPBOARD_DISPATCH_MAX = 32;
 const clipboardDispatchStack = [];
 let clipboardDispatchOverflow = false;
@@ -82,8 +83,16 @@ contextBridge.exposeInMainWorld('mpHost', {
   // its final source-ticket check. No disk IO or document text crosses this call.
   commitOpen: (request) => ipcRenderer.sendSync('doc:commit-open', request),
   save: (filePath, text, metadata = {}) => ipcRenderer.invoke('file:save', { ...metadata, filePath, text }),
+  /* ── live 协同 transport（desktop/API.md §3.1）：renderer/host.js 的 mpEngine.liveDocument
+   *    facade 经这四条进主进程的 LiveDocuments 权威。payload = { filePath, text, rawSha? }；
+   *    回执信封见 §2（成功 { ok:true, ... }，失败 { ok:false, error, code }，不抛异常）。 */
+  liveJoin: (payload) => ipcRenderer.invoke('live:join', payload || {}),
+  liveExchange: (client, request) => ipcRenderer.invoke('live:exchange', { client, request }),
+  liveLeave: (client) => ipcRenderer.invoke('live:leave', client),
+  liveRefresh: (client, epoch) => ipcRenderer.invoke('live:refresh', { client, epoch }),
   __save: () => ipcRenderer.invoke('file:requestSave'),
   saveAs: () => ipcRenderer.invoke('file:saveAs'),
+  prepareOverwrite: expected => ipcRenderer.invoke('file:prepareOverwrite', expected),
   reload: (opts = {}) => ipcRenderer.invoke('file:reload', opts),
   reloadView: () => ipcRenderer.invoke('view:reload'),
   cancelCloseSave: () => ipcRenderer.invoke('file:cancelCloseSave'),
@@ -110,6 +119,8 @@ contextBridge.exposeInMainWorld('mpHost', {
   showItem: (targetPath) => ipcRenderer.invoke('shell:showItem', targetPath),
   /* 剪贴板写入（主进程执行）：表格/富文本复制走这条，避免渲染进程手势/权限导致的静默失败。 */
   writeClipboard: (payload, token) => ipcRenderer.invoke('clipboard:write', payload || {}, clipboardToken(token)),
+  rememberImageSource: (token, refs, plain) => ipcRenderer.sendSync('clipboard:rememberImageSource', clipboardToken(token), {...refs, hash:imageSourceHash(plain)}),
+  recoverImageSource: (id, plain) => ipcRenderer.sendSync('clipboard:recoverImageSource', id, plain.length, imageSourceHash(plain)),
   writeClipboardImage: (payload, token) => ipcRenderer.sendSync('clipboard:writeImageSync', payload, clipboardToken(token)),
   beginClipboardIntent,
   eventClipboardIntent,

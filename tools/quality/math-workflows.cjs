@@ -17,7 +17,8 @@ async function main(){
       ['quoted-whitespace-block','Start\n\n> $$\n>   x+y   \n> $$\n\nEnd\n','block'],
       ['single-dollar-quoted-block','Start\n\n> $\\begin{aligned}\n> x+y\n> \\end{aligned}$\n\nEnd\n','block'],
       ['ordinary-block','Start\n\n$$\nx+y\n$$\n\nEnd\n','block'],
-      ['ordinary-inline','Start\n\ninline $x+y$ after\n\nEnd\n','inline']
+      ['ordinary-inline','Start\n\ninline $x+y$ after\n\nEnd\n','inline'],
+      ['adjacent-inline-owner','Start\n\ninline $A$$y$$C$ after\n\nEnd\n','inline']
     ];
     for(const [name,initial,kind]of fixtures)await test(name+'-glyph-click-edit-undo-redo',async trace=>{
       const fixture=path.join(dir,name+'.md');fs.writeFileSync(fixture,initial);
@@ -60,6 +61,26 @@ async function main(){
       await waitUntil(()=>page.evaluate(()=>document.hasFocus()&&window.mpEngine._view().hasFocus),'workflow editor focus');
       return{page,file};
     };
+    await test('empty-inline-shortcut-keeps-paragraph-alignment',async trace=>{
+      const {page}=await fresh('empty-inline-shortcut','Note\n\n');
+      await page.keyboard.press('Control+End');
+      const geometry=()=>page.evaluate(()=>{
+        const view=window.mpEngine._view(),head=view.state.selection.main.head;
+        const node=view.domAtPos(head).node;
+        const line=(node.nodeType===1?node:node.parentElement).closest('.cm-line');
+        return {line:view.state.doc.lineAt(head).text,align:getComputedStyle(line).textAlign,
+          left:view.coordsAtPos(head).left,focus:document.hasFocus()&&view.hasFocus};
+      });
+      const start=await geometry();assert(start.focus);
+      await page.keyboard.press('Control+Shift+E');const empty=await geometry();
+      assert.equal(empty.line,'$$');assert.equal(empty.align,start.align);assert(empty.focus);
+      trace.push({empty,screenshot:await frame(page,dir,'inline-empty')});
+      await page.keyboard.insertText('a');const typed=await geometry();
+      assert.equal(typed.line,'$a$');assert.equal(typed.align,start.align);assert(typed.focus);
+      await page.keyboard.press('Backspace');const erased=await geometry();
+      assert.equal(erased.line,'$$');assert.equal(erased.align,start.align);
+      assert(Math.abs(erased.left-empty.left)<2,'deleting the character returns to the same inline caret');
+    });
     const literalCases=[
       {name:'control-non-tail-left',text:'Before $\\lambda+y$ after.\n',symbol:'λ',side:.2},
       {name:'control-non-tail-right',text:'Before $\\lambda+y$ after.\n',symbol:'λ',side:.8},

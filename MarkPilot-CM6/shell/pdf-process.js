@@ -27,12 +27,13 @@ async function inspectPdf(file){
  if(header!=='%PDF-'||!/%%EOF\s*$/.test(tail.toString('latin1'))||!pages||bytes!==st.size)throw fail('MP_PDF_OUTPUT','PDF 文件未完成，已保留原保存目标');
  return {bytes,pages,sha256:h.digest('hex')};
 }
-async function publishPdf(source,target,info,{isCanceled,onPhase,onPublishing,validateTarget,commitPublication}={}){
+async function publishPdf(source,target,info,{isCanceled,onPhase,onPublishing,validateTarget,commitPublication,outputGrant}={}){
  if(isCanceled?.())throw canceled();
  await validateTarget?.();
- const before=await fsp.stat(target).catch(e=>{if(e.code!=='ENOENT')throw e;return null;});
- if(before&&!before.isFile())throw fail('MP_PDF_TARGET','PDF 保存目标不是文件');
- const baseline=before?{sha256:await hashFile(target)}:null,temp=path.join(path.dirname(target),'.mp-pdf-'+process.pid+'-'+crypto.randomUUID());
+ if(outputGrant)target=outputGrant.canonical;
+ // An explicit null baseline means the approved target did not exist.
+ const baseline=outputGrant?outputGrant.baseline:await require('./export-target').captureBaseline(target);
+ const temp=path.join(path.dirname(target),'.mp-pdf-'+process.pid+'-'+crypto.randomUUID());
  let transaction,handle,committed=false,written=0,chunks=0;const h=crypto.createHash('sha256');
  try{
   if(isCanceled?.())throw canceled();
@@ -57,8 +58,21 @@ async function publishPdf(source,target,info,{isCanceled,onPhase,onPublishing,va
   throw error;
  }
 }
+async function printInProcess(options){
+ // Keep the approved destination untouched while Chromium is printing.
+ const staged=path.join(path.dirname(options.htmlFile),'.mp-local-pdf-'+crypto.randomUUID()+'.pdf');
+ try {
+  const rendered=await pdf.printLocalHtmlToPdf({...options,outFile:staged});
+  if(!rendered.ok)return rendered;
+  const info=await inspectPdf(staged);
+  const publish=()=>publishPdf(staged,options.outFile,info,options);
+  const copied=await(options.withPublication?options.withPublication(publish):publish());
+  return {...rendered,file:options.outFile,bytes:copied.bytes,chunks:copied.chunks};
+ }catch(error){if(error.canceled)return {ok:false,canceled:true};throw error;}
+ finally{await fsp.unlink(staged).catch(error=>{if(error.code!=='ENOENT')throw error;});}
+}
 function printInWorker(options){
- if(process.platform!=='win32')return pdf.printLocalHtmlToPdf(options);
+ if(process.platform!=='win32')return printInProcess(options);
  if(closing)return Promise.reject(fail('MP_PDF_CLOSING','PDF 导出服务正在关闭'));
  let finish;const job={stopReason:null,runDir:null,child:null,exited:false,done:new Promise(r=>{finish=r;})};active.add(job);
  const requestedCancel=()=>job.stopReason==='canceled'||options.isCanceled?.()||options.signal?.aborted;
@@ -120,7 +134,7 @@ function printInWorker(options){
    const r=result.result,info=await inspectPdf(stagedPdf);
    if(info.bytes!==r.bytes||info.pages!==r.pages||!same(r.file,stagedPdf))throw fail('MP_PDF_OUTPUT','PDF 字节或页数校验失败，原保存目标未改动',{worker});
    if(requestedCancel())throw canceled();
-   const publish=()=>publishPdf(stagedPdf,options.outFile,info,{isCanceled:requestedCancel,onPhase:emit,onPublishing:options.onPublishing,validateTarget:options.validateTarget,commitPublication:options.commitPublication});
+   const publish=()=>publishPdf(stagedPdf,options.outFile,info,{isCanceled:requestedCancel,onPhase:emit,onPublishing:options.onPublishing,validateTarget:options.validateTarget,commitPublication:options.commitPublication,outputGrant:options.outputGrant});
    const copied=await(options.withPublication?options.withPublication(publish):publish());published=true;
    emit({phase:'write-done',bytes:info.bytes,chunks:copied.chunks,ms:Date.now()-t0});
    return {...r,file:options.outFile,bytes:info.bytes,pages:info.pages,chunks:copied.chunks,ms:Date.now()-t0,worker:{...worker,sha256:info.sha256}};

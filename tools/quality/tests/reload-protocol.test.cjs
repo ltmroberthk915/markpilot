@@ -22,9 +22,17 @@ test('actual reload handler releases canceled and thrown confirmations; a later 
  confirm=true;const r=await reload({requestId:'three'},S,W);assert(r.ok);assert.equal(count,1);assert.equal(pushed[0].requestId,'three');assert.equal(map.size,0);
 });
 test('an expired informational banner may not hide a newer recovery action',()=>{
- const source=fs.readFileSync(path.join(root,'MarkPilot-CM6/renderer/host.js'),'utf8'),from=source.indexOf('function showBanner('),to=source.indexOf('\n/* ── 标题',from);assert(from>0&&to>from);
+ const source=fs.readFileSync(path.join(root,'MarkPilot-CM6/renderer/host.js'),'utf8');
+ const sigFrom=source.indexOf('function bannerSig('),sigTo=source.indexOf('function liveError(',sigFrom);
+ const from=source.indexOf('function showBanner('),to=source.indexOf('\n/* ── 标题',from);
+ assert(sigFrom>0&&sigTo>sigFrom&&from>0&&to>from);
  const node={textContent:'',className:'',style:{},appendChild(button){this.button=button}},document={createElement(){return{}}};
- const {showBanner,hideBanner}=new Function('bannerEl','document','let bannerSerial = 0;\n'+source.slice(from,to)+'\nreturn{showBanner,hideBanner};')(()=>node,document);
+ /* 真实 free name 初始化：bannerSig helper 与其依赖的 bannerIdentity/文档上下文一起注入，
+    保持原票据保护断言不变；仅提取 showBanner/hideBanner 本体（bannerEl 走参数）。
+    bannerSig 锚点不存在（旧产品）时回退为空串，保证未打补丁的树同样可跑。 */
+ const state='let bannerSerial = 0; let bannerIdentity = null;\nconst documentId = "doc", recoverySerial = 0, liveGeneration = 0, filePath = "doc.md";\n';
+ const helper=sigFrom>0&&sigTo>sigFrom?source.slice(sigFrom,sigTo):'';
+ const {showBanner,hideBanner}=new Function('bannerEl','document',state+helper+'\n'+source.slice(from,to)+'\nreturn{showBanner,hideBanner};')(()=>node,document);
  const expired=showBanner('Export finished',[],true),pending=showBanner('Save failed',[{label:'Save As',run(){}}]);
  hideBanner(expired);assert.equal(node.textContent,'Save failed','a late export timeout must retain the current recovery surface');assert.equal(node.style.display,'block');
  hideBanner(pending);assert.equal(node.style.display,'none','the current banner remains explicitly dismissible');

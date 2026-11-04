@@ -3,12 +3,32 @@ import { inlineImageAtoms } from './resource-images.js';
 
 // One source-only projection for cells and HTML exits. The editor continues to
 // own the original Markdown; these trees never become an editing document.
-const underline = { resolve: 'Underline', mark: 'UnderlineMark' };
+const htmlMarks = {
+  u: { resolve: 'Underline', mark: 'UnderlineMark' },
+  sup: { resolve: 'Superscript', mark: 'SuperscriptMark' },
+  sub: { resolve: 'Subscript', mark: 'SubscriptMark' },
+};
 const images = new RegExp(inlineImageAtoms().source, 'iy');
+export function hasUnescapedDollar(text) {
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '\\') i++;
+    else if (text[i] === '$') return true;
+  }
+  return false;
+}
+// A block occupying one line ends at its first unescaped double delimiter.
+export function singleLineDisplayTex(text) {
+  if (!text.startsWith('$$')) return null;
+  for (let i = 2; i < text.length; i++) {
+    if (text[i] === '\\') { i++; continue; }
+    if (text.startsWith('$$', i)) return text.slice(i + 2).trim() ? null : text.slice(2, i);
+  }
+  return null;
+}
 const inlineParser = parser.configure([Strikethrough, {
   remove: ['IndentedCode', 'FencedCode', 'Blockquote', 'HorizontalRule',
     'BulletList', 'OrderedList', 'ATXHeading', 'HTMLBlock', 'SetextHeading', 'LinkReference'],
-  defineNodes: ['Underline', 'UnderlineMark', 'SourceMath', 'SourceImage'],
+  defineNodes: ['Underline', 'UnderlineMark', 'Superscript', 'SuperscriptMark', 'Subscript', 'SubscriptMark', 'SourceMath', 'SourceImage'],
   parseInline: [{
     name: 'SourceLiteralLinkText', before: 'LinkEnd',
     parse(cx, next, pos) {
@@ -33,8 +53,8 @@ const inlineParser = parser.configure([Strikethrough, {
     name: 'Underline', before: 'HTMLTag',
     parse(cx, next, pos) {
       if (next !== 60) return -1;
-      const match = /^<(\/?)u\s*>/i.exec(cx.slice(pos, Math.min(cx.end, pos + 16)));
-      return match ? cx.addDelimiter(underline, pos, pos + match[0].length, !match[1], !!match[1]) : -1;
+      const match = /^<(\/?)(u|sup|sub)\s*>/i.exec(cx.slice(pos, Math.min(cx.end, pos + 16)));
+      return match ? cx.addDelimiter(htmlMarks[match[2].toLowerCase()], pos, pos + match[0].length, !match[1], !!match[1]) : -1;
     },
   }, {
     name: 'SourceMath', before: 'Emphasis',
@@ -44,11 +64,15 @@ const inlineParser = parser.configure([Strikethrough, {
       for (let end = pos + width; end < cx.end; end++) {
         if (cx.char(end) === 92) { end++; continue; }
         if (cx.char(end) !== 36) continue;
-        if (width === 2 && cx.char(end + 1) !== 36) continue;
-        if (!cx.slice(pos + width, end).trim()) return -1;
+        // An incomplete double-dollar atom must not donate its closing single
+        // dollar to a later formula (e.g. $$a$ **bold** $B$).
+        if (width === 2 && cx.char(end + 1) !== 36)
+          return end + 1;
+        if (!cx.slice(pos + width, end).trim())
+          return width === 2 ? end + width : -1;
         return cx.addElement(cx.elt('SourceMath', pos, end + width));
       }
-      return -1;
+      return width === 2 ? pos + 2 : -1;
     },
   }],
 }]);
@@ -56,7 +80,7 @@ const inlineParser = parser.configure([Strikethrough, {
 const trees = new Map();
 let cachedChars = 0;
 const escapeText = value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const tags = { StrongEmphasis: 'strong', Emphasis: 'em', Strikethrough: 's', Underline: 'u' };
+const tags = { StrongEmphasis: 'strong', Emphasis: 'em', Strikethrough: 's', Underline: 'u', Superscript: 'sup', Subscript: 'sub' };
 
 function treeOf(source) {
   const cached = trees.get(source);
@@ -74,9 +98,37 @@ function treeOf(source) {
   return tree;
 }
 
+// Code span fences must be longer than every literal run inside the sample.
+// Padding separates a literal edge backtick from its fence, and compensates
+// for Markdown stripping one symmetric space from nonblank code.
+export function codeSpanPadding(text) {
+  return text.startsWith(' ') && text.endsWith(' ') && /[^ ]/.test(text) ? 1 : 0;
+}
+export function codeSpanMarkers(text) {
+  let width = 1;
+  for (const run of text.matchAll(/`+/g)) width = Math.max(width, run[0].length + 1);
+  const fence = '`'.repeat(width);
+  const pad = text.startsWith('`') || text.endsWith('`') || codeSpanPadding(text.replace(/\r\n?|\n/g, ' ')) ? ' ' : '';
+  return { open: fence + pad, close: pad + fence };
+}
+export function inlineCodeSpans(source) {
+  if (!source.includes('`')) return [];
+  const spans = [];
+  treeOf(source).iterate({ enter(node) {
+    if (['SourceMath', 'SourceImage', 'Image'].includes(node.name)) return false;
+    if (node.name !== 'InlineCode') return;
+    const marks = node.node.getChildren('CodeMark');
+    const start = marks[0].to, end = marks[marks.length - 1].from;
+    const pad = codeSpanPadding(source.slice(start, end).replace(/\r\n?|\n/g, ' '));
+    spans.push({ from: node.from, to: node.to, innerFrom: start + pad, innerTo: end - pad });
+    return false;
+  } });
+  return spans;
+}
+
 export function inlineEmphasisSpans(source) {
   const text = String(source ?? '');
-  if (!text.includes('**')) return [];
+  if (!text.includes('*')) return [];
   const out = [], stack = [treeOf(text).topNode];
   const opaque = new Set(['InlineCode', 'SourceMath', 'SourceImage', 'Image']);
   while (stack.length) {
@@ -95,6 +147,23 @@ export function inlineEmphasisSpans(source) {
 export function inlineStrongSpans(source) {
   return inlineEmphasisSpans(source).filter(span => span.width === 2)
     .map(({ from, to }) => ({ from, to }));
+}
+
+export function inlineMathSpans(source) {
+  const text = String(source ?? '');
+  if (!text.includes('$')) return [];
+  const spans = [], stack = [treeOf(text).topNode];
+  const opaque = new Set(['InlineCode', 'SourceImage', 'Image']);
+  while (stack.length) {
+    const node = stack.pop();
+    for (let child = node.firstChild; child; child = child.nextSibling) {
+      if (child.name === 'SourceMath') {
+        const raw = text.slice(child.from, child.to), width = raw.startsWith('$$') ? 2 : 1;
+        spans.push({ from: child.from, to: child.to, width, tex: raw.slice(width, -width) });
+      } else if (!opaque.has(child.name)) stack.push(child);
+    }
+  }
+  return spans.sort((a, b) => a.from - b.from);
 }
 
 export function inlineLinkSpans(source) {
@@ -136,13 +205,15 @@ export function renderInlineSegment(value, options = {}) {
     if (tag || node.name === 'Paragraph') {
       if (tag) out.push('<' + tag + '>');
       stack.push({ child: node.firstChild, pos: node.from, end: node.to, close: tag ? '</' + tag + '>' : '' });
-    } else if (/^(Emphasis|Strikethrough|Underline)Mark$/.test(node.name)) {
+    } else if (/^(Emphasis|Strikethrough|Underline|Superscript|Subscript)Mark$/.test(node.name)) {
       // Matched delimiters are hidden; unmatched delimiters remain text gaps.
     } else if (node.name === 'Escape') {
       out.push(escapeText(raw.slice(1)));
     } else if (node.name === 'InlineCode') {
       const marks = node.getChildren('CodeMark');
-      const code = source.slice(marks[0].to, marks[marks.length - 1].from);
+      const body = source.slice(marks[0].to, marks[marks.length - 1].from).replace(/\r\n?|\n/g, ' ');
+      const pad = codeSpanPadding(body);
+      const code = body.slice(pad, body.length - pad);
       out.push(options.code?.(code) ?? '<code>' + escapeText(code) + '</code>');
     } else if (node.name === 'SourceMath') {
       const width = raw.startsWith('$$') ? 2 : 1;
@@ -168,8 +239,16 @@ export function renderInlineSegment(value, options = {}) {
 }
 
 export function renderInline(value, options = {}) {
-  // Keep the existing source-cell / export <br> contract. Splitting precedes
-  // atom parsing, so a literal <br> cannot be injected into KaTeX output.
-  return String(value ?? '').split(/(<br\s*\/?>)/i)
-    .map((part, index) => index % 2 ? '<br>' : renderInlineSegment(part, options)).join('');
+  const source = String(value ?? '');
+  if (!/<br\s*\/?>/i.test(source)) return renderInlineSegment(source, options);
+  const spans = inlineCodeSpans(source), out = [];
+  let start = 0, index = 0;
+  for (const br of source.matchAll(/<br\s*\/?>/gi)) {
+    while (index < spans.length && spans[index].to <= br.index) index++;
+    if (spans[index] && spans[index].from <= br.index) continue;
+    out.push(renderInlineSegment(source.slice(start, br.index), options), '<br>');
+    start = br.index + br[0].length;
+  }
+  out.push(renderInlineSegment(source.slice(start), options));
+  return out.join('');
 }

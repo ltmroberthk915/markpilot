@@ -5,13 +5,22 @@ const path=require('node:path');
 const crypto=require('node:crypto');
 const {decodeDocument,encodeDocument}=require('./text-codec');
 const {prepareFile}=require('./safe-file');
+// Local saves share the cross-process file-write reservation with the live
+// rooms authority (EXE windows, DSH hosts, model writes). LiveDocuments only
+// pulls this module lazily, so the require cycle stays load-time safe.
+const {withFileCommit, defaultDirectory: liveCommitDirectory}=require('./live-documents');
 const failure=(code,message)=>Object.assign(new Error(message),{code});
 const digest=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 function createSession(){
   return {documentId:crypto.randomUUID(),revision:0,lastSavedRevision:0,filePath:null,savedText:'',diskMtime:0,baseline:null,bom:false,eol:'\n',encoding:'utf8',dirty:false,saveAsRequest:0,saveAsGrant:null,lastSave:null,loadRequest:0,pendingSaves:new Set()};
 }
 class DocumentStore{
-  constructor({beforeReplace=async()=>{},prepareSaveAs=async()=>null}={}){this.jobs=new Map();this.commitTail=Promise.resolve();this.beforeReplace=beforeReplace;this.prepareSaveAs=prepareSaveAs;}
+  constructor({beforeReplace=async()=>{},prepareSaveAs=async()=>null,commitDirectory=liveCommitDirectory()}={}){
+    this.jobs=new Map();this.commitTail=Promise.resolve();this.beforeReplace=beforeReplace;this.prepareSaveAs=prepareSaveAs;
+    // Must match the LiveDocuments directory for same-lock reentrancy when a
+    // live save hands its writer down to this store's compare+replace commit.
+    this.commitDirectory=commitDirectory;
+  }
   reset(S){const pending=S.pendingSaves,request=S.loadRequest+1;Object.assign(S,createSession(),{pendingSaves:pending,loadRequest:request});return this.metadata(S);}
   metadata(S){return {documentId:S.documentId,revision:S.revision,filePath:S.filePath,text:S.savedText,bom:S.bom,eol:S.eol,encoding:S.encoding};}
   async canonical(file){
@@ -43,6 +52,7 @@ class DocumentStore{
     const current=()=>S.documentId===origin.documentId&&S.revision===origin.revision&&this.key(S.filePath||'')===this.key(origin.filePath||'');
     if(!current()||(expected&&expected.loadRequest!==S.loadRequest))throw failure('MP_DOC_MISMATCH','重载期间文档或编辑版本已改变');
     const request=++S.loadRequest,canonical=await this.canonical(file);
+    if(expected&&this.key(canonical)!==this.key(expected.filePath))throw failure('MP_FILE_CONFLICT','原文件位置已改变，请另存为保留当前内容');
     return this.queue(this.key(canonical),async()=>{
       const snap=await this.snapshot(canonical),decoded=decodeDocument(snap.bytes,file);
       if(this.key(await this.canonical(file))!==this.key(canonical))throw failure('MP_FILE_CONFLICT','读取期间文件位置已改变，已保留原文档：'+file);
@@ -70,6 +80,22 @@ class DocumentStore{
     const grant={token:crypto.randomUUID(),documentId,request:request.serial,filePath:path.resolve(file),canonical,baseline:snap?.baseline||null};
     S.saveAsGrant=grant;return {ok:true,filePath:grant.filePath,documentId,saveAsToken:grant.token};
   }
+  async grantOverwrite(S,expected,ownerCurrent=()=>true){
+    const current=()=>ownerCurrent()&&expected?.documentId===S.documentId&&expected.revision===S.revision&&expected.filePath===S.filePath;
+    if(!current()||!S.filePath)throw failure('MP_DOC_MISMATCH','文档或编辑版本已改变，覆盖已取消');
+    const grant=await this.grantSaveAs(S,S.filePath);
+    if(S.saveAsGrant?.token!==grant.saveAsToken)throw failure('MP_SAVE_TARGET','覆盖操作已被新的选择替代');
+    if(!current()||!S.saveAsGrant?.baseline){
+      if(S.saveAsGrant?.token===grant.saveAsToken)S.saveAsGrant=null;
+      throw failure(current()?'MP_FILE_MISSING':'MP_DOC_MISMATCH','文件已移除或编辑版本已改变，请另存为保留修改');
+    }
+    if(this.key(S.saveAsGrant.canonical)!==this.key(expected.filePath)){
+      S.saveAsGrant=null;
+      throw failure('MP_FILE_CONFLICT','原文件位置已改变，请另存为保留修改');
+    }
+    S.saveAsGrant.overwriteRevision=expected.revision;
+    return grant;
+  }
   async validate(file,baseline){
     const actual=await this.snapshot(file,{allowMissing:true});
     if(baseline&&!actual)throw failure('MP_FILE_MISSING','原文件已不在磁盘上（可能被重命名或删除）：'+file);
@@ -84,11 +110,21 @@ class DocumentStore{
       const grant=saveAsToken&&S.saveAsGrant;
       const grantCurrent=()=>!grant||(S.documentId===grant.documentId&&S.saveAsRequest===grant.request);
       if(saveAsToken&&(!grant||grant.token!==saveAsToken||grant.documentId!==documentId||grant.filePath!==path.resolve(filePath)))throw failure('MP_SAVE_TARGET','另存为许可已失效，请重新选择路径');
+      if(grant?.overwriteRevision!==undefined&&(revision!==grant.overwriteRevision||S.revision!==grant.overwriteRevision))throw failure('MP_DOC_MISMATCH','覆盖授权后继续编辑，请重新确认保存');
       if(!grant&&(!S.filePath||path.resolve(filePath)!==S.filePath))throw failure('MP_SAVE_TARGET','保存目标不属于当前文档，请使用另存为');
       if(grant)S.saveAsGrant=null; // One use, including a failed attempt.
       const target=await this.canonical(filePath);
-      if(grant&&this.key(target)!==this.key(grant.canonical))throw failure('MP_FILE_CONFLICT','另存为目标位置已改变，请重新选择路径');
+      // Ordinary saves remain bound to the physical path captured at load.
+      // Only an explicit Save As may authorize a different target.
+      if(this.key(target)!==this.key(grant ? grant.canonical : sourcePath))throw failure('MP_FILE_CONFLICT','保存位置已改变，请重新选择路径');
       return this.queue(this.key(target),async()=>{
+        // The whole local compare+atomic-replacement runs inside the same
+        // cross-process file-write reservation as LiveDocuments.save/external.
+        // A live-scoped writer reenters the inherited reservation instead of
+        // taking a second lease; standalone saves take the lease themselves,
+        // so two hosts on one baseline serialize and the later one loses only
+        // by the raw-baseline comparison, never by a torn interleave.
+        return withFileCommit(target,async()=>{
         if(!grantCurrent())throw failure('MP_SAVE_TARGET','另存为操作已被新的选择替代');
         if(S.documentId!==documentId||(!grant&&S.filePath!==path.resolve(filePath))||revision<S.lastSavedRevision)throw failure('MP_DOC_MISMATCH','文档已切换或已有更新的保存');
         const baseline=grant?grant.baseline:S.baseline,format={bom:S.bom,eol:S.eol,encoding:S.encoding},out=encodeDocument(text,format);
@@ -109,11 +145,12 @@ class DocumentStore{
           await this.beforeReplace({session:S,filePath:target,text,revision});
           return await this.commit(async()=>{
             // The short shared commit also protects alternate names of the same file.
-            if(this.key(await this.canonical(filePath))!==this.key(target))throw failure('MP_FILE_CONFLICT','保存位置已改变，请重新加载或另存为');
             if(typeof prepared?.validate==='function')await prepared.validate();
             await this.validate(target,baseline);
+            if(this.key(await this.canonical(filePath))!==this.key(target))throw failure('MP_FILE_CONFLICT','保存位置已改变，请重新加载或另存为');
             if(!grantCurrent())throw failure('MP_SAVE_TARGET','另存为操作已被新的选择替代');
             if(grant&&!saveAsCurrent())throw failure('MP_DOC_MISMATCH','另存为的文档或窗口已改变');
+            if(grant?.overwriteRevision!==undefined&&S.revision!==grant.overwriteRevision)throw failure('MP_FILE_CONFLICT','覆盖确认后又有新输入，请重新确认保留修改');
             const receipt=await stage.commit();const st=await fs.stat(target),id=crypto.randomUUID();
             const current=S.documentId===documentId&&grantCurrent();
             if(current){
@@ -125,6 +162,7 @@ class DocumentStore{
           });
         }catch(error){primaryFailure=error;throw error;}
         finally{try{await stage?.abort();}catch(error){if(primaryFailure)primaryFailure.cleanupError=error.message;else throw error;}}
+        },this.commitDirectory);
       });
     })();
     S.pendingSaves.add(job);const clear=()=>S.pendingSaves.delete(job);job.then(clear,clear);return job;
@@ -132,8 +170,11 @@ class DocumentStore{
   async pending(S){await Promise.allSettled([...S.pendingSaves]);}
   async outsideChange(S,file){
     if(file!==S.filePath)return {changed:false,stale:true};
-    const documentId=S.documentId,snap=await this.snapshot(await this.canonical(file),{allowMissing:true});
-    if(documentId!==S.documentId)return {changed:false,stale:true};
+    const documentId=S.documentId,canonical=await this.canonical(file);
+    if(documentId!==S.documentId||file!==S.filePath)return {changed:false,stale:true};
+    if(this.key(canonical)!==this.key(file))return {changed:true,relocated:true};
+    const snap=await this.snapshot(canonical,{allowMissing:true});
+    if(documentId!==S.documentId||file!==S.filePath)return {changed:false,stale:true};
     return {changed:!snap||snap.baseline.sha256!==S.baseline?.sha256,missing:!snap,mtimeMs:snap?.baseline.mtimeMs,size:snap?.baseline.size};
   }
 }

@@ -62,7 +62,7 @@ export function createCommandContext({ getView, epochOf, owner, flushOwner, resu
     document.addEventListener('keydown', event => {
       if (!event.isTrusted) return;
       serial++;
-      const view = getView(); if (view) cancelViewport(view);
+      const view = getView(); if (view) cancelViewport(view, event);
       if (event.key === 'Tab' || chrome(event.target)) suspend(); else suspended = null;
     }, true);
     document.addEventListener('beforeinput', event => { if (event.isTrusted) invalidate(); }, true);

@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { mkdtemp, writeFile, readFile, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, mkdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, normalize, isAbsolute } from 'node:path';
 import {
@@ -372,7 +372,7 @@ test('apply(ctx) 挂 prefix 路由；open/save/stat/edit 走 mock ctx.fs 与真�
     assert.equal(stale.json.error.code, 'FS_STALE_VERSION');
     assert.equal(fs.files.get(normalize('D:/docs/a.md')).text, '# A\n');
 
-    // 正确 baseVersion → 成功；向所有 SSE 连接广播 version
+    // 正确 baseVersion → 成功；change 事件按 targetKey 定向：只发给同文件订阅者
     const saved = await postJson(port, '/dsh-markdown-typora/api/save', { path: 'D:/docs/a.md', text: '# B\n', baseVersion: v1 });
     assert.equal(saved.json.ok, true);
     const v2 = saved.json.value.version;
@@ -381,8 +381,11 @@ test('apply(ctx) 挂 prefix 路由；open/save/stat/edit 走 mock ctx.fs 与真�
     const eventMain = eventData(await sseMain.waitFor((raw) => raw.includes('event: change')));
     assert.equal(eventMain.version, v2);
     assert.equal(eventMain.path, normalize('D:/docs/a.md'));
-    const eventOther = eventData(await sseOther.waitFor((raw) => raw.includes('event: change')));
-    assert.equal(eventOther.version, v2, '写成功后要向所有 SSE 连接广播（客户端按 path 过滤）');
+    // scoped SSE 隔离（本轮行为变更）：a.md 的写不得推给 other.md 的订阅者 ——
+    // 其他文件的正文/版本信息不跨订阅者泄漏；客户端也不再需要按 path 过滤别人的内容。
+    // 同文件正例已在上一断言（sseMain 收到 change）；此处只等一个短静默窗再判无。
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    assert.equal(sseOther.countChangeEvents(), 0, 'other.md 订阅者不得收到 a.md 的 change（scoped SSE）');
 
     // stat 返回新版本
     const stat = await postJson(port, '/dsh-markdown-typora/api/stat', { path: 'D:/docs/a.md' });
@@ -758,18 +761,46 @@ test('createHost 缺少 fs 服务时明确抛错（apply 会捕获并告警）',
   assert.throws(() => createHost({}), /fs/);
 });
 
+test('两个本地宿主竞争同一基准时只有一个可提交，且保留 UTF-16 BOM 和 CRLF', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'dsh-md-native-'));
+  const file = join(dir, 'shared.md');
+  const encoded = text => Buffer.from('\ufeff' + text.replaceAll('\n', '\r\n'), 'utf16le');
+  const service = createMockFs({});
+  service.stat = async target => {
+    const s = await stat(target.targetKey, { bigint: true });
+    return { type: 'file', size: Number(s.size), version: `${s.dev}:${s.ino}:${s.size}:${s.mtimeNs}:${s.ctimeNs}` };
+  };
+  const hosts = [createHost({fs: service, log: SILENT_LOG}), createHost({fs: service, log: SILENT_LOG})];
+  try {
+    await writeFile(file, encoded('初稿\n'));
+    const opened = await hosts[0].dispatch('open', { path: file });
+    assert.equal(opened.value.text, '初稿\n');
+    const writers = ['第一稿\n', '第二稿\n'];
+    const responses = await Promise.all(hosts.map((host, i) => host.dispatch('save', { path: file, text: writers[i], baseVersion: opened.value.version })));
+    assert.equal(responses.filter(r => r.ok).length, 1);
+    assert.equal(responses.find(r => !r.ok).error.code, 'FS_STALE_VERSION');
+    assert.deepEqual(await readFile(file), encoded(writers[responses.findIndex(r => r.ok)]));
+  } finally {
+    for (const host of hosts) host.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('DSH 文件策略拒绝写入时回退原生 fs，且版本守卫仍然生效', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'dsh-md-sandbox-write-'));
   const file = join(dir, 'outside.md');
   await writeFile(file, '# A\n', 'utf8');
   const fs = createMockFs({});
-  let statCalls = 0;
+  let statCalls = 0, deniedCalls = 0;
   fs.resolve = async (targetPath) => ({ targetKey: normalize(targetPath), displayPath: normalize(targetPath) });
   fs.stat = async () => {
     statCalls += 1;
-    return { version: statCalls === 1 ? 'v1' : 'v2', size: 4, type: 'file' };
+    // Version describes the file, not how often the guard checks it.
+    const text=await readFile(file,'utf8');
+    return { version:text==='# A\n'?'v1':'v2', size:Buffer.byteLength(text), type:'file' };
   };
   fs.writeText = async () => {
+    deniedCalls++;
     throw new MockFsError('cannot write "...": file access denied under workspace-write mode', 'FS_SANDBOX_DENIED');
   };
   const { ctx, routes } = createMockContext(fs);
@@ -781,6 +812,7 @@ test('DSH 文件策略拒绝写入时回退原生 fs，且版本守卫仍然生�
     });
     assert.equal(saved.json.ok, true);
     assert.equal(saved.json.value.version, 'v2');
+    assert.equal(deniedCalls,1);
     assert.equal(await readFile(file, 'utf8'), '# B\n');
 
     // 回退路径也必须先验 baseVersion：旧版本不得覆盖磁盘。
