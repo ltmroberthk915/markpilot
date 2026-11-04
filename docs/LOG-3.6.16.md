@@ -53,7 +53,7 @@ DSH 侧：`web` 与 `desktop` 两个 profile 的 `dsh-markdown-typora` 均是指
 
 ## 发布与实装
 
-- GitHub：`main` 已推送（释放提交 `70d0838`、合并提交 `fd94839`、`7000c2d`、`370ed7b`）；[MarkPilot 3.6.16](https://github.com/ltmroberthk915/markpilot/releases/tag/v3.6.16) 与 [dsh-markdown-typora 0.3.11](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v0.3.11) 已发布。Release API 记录的 Setup/portable/TGZ/SHA256SUMS digest 与本地逐项一致；桌面 Release 触发的 winget 工作流成功，插件 Release 同时触发的 winget 工作流按预期失败（它期待桌面 Setup，与 0.3.4 时相同）。
+- GitHub：`main` 已推送（释放提交 `70d0838`、合并提交 `fd94839`，以及 `7000c2d`、`370ed7b`、`34db652`、`28d7dc9`）；[MarkPilot 3.6.16](https://github.com/ltmroberthk915/markpilot/releases/tag/v3.6.16) 与 [dsh-markdown-typora 0.3.11](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v0.3.11) 已发布。Release API 记录的 Setup/portable/TGZ/SHA256SUMS digest 与本地逐项一致；桌面 Release 触发的 winget 工作流成功，插件 Release 同时触发的 winget 工作流按预期失败（它期待桌面 Setup，与 0.3.4 时相同）。
 - npm：**仍被阻断**。`npm whoami` 返回 401、`npm publish --access public` 返回 404（无权限）；`%USERPROFILE%\.npmrc` 里的 token 已失效，与 0.3.4 轮记录一致。`npm pack --dry-run` 的 146 个文件、2,654,982 字节与 GitHub 资产一致；换有效 token 或 `npm login` 后重跑即可发布。
 - DSH 实装：`web`/`desktop` profile 保持指向本源码的 link（0.3.11 / core 3.6.16）；运行中的 desktop 宿主通过插件管理器 `pluginManager/setBundleEnabled` 关闭再启用 `dsh-markdown-typora`，两次均 `application=applied`、无警告，插件 fiber 为 active；`headless` profile 从本次 GitHub Release 的 TGZ 全新安装为 `dsh-markdown-typora@0.3.11`，下载文件摘要与 Release digest 一致。
 - 实装 EXE 为本次 Release 的同一个 Setup：安装版 3.6.16.0 / ProductVersion 3.6.16，EXE `339ff062…`，ASAR `a9dd12f8…`；发布用 Setup `92fa932d…` 为 rcedit 盖章后的安装包。
