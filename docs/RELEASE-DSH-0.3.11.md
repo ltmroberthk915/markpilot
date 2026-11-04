@@ -30,11 +30,9 @@ dsh plugin --profile web add dsh-markdown-typora-0.3.11.tgz
 dsh plugin --profile desktop add dsh-markdown-typora-0.3.11.tgz
 ```
 
-从 0.3.4 升级直接覆盖安装即可。也可以从 npm 安装同一个包：
+从 0.3.4 升级直接覆盖安装即可。
 
-```bash
-npm install dsh-markdown-typora@0.3.11
-```
+npm 上的 `dsh-markdown-typora` 当前最新为 0.3.5；0.3.11 的 npm 发布本轮被本机失效 token 阻断（`npm publish` 返回 404），拿到有效 token 后即可补发。在此之前请使用上面的 GitHub Release TGZ 安装 0.3.11。
 
 ## 已知限制
 

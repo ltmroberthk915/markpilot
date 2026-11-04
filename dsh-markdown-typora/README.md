@@ -68,7 +68,7 @@ dsh plugin --profile web add ./dsh-markdown-typora-0.3.11.tgz
 dsh plugin --profile desktop add ./dsh-markdown-typora-0.3.11.tgz
 ```
 
-Use this only when you cannot install from npm; the package on npm tracks the same source.
+The npm registry currently carries 0.3.5; this release's 0.3.11 build is the TGZ above, and the registry copy follows once the npm publication is renewed. Use the TGZ when you need this exact version.
 ### Manual (development checkout)
 
 The plugin is the `dsh-markdown-typora/` subdirectory of the [MarkPilot repository](https://github.com/ltmroberthk915/markpilot). To load a checkout as a bundle:

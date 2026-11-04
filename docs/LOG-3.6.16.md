@@ -37,7 +37,7 @@
 | --- | --- |
 | `markpilot-Setup-3.6.16.exe` | `92fa932d7d3739a1f14f19e698ced8c005ce5a305013e7264c8fb11176a3daa0` |
 | `markpilot-3.6.16-portable.exe` | `7733222575c80184e45784ae06f7060375463f6bf8b0b4ce22859715b21f6fbb` |
-| `dsh-markdown-typora-0.3.11.tgz` | `ab7449b28b2fd68ab3d6da11f53202db23288544eac64a7743f49683a6d09684` |
+| `dsh-markdown-typora-0.3.11.tgz` | `2ebaf88cd50e0925288df00e2d3cd331932175b35fd65fdd6fd5378299df84b9` |
 
 实装主程序 SHA-256 `339ff062b49656c53e9587ac9ab1d18dcf3e7d796ca8ad3288a54b2eb1b43d29`，应用包 SHA-256 `a9dd12f84ec42f528c731bb0ec709abb1bdc601eff2dcd2795ebf5283cd584a0`。从正式安装位置另跑 40 项全部通过：反向选择与剪贴 5、另存为/保留我的修改 7、富文本 10、可见图片迟到 2、组字后点击序列 4、跨目录图片 4、双窗实时协同 5、代表性大笔记 1、首键 2。安装版反向选择第一次因窗口/滚动几何瞬时抖动在 `mixed-reverse` 失败，重跑 5/5；首键第一次前台锁失败，重跑 2/2；原始失败记录保留。
 
@@ -49,7 +49,7 @@ DSH 侧：`web` 与 `desktop` 两个 profile 的 `dsh-markdown-typora` 均是指
 - 真实微软拼音（公式与表格提交“你”）的物理输入证据来自上一候选 D1（ASAR `d1f12e18…`）。本轮没有在最终 ASAR `a9dd12f8…` 上重跑物理 IME；IME 相关源码未变，但这里不据此声明最终候选的物理 IME 通过。
 - DSH 宿主未重启；插件在磁盘上的字节与 TGZ 已核对，运行中模块的加载状态如实记为“未重启”。
 
-完整交付收据为 `.mp-verify/editing-3616/delivery.json`，SHA-256 `4b9fa76303385e58f137492494d6f427a39bc7e967696177c86a8179df2e6c84`；正式安装收据 `official-install.json`（SHA-256 `0bbb8126…`）。
+完整交付收据为 `.mp-verify/editing-3616/delivery.json`，SHA-256 `3b2da04ee8898d48709d6f49c457ddf7fa42b617d449be0a5fbbdff59f5ca430`；正式安装收据 `official-install.json`（SHA-256 `0bbb8126…`）。
 
 ## 发布与实装
 
