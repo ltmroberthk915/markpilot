@@ -37,7 +37,7 @@
 | --- | --- |
 | `markpilot-Setup-3.6.16.exe` | `92fa932d7d3739a1f14f19e698ced8c005ce5a305013e7264c8fb11176a3daa0` |
 | `markpilot-3.6.16-portable.exe` | `7733222575c80184e45784ae06f7060375463f6bf8b0b4ce22859715b21f6fbb` |
-| `dsh-markdown-typora-0.3.11.tgz` | `5b3cfa6fe7376c3f7db5c308c33d7572b08fd96914ecb281688e81a409981031` |
+| `dsh-markdown-typora-0.3.11.tgz` | `ab7449b28b2fd68ab3d6da11f53202db23288544eac64a7743f49683a6d09684` |
 
 实装主程序 SHA-256 `339ff062b49656c53e9587ac9ab1d18dcf3e7d796ca8ad3288a54b2eb1b43d29`，应用包 SHA-256 `a9dd12f84ec42f528c731bb0ec709abb1bdc601eff2dcd2795ebf5283cd584a0`。从正式安装位置另跑 40 项全部通过：反向选择与剪贴 5、另存为/保留我的修改 7、富文本 10、可见图片迟到 2、组字后点击序列 4、跨目录图片 4、双窗实时协同 5、代表性大笔记 1、首键 2。安装版反向选择第一次因窗口/滚动几何瞬时抖动在 `mixed-reverse` 失败，重跑 5/5；首键第一次前台锁失败，重跑 2/2；原始失败记录保留。
 
