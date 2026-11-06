@@ -72,6 +72,46 @@
    * 注意 engine 在模块加载时已跑过一次 applyEditorTheme（boot 前）；因此偏好写入必须发生在
    * boot 之前才叫"首帧正确"，boot 之后则靠 setTheme() 立即生效。两路都走，幂等。
    */
+  // Skin state follows the engine's actual mode, without writing its palette.
+  var lastSkinDark = null;
+  function syncSkinTheme() {
+    var root = document.documentElement;
+    if (!root) return;
+    var mode = root.dataset && root.dataset.mode;
+    var dark = mode === 'dark' ? true : mode === 'light' ? false : themeDark;
+    if (dark === null) return;
+    var value = dark ? 'dark' : 'light';
+    if (root.dataset.dshTheme !== value) root.dataset.dshTheme = value;
+    if (root.style.colorScheme !== value) root.style.colorScheme = value;
+    if (lastSkinDark !== dark) {
+      lastSkinDark = dark;
+      emitSkin('theme', { dark: dark });
+    }
+  }
+  function applyAppearance(content) {
+    if (!content || typeof content.transparent !== 'boolean') return;
+    var root = document.documentElement;
+    if (!root) return;
+    var value = content.transparent ? 'on' : 'off';
+    if (root.getAttribute('data-mp-transparent') !== value) root.setAttribute('data-mp-transparent', value);
+    if (typeof content.workbenchCollapsed === 'boolean') {
+      var controls = content.workbenchCollapsed ? '1' : '0';
+      if (root.getAttribute('data-mp-workbench-collapsed') !== controls) root.setAttribute('data-mp-workbench-collapsed', controls);
+    }
+  }
+  var skinThemeObserver = null;
+  function installSkinThemeObserver() {
+    if (skinThemeObserver || typeof MutationObserver !== 'function' || !document.documentElement) return;
+    skinThemeObserver = new MutationObserver(syncSkinTheme);
+    skinThemeObserver.observe(document.documentElement, {
+      attributes: true, attributeFilter: ['data-mode', 'data-editor-theme']
+    });
+    window.addEventListener('pagehide', function (event) {
+      if (event.persisted) return;
+      if (skinThemeObserver) skinThemeObserver.disconnect();
+      skinThemeObserver = null;
+    });
+  }
   function applyHostTheme(dark) {
     themeDark = !!dark;
     var root = document.documentElement;
@@ -93,11 +133,23 @@
     } else {
       pendingThemeApply = true;   // open/boot 之后补一次（引擎 boot 结束才会创建 window.mpEngine）
     }
-    emitSkin('theme', { dark: !!dark });
+    syncSkinTheme();
+  }
+
+  var embedPrefsReady = false;
+  function applyEmbedDefaults() {
+    var engine = window.mpEngine;
+    if (embedPrefsReady || !engine || typeof engine.setPref !== 'function') return;
+    try {
+      // A new embedded editor uses its available pane; explicit user widths win.
+      if (localStorage.getItem('mp-pref-pageWidth') === null) engine.setPref('pageWidth', 100);
+      embedPrefsReady = true;
+    } catch (error) { /* no persistent storage: leave the engine preference alone */ }
   }
 
   // boot 完成（= 引擎已处理过 down open）后补应用一次挂起的主题。
   function maybeApplyPendingTheme() {
+    applyEmbedDefaults();
     if (!pendingThemeApply || themeDark === null) return;
     var engine = window.mpEngine;
     if (!engine || typeof engine.setTheme !== 'function') return;
@@ -287,6 +339,16 @@
   function applicationResult(request,applied,reason) {
     return {protocol:2,docToken:request.docToken,applyId:request.applyId,applied:applied,reason:reason||null,session:sessionNow()||null,composing:!!window.mpEngine?.isComposing?.()};
   }
+  function prepareDocumentInteraction() {
+    var interaction = window.__dshInteraction;
+    if (!interaction || typeof interaction.beforeDocumentChange !== 'function') return true;
+    try {
+      if (interaction.beforeDocumentChange() !== false) return true;
+      // A released foreign reading mode may continue. Only an owned lease
+      // that could not finish blocks document application.
+      return typeof interaction.snapshot === 'function' && !interaction.snapshot().active;
+    } catch (error) { return false; }
+  }
   async function applyDocument(type,request) {
     if (!request.docToken || !request.applyId || typeof request.content!=='string' || !Number.isSafeInteger(request.serial)) return;
     var previous=lastRequest?.applyId===request.applyId?lastRequest:null;
@@ -312,12 +374,14 @@
         applyDocBase(ready?(request.rootPath||''):'');
         var list=handlers.open||[];
         if(!list.length)throw Error('not-ready');
+        if(!prepareDocumentInteraction())throw Error('interaction-busy');
         for(var i=0;i<list.length;i++)list[i]({content:request.content,rootPath:request.rootPath});
         if(!window.mpEngine || !sessionNow())throw Error('boot-failed');
         boundDocToken=request.docToken;
         queueMicrotask(maybeApplyPendingTheme);
       }else{
         if(!boundDocToken || !sameSession(request.expected,sessionNow()))throw Error('stale');
+        if(!prepareDocumentInteraction())throw Error('interaction-busy');
         var ticket=window.mpEngine.commands.capture({flush:false});
         if(!ticket)throw Error('composing');
         if(!window.mpEngine.setValue(request.content,ticket))throw Error('rejected');
@@ -501,6 +565,7 @@
       }
       return;
     }
+    if (type === 'appearance') { applyAppearance(content); return; }
     if (type === 'theme') { applyHostTheme(normalizeDark(content)); return; }
     if (type === 'toast') { showToast(content); emitSkin('toast', { text: typeof content === 'string' ? content : '' }); return; }
 
@@ -519,6 +584,7 @@
         applyDocBase(ready ? docDir : '');
         trace.ready = !!ready;
         trace.base = (function () { try { return document.baseURI; } catch (error) { return null; } })();
+        if (!prepareDocumentInteraction()) return;
         runHandlers('open', content);
         trace.ms = Date.now() - trace.startedAt;
         // 引擎 boot() 是同步的：handler 返回时 window.mpEngine 已创建。
@@ -532,6 +598,7 @@
       handshakeSatisfied = true;
       stopWatchdog();
     }
+    if ((type === 'setValue' || type === 'replaceDocument') && !prepareDocumentInteraction()) return;
     runHandlers(type, content);
   });
 
@@ -611,6 +678,9 @@
     var saved = localStorage.getItem('dshmd-theme');
     if (saved === 'dark' || saved === 'light') applyHostTheme(saved === 'dark');
   } catch (error) { /* 无存储：等父窗口下发的 theme */ }
+
+  installSkinThemeObserver();
+  syncSkinTheme();
 
   // 通知父窗口桥已就绪（父页面据此判断可以开始握手/下发 theme）。
   send('bridge-ready', { href: location.href });

@@ -17,9 +17,10 @@
 //      unhandled rejection + watcher 泄漏。这里 await 捕获并幂等 close。
 //   4. 每个 async 分支都有 try/catch，错误以 {ok:false,error:{code,message}} 返回，code 原样透传。
 
-import { readFile, stat as fsStat, realpath } from 'node:fs/promises';
-import { createReadStream } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { readFile, stat as fsStat, realpath, writeFile, mkdir } from 'node:fs/promises';
+import { createReadStream, readFileSync, writeFileSync, appendFileSync, renameSync, rmSync, mkdirSync, existsSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 // 下面三个静态导入**只保留 HMR 依赖边**（host/*.js 变更 ⇒ dsh-hmr 把插件条目一并重启），
 // 实例不直接消费：DSH HMR 的替换计划只驱逐「变更模块 + 其 importer」（planReplacement
@@ -32,7 +33,7 @@ import rawDiskStore from '../host/document-store.js';
 import rawLiveStore from '../host/live-documents.js';
 import rawTextCodec from '../host/text-codec.js';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, normalize, sep, extname } from 'node:path';
+import { dirname, join, normalize, sep, extname, resolve as pathResolve } from 'node:path';
 
 const requirePlugin = createRequire(import.meta.url);
 const nodeFs = requirePlugin('node:fs');
@@ -227,7 +228,7 @@ function loadHostGraph() {
   }
   slot.current = nextGraph;
   return { live: loaded.get('live-documents.js'), disk: loaded.get('document-store.js'),
-    codec: loaded.get('text-codec.js'), graph: slot.current };
+    codec: loaded.get('text-codec.js'), safeFile: loaded.get('safe-file.js'), graph: slot.current };
 }
 /** 发布前绑定/导出一致性校验：真实 Module 对象缺失或 exports 形状不符 ⇒ 直接失败（不静默放过）。 */
 function validateOwnedGraph(loaded, cjsModules) {
@@ -316,7 +317,9 @@ const API_PREFIX = ROUTE_PREFIX + '/api/';
 const MODEL_TOOL = Symbol('markdown model tool');
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'diag']);
+/** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
+let lastDiag = null;
 const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '::1']);
 
 /** 请求体上限：64MB。含内联图文档常见 10MB+；上限之外明确 413，不静默截断。 */
@@ -1102,6 +1105,153 @@ export function createHost(options = {}) {
     });
   }
 
+  /**
+   * 新建文档：在指定文件夹里落一个 .md，绝不覆盖已有文件。
+   * 与 apiSave 的区别：这里没有「已存在版本」可守，所以用 wx 独占创建（EEXIST 即换名重试），
+   * 天然满足"永不覆盖"；写入内容来自设置里的模板（{title} 已由客户端替换过一次，
+   * 这里再兜一次，避免模板里残留占位符）。
+   */
+  /**
+   * 新建文档：在指定文件夹里落一个 .md，绝不覆盖已有文件。
+   *
+   * 走的是 EXE 那套安全写入（host/document-store.js 同款协议）：
+   *   prepareFile(target, tmp, { baseline: null, output:{bytes,sha256} })
+   *     → 原生 worker 收到 expected={exists:false}，**在替换层就拒绝覆盖**；
+   *   → 内容写进 .mp-tmp-<pid>-<uuid> 临时文件（flag r+，槽位由 prepareFile 建好）；
+   *   → commit() 由原生 worker 原子落地；失败保留恢复副本；
+   *   → finally 里 abort() 清理，绝不留半截临时文件。
+   * 不再裸 writeFile —— 那是这条加固链上唯一的漏洞。
+   */
+  async function apiDocsCreate(payload) {
+    const dir = typeof payload?.dir === 'string' ? payload.dir.trim() : '';
+    const rawName = typeof payload?.name === 'string' ? payload.name.trim() : '';
+    const template = typeof payload?.template === 'string' ? payload.template : '';
+    if (!dir) return badRequest('dir is required');
+    if (!rawName) return badRequest('name is required');
+
+    // 文件名清洗：拆掉路径分隔符与 Windows 非法字符，去掉尾部点，强制 .md
+    let name = rawName.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '').replace(/[. ]+$/, '').trim();
+    if (!name) return badRequest('name is blank after sanitize');
+    if (!/\.(md|markdown)$/i.test(name)) name += '.md';
+    const stem = name.replace(/\.(md|markdown)$/i, '');
+    const ext = name.slice(stem.length);
+
+    try { await mkdir(dir, { recursive: true }); } catch (error) { throw codedError('MP_DIR_CREATE_FAILED', String(error?.message ?? error)); }
+
+    const safeFile = hostModules?.safeFile;
+    if (!safeFile || typeof safeFile.prepareFile !== 'function') {
+      throw codedError('MP_SAFE_FILE_UNAVAILABLE', '安全写入模块不可用，拒绝裸写');
+    }
+
+    const body = (template || '').replace(/\{title\}/g, stem);
+    const out = Buffer.from(body, 'utf8');
+    const outHash = createHash('sha256').update(out).digest('hex');
+
+    for (let attempt = 1; attempt <= 99; attempt += 1) {
+      const candidate = attempt === 1 ? join(dir, name) : join(dir, `${stem} (${attempt})${ext}`);
+      if (await fs.stat(await fs.resolve(candidate)).then(Boolean, () => false)) continue;   // 已存在 → 换序号
+      const tmp = join(dir, '.mp-tmp-' + process.pid + '-' + randomUUID());
+      let stage, primaryFailure;
+      try {
+        stage = await safeFile.prepareFile(candidate, tmp, { baseline: null, output: { bytes: out.length, sha256: outHash } });
+        await writeFile(tmp, out, { flag: 'r+' });
+        await stage.commit();
+      } catch (error) {
+        primaryFailure = error;
+        // 并发抢名：别人刚建了同名 → 换序号重试；其余错误原样透出
+        const taken = await fs.stat(await fs.resolve(candidate)).then(Boolean, () => false);
+        if (taken) continue;
+        throw error;
+      } finally {
+        try { await stage?.abort(); } catch (error) { if (primaryFailure) primaryFailure.cleanupError = String(error?.message ?? error); }
+      }
+      let displayPath = candidate, version;
+      try {
+        const target = await fs.resolve(candidate);
+        const info = await fs.stat(target);
+        if (target) displayPath = target.displayPath ?? candidate;
+        if (info) version = info.version;
+      } catch { /* 解析失败不影响"已创建"这个事实 */ }
+      return { ok: true, value: { path: candidate, displayPath, version, safe: true } };
+    }
+    throw codedError('MP_FILE_EXISTS', 'too many files with the same name');
+  }
+
+  /* ── 最近打开：与 MarkPilot.EXE 共用同一份 MRU ────────────────────────
+   * EXE 侧真源：%APPDATA%\MarkPilot\recents.json（shell/recents.js + main.js）。
+   * 语义照抄 EXE：纯字符串数组、绝对路径、Windows 大小写不敏感去重、新的置顶、上限 10、
+   * 原子写（临时文件 + rename；rename 失败先删再改名，应对杀软/索引器持有句柄）。
+   * 这样 EXE 的「文件 → 最近打开」和插件的文档中心看到的是同一份清单。
+   */
+  const RECENT_LIMIT = 10;
+
+  function recentsPath() {
+    const base = process.env.APPDATA;
+    return base ? join(base, 'MarkPilot', 'recents.json') : null;
+  }
+
+  function normalizeRecents(value, limit = RECENT_LIMIT) {
+    const seen = new Set(); const out = [];
+    for (const item of Array.isArray(value) ? value : []) {
+      if (typeof item !== 'string' || !item.trim()) continue;
+      let abs; try { abs = pathResolve(item); } catch { continue; }
+      const key = process.platform === 'win32' ? abs.toLowerCase() : abs;
+      if (seen.has(key)) continue;
+      seen.add(key); out.push(abs);
+      if (out.length >= limit) break;
+    }
+    return out;
+  }
+
+  function readRecents() {
+    const file = recentsPath();
+    if (!file) return [];
+    try { return normalizeRecents(JSON.parse(readFileSync(file, 'utf8'))); } catch { return []; }
+  }
+
+  function writeRecents(list) {
+    const file = recentsPath();
+    if (!file) return false;
+    const tmp = `${file}.dshtmp-${process.pid}-${randomUUID()}`;
+    try {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(tmp, JSON.stringify(list, null, 2), 'utf8');
+      try { renameSync(tmp, file); }
+      catch {
+        try { rmSync(file, { force: true }); } catch { /* 目标可能本来就不在 */ }
+        renameSync(tmp, file);
+      }
+      return true;
+    } catch { try { rmSync(tmp, { force: true }); } catch { /* 清不掉也不影响主流程 */ } return false; }
+  }
+
+  async function apiDocsRecent(payload) {
+    const op = typeof payload?.op === 'string' ? payload.op : 'list';
+    if (op === 'list') {
+      // 剔除已经不存在的条目并回写：过期 MRU 会让文档中心自动选中一份打不开的文件。
+      const all = readRecents();
+      const alive = all.filter((item) => { try { return existsSync(item); } catch { return false; } });
+      if (alive.length !== all.length) writeRecents(alive);
+      return { ok: true, value: { items: alive, pruned: all.length - alive.length } };
+    }
+    if (op === 'clear') { writeRecents([]); return { ok: true, value: { items: [] } }; }
+    if (op === 'push') {
+      const raw = typeof payload?.path === 'string' ? payload.path : '';
+      if (!raw) return badRequest('path is required');
+      let abs = '';
+      try {
+        const target = await fs.resolve(raw, resolveOptions(payload));
+        abs = nativeTargetPath(target) || target.displayPath || pathResolve(raw);
+      } catch { abs = pathResolve(raw); }
+      const key = process.platform === 'win32' ? abs.toLowerCase() : abs;
+      const rest = readRecents().filter((item) => (process.platform === 'win32' ? item.toLowerCase() : item) !== key);
+      const next = normalizeRecents([abs, ...rest]);
+      const persisted = writeRecents(next);
+      return { ok: true, value: { items: next, persisted } };
+    }
+    return badRequest('unknown op');
+  }
+
   async function apiStat(payload) {
     const path = typeof payload?.path === 'string' ? payload.path : '';
     if (!path) return badRequest('path is required');
@@ -1158,6 +1308,14 @@ export function createHost(options = {}) {
         case 'stat': return await apiStat(payload);
         case 'live': return authority === MODEL_TOOL ? badRequest('editor lease required') : await liveEndpoint(payload);
         case 'edit': return await apiEdit(payload, invocation);
+        case 'docs/create': return await apiDocsCreate(payload);
+        case 'docs/recent': return await apiDocsRecent(payload);
+        case 'diag': {
+          lastDiag = { receivedAt: Date.now(), payload };
+          // 诊断同时落盘一份，验收时用 PowerShell 直接读，不必开 DevTools、也不受接口鉴权影响。
+          try { writeFileSync(join(tmpdir(), 'mp-diag.json'), JSON.stringify(lastDiag, null, 1), 'utf8'); } catch { /* 落盘失败不影响功能 */ }
+          return { ok: true };
+        }
         default: return badRequest(`unknown endpoint: ${String(endpoint)}`);
       }
     } catch (error) {
@@ -1258,6 +1416,10 @@ export function createHost(options = {}) {
         }
         if (req.method === 'GET' && pathname === API_PREFIX + 'watch') {
           await handleWatch(req, res, url);
+          return;
+        }
+        if (isRead && pathname === API_PREFIX + 'diag') {
+          sendJson(res, 200, { ok: true, diag: lastDiag });
           return;
         }
         if (req.method === 'POST' && pathname.startsWith(API_PREFIX)) {

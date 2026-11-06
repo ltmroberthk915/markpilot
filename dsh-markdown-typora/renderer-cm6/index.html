@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-dsh-embed="markpilot">
 
 <head>
   <meta charset="utf-8" />
@@ -20,6 +20,11 @@
   <script src="dsh-bridge.js"></script>
   <!-- 选区浮按钮在 app.js 之后执行（defer 保证正文脚本先跑完）；它只读引擎 state，不改。 -->
   <script src="dsh-selection.js" defer></script>
+  <script src="dsh-interaction.js" defer></script>
+  <!-- 数学推导 + AI 交互工具层（外壳）：defer 保证在 cm6/app.js 之后执行；
+       只读 window.mpEngine._view()，写经 CM6 dispatch；不改引擎、不改桥；
+       删掉本行 + dsh-mp-tools.js 即完全回退。 -->
+  <script src="dsh-mp-tools.js" defer></script>
   <style>
     /* ── DSH 皮：只做三件事 ─────────────────────────────────────────────
        1) 给 iframe 一个不会白闪的首帧底色（引擎 boot 后由 --mp-bg 接管）；
@@ -27,25 +32,62 @@
        3) 轻提示（父窗口 toast 在引擎 toast 层不可用时的兜底）。
        纪律：不覆盖引擎的 html/body/.cm-editor 背景（引擎注入的 CSS 是后写者），
        不引入第二套文档/主题变量；明暗只跟随 <html data-dsh-theme>。 */
+    /* 编辑区透明：让 DSH 应用背景（含 dream-skin 皮肤）直接透上来，消除与宿主之间的割裂感。
+       引擎后注入的 html/body/.cm-editor 背景用 !important 压过（引擎不带 !important）。 */
+    /* 透明模式：由独立 appearance 消息即时同步，load/ready/init 均可补发。 */
+    html[data-mp-transparent="on"],
+    html[data-mp-transparent="on"] body,
+    html[data-mp-transparent="on"] .cm-editor,
+    html[data-mp-transparent="on"] .cm-scroller,
+    html[data-mp-transparent="on"] .cm-content,
+    html[data-mp-transparent="on"] .cm-gutters,
+    html[data-mp-transparent="on"] .mp-zoom-wrap {
+      background: transparent !important;
+    }
+
+    /* Light ink needs a light translucent surface over a dark host wallpaper. */
+    html[data-mp-transparent="on"][data-mode="light"],
+    html[data-mp-transparent="on"][data-mp-reading="1"] {
+      background: color-mix(in srgb,var(--mp-bg,#faf9f6) 86%,transparent) !important;
+    }
+
+    /* Keep the engine's page-width preference and zoom; compact only the shell inset. */
+    html[data-dsh-embed="markpilot"]:not([data-mp-reading="1"]) .cm-scroller > .cm-content {
+      --mp-measure: 100%;
+      /* Native heading badges and code numbers use the leading gutter. */
+      padding-left: 24px !important;
+      padding-right: 8px !important;
+    }
+    /* Parent controls occupy physical x=12..44 and y=8..84. Island and content
+       zoom are independent; reserve physical pixels through their own scales. */
+    html[data-mp-workbench-collapsed="1"] .mp-toolbar {
+      left: calc(56px / var(--mp-island-scale,1));
+      max-width: calc(100% - 12px - 56px / var(--mp-island-scale,1));
+    }
+    html[data-mp-workbench-collapsed="1"]:not([data-mp-reading="1"]) .cm-content {
+      padding-top: max(calc(var(--mp-toolbar-h,32px) + 2px),calc(88px / var(--mp-zoom,1))) !important;
+    }
+
     html {
       background: #2E3440;
       color-scheme: dark;
     }
 
+    html[data-mp-transparent="on"] {
+      background: transparent;
+    }
+
     @media (prefers-color-scheme: light) {
       html {
-        background: #FAF9F6;
         color-scheme: light;
       }
     }
 
     html[data-dsh-theme="dark"] {
-      background: #2E3440;
       color-scheme: dark;
     }
 
     html[data-dsh-theme="light"] {
-      background: #FAF9F6;
       color-scheme: light;
     }
 
@@ -162,6 +204,36 @@
       border: 1px solid rgba(16, 24, 40, .12);
       box-shadow: 0 8px 24px rgba(16, 24, 40, .18);
     }
+    /* Plugin tools follow the active editor palette; no CM6 styles are changed. */
+    html[data-dsh-theme] .mp-tools,
+    html[data-dsh-theme] .mp-tools__btn,
+    html[data-dsh-theme] .mp-tools__cell,
+    html[data-dsh-theme] .mp-tools__ask input { color:var(--mp-fg,#c8cfda); }
+    html[data-dsh-theme] .mp-tools__wand,
+    html[data-dsh-theme] .mp-tools__panel {
+      color:var(--mp-fg,#c8cfda);
+      background:color-mix(in srgb,var(--mp-bg,#2e3440) 88%,transparent);
+      border-color:var(--mp-border,rgba(128,128,128,.3));
+    }
+    html[data-dsh-theme] .mp-tools__h,
+    html[data-dsh-theme] .mp-tools__cell small { color:var(--mp-muted,var(--mp-fg,#9aa4b2)); }
+    html[data-dsh-theme] .mp-tools__cell,
+    html[data-dsh-theme] .mp-tools__ask input {
+      background:color-mix(in srgb,var(--mp-fg,#c8cfda) 5%,transparent);
+      border-color:var(--mp-border,rgba(128,128,128,.3));
+    }
+    html[data-dsh-theme] .mp-tools__sep { background:var(--mp-border,rgba(128,128,128,.3)); }
+    html[data-dsh-theme] .mp-tools__btn:hover,
+    html[data-dsh-theme] .mp-tools__btn[data-on="1"],
+    html[data-dsh-theme] .mp-tools__wand:hover,
+    html[data-dsh-theme] .mp-tools__wand[data-on="1"],
+    html[data-dsh-theme] .mp-tools__cell:hover,
+    html[data-dsh-theme] .mp-tools__cell:active {
+      color:var(--mp-fg,#c8cfda);
+      background:color-mix(in srgb,var(--mp-accent,#4f8ef7) 20%,transparent);
+    }
+    html[data-dsh-theme="light"] .mp-tools__panel { box-shadow:0 12px 36px rgba(16,24,40,.16); }
+    html[data-dsh-theme="light"] .mp-tools__toast { color:#146c3d;background:rgba(232,247,238,.96); }
   </style>
 </head>
 

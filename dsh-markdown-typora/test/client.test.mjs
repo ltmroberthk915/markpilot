@@ -272,10 +272,33 @@ test('apply 防御性：tab 类型 + tab body 各自注册，服务缺失不抛'
   assert.equal(registered.tabs.length, 1);
   assert.equal(registered.tabs[0].id, 'dsh-markdown-typora/editor');
   assert.equal(registered.tabs[0].keepMounted, true);
-  assert.equal(registered.slots.length, 1);
-  assert.equal(registered.slots[0].definition.name, 'sidebar.right.pane.tab');
-  assert.equal(registered.slots[0].definition.key, 'dsh-markdown-typora/editor');
-  assert.equal(typeof registered.slots[0].component, 'function');
+  // 契约是「各座位独立注册、任一失败不影响其他」。
+  // 座位数量会随功能增长（tab body / 浮层舞台 / 左栏入口 / main 页 / 设置页），
+  // 所以这里按**名字**断言，不锁总数 —— 锁总数会让每加一个座位都要改这个用例。
+  const byName = (n) => registered.slots.find((s) => s.definition.name === n);
+  const tabSlot = byName('sidebar.right.pane.tab');
+  assert.ok(tabSlot, 'tab body 必须注册');
+  assert.equal(tabSlot.definition.key, 'dsh-markdown-typora/editor');
+  assert.equal(typeof tabSlot.component, 'function');
+
+  const stageSlot = byName('shell.overlay');
+  assert.ok(stageSlot, '浮层舞台必须注册');
+  assert.equal(stageSlot.definition.id, 'dsh-markdown-typora-stage');
+  assert.equal(typeof stageSlot.component, 'function');
+
+  const railSlot = byName('sidebar.panellist');
+  assert.ok(railSlot, '左栏入口必须注册');
+  assert.equal(railSlot.definition.label, 'Markdown');
+  assert.equal(typeof railSlot.component, 'function');
+
+  const mainSlot = byName('main');
+  assert.ok(mainSlot, 'main 页面必须注册');
+  assert.equal(mainSlot.definition.key, 'dsh-markdown-typora-docs');
+
+  const settingsSlot = byName('settings.section');
+  assert.ok(settingsSlot, '设置页 section 必须注册');
+  assert.equal(settingsSlot.definition.id, 'dsh-markdown-typora');
+  assert.equal(typeof settingsSlot.component, 'function');
 
   // 极简 ctx（没有 sidebarRightTabs / inject）也不能抛
   assert.doesNotThrow(() => mod.apply({ slots: { inject(name, cb) { return cb(); }, register() { return () => {}; } }, effect(fn) { return fn(); } }));

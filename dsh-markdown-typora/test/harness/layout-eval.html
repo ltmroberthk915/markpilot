@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>MarkPilot M0 布局引擎 · 真实浏览器验收</title>
+<style>
+  /* 仿真宿主：一个中间列，里面是会话根 > [header, body] */
+  html, body { margin: 0; padding: 0; background: #111; }
+  #stage { position: relative; width: 1600px; height: 900px; }
+  .root { display: flex; flex-direction: column; width: 1600px; height: 900px; margin-left: 0; margin-right: 0; }
+  .header { flex: none; height: 48px; background: #222; }
+  .body { flex: 1; min-height: 0; background: #1a1a1a; margin-left: 0; margin-right: 0; }
+  pre { color: #ddd; font: 12px/1.5 Consolas, monospace; padding: 12px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="root" data-phase="active" id="root">
+    <div class="header"></div>
+    <div class="body" data-conversation-content id="convbody"></div>
+  </div>
+</div>
+<pre id="out">running…</pre>
+
+<script>
+  /* loader 垫片必须早于 client.js：它靠 window.__ModuleLoader__.load 注册工厂 */
+  window.__mpCapturedDefinition = null;
+  window.__ModuleLoader__ = { load: function (def) { window.__mpCapturedDefinition = def; } };
+</script>
+<script src="../../lib/client.js"></script>
+<script>
+(function () {
+  'use strict';
+  var lines = [];
+  var pass = 0, fail = 0;
+
+  function check(name, cond, detail) {
+    if (cond) { pass += 1; lines.push('PASS  ' + name + (detail ? '  [' + detail + ']' : '')); }
+    else { fail += 1; lines.push('FAIL  ' + name + (detail ? '  [' + detail + ']' : '')); }
+  }
+
+  function finish() {
+    lines.push('SUMMARY pass=' + pass + ' fail=' + fail);
+    document.getElementById('out').textContent = lines.join('\n');
+  }
+
+  try {
+    // 1) 取工厂
+    var def = null;
+    // __ModuleLoader__ 已在 client.js 执行时被调用；这里从 window 上取回来
+    if (window.__mpCapturedDefinition) def = window.__mpCapturedDefinition;
+    check('client.js 已注册模块定义', !!def);
+    if (!def) { finish(); return; }
+
+    var mod = def.factory(function (name) {
+      if (name === 'react') return null;
+      throw new Error('unexpected require: ' + name);
+    });
+    check('factory 暴露 __test.layout', !!(mod.__test && mod.__test.layout));
+    var L = mod.__test.layout;
+    if (!L) { finish(); return; }
+
+    var rootEl = document.getElementById('root');
+    var bodyEl = document.getElementById('convbody');
+
+    // 2) 真实 DOM 上的锚点解析（顺带验证 :scope 选择器在真实浏览器可用）
+    check('findConversationRoot 命中 [data-phase]', L.findConversationRoot(document) === rootEl);
+    check('findConversationBody 用 :scope > [data-conversation-content]',
+      L.findConversationBody(rootEl) === bodyEl);
+
+    // 3) 真实几何
+    var rect = rootEl.getBoundingClientRect();
+    check('真实 rect 宽度 = 1600', Math.round(rect.width) === 1600, String(Math.round(rect.width)));
+    var g = L.computeLayout('center', { chatWidth: 420 }, rect.width, rect.height);
+    check('几何：chatW=420', g.chatW === 420, String(g.chatW));
+    check('几何：marginLeft = 1180px', g.marginLeft === '1180px', g.marginLeft);
+
+    // 4) 引擎写入真实 style
+    var cfg = { enabled: true, mode: 'center', chatWidth: 420 };
+    var engine = L.createLayoutEngine({ doc: document, win: window, cfg: cfg });
+    check('apply 成功', engine.apply() === true);
+
+    var cs = getComputedStyle(bodyEl);
+    var rawVar = bodyEl.style.getPropertyValue('--dsh-chat-user-width').trim();
+    check('宽度变量写在内容区上', rawVar === '420px', rawVar);
+    check('会话根上没有该变量',
+      rootEl.style.getPropertyValue('--dsh-chat-user-width').trim() === '',
+      rootEl.style.getPropertyValue('--dsh-chat-user-width'));
+    check('margin-left 内联已写', bodyEl.style.getPropertyValue('margin-left') === '1180px',
+      bodyEl.style.getPropertyValue('margin-left'));
+
+    // 内容区实际宽度应变成 420（真实布局计算，不是读我们自己写的值）
+    var bw = bodyEl.getBoundingClientRect().width;
+    check('内容区真实宽度被挤到 ~420', Math.abs(bw - 420) <= 1, String(Math.round(bw)));
+
+    // 5) 幂等：再 apply 两次，写入次数不增
+    var w1 = engine.snapshot().writes;
+    engine.apply();
+    engine.apply();
+    check('二次 apply 零新写入', engine.snapshot().writes === w1,
+      w1 + ' -> ' + engine.snapshot().writes);
+
+    // 6) 让位
+    bodyEl.style.setProperty('margin-left', '999px');
+    check('外部改写触发让位', engine.checkYield() === true);
+    check('让位后失活', engine.snapshot().active === false);
+    check('让位后 margin 已还原', bodyEl.style.getPropertyValue('margin-left') === '',
+      bodyEl.style.getPropertyValue('margin-left'));
+
+    // 7) 重新 apply 后 restore 回到原值
+    engine.apply();
+    engine.restore();
+    check('restore 后变量清空', bodyEl.style.getPropertyValue('--dsh-chat-user-width') === '');
+    check('restore 后 margin 清空', bodyEl.style.getPropertyValue('margin-left') === '');
+    check('restore 后宽度回升到 1600',
+      Math.abs(bodyEl.getBoundingClientRect().width - 1600) <= 1,
+      String(Math.round(bodyEl.getBoundingClientRect().width)));
+    check('restore 后根标记移除', rootEl.getAttribute('data-mp-layout') === null);
+
+    // 8) 负 margin 守卫（真实浏览器里复算那组数字）
+    var narrow = L.computeLayout('center', { chatWidth: 900 }, 516, 800);
+    check('窄列(516) chatW 不超列宽', narrow.chatW <= 516, String(narrow.chatW));
+    check('窄列(516) margin 非负', parseInt(narrow.marginLeft, 10) >= 0, narrow.marginLeft);
+  } catch (error) {
+    lines.push('EXCEPTION  ' + (error && error.message ? error.message : String(error)));
+    fail += 1;
+  }
+
+  finish();
+})();
+</script>
+</body>
+</html>

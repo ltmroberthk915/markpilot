@@ -113,3 +113,9 @@ node dsh-markdown-typora/scripts/sync-core.mjs --check
 ## License
 
 MIT. The MarkPilot engine and its bundled Mermaid/KaTeX assets retain their upstream licenses; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+## MarkPilot 1.0
+
+Enjoy a wider writing canvas, compact vertical workbench controls, live transparency and theme updates, and stable table editing when moving between your document and AI chat. Closing the editor restores the native workspace layout; an optional setting keeps adjustable split handles available. Windows layout and file-worker optimizations improve responsiveness while preserving existing editor features.
+
+Install this release with `dsh plugin --profile desktop add dsh-markdown-typora@1.0.0`, or use `dsh-markdown-typora-1.0.0.tgz` from the matching GitHub release. The earlier version-specific examples above remain as historical installation examples.

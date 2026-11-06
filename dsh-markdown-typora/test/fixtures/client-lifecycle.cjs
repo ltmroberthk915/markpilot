@@ -3,8 +3,8 @@
 // fixtures. Renderer protocol correctness is covered separately by bridge/engine
 // integration probes. This fixture does not claim native input or IDB coverage.
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
-let ROOT=__dirname;while(!fs.existsSync(path.join(ROOT,'dsh-markdown-typora/lib/client.js'))){const up=path.dirname(ROOT);if(up===ROOT)throw Error('Repository root not found');ROOT=up;}
-const source=fs.readFileSync(path.join(ROOT,'dsh-markdown-typora/lib/client.js'),'utf8');
+const ROOT=path.resolve(__dirname,'../..');
+const source=fs.readFileSync(path.join(ROOT,'lib/client.js'),'utf8');
 const drain=async()=>{for(let i=0;i<40;i++)await Promise.resolve();};
 function make(options={}){
  const effects=[],refs=[],listeners=new Map(),timers=new Map(),storage=new Map(),slots=new Map(),posts=[],requests=[],held=[];
@@ -51,7 +51,10 @@ function make(options={}){
  const mod=definition.factory(n=>{if(n==='react')return React;throw Error(n);});
  mod.__test.SessionsBridge.getSessions=()=>({list:{getSnapshot:()=>({byId:{test:{cwd}}})}});
  mod.__test.EditorTabBodyInner({sessionId:'test',useTabInfo:()=>({tab:{contentId:options.address||'dsh-resource://file/absolute/D%3A/probe/a.md',visible:true}})});
- refs[0].current={contentWindow:win};const cleanup=effects[0]();effects[1]();const st=refs[2].current;st.doc.win=win;
+ refs[0].current={contentWindow:win};
+ const cleanups=effects.map(effect=>effect()).filter(value=>typeof value==='function');
+ const cleanup=()=>{for(const dispose of [...cleanups].reverse())dispose();};
+ const st=refs[2].current;st.doc.win=win;
  return{st,posts,requests,storage,slots,timers,cleanup,message,transport,held,engine,draftStore,setFetch:f=>fetchHandler=f,setCwd:value=>{cwd=value;},ui:()=>ui,
   edit(text,composing=false){if(!engine.session)throw Error('Renderer not initialized');const before={...engine.session},beforeLength=engine.text.length;engine.session={...before,sourceRevision:before.sourceRevision+1};engine.text=text;engine.composing=composing;message('document-delta',{protocol:2,docToken:engine.token,before,after:{...engine.session},beforeLength,afterLength:text.length,changes:[{from:0,to:beforeLength,insert:text}],composing,lastApply:engine.lastApply});},
   composition(value){engine.composing=value;message('composition',{protocol:2,docToken:engine.token,session:{...engine.session},composing:value});},
