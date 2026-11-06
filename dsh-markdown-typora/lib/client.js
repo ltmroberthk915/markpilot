@@ -2070,6 +2070,9 @@ const SETTINGS_DEFAULTS = {
   mode: "center",
   chatWidth: 420,
   docsFolder: "",
+  workspaceOpenMode: "recent",
+  workspaceEmptyMode: "files",
+  workspaceSwitchMode: "follow",
   docsTemplate: "# {title}\n\n",
   transparent: true,     // 编辑区透明：让应用背景（含 dream-skin 皮肤）透上来
   keepResizeHandlesAfterClose: false,
@@ -2090,6 +2093,9 @@ function readSettings(storage) {
     mode: SETTINGS_DEFAULTS.mode,
     chatWidth: SETTINGS_DEFAULTS.chatWidth,
     docsFolder: SETTINGS_DEFAULTS.docsFolder,
+    workspaceOpenMode: SETTINGS_DEFAULTS.workspaceOpenMode,
+    workspaceEmptyMode: SETTINGS_DEFAULTS.workspaceEmptyMode,
+    workspaceSwitchMode: SETTINGS_DEFAULTS.workspaceSwitchMode,
     docsTemplate: SETTINGS_DEFAULTS.docsTemplate,
     transparent: SETTINGS_DEFAULTS.transparent,
     docsListCollapsed: SETTINGS_DEFAULTS.docsListCollapsed,
@@ -2112,6 +2118,9 @@ function readSettings(storage) {
     if (LAYOUT_MODES.indexOf(s.mode) >= 0) out.mode = s.mode;
     if (typeof s.chatWidth === "number") out.chatWidth = Math.round(layoutClamp(s.chatWidth, LAYOUT_MIN_CHAT, 900));
     if (typeof s.docsFolder === "string") out.docsFolder = s.docsFolder;
+    if (["recent", "files", "blank"].includes(s.workspaceOpenMode)) out.workspaceOpenMode=s.workspaceOpenMode;
+    if (["files", "blank"].includes(s.workspaceEmptyMode)) out.workspaceEmptyMode=s.workspaceEmptyMode;
+    if (["follow", "keep"].includes(s.workspaceSwitchMode)) out.workspaceSwitchMode=s.workspaceSwitchMode;
     if (typeof s.docsTemplate === "string") out.docsTemplate = s.docsTemplate;
     if (typeof s.transparent === "boolean") out.transparent = s.transparent;
     if (typeof s.keepResizeHandlesAfterClose === "boolean") out.keepResizeHandlesAfterClose = s.keepResizeHandlesAfterClose;
@@ -2135,6 +2144,9 @@ function writeSettings(storage, patch) {
   next.chatWidth = Math.round(layoutClamp(next.chatWidth, LAYOUT_MIN_CHAT, 900));
   if (LAYOUT_MODES.indexOf(next.mode) < 0) next.mode = "center";
   next.enabled = next.enabled === true;
+  if (!["recent", "files", "blank"].includes(next.workspaceOpenMode)) next.workspaceOpenMode="recent";
+  if (!["files", "blank"].includes(next.workspaceEmptyMode)) next.workspaceEmptyMode="files";
+  if (!["follow", "keep"].includes(next.workspaceSwitchMode)) next.workspaceSwitchMode="follow";
   if (typeof next.docsFolder !== "string") next.docsFolder = "";
   if (typeof next.docsTemplate !== "string") next.docsTemplate = SETTINGS_DEFAULTS.docsTemplate;
   next.transparent = next.transparent !== false;
@@ -2520,6 +2532,13 @@ function createLayoutEngine(options) {
     if (!root) { state.reason = "no-root"; hideStage(); if (state.active) restore(); return false; }
     var body = findConversationBody(root);
     if (!body) { state.reason = "no-body"; hideStage(); if (state.active) restore(); return false; }
+    // A Files tab can already be expanded before the first Markdown opens.
+    // Bootstrap its sizing lease before measuring the conversation column;
+    // subsequent frames reuse the pin and never repaint handles here.
+    if(handleFloorInstalled) {
+      var initialFrame=handleFrame(handleState.frame);
+      if(initialFrame && !isPinned(initialFrame)) { paintHandles(); watchPinned(); }
+    }
     var rect = readRect(root);
     if (!rect || rect.width <= 0) { state.reason = "bad-rect"; hideStage(); if (state.active) restore(); return false; }
 
@@ -3811,6 +3830,7 @@ const __test = {
         seq: ++overlayDocSeq,
       });
       recomputeOverlayDoc();
+      if(next.explicit === true && next.tab.visible !== false && docsModeOn)void activateNativeOverlay(next);
     }
 
     /** 只回收这一条；绝不因为一个 tab 卸载就清空全部。 */
@@ -3873,12 +3893,161 @@ const __test = {
     var hostSidebarRight = null;   // sidebarRight 服务（get 优先 / inject 等待，与 tab 类型注册同套）
     var docsModeOn = false;        // 文档工作台是否打开（列表+编辑器都在浮层里，主区域留给对话）
 
+    var workbenchDoc = null, workspaceIntent = 0, workspaceNotice = "";
+    var editorLeaveGuards = new Map();
+    var workspaceService = null;
+    const WORKSPACE_DRAFT_KEY = "dsh.markpilot.workspace-drafts.v1";
+    function workspaceKey(path) {
+      var p=String(path||"").replace(/\\/g,"/");
+      var windows=/^[a-z]:\//i.test(p) || p.startsWith("//");
+      var root=p.startsWith("//") ? "//" : p.startsWith("/") ? "/" : /^[a-z]:\//i.test(p) ? p.slice(0,3) : "";
+      var parts=[], floor=root==="//" ? 2 : 0;
+      for(var part of p.slice(root.length).split("/")) {
+        if(!part || part===".")continue;
+        if(part==="..") { if(parts.length>floor && parts[parts.length-1]!=="..")parts.pop();else if(!root)parts.push(part); }
+        else parts.push(part);
+      }
+      var key=root+parts.join("/");
+      return windows ? key.toLowerCase() : key;
+    }
+    function workspaceContext() {
+      try {
+        var service=workspaceService || docsCtx?.get?.("uiWorkspace");
+        var id=service?.selection?.getSnapshot?.()?.sessionId || "";
+        var cwd=id ? currentCwd(id) : "";
+        return { sessionId:id, cwd:cwd||"", key:workspaceKey(cwd) };
+      } catch(e) { return {sessionId:"",cwd:"",key:""}; }
+    }
+    function workspaceMessage(message) { workspaceNotice=message; bumpOverlay(); }
+    function pendingWorkspaceDraft(context, value) {
+      try {
+        var all=JSON.parse(window.localStorage.getItem(WORKSPACE_DRAFT_KEY)||"{}");
+        if(!all || typeof all!=="object" || Array.isArray(all))throw new Error("空白草稿索引无法读取，原记录已保留。");
+        if (value === undefined) return all[context.key] || null;
+        if(value && !all[context.key] && Object.keys(all).length>=128)throw new Error("待保存草稿较多，请先保存已有草稿。");
+        if (value === null) delete all[context.key]; else all[context.key]=value;
+        window.localStorage.setItem(WORKSPACE_DRAFT_KEY,JSON.stringify(all));
+        return true;
+      } catch(e) { if(value===undefined)throw e; return false; }
+    }
+    async function prepareWorkspaceLeave() {
+      var leases=[];
+      for (var guard of editorLeaveGuards.values()) {
+        var lease=await guard();
+        if (!lease) { workspaceMessage("当前文档尚未安全留存，请完成输入或保存后再切换。"); return null; }
+        leases.push(lease);
+      }
+      return () => leases.every(check=>check());
+    }
+    function enableWorkbench() {
+      if (readSettings(window.localStorage).enabled!==true) {
+        writeSettings(window.localStorage,{enabled:true}); mountLayout(docsCtx);
+      }
+    }
+    async function chooseWorkbenchDoc(entry) {
+      var intent=++workspaceIntent;
+      var check=await prepareWorkspaceLeave();
+      if (!check || intent!==workspaceIntent || !check()) return false;
+      workbenchDoc=entry; workspaceNotice=""; docsModeOn=true; clearClosedOverlayKeys();
+      enableWorkbench(); bumpOverlay(); return true;
+    }
+    async function activateNativeOverlay(next) {
+      const context=workspaceContext(), key=docKeyOf(next.tab);
+      if(next.sessionId!==context.sessionId || next.tab.signal?.aborted)return;
+      const intent=++workspaceIntent, check=await prepareWorkspaceLeave();
+      if(!check || !check() || intent!==workspaceIntent || workspaceContext().sessionId!==context.sessionId
+        || next.tab.signal?.aborted || docKeyOf(overlayDoc?.tab)!==key
+        || !overlayDocs.get(key)?.visible || overlayDocs.get(key)?.tab.navigation?.revision!==next.tab.navigation?.revision)return;
+      docsModeOn=false;workspaceNotice="";enableWorkbench();bumpOverlay();
+    }
+    async function closeWorkspaceEditor() {
+      var intent=++workspaceIntent, check=await prepareWorkspaceLeave();
+      if (!check || intent!==workspaceIntent || !check()) return;
+      closeDocsWorkbench();
+    }
+    async function openWorkspace(context) {
+      var intent=++workspaceIntent, cfg=readSettings(window.localStorage);
+      const current=()=>intent===workspaceIntent && workspaceContext().sessionId===context.sessionId && workspaceContext().key===context.key;
+      if (!context.sessionId || !context.key) { workspaceMessage("请先选择有工作目录的会话。"); return; }
+      try {
+        var mode=cfg.workspaceOpenMode, entry=null;
+        if (mode==="recent") {
+          var pending=pendingWorkspaceDraft(context);
+          if (pending && pending.draft?.id && workspaceKey(pending.draft.cwd)===context.key) entry=pending;
+          else {
+            var result=await api("docs/recent",{op:"list",workspace:context.cwd});
+            if (!current()) return;
+            if (!result.ok) throw new Error(result.error?.message || "无法读取最近文档");
+            var paths=result.value?.items || [];
+            if (paths.length) entry={path:paths[0],address:absoluteFileAddress(paths[0]),workspace:context.cwd,sessionId:context.sessionId};
+            else mode=cfg.workspaceEmptyMode;
+          }
+        }
+        if (mode==="blank") {
+          entry=pendingWorkspaceDraft(context);
+          if (!entry) {
+            var id=window.crypto.randomUUID(), path=context.cwd.replace(/[\\/]+$/,"")+"/未命名-"+id+".md";
+            entry={path:path,address:absoluteFileAddress(path),workspace:context.cwd,sessionId:context.sessionId,draft:{id:id,cwd:context.cwd}};
+          }
+        }
+        var check=await prepareWorkspaceLeave();
+        if (!current() || !check || !check()) return;
+        if (mode==="files") {
+          var sr=hostSidebarRight || docsCtx?.get?.("sidebarRight"), opened=false;
+          for (var n=0;n<8 && current();n++) {
+            try {
+              var target=sr?.commandTarget?.(null);
+              if (target?.sessionId===context.sessionId && typeof sr.openTabFromTarget==="function") { sr.openTabFromTarget("files",target); opened=true; }
+              else if (!sr?.commandTarget && sr?.openTab) { sr.openTab("files"); opened=true; }
+              if (opened) break;
+            } catch(e) { if(n===7) throw e; }
+            await new Promise(resolve=>setTimeout(resolve,50));
+          }
+          if (!opened) throw new Error("文件目录暂未就绪，请再次点击 Markdown。");
+          if (current() && check()) closeDocsWorkbench();
+          return;
+        }
+        if (!entry) return;
+        if (entry.draft && !pendingWorkspaceDraft(context,entry)) throw new Error("无法保留空白草稿，请检查本机存储空间。");
+        workbenchDoc=entry; workspaceNotice=""; docsModeOn=true; clearClosedOverlayKeys();
+        enableWorkbench(); bumpOverlay();
+      } catch(e) { if(current()) workspaceMessage(String(e?.message||e)); }
+    }
+    function installWorkspaceNavigation(ctx) {
+      var stops=[], disposed=false, queued=false, previous=null;
+      function observe() {
+        if(disposed || queued)return; queued=true;
+        Promise.resolve().then(()=>{
+          queued=false;if(disposed)return;
+          var now=workspaceContext();
+          if(!now.sessionId || !now.key)return;
+          if(!previous){previous=now;return;}
+          if(now.sessionId===previous.sessionId){previous=now;return;}
+          var changed=now.key!==previous.key; previous=now;
+          ++workspaceIntent; bumpOverlay();
+          if(changed && readSettings(window.localStorage).workspaceSwitchMode!=="keep")void openWorkspace(now);
+        });
+      }
+      const bind=(c)=>{
+        if(disposed)return;
+        workspaceService=c.uiWorkspace;
+        for(var stop of stops)stop();stops=[];
+        for(var store of [c.uiWorkspace?.selection,c.sessions?.list])if(store?.subscribe)stops.push(store.subscribe(observe));
+        observe();
+        return ()=>{for(var stop of stops)stop();stops=[];};
+      };
+      if(ctx?.inject)ctx.inject(["uiWorkspace","sessions"],bind);
+      else bind({uiWorkspace:ctx?.get?.("uiWorkspace"),sessions:ctx?.get?.("sessions")});
+      return ()=>{disposed=true;++workspaceIntent;for(var stop of stops)stop();};
+    }
+
     /** 让浮层舞台重画（docsMode 变化时用；沿用文档订阅通道）。 */
     function bumpOverlay() {
       for (var fn of Array.from(overlayDocListeners)) { try { fn(); } catch (e) { /* 忽略 */ } }
     }
 
     function closeDocsWorkbench() {
+      ++workspaceIntent; workspaceNotice="";
       docsModeOn = false;
       clearOverlayDoc();
       bumpOverlay();
@@ -3886,12 +4055,12 @@ const __test = {
     }
 
     /** 最近列表来自宿主（与 EXE 共用 recents.json）；返回 {path, address} 数组。 */
-    function readRecentDocs(cb) {
+    function readRecentDocs(cb, workspace) {
       var done = typeof cb === "function" ? cb : function () {};
       fetch(API_BASE + "docs/recent", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ op: "list" }),
+        body: JSON.stringify({ op: "list", workspace:workspace || undefined }),
       }).then(function (r) { return r.json(); })
         .then(function (res) {
           var items = (res && res.ok && res.value && Array.isArray(res.value.items)) ? res.value.items : [];
@@ -3901,13 +4070,13 @@ const __test = {
     }
 
     /** 记一条最近：交给宿主置顶并落盘（失败静默，不影响编辑）。 */
-    function recordRecentDoc(parsed, sessionId) {
+    function recordRecentDoc(parsed, sessionId, workspace) {
       try {
         if (!parsed || !parsed.path) return;
         fetch(API_BASE + "docs/recent", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ op: "push", path: parsed.path, sessionId: sessionId || "", scope: parsed.scope }),
+          body: JSON.stringify({ op: "push", path: parsed.path, sessionId: sessionId || "", scope: parsed.scope, workspace:workspace || undefined }),
         }).catch(function () { /* 记最近失败不影响编辑 */ });
       } catch (e) { /* 忽略 */ }
     }
@@ -3916,7 +4085,7 @@ const __test = {
     function absoluteFileAddress(nativePath) {
       var p = String(nativePath || "").replace(/\\/g, "/");
       if (!p) return "";
-      return FILE_ADDRESS_PREFIX + "absolute/" + p.replace(/^\/+/, "").split("/").map(encodeURIComponent).join("/");
+      return FILE_ADDRESS_PREFIX + "absolute/" + (p.startsWith("//") ? "/" : "") + p.replace(/^\/+/, "").split("/").map(encodeURIComponent).join("/");
     }
 
     /** 用宿主服务打开一份资源；宿主没给 sidebarRight 时返回 false（页面据此提示）。 */
@@ -3993,7 +4162,8 @@ const __test = {
     function DocsWorkbench(props) {
       var h = React.createElement;
       var settings = readSettings(window.localStorage);
-      var folder = String(settings.docsFolder || "").trim();
+      var context = workspaceContext();
+      var folder = String(settings.docsFolder || context.cwd || "").trim();
 
       var collapsedUnit = React.useState(settings.docsListCollapsed === true);
       var collapsed = collapsedUnit[0], setCollapsed = collapsedUnit[1];
@@ -4072,23 +4242,23 @@ const __test = {
       };
       var recentsUnit = React.useState([]);
       var recents = recentsUnit[0], setRecents = recentsUnit[1];
-      var activeUnit = React.useState(null);
-      var active = activeUnit[0], setActive = activeUnit[1];
+      var active = workbenchDoc;
+      var setActive = function(entry) { void chooseWorkbenchDoc(Object.assign({workspace:context.cwd,sessionId:context.sessionId},entry)); };
       var nameUnit = React.useState("");
       var name = nameUnit[0], setName = nameUnit[1];
       var busyUnit = React.useState(false);
       var busy = busyUnit[0], setBusy = busyUnit[1];
       var noticeUnit = React.useState("");
-      var notice = noticeUnit[0], setNotice = noticeUnit[1];
+      var notice = workspaceNotice || noticeUnit[0], setNotice = noticeUnit[1];
 
+      var listEpoch = React.useRef(0);
       var loadRecents = React.useCallback(function () {
+        var request=++listEpoch.current;
         readRecentDocs(function (items) {
-          setRecents(items);
-          // 首次进入自动选中第一条，省一次点击；已有选中就保持
-          setActive(function (cur) { return cur || (items.length ? items[0] : null); });
-        });
-      }, []);
-      React.useEffect(function () { loadRecents(); }, []);
+          if(request===listEpoch.current && workspaceContext().key===context.key)setRecents(items);
+        }, context.cwd);
+      }, [context.key]);
+      React.useEffect(function () { setRecents([]);setBusy(false);setNotice("");loadRecents();return ()=>{++listEpoch.current;}; }, [context.key]);
 
       var toggleCollapsed = function () {
         var next = !collapsed;
@@ -4099,9 +4269,12 @@ const __test = {
       var doCreate = function () {
         if (!folder) { setNotice("请先在「设置 → Markdown 编辑器」里填写目标文档文件夹。"); return; }
         if (!String(name).trim()) { setNotice("请先输入文件名。"); return; }
+        var intent=workspaceIntent, origin=context.key;
+        var current=()=>intent===workspaceIntent && workspaceContext().key===origin;
         setBusy(true); setNotice("");
         createDocViaHost(folder, String(name).trim(), String(settings.docsTemplate || ""))
           .then(function (res) {
+            if(!current())return;
             setBusy(false);
             try { window.__MP_DOCS_LOG = { create: res }; } catch (e) { /* 忽略 */ }
             if (!res || res.ok !== true) {
@@ -4116,6 +4289,7 @@ const __test = {
             loadRecents();
           })
           .catch(function (e) {
+            if(!current())return;
             setBusy(false);
             setNotice("新建失败：" + String((e && e.message) || e));
           });
@@ -4139,6 +4313,7 @@ const __test = {
       };
 
       return h("div", { "data-mp-workbench": "", style: { display: "flex", height: "100%", minHeight: 0, color: "inherit" } },
+        workspaceNotice ? h(WorkspaceNotice) : null,
 
         // ── 左：文件列表（可折叠、右沿可拖宽） ──
         h("div", {
@@ -4175,7 +4350,7 @@ const __test = {
           collapsed ? null : h("div", { style: { fontSize: 12.5, fontWeight: 600, flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "Markdown"),
           h("button", {
             key: "workbench-close", type: "button", title: "关闭文档工作台", "aria-label": "关闭文档工作台", "data-mp-rail-action": "close",
-            onClick: function () { try { if (typeof props !== "undefined" && props.close) props.close(); else closeDocsWorkbench(); } catch (e) { /* 忽略 */ } },
+            onClick: function () { try { if (typeof props !== "undefined" && props.close) props.close(); else void closeWorkspaceEditor(); } catch (e) { /* 忽略 */ } },
             style: railBtn,
           }, h("svg", { width: 17, height: 17, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", "aria-hidden": "true", focusable: "false" }, h("path", { d: "M7 7l10 10M17 7 7 17" })))),
 
@@ -4222,8 +4397,8 @@ const __test = {
         h("div", { style: { flex: "1 1 auto", minWidth: 0, minHeight: 0, display: "flex" } },
           active
             ? h(EditorTabBodyInner, {
-                useTabInfo: function () { return { tab: { contentId: active.address, id: "dsh-markdown-typora-docs" } }; },
-                sessionId: "", workbenchCollapsed: collapsed,
+                useTabInfo: function () { return { tab: { contentId: active.address, id: "dsh-markdown-typora-docs", draft:active.draft, workspace:active.workspace } }; },
+                sessionId: active.sessionId || context.sessionId, workbenchCollapsed: collapsed,
               })
             : h("div", { style: { margin: "auto", textAlign: "center", fontSize: 12.5, ...sub, opacity: 0.8 } },
                 folder ? "从左侧选一份文档，或新建一份。" : "先在「设置 → Markdown 编辑器」里填写目标文档文件夹。")),
@@ -4297,6 +4472,12 @@ const __test = {
         h("div", { style: { fontSize: 16, fontWeight: 600, marginBottom: 4 } }, "Markdown 编辑器"),
         h("div", { style: { color: "var(--dsw-alias-label-secondary, #9aa4b2)", marginBottom: 18 } }, "管理文档与编辑布局。修改后自动保存。"),
 
+        h("div", { style: group }, "打开与切换"),
+        ...[
+          ["workspaceOpenMode","点击 Markdown 时","按当前会话的工作目录打开。",[["recent","最近打开的 Markdown"],["files","工作目录文件列表"],["blank","新空白 Markdown"]]],
+          ["workspaceEmptyMode","没有最近文档时","独立于上方选项，仅在没有可用历史文档时生效。",[["files","工作目录文件列表"],["blank","新空白 Markdown"]]],
+          ["workspaceSwitchMode","切换到其他工作目录","同一工作目录内切换会话始终保留当前文档。",[["follow","按打开规则切换"],["keep","保持当前文档"]]]
+        ].map(([key,label,hint,choices])=>h(SettingsField,{key,label,hint},h("select",{value:settings[key],style:SettingsInputStyle({}),onChange:e=>save({[key]:e.target.value})},...choices.map(([value,label])=>h("option",{key:value,value},label))))),
         h("div", { style: group }, "文档"),
         h(SettingsField, {
           label: "目标文档文件夹",
@@ -4403,16 +4584,25 @@ const __test = {
       var tab = props.useTabInfo().tab;
       var key = docKeyOf(tab);
       var visible = !(tab && tab.visible === false);
+      var navigation = tab?.navigation?.revision;
+      var previousNavigation = React.useRef({key,signal:tab?.signal,revision:navigation});
       var rerender = React.useState(0)[1];
       React.useEffect(function () {
         var off = subscribeOverlayDoc(function () { rerender(function (n) { return n + 1; }); });
         return off;
       }, []);
       React.useEffect(function () {
-        publishOverlayDoc({ tab: tab, sessionId: props.sessionId, inputActions: props.inputActions });
+        var previous=previousNavigation.current;
+        var explicit=previous.key===key && previous.signal===tab?.signal && navigation>previous.revision;
+        previousNavigation.current={key,signal:tab?.signal,revision:navigation};
+        publishOverlayDoc({ tab: tab, sessionId: props.sessionId, inputActions: props.inputActions, explicit:explicit });
         return function () { unpublishOverlayDoc(tab); };
-      }, [key, visible]);
-      var shown = !!(overlayDoc && docKeyOf(overlayDoc.tab) === key);
+      }, [key, visible, navigation]);
+      var shown = !docsModeOn && !!(overlayDoc && docKeyOf(overlayDoc.tab) === key);
+      if(docsModeOn && workbenchDoc?.path) {
+        var nativeFile=parseFileAddress(tab?.contentId);
+        if(nativeFile)shown=workspaceKey(absolutePath(nativeFile.path,currentCwd(nativeFile.sessionId || props.sessionId)))===workspaceKey(workbenchDoc.path);
+      }
       return React.createElement(EditorTabPlaceholder, {
         tab: tab, shown: shown, sessionId: props.sessionId, inputActions: props.inputActions,
       });
@@ -4438,8 +4628,8 @@ const __test = {
             mountLayout(docsCtx);
           }
         } catch (e0) { /* 忽略 */ }
-        if (docsModeOn) closeDocsWorkbench();
-        else { clearClosedOverlayKeys(); docsModeOn = true; bumpOverlay(); }
+        if (docsModeOn || overlayDoc) void closeWorkspaceEditor();
+        else void openWorkspace(workspaceContext());
         try {
           var lay = docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("layout") : null;
           if (lay && typeof lay.selectPanel === "function") lay.selectPanel(null);
@@ -4456,6 +4646,11 @@ const __test = {
       return null;
     }
 
+    function WorkspaceNotice() {
+      if(!workspaceNotice)return null;
+      return React.createElement("div", {role:"alert",style:{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",zIndex:1000,maxWidth:"min(560px,80vw)",display:"flex",gap:16,alignItems:"center",padding:"12px 16px",borderRadius:10,border:"1px solid var(--dsw-alias-border-l2,#555)",background:"var(--dsw-alias-bg-elevated,#25282e)",color:"var(--dsw-alias-label-primary,#eee)",boxShadow:"0 6px 24px #0003",font:"13px/1.5 system-ui",pointerEvents:"auto"}},workspaceNotice,
+        React.createElement("button",{type:"button","aria-label":"关闭提示",onClick:()=>{workspaceNotice="";bumpOverlay();},style:{border:0,background:"transparent",color:"inherit",cursor:"pointer",fontSize:18,padding:4}},"×"));
+    }
     function EditorOverlayStage(props) {
       var h = React.createElement;
       var docRef = React.useRef(null);
@@ -4501,10 +4696,10 @@ const __test = {
           onPointerUp: onHandleUp,
           onPointerCancel: onHandleUp,
         }, h(DocsWorkbench, {
-          close: closeDocsWorkbench,
+          close: closeWorkspaceEditor,
         }));
       }
-      if (!d || !d.tab) return null;
+      if (!d || !d.tab) return workspaceNotice ? h(WorkspaceNotice) : null;
       var closeBtn = h("button", {
         type: "button",
         title: "关闭编辑区",
@@ -4547,6 +4742,47 @@ const __test = {
       }));
     }
 
+    // Save acknowledgement is independent of phase/detail, which also carry errors,
+    // recovery and notices. A controller belongs to one document generation.
+    function createSaveStatusController(isCurrent, publish) {
+      let dirty = false, status = "", timer = null, epoch = 0, disposed = false;
+      function cancelTimer() {
+        epoch += 1;
+        if (timer !== null) clearTimeout(timer);
+        timer = null;
+      }
+      function emit(next) {
+        if (next === status) return;
+        status = next;
+        if (!disposed && isCurrent()) publish(next);
+      }
+      return {
+        update(nextDirty, confirmedSaved) {
+          if (disposed || !isCurrent()) return;
+          const wasDirty = dirty;
+          dirty = nextDirty === true;
+          if (dirty) {
+            cancelTimer();
+            emit("unsaved");
+          } else if (confirmedSaved === true) {
+            cancelTimer();
+            emit("saved");
+            const ticket = epoch;
+            timer = setTimeout(() => {
+              if (disposed || !isCurrent() || dirty || ticket !== epoch) return;
+              timer = null;
+              emit("");
+            }, 3000);
+          } else if (wasDirty) {
+            // Reload/discard can become clean without saving: do not claim a save.
+            cancelTimer();
+            emit("");
+          }
+        },
+        dispose() { disposed = true; cancelTimer(); },
+      };
+    }
+
     function EditorTabBodyInner(props) {
       const h = React.createElement;
       const tab = props.useTabInfo().tab;
@@ -4557,10 +4793,7 @@ const __test = {
       const sessionIdFromProps = typeof props.sessionId === "string" ? props.sessionId : "";
 
       // 最近文档登记：交给宿主置顶（与 EXE 共用 MRU），布局开关关着也记。
-      React.useEffect(() => {
-        if (!parsed) return;
-        recordRecentDoc(parsed, parsed.sessionId || sessionIdFromProps || "");
-      }, [depKey]);
+      // Successful application below records the workspace history.
 
       const frameRef = React.useRef(null);
       const rootRef = React.useRef(null);
@@ -4575,7 +4808,7 @@ const __test = {
         if (win) { try { win.postMessage({ __dshmd: true, dir: "down", type: "appearance", content: editorAppearance() }, "*"); } catch (e) { /* load/ready retries */ } }
       }, [props.workbenchCollapsed]);
 
-      const [ui, setUi] = React.useState({ phase: "loading", detail: "", notice: "", recovery: null, recovered: null });
+      const [ui, setUi] = React.useState({ phase: "loading", detail: "", notice: "", recovery: null, recovered: null, saveStatus: "" });
       const setUiIfChanged = React.useCallback((next) => {
         setUi((prev) => {
           if (prev.phase === next.phase && prev.detail === next.detail && prev.notice === next.notice) return prev;
@@ -4605,6 +4838,8 @@ const __test = {
           editorReady: false,
           booting: false,
           lastVersion: null,
+          untitled: !!tab.draft, draft:tab.draft || null, firstSaveText:typeof tab.draft?.firstSaveText==="string" ? tab.draft.firstSaveText : null,
+          workspace:tab.workspace || currentCwd(sessionIdFromProps) || workspaceContext().cwd,
           dirty: false,
           conflict: false,
           saving: false,
@@ -4638,11 +4873,15 @@ const __test = {
         };
         st.doc = doc;
         setUiIfChanged({ phase: "loading", detail: "", notice: "", recovery: null });
-        setUi((prev) => (prev.recovered ? { ...prev, recovered: null } : prev));   // 新文档代际不继承 recovered 横幅
+        setUi((prev) => (prev.recovered || prev.saveStatus ? { ...prev, recovered: null, saveStatus: "" } : prev));   // 新文档代际不继承恢复提示或保存回执
 
         const ticket = ticketOf(doc.sessionId, doc.absPath, doc.gen);
         const alive = () => !doc.dead && st.doc === doc && ticket.generation === doc.gen;
         const cleanups = [];
+        const saveStatus = createSaveStatusController(alive, (status) => {
+          setUi((prev) => prev.saveStatus === status ? prev : { ...prev, saveStatus: status });
+        });
+        cleanups.push(() => saveStatus.dispose());
 
         function refreshPath() {
           // A session cwd change never retargets an already owned document.
@@ -4660,6 +4899,17 @@ const __test = {
           });
         }
         refreshPath();
+        editorLeaveGuards.set(doc.token, async () => {
+          if (!alive()) return ()=>true;
+          if (doc.saving || doc.composing || doc.pendingApply || doc.applyUnknown) return null;
+          if (!doc.dirty) return ()=>alive() && !doc.dirty && !doc.saving && !doc.composing && !doc.pendingApply && !doc.applyUnknown;
+          const seq=doc.editSeq, pulled=await pullText();
+          if (pulled.stale || !alive() || doc.editSeq!==seq || doc.composing) return null;
+          const receipt=await checkpointRecovery(pulled.text,pulled.session,true);
+          if (receipt?.ok!==true || receipt.durable!==true) return null;
+          return ()=>alive() && doc.editSeq===seq && !doc.saving && !doc.composing && !doc.pendingApply && !doc.applyUnknown;
+        });
+        cleanups.push(()=>editorLeaveGuards.delete(doc.token));
 
         function currentFrameWin() {
           // 只在"还是当前代且未死"时回落到 ref：清理阶段 frameRef 可能已指向新文档的 iframe，
@@ -4810,7 +5060,8 @@ const __test = {
           // 共享房间的未存草稿不是磁盘状态：open 带回的正文若与磁盘种子不同（value.live.dirty），
           // 必须如实标记脏 —— baseVersion/lastVersion 仍指向磁盘版本，绝不能把共享正文
           // 当成"已在盘上"的基线；后续落盘只能走 live 票（房间校验）路径。
-          doc.dirty=restore||(pending.firstOpen&&value.live&&value.live.dirty===true);
+          doc.dirty=restore||doc.untitled||(pending.firstOpen&&value.live&&value.live.dirty===true);
+          if(pending.firstOpen && !doc.untitled) recordRecentDoc({path:doc.absPath,scope:"absolute"},doc.sessionId,doc.workspace);
           doc.conflict=false;doc.externalStale=false;doc.staleNotified=false;
           if(restore)doc.editSeq++;
           // live 会话：open(live:true) 回执带票且引擎 facade 可用时，把传输桥交给 iframe。
@@ -4867,7 +5118,7 @@ const __test = {
           if(delta?.protocol!==2 || delta.docToken!==doc.token || !doc.mirror)return false;
           if(delta.after?.epoch===doc.mirror.session.epoch && delta.after.sourceRevision<=doc.mirror.session.sourceRevision)return true;
           const applied=applyMirrorDelta(doc.mirror,delta);
-          if(!applied.ok){doc.mirror.continuous=false;doc.dirty=true;if(!doc.gapDeltas.some(x=>sameSession(x.after,delta.after)))doc.gapDeltas.push(delta);if(!doc.pulls.size)void requestSnapshot('gap');return false;}
+          if(!applied.ok){doc.mirror.continuous=false;doc.dirty=true;saveStatus.update(true);if(!doc.gapDeltas.some(x=>sameSession(x.after,delta.after)))doc.gapDeltas.push(delta);if(!doc.pulls.size)void requestSnapshot('gap');return false;}
           doc.mirror=applied.mirror;doc.textFresh=false;doc.dirty=true;doc.editSeq++;doc.composing=!!delta.composing;
           try{const result=inspectStoreResult(draftStore()?.append?.({...delta,path:doc.absPath,baseVersion:doc.lastVersion}));result?.durable?.then?.(inspectStoreResult).catch?.(error=>showNotice('恢复记录尚未持久化：'+String(error)));}catch(error){showNotice('恢复记录尚未持久化：'+String(error));}
           if(doc.dead){persistCurrentRecovery();return true;}
@@ -4913,7 +5164,7 @@ const __test = {
             if(!doc.mirror || reply.session.epoch!==doc.mirror.session.epoch || reply.session.sourceRevision<doc.mirror.session.sourceRevision)return;
             const advanced=reply.session.sourceRevision>doc.mirror.session.sourceRevision;
             doc.mirror=mirrorOf(reply.text,reply.session,doc.token);doc.text=reply.text;doc.textFresh=true;doc.composing=!!reply.composing;
-            if(advanced){doc.dirty=true;doc.editSeq++;}
+            if(advanced){doc.dirty=true;doc.editSeq++;saveStatus.update(true);}
             if(doc.dirty)checkpointRecovery(reply.text,reply.session,true);
             const queued=doc.gapDeltas;doc.gapDeltas=[];
             for(const delta of queued)acceptDelta(delta);
@@ -4926,6 +5177,7 @@ const __test = {
 
 
         function showPhase(phase, detail) {
+          saveStatus.update(doc.dirty);
           doc.phase = phase;
           doc.detail = detail || "";
           if (phase !== "ready" && phase !== "dirty") doc.notice = "";
@@ -4935,20 +5187,10 @@ const __test = {
           showPhase("error", message);
         }
         function showNotice(message) {
-          if (doc.dead) return; // 卸载/关闭后不再 setState（恢复槽超大等清理期提示）
-          doc.notice = message;
-          setUiIfChanged({ phase: doc.phase, detail: doc.detail || "", notice: message });
-          // 轻提示 4 秒自动消失，避免长时间占着一条横栏（用户要求：省高度空间）
-          try {
-            if (doc.noticeTimer) clearTimeout(doc.noticeTimer);
-            doc.noticeTimer = setTimeout(function () {
-              try {
-                if (doc.dead) return;
-                doc.notice = "";
-                setUiIfChanged({ phase: doc.phase, detail: doc.detail || "", notice: doc.notice || "" });
-              } catch (eT) { /* 忽略 */ }
-            }, 4000);
-          } catch (eT2) { /* 忽略 */ }
+          if (!alive()) return;
+          // Non-status feedback uses the existing bottom editor toast. It must
+          // never replace or extend the top save acknowledgement.
+          post("toast", message);
         }
 
         function writeRecovery(text, stale) {
@@ -4990,11 +5232,57 @@ const __test = {
           }, typeof delay === "number" ? Math.max(0, delay) : SAVE_DEBOUNCE_MS);
         }
 
+        async function saveUntitled() {
+          if(!alive() || !doc.opened || doc.saving || doc.composing || doc.pendingApply || doc.applyUnknown)return;
+          doc.saving=true;
+          try {
+            const seq=doc.editSeq, pulled=await pullText();
+            if(pulled.stale || !alive())return;
+            if(doc.firstSaveText===null) {
+              const frozen={...doc.draft,firstSaveText:pulled.text};
+              const entry={path:doc.absPath,address,workspace:doc.workspace,sessionId:doc.sessionId,draft:frozen};
+              if(!pendingWorkspaceDraft({key:workspaceKey(doc.workspace)},entry))throw new Error("首次保存记录无法持久化，尚未创建文件");
+              doc.draft=frozen;doc.firstSaveText=pulled.text;
+              if(workbenchDoc?.address===address)workbenchDoc.draft=frozen;
+            }
+            const result=await api("docs/create",{dir:doc.draft.cwd,draftId:doc.draft.id,exactText:doc.firstSaveText});
+            if(!alive())return;
+            if(!result.ok){showError("保存失败："+(result.error?.message||"未知错误"));return;}
+            if(!result.value?.version || (result.value.draftId && result.value.draftId!==doc.draft.id)) {
+              showError("保存回执不完整，草稿已保留，请重试");return;
+            }
+            // The host resolves junctions/symlinks. Its request-path receipt preserves
+            // the original ownership while the canonical path may differ.
+            if(workspaceKey(result.value.requestedPath || result.value.path)!==workspaceKey(doc.absPath)){showError("保存路径不匹配，草稿已保留");return;}
+            if(!pendingWorkspaceDraft({key:workspaceKey(doc.workspace)},null)) {
+              showError("文件已创建，但本机草稿状态尚未确认；内容已保留，请再次保存。");return;
+            }
+            doc.lastVersion=result.value.version;doc.untitled=false;
+            const clean=seq===doc.editSeq && pulled.text===doc.firstSaveText;
+            doc.dirty=!clean; doc.firstSaveText=null;
+            if(workbenchDoc?.address===address)delete workbenchDoc.draft;
+            recordRecentDoc({path:doc.absPath,scope:"absolute"},doc.sessionId,doc.workspace);
+            if(clean) {
+              try {inspectStoreResult(await draftStore()?.markSaved?.({path:doc.absPath,docToken:doc.token,session:pulled.session,baseVersion:doc.lastVersion}));}
+              catch(e) {if(alive())showNotice("恢复记录更新失败："+String(e));}
+            }
+            if(!alive())return;
+            saveStatus.update(doc.dirty,!doc.dirty);showPhase(doc.dirty?"dirty":"ready","");startSse();
+            if(doc.dirty)doc.saveQueued=true;
+          } catch(e) {if(alive())showError("保存未确认，草稿已保留，请重试："+String(e?.message||e));}
+          finally {
+            doc.saving=false;
+            if(alive() && !doc.untitled && (doc.saveQueued || doc.manualPending)) {
+              doc.saveQueued=false; scheduleSave(0);
+            }
+          }
+        }
         async function runSave(options) {
           const manual = !!(options && options.manual);
           if (doc.dead) return;
           // 有界预算耗尽后不再自动发保存请求（防持续竞争下无界后台唤醒）；
           // 显式保存（Ctrl+S）重置预算，输入改动只保留草稿等显式动作。
+          if (doc.untitled) { if(manual) await saveUntitled(); return; }
           if (doc.liveStaleBlocked && !manual) return;
           if (doc.pendingApply || doc.applyUnknown || doc.composing) { if (manual) { doc.manualPending = true; post("toast", "请先完成输入或等待编辑器同步"); } return; }
           const gate = saveGate({
@@ -5018,7 +5306,8 @@ const __test = {
             return;
           }
           if (gate.action !== "save") {
-            if (manual) post("toast", gate.reason === "clean" ? "没有需要保存的改动" : "文档尚未就绪，暂不能保存");
+            if (manual && gate.reason === "clean") saveStatus.update(false, true);
+            else if (manual) post("toast", "文档尚未就绪，暂不能保存");
             return;
           }
           const manualThisRun = manual || doc.manualPending;
@@ -5085,8 +5374,9 @@ const __test = {
                 doc.staleNotified = false;
                 doc.liveStaleRounds = 0;      // 保存成功 = 预算清零（下一轮竞争重新计数）
                 doc.liveStaleBlocked = false;
+                saveStatus.update(doc.dirty, !doc.dirty);
                 showPhase(doc.dirty ? "dirty" : "ready", doc.dirty ? "编辑中…（上一轮已保存，继续保存新改动）" : "已保存");
-                if (manualThisRun) post("toast", doc.dirty ? "已保存；还有新改动，继续保存中…" : "已保存");
+                if (manualThisRun && doc.dirty) post("toast", "已保存；还有新改动，继续保存中…");
                 // 保存飞行期间可能被外部改过：落盘后 stat 对账（live 会话交给房间刷新，干净非 live 才静默重载）。
                 try {
                   const stat = await api("stat", { path: doc.absPath });
@@ -5163,6 +5453,7 @@ const __test = {
          */
         function manualSave(content) {
           if (doc.dead) return;
+          if(doc.untitled){void runSave({manual:true});return;}
           doc.liveStaleBlocked = false;   // 显式保存 = 重置 STALE 退避预算（只此显式入口重置）
           doc.liveStaleRounds = 0;
           const gate = manualSaveGate({
@@ -5174,7 +5465,7 @@ const __test = {
             dead: doc.dead,
           });
           if (gate.action === "skip") return;
-          if (gate.action === "clean") { post("toast", "没有需要保存的改动"); return; }
+          if (gate.action === "clean") { saveStatus.update(false, true); return; }
           if (gate.action === "block") {
             if (gate.reason === "conflict") {
               showPhase("conflict", "文件已在别处被修改；版本守卫拒绝覆盖");
@@ -5207,7 +5498,11 @@ const __test = {
           try {
             // live:true 只在本机文件上会真正入房（宿主在 join 前核对原生文件与字节基线）；
             // 虚拟/会话投影文件拿不到 live 票，自动走原有单窗口守卫路径。
-            const result = await api("open", {path:pathAtStart, live:!doc.liveUnsupported});
+            let result;
+            if (doc.untitled) {
+              var recovery=await draftStore()?.readLatest?.(doc.absPath);
+              result={ok:true,value:{text:typeof recovery?.text==="string" ? recovery.text : (doc.firstSaveText || ""),version:null,displayPath:doc.absPath,size:0}};
+            } else result = await api("open", {path:pathAtStart, live:!doc.liveUnsupported});
             if (!ownsLoad()) return false;
             if (doc.opened && (doc.editSeq !== editSeqAtStart || doc.composing || (!opts.discard && (doc.dirty || doc.conflict)))) { doc.externalStale = true; return false; }
             if (result.ok !== true) { if (!opts.silent) showError("打开失败：" + (result.error?.message || result.error?.code || "error")); return false; }
@@ -5235,6 +5530,7 @@ const __test = {
 
         function onDirty(content) {
           doc.dirty = true;
+          saveStatus.update(true);
           doc.editSeq += 1;
           doc.textFresh = false;
           const len = content && typeof content === "object" && Number.isFinite(Number(content.len)) ? Number(content.len) : null;
@@ -5317,6 +5613,7 @@ const __test = {
         }
 
         function startSse() {
+          if(doc.untitled)return;
           if (typeof EventSource !== "function") { schedulePoll(POLL_FAST_MS); return; }
           try {
             const es = new EventSource(API_BASE + "watch?path=" + encodeURIComponent(doc.absPath));
@@ -5355,14 +5652,15 @@ const __test = {
           // 所以那条路走宿主的 sessions 服务直发（worktable 同款），而不是复制到剪贴板。
           const wantSend = !!(content && content.send === true);
           // 优先用官方 provide 通道的动作面（浮层、侧栏 tab 都能拿到），其次才是 tab props 那份。
-          const acts0 = inputFaceOf(doc.sessionId) || inputActionsRef.current;
+          const recipient = workspaceContext().sessionId || doc.sessionId;
+          const acts0 = inputFaceOf(recipient) || (recipient===doc.sessionId ? inputActionsRef.current : null);
           const canCompose = !!(acts0
             && typeof acts0.captureInsertion === "function"
             && typeof acts0.insertText === "function");
           if (!canCompose) {
             // 浮层编辑器没有 composer 句柄：先真的写进宿主输入框（用户看得见），
             // 要发送就再触发一次发送；写不进去才退到 sessions 直发。
-            const wrote = await writeIntoComposer(payload);
+            const wrote = false; // No asynchronous DOM fallback across session navigation.
             if (!alive()) return;
             if (wrote) {
               if (wantSend) {
@@ -5377,7 +5675,7 @@ const __test = {
               return;
             }
             if (wantSend) {
-              const direct = await sendViaHostSession(doc.sessionId, payload);
+              const direct = await sendViaHostSession(recipient, payload);
               if (!alive()) return;
               if (direct.ok) {
                 post("toast", "已发送给 AI");
@@ -5491,6 +5789,7 @@ const __test = {
                   && Number.isSafeInteger(status.savedVersion) && status.version === status.savedVersion) {
                   doc.dirty = false;
                   if (doc.saveTimer) { clearTimeout(doc.saveTimer); doc.saveTimer = null; }
+                  saveStatus.update(false, true);
                   if (doc.phase === "dirty") showPhase("ready", "已同步保存");
                 }
               }
@@ -5710,10 +6009,10 @@ const __test = {
       } else if (ui.phase === "loading") {
         banner = h("div", { style: bannerStyle(false) }, "正在加载文档…");
       } else {
-        // 轻提示走**悬浮层**（不占布局高度）；没有通知就不渲染 ——
-        // 之前那条固定高度的空横栏就是 tab 与编辑区之间多余的一条。
-        var bannerText = ui.notice || ui.detail || "";
-        banner = bannerText ? h("div", { style: toastStyle }, bannerText) : null;
+        // Only save state appears at the top. Actionable banners above keep
+        // priority; their actions and the independent recovered banner survive.
+        const saveText = ui.saveStatus === "unsaved" ? "未保存" : ui.saveStatus === "saved" ? "已保存" : "";
+        banner = saveText ? h("div", { style: toastStyle, "data-mp-save-status": ui.saveStatus, role: "status" }, saveText) : null;
       }
 
       /* recovered：join 票带回的草稿副本提示（独立于 phase；按票一次；只展示+复制路径，
@@ -6023,6 +6322,7 @@ const __test = {
 
       // ③ sessions 旁路（cwd 解析用；服务晚到也没关系，每次 open 现取）。
       try { SessionsBridge.getSessions = () => get("sessions"); } catch (e) { /* 忽略 */ }
+      ctx.effect(() => installWorkspaceNavigation(ctx), "dsh-markdown-typora: workspace navigation");
 
       // Rightbar preferences apply only to the editor-owned grid.
 

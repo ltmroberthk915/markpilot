@@ -11,6 +11,7 @@ const flatten = tree => {
 test('floating workbench actions reserve no full-height rail and retain independent hit targets', () => {
   const f = fixture.make();
   f.store.set('dsh.markpilot.settings.v1', '{"docsListCollapsed":true}');
+  f.a.privateSetWorkbenchDoc({address:'dsh-resource://file/absolute/D%3A/probe/a.md'});
   let nodes = flatten(f.a.DocsWorkbench({ close() {} }));
   const header = nodes.find(n => n.props['data-mp-workbench-controls'] === 'floating');
   const actions = nodes.filter(n => n.props['data-mp-rail-action']);

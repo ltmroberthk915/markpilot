@@ -17,7 +17,7 @@
 //      unhandled rejection + watcher 泄漏。这里 await 捕获并幂等 close。
 //   4. 每个 async 分支都有 try/catch，错误以 {ok:false,error:{code,message}} 返回，code 原样透传。
 
-import { readFile, stat as fsStat, realpath, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, stat as fsStat, realpath, writeFile, mkdir, open as fsOpen, link as fsLink, unlink as fsUnlink, rename as fsRename } from 'node:fs/promises';
 import { createReadStream, readFileSync, writeFileSync, appendFileSync, renameSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
@@ -33,7 +33,7 @@ import rawDiskStore from '../host/document-store.js';
 import rawLiveStore from '../host/live-documents.js';
 import rawTextCodec from '../host/text-codec.js';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, normalize, sep, extname, resolve as pathResolve } from 'node:path';
+import { dirname, join, normalize, sep, extname, resolve as pathResolve, isAbsolute, relative as pathRelative }  from 'node:path';
 
 const requirePlugin = createRequire(import.meta.url);
 const nodeFs = requirePlugin('node:fs');
@@ -171,7 +171,7 @@ function loadHostGraph() {
   if (slot.current && slot.current.digest === graph.digest && slot.current.abi === HOST_GRAPH_ABI) {
     const current = slot.current;
     return { live: current.modules.get('live-documents.js'), disk: current.modules.get('document-store.js'),
-      codec: current.modules.get('text-codec.js'), graph: current };
+      codec: current.modules.get('text-codec.js'), safeFile: current.modules.get('safe-file.js'), graph: current };
   }
   // 预载新图：逐出本图 .js 成员缓存键（含 native-worker-lease 等），拓扑序 require，形状验证。
   const restore = evictHostCacheKeys(graph.members);
@@ -1122,7 +1122,78 @@ export function createHost(options = {}) {
    *   → finally 里 abort() 清理，绝不留半截临时文件。
    * 不再裸 writeFile —— 那是这条加固链上唯一的漏洞。
    */
+
+  // First-save drafts use a fixed UUID name. A retry never chooses another file.
+  const draftReceipts = new Map();
+  async function createExactDraft(payload) {
+    const draftId = payload?.draftId;
+    if (typeof draftId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(draftId)
+      || typeof payload.exactText !== 'string') return badRequest('draftId UUID and exactText are required');
+    const rawDir = typeof payload.dir === 'string' ? payload.dir : '';
+    if (!rawDir || !isAbsolute(rawDir)) return badRequest('draft directory must be absolute');
+    const dir = await realpath(rawDir), directory = await fsStat(dir, {bigint:true});
+    if (!directory.isDirectory()) throw codedError('FS_NOT_DIRECTORY','draft directory is not a directory');
+    const fileName = '未命名-' + draftId.toLowerCase() + '.md';
+    const candidate = join(dir,fileName), key = pathKey(candidate);
+    if ((payload.name !== undefined && payload.name !== fileName)
+      || (payload.path !== undefined && (!isAbsolute(payload.path) || pathKey(payload.path) !== pathKey(join(rawDir,fileName)))))
+      return badRequest('draft path must match its fixed UUID name');
+    const bytes = Buffer.from(payload.exactText,'utf8'), sha = createHash('sha256').update(bytes).digest('hex');
+    const id = draftId.toLowerCase(), prior = draftReceipts.get(id);
+    if (prior && (prior.key !== key || prior.sha !== sha)) throw codedError('MP_DRAFT_REUSED','draft creation identity or first-save content changed');
+    if (!prior && draftReceipts.size >= 2048) throw codedError('MP_DRAFT_LIMIT','too many draft creation receipts; current draft is preserved');
+    const record = prior || {key,sha,version:null};
+    draftReceipts.set(id,record);
+    return queueSave(key,async()=>{
+      if (closed) throw codedError('MP_HOST_CLOSED','draft host has closed');
+      // Do not redirect a held draft through a replaced directory or symlink.
+      const currentDir=await realpath(rawDir), currentInfo=await fsStat(currentDir,{bigint:true});
+      if (pathKey(currentDir)!==pathKey(dir) || currentInfo.dev!==directory.dev || currentInfo.ino!==directory.ino)
+        throw codedError('FS_STALE_VERSION','draft directory changed before creation');
+      const receipt = async (reused) => {
+        const before=await fsStat(candidate,{bigint:true});
+        if(!before.isFile())throw codedError('FS_NOT_REGULAR_FILE','draft target is not a regular file');
+        const actual=await readFile(candidate), after=await fsStat(candidate,{bigint:true});
+        if(versionOfBigInt(before)!==versionOfBigInt(after) || actual.length!==bytes.length
+          || createHash('sha256').update(actual).digest('hex')!==sha)
+          throw codedError('FS_STALE_VERSION','draft target differs from the first-save text');
+        const target=await fs.resolve(candidate), info=await fs.stat(target);
+        if(!info || info.type!=='file' || pathKey(await canonicalTarget(target))!==key
+          || String(info.version)!==versionOfBigInt(after))
+          throw codedError('FS_STALE_VERSION','draft target changed while resolving its save receipt');
+        if(record.version!==null && record.version!==String(info.version))
+          throw codedError('FS_STALE_VERSION','draft target changed after its initial save');
+        record.version=String(info.version);
+        return {ok:true,value:{path:candidate,requestedPath:join(rawDir,fileName),displayPath:target.displayPath||candidate,version:info.version,size:bytes.length,safe:true,draftId:id,idempotent:reused}};
+      };
+      const exists=await fsStat(candidate).then(()=>true,error=>{if(error.code==='ENOENT')return false;throw error;});
+      if(exists)return receipt(true); // Exact-byte reconciliation also covers a lost reply / host restart.
+      if(record.version!==null)throw codedError('FS_STALE_VERSION','created draft was removed; refusing to recreate it');
+      const temp=join(dir,'.mp-tmp-'+process.pid+'-'+randomUUID());
+      let stage, handle, primaryFailure;
+      try {
+        if(process.platform==='win32') {
+          const safeFile=hostModules.safeFile;
+          if(typeof safeFile?.prepareFile!=='function')throw codedError('MP_SAFE_FILE_UNAVAILABLE','safe file creation unavailable');
+          stage=await safeFile.prepareFile(candidate,temp,{baseline:null,output:{bytes:bytes.length,sha256:sha}});
+          await writeFile(temp,bytes,{flag:'r+'});
+          await stage.commit();
+        } else {
+          // POSIX rename would overwrite a racing file; hard-link publication is no-replace.
+          handle=await fsOpen(temp,'wx',0o600);await handle.writeFile(bytes);await handle.sync();await handle.close();handle=null;
+          await fsLink(temp,candidate);
+        }
+      } catch(error) {primaryFailure=error;throw error;}
+      finally {
+        try {await handle?.close();await stage?.abort();if(process.platform!=='win32')await fsUnlink(temp).catch(error=>{if(error.code!=='ENOENT')throw error;});}
+        catch(error){if(primaryFailure)primaryFailure.cleanupError=String(error?.message||error);else throw error;}
+      }
+      const result=await receipt(false);broadcastChange({targetKey:candidate,displayPath:candidate},result.value.version);return result;
+    });
+  }
+
   async function apiDocsCreate(payload) {
+    if (payload && (Object.hasOwn(payload,'exactText') || Object.hasOwn(payload,'draftId'))) return createExactDraft(payload);
     const dir = typeof payload?.dir === 'string' ? payload.dir.trim() : '';
     const rawName = typeof payload?.name === 'string' ? payload.name.trim() : '';
     const template = typeof payload?.template === 'string' ? payload.template : '';
@@ -1225,7 +1296,59 @@ export function createHost(options = {}) {
     } catch { try { rmSync(tmp, { force: true }); } catch { /* 清不掉也不影响主流程 */ } return false; }
   }
 
+
+  const workspaceRecentJobs = (globalThis[Symbol.for('dsh-markdown-typora:workspace-recent-jobs')] ??= new Map());
+  const workspaceRecentFile=()=>join(process.env.APPDATA || process.env.XDG_STATE_HOME || join(process.env.HOME || tmpdir(),'.local','state'),'MarkPilot','workspace-recents.json');
+  const insideWorkspace=(cwd,file)=>{const rel=pathRelative(pathKey(cwd),pathKey(file));return rel==='' || (!rel.startsWith('..'+sep) && rel!=='..' && !isAbsolute(rel));};
+  async function workspaceRecent(payload) {
+    if(typeof payload.workspace!=='string' || !isAbsolute(payload.workspace))return badRequest('workspace must be an absolute directory');
+    const cwd=await realpath(payload.workspace), dirInfo=await fsStat(cwd);
+    if(!dirInfo.isDirectory())throw codedError('FS_NOT_DIRECTORY','workspace is not a directory');
+    const wk=pathKey(cwd), op=payload.op || 'list';
+    if(!['list','push','clear'].includes(op))return badRequest('unknown op');
+    const work=async()=>{
+      const file=workspaceRecentFile();let data={schema:1,workspaces:{}};
+      try {data=JSON.parse(await readFile(file,'utf8'));if(data?.schema!==1 || !data.workspaces || typeof data.workspaces!=='object' || Array.isArray(data.workspaces))throw codedError('MP_RECENTS_FORMAT','workspace history is malformed');}
+      catch(error){if(error.code!=='ENOENT')throw error;}
+      const saved=Object.hasOwn(data.workspaces,wk)?data.workspaces[wk]:null;
+      if(saved!==null && !Array.isArray(saved))throw codedError('MP_RECENTS_FORMAT','workspace history entry is malformed');
+      let migrated=[];
+      if(saved===null && recentsPath()) {
+        try {const legacy=JSON.parse(await readFile(recentsPath(),'utf8'));if(!Array.isArray(legacy))throw codedError('MP_RECENTS_FORMAT','legacy history is malformed');migrated=normalizeRecents(legacy).filter(p=>insideWorkspace(cwd,p));}
+        catch(error){if(error.code!=='ENOENT')throw error;}
+      }
+      let entries=saved || migrated;
+      const valid=[];
+      for(const p of normalizeRecents(entries,64)) {
+        if(!insideWorkspace(cwd,p) || !/\.(md|markdown)$/i.test(p))continue;
+        let canonical,info;
+        try{canonical=await realpath(p);info=await fsStat(canonical);}catch(error){if(error.code==='ENOENT'||error.code==='ENOTDIR')continue;throw error;}
+        if(info.isFile()&&insideWorkspace(cwd,canonical)&&!valid.some(x=>pathKey(x)===pathKey(canonical)))valid.push(canonical);
+      }
+      let next=valid;
+      if(op==='push') {
+        if(typeof payload.path!=='string' || !isAbsolute(payload.path))return badRequest('workspace recent path must be absolute');
+        const canonical=await realpath(payload.path), info=await fsStat(canonical);
+        if(!info.isFile() || !/\.(md|markdown)$/i.test(canonical))throw codedError('FS_NOT_REGULAR_FILE','workspace recent is not a Markdown file');
+        if(!insideWorkspace(cwd,canonical))return {ok:true,value:{items:valid,recorded:false}};
+        next=[canonical,...valid.filter(x=>pathKey(x)!==pathKey(canonical))].slice(0,64);
+      }else if(op==='clear')next=[];
+      if(op!=='list' || saved===null || JSON.stringify(saved)!==JSON.stringify(next)) {
+        // Most-recent workspace first; bounded metadata without touching document recovery.
+        data={schema:1,workspaces:Object.fromEntries([[wk,next],...Object.entries(data.workspaces).filter(([key])=>key!==wk)].slice(0,128))};
+        await mkdir(dirname(file),{recursive:true});const temp=file+'.tmp-'+randomUUID();
+        try{await writeFile(temp,JSON.stringify(data),'utf8');await fsRename(temp,file);}
+        finally{await fsUnlink(temp).catch(error=>{if(error.code!=='ENOENT')throw error;});}
+      }
+      return {ok:true,value:{items:next,workspace:cwd,recorded:op==='push'}};
+    };
+    const key=pathKey(workspaceRecentFile());
+    const job=(workspaceRecentJobs.get(key)||Promise.resolve()).catch(()=>{}).then(work);workspaceRecentJobs.set(key,job);
+    const done=()=>{if(workspaceRecentJobs.get(key)===job)workspaceRecentJobs.delete(key);};job.then(done,done);return job;
+  }
+
   async function apiDocsRecent(payload) {
+    if(payload && Object.hasOwn(payload,'workspace'))return workspaceRecent(payload);
     const op = typeof payload?.op === 'string' ? payload.op : 'list';
     if (op === 'list') {
       // 剔除已经不存在的条目并回写：过期 MRU 会让文档中心自动选中一份打不开的文件。

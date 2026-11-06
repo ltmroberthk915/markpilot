@@ -16,7 +16,7 @@ function fixture(source){
   const React={createElement:(type,props,...children)=>({type,props:props||{},children}),useState:v=>[v===null?{address:'dsh-resource://file/absolute/D%3A/probe/a.md'}:typeof v==='function'?v():v,()=>{}],useRef:v=>({current:v}),useCallback:f=>f,useEffect:()=>{}};
   const sandbox={window,document,console,MutationObserver:MO,requestAnimationFrame:f=>{rafs.set(++nextRaf,f);return nextRaf;},cancelAnimationFrame:id=>rafs.delete(id),setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){}};
   source=source.replace('exports.__test = __test;',`exports.__test = {...__test, fitRightbarContent, releaseRightbarFits, installHandleLifecycle, installHandleFloor, ensureGridStyle, ensureEdgeHandle, ensureChatHandle, handleState, pinGrid, applyPinnedModel, paintHandles, watchPinned, setNativeHandleLeft, restoreNativeHandleLeft, DocsWorkbench, closeDocsWorkbench,
-    privateSetDocs(v){docsModeOn=v;bumpOverlay();}, privateLeaseSize(){return nativeHandleLeft.size;},
+    privateSetDocs(v){docsModeOn=v;bumpOverlay();}, privateSetWorkbenchDoc(v){workbenchDoc=v;}, privateLeaseSize(){return nativeHandleLeft.size;},
     privateSetReapply(fn){layoutReapply=fn;}, privateInstalled(){return handleFloorInstalled;}};`);
   vm.runInNewContext(source,sandbox,{filename:'private-candidate'});
   const createModule=()=>captured.factory(name=>name==='react'?React:null);

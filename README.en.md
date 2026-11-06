@@ -890,3 +890,10 @@ Committed table-cell edits continue to autosave at the configured interval after
 - Switching between adjacent cells preserves table position, including zoomed views and keyboard cell navigation.
 - Math-heavy long documents spend less work rendering beyond the visible page, with faster entry into formula editing after scrolling.
 - Tall formulas, repeated formulas and selection across screens retain their source ownership and undo history.
+
+
+### MarkPilot for DSH 1.1 · Continue in the right workspace
+
+Open the most recently used Markdown note for the current working directory, the native Files panel, or a blank document. Choose an independent fallback for directories with no recent note. Follow conversations across working directories or keep the current document; conversations in the same directory always preserve it. A blank note first saves directly into its working directory. Unsaved feedback stays visible; the saved receipt fades after three seconds.
+
+[Download DSH plugin 1.1.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.0), or install `dsh-markdown-typora@1.1.0`. Find the options in Settings → Markdown 编辑器 → 打开与切换.

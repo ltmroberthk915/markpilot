@@ -119,3 +119,14 @@ MIT. The MarkPilot engine and its bundled Mermaid/KaTeX assets retain their upst
 Enjoy a wider writing canvas, compact vertical workbench controls, live transparency and theme updates, and stable table editing when moving between your document and AI chat. Closing the editor restores the native workspace layout; an optional setting keeps adjustable split handles available. Windows layout and file-worker optimizations improve responsiveness while preserving existing editor features.
 
 Install this release with `dsh plugin --profile desktop add dsh-markdown-typora@1.0.0`, or use `dsh-markdown-typora-1.0.0.tgz` from the matching GitHub release. The earlier version-specific examples above remain as historical installation examples.
+
+
+## MarkPilot 1.1 · Workspace memory
+
+Click Markdown to return to the last note opened in the current conversation’s working directory. In **Settings → Markdown 编辑器 → 打开与切换**, choose a recent note, the native Files panel, or a blank document; choose a separate fallback when no recent note exists. Recent notes follow the order you opened them, independent of file modification times.
+
+Switching to another working directory follows this opening choice by default. Select **保持当前文档** to keep your note across directories. Conversations in the same directory always preserve the current document. Unsaved notes stay in local recovery when switching safely.
+
+Blank documents create no file until their first Ctrl/Cmd+S. That save creates a uniquely named `未命名-….md` directly in the original working directory; subsequent edits autosave. Rename the file using your normal file tools after saving. The top save indicator shows only **未保存** while dirty and **已保存** for three seconds after a confirmed save.
+
+Install `dsh-markdown-typora@1.1.0` or the matching GitHub release archive, then restart DSH. Windows and DSH 0.2.2-rc.1 are the validated combination for these workspace features; the bundled editor core remains 3.6.17.
