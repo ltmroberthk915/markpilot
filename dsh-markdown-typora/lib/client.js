@@ -3930,6 +3930,41 @@ const __test = {
         return true;
       } catch(e) { if(value===undefined)throw e; return false; }
     }
+    const WORKSPACE_EDITOR_KEY = "dsh.markpilot.workspace-editor.v1";
+    /** 用户点 × 关掉编辑区后，按工作目录记住「别再自动弹回来」。 */
+    function workspaceEditorState() {
+      try {
+        var raw = window.localStorage.getItem(WORKSPACE_EDITOR_KEY);
+        var all = raw ? JSON.parse(raw) : {};
+        return all && typeof all === "object" && !Array.isArray(all) ? all : {};
+      } catch (e) { return {}; }
+    }
+    function workspaceAutoOpenSuppressed(key) {
+      if (!key) return false;
+      var entry = workspaceEditorState()[key];
+      return !!(entry && entry.closed === true);
+    }
+    function setWorkspaceAutoOpenSuppressed(key, suppressed) {
+      if (!key) return;
+      try {
+        var all = workspaceEditorState();
+        if (suppressed) {
+          if (all[key] && all[key].closed === true) return;
+          all[key] = { closed: true, at: Date.now() };
+          var keys = Object.keys(all);
+          if (keys.length > 200) {
+            keys.map(function (k) { return [k, Number((all[k] && all[k].at) || 0)]; })
+              .sort(function (a, b) { return a[1] - b[1]; })
+              .slice(0, keys.length - 200)
+              .forEach(function (pair) { delete all[pair[0]]; });
+          }
+        } else {
+          if (!all[key]) return;
+          delete all[key];
+        }
+        window.localStorage.setItem(WORKSPACE_EDITOR_KEY, JSON.stringify(all));
+      } catch (e) { /* 存储不可用时按未记忆处理 */ }
+    }
     async function prepareWorkspaceLeave() {
       var leases=[];
       for (var guard of editorLeaveGuards.values()) {
@@ -3949,6 +3984,7 @@ const __test = {
       var check=await prepareWorkspaceLeave();
       if (!check || intent!==workspaceIntent || !check()) return false;
       workbenchDoc=entry; workspaceNotice=""; docsModeOn=true; clearClosedOverlayKeys();
+      setWorkspaceAutoOpenSuppressed(workspaceKey(entry && entry.workspace), false);
       enableWorkbench(); bumpOverlay(); return true;
     }
     async function activateNativeOverlay(next) {
@@ -3977,6 +4013,14 @@ const __test = {
       const current=()=>intent===workspaceIntent && workspaceContext().sessionId===context.sessionId && workspaceContext().key===context.key;
       if (!context.sessionId || !context.key) { if(!auto) workspaceMessage("请先选择有工作目录的会话。"); return; }
       try {
+        // 跟随模式收掉上一个目录的文档（编辑区回到原生布局），避免跨目录误编辑。
+        const tuckAway=async()=>{
+          if(!docsModeOn) return;
+          var leave=await prepareWorkspaceLeave();
+          if(current() && leave && leave()) closeDocsWorkbench();
+        };
+        // 这个工作目录上次是被 × 关掉的：会话再被点开时不弹回来。
+        if (auto && workspaceAutoOpenSuppressed(context.key)) { await tuckAway(); return; }
         var mode=auto ? "recent" : cfg.workspaceOpenMode, entry=null;
         if (mode==="recent") {
           var pending=pendingWorkspaceDraft(context);
@@ -3988,10 +4032,8 @@ const __test = {
             var paths=result.value?.items || [];
             if (paths.length) entry={path:paths[0],address:absoluteFileAddress(paths[0]),workspace:context.cwd,sessionId:context.sessionId};
             else if (auto) {
-              // 该工作目录没有上次打开的文档：不弹文件列表、不建空白稿。
-              // 若上个目录的文档还开着，跟随模式下把它收起（编辑区回到原生布局），
-              // 免得工作台列表已是新目录、编辑区还停在别处的文件上。
-              if (docsModeOn) { var leave=await prepareWorkspaceLeave(); if (current() && leave && leave()) closeDocsWorkbench(); }
+              // 该工作目录没有上次打开的文档：不弹文件列表、不建空白稿，只把上个目录的文档收起。
+              await tuckAway();
               return;
             }
             else mode=cfg.workspaceEmptyMode;
@@ -4018,12 +4060,13 @@ const __test = {
             await new Promise(resolve=>setTimeout(resolve,50));
           }
           if (!opened) throw new Error("文件目录暂未就绪，请再次点击 Markdown。");
-          if (current() && check()) closeDocsWorkbench();
+          if (current() && check()) { closeDocsWorkbench(); setWorkspaceAutoOpenSuppressed(context.key,false); }
           return;
         }
         if (!entry) return;
         if (entry.draft && !pendingWorkspaceDraft(context,entry)) throw new Error("无法保留空白草稿，请检查本机存储空间。");
         workbenchDoc=entry; workspaceNotice=""; docsModeOn=true; clearClosedOverlayKeys();
+        setWorkspaceAutoOpenSuppressed(context.key,false);
         enableWorkbench(); bumpOverlay();
       } catch(e) {
         if(current()) {
@@ -4092,6 +4135,7 @@ const __test = {
     function recordRecentDoc(parsed, sessionId, workspace) {
       try {
         if (!parsed || !parsed.path) return;
+        setWorkspaceAutoOpenSuppressed(workspaceKey(workspace || ""), false);
         fetch(API_BASE + "docs/recent", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -4369,7 +4413,15 @@ const __test = {
           collapsed ? null : h("div", { style: { fontSize: 12.5, fontWeight: 600, flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "Markdown"),
           h("button", {
             key: "workbench-close", type: "button", title: "关闭文档工作台", "aria-label": "关闭文档工作台", "data-mp-rail-action": "close",
-            onClick: function () { try { if (typeof props !== "undefined" && props.close) props.close(); else void closeWorkspaceEditor(); } catch (e) { /* 忽略 */ } },
+            onClick: function () {
+              void (async function () {
+                try { await closeWorkspaceEditor(); } catch (e) { /* 忽略 */ }
+                // 关成功了才记：这个工作目录的会话再点开时不要自动弹回来。
+                if (!docsModeOn) {
+                  try { setWorkspaceAutoOpenSuppressed(workspaceContext().key, true); } catch (e0) { /* 忽略 */ }
+                }
+              })();
+            },
             style: railBtn,
           }, h("svg", { width: 17, height: 17, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", "aria-hidden": "true", focusable: "false" }, h("path", { d: "M7 7l10 10M17 7 7 17" })))),
 
@@ -4723,7 +4775,11 @@ const __test = {
         type: "button",
         title: "关闭编辑区",
         "aria-label": "关闭编辑区",
-        onClick: function () { try { clearOverlayDoc(); } catch (e) { /* 忽略 */ } },
+        onClick: function () {
+          // 显式关掉编辑区：记住这个工作目录别再自动弹回来，再收起浮层。
+          try { setWorkspaceAutoOpenSuppressed(workspaceContext().key, true); } catch (e0) { /* 忽略 */ }
+          try { clearOverlayDoc(); } catch (e) { /* 忽略 */ }
+        },
         style: {
           position: "absolute", top: 4, right: 6, zIndex: 2,
           width: 20, height: 20, padding: 0, border: "none", borderRadius: 4,

@@ -6,12 +6,13 @@
 
 - `lib/client.js`：`openWorkspace` 增加 `options.auto`；自动路径只走 recent（含未保存空白草稿），空态直接返回，不再回退到 files/blank；跟随模式下若上一个目录的文档仍开着，先过 `prepareWorkspaceLeave` 再 `closeDocsWorkbench()`；自动路径失败只写 `console.warn`，不弹提示。显式点击路径（`DocsEntryRedirect`）行为不变。
 - 设置页「打开与切换」两段说明与 follow 选项标签改为与新语义一致；枚举值与 localStorage 键不变。
-- 测试：`test/workspace-navigation.test.mjs` 拆分为 22 个用例，新增异目录文档残留、空白草稿恢复、接口失败不打扰、空态只查一次四类。
+- × 关闭记忆：新增 `dsh.markpilot.workspace-editor.v1`（按 `workspaceKey` 记 `{closed:true,at}`，上限 200 条按时间淘汰）。文档工作台左栏 × 与原生编辑区 × 均写入该记忆；自动路径先读记忆，命中就只收起旧文档、不恢复任何内容。显式打开（点击 Markdown 打开文件／文件列表／空白稿）、`chooseWorkbenchDoc`、`recordRecentDoc` 都会清除该目录的记忆，恢复自动恢复能力。
+- 测试：`test/workspace-navigation.test.mjs` 现为 26 个用例，新增异目录文档残留、空白草稿恢复、接口失败不打扰、空态只查一次、× 记忆不再恢复、× 记忆下收起旧文档、显式打开解除记忆、工作台 × 写入记忆八类。
 
 ## 验证
 
-- `node --test test/*.test.mjs`：310 项，309 通过，1 项 POSIX 在 Windows 跳过，0 失败。
-- `node --test test/workspace-navigation.test.mjs`：22 项全过。
+- `node --test test/*.test.mjs`：314 项，313 通过，1 项 POSIX 在 Windows 跳过，0 失败。
+- `node --test test/workspace-navigation.test.mjs`：26 项全过。
 - README 只增不删：`node scripts/verify-readme-keep.cjs --baseline <1.1.1 改前副本>` 通过（详见本次提交的收据）。
 
 ## 包与实装

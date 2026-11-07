@@ -177,8 +177,8 @@ Install `dsh-markdown-typora@1.1.0` or the matching GitHub release archive, then
 
 ## MarkPilot for DSH 1.1.1 · 打开更安静 / A quieter open
 
-点开会话时，编辑器只恢复该工作目录上次打开的文档；该目录还没有文档时不弹文件列表、也不新建空白稿，跟随模式下会收起上一个目录的文档。文件列表与空白文档在点击左侧 Markdown 时按设置打开。同一目录内切换会话仍保留当前文档与未保存内容。
+点开会话时，编辑器只恢复该工作目录上次打开的文档；该目录还没有文档时不弹文件列表、也不新建空白稿，跟随模式下会收起上一个目录的文档。文件列表与空白文档在点击左侧 Markdown 时按设置打开。同一目录内切换会话仍保留当前文档与未保存内容。用 × 关掉编辑区后该工作目录会被记住，下次点开会话不再自动弹出文档或文件列表，直到你重新点 Markdown。
 
-Switching conversations restores only the note from that working directory. A directory without a note stays quiet: no file list, no blank document, and a document from another directory steps aside. The file list and blank notes open when you click Markdown, following the opening settings. Conversations in the same directory keep the current document and unsaved edits.
+Switching conversations restores only the note from that working directory. A directory without a note stays quiet: no file list, no blank document, and a document from another directory steps aside. The file list and blank notes open when you click Markdown, following the opening settings. Conversations in the same directory keep the current document and unsaved edits. Closing the editor with × is remembered per working directory: conversations there open without the editor or the file list until you open Markdown again.
 
 Install `dsh-markdown-typora@1.1.1` or the matching GitHub release archive, then restart DSH.

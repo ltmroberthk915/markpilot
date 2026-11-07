@@ -120,3 +120,28 @@ test('navigation: an empty switch issues exactly one recent query',async()=>{
   const f=make();const stop=f.W.installWorkspaceNavigation(f.ctx);await drain();f.setActive('B');await drain();
   assert.equal(f.requests.length,1);assert.equal(f.requests[0].payload.op,'list');assert.equal(f.requests[0].payload.workspace,'D:/B');assert.equal(f.W.state().workspaceNotice,'');stop();f.dispose();
  });
+
+test('navigation: a workspace closed with × is not restored on switch',async()=>{
+  const f=make();f.setFetch(()=>({ok:true,value:{items:['D:/B/b.md']}}));
+  f.W.setWorkspaceAutoOpenSuppressed(f.W.workspaceKey('D:/B'),true);
+  const stop=f.W.installWorkspaceNavigation(f.ctx);await drain();f.setActive('B');await drain();
+  assert.equal(f.W.state().docsModeOn,false);assert.equal(f.opens.length,0);assert.equal(f.W.state().workbenchDoc,null);stop();f.dispose();
+ });
+test('navigation: × memory also tucks away a document from another directory',async()=>{
+  const f=make();f.setFetch(()=>({ok:true,value:{items:['D:/B/b.md']}}));
+  await f.W.chooseWorkbenchDoc({path:'D:/A/a.md',address:'dsh-resource://file/absolute/D%3A/A/a.md',workspace:'D:/A',sessionId:'A'});
+  f.W.setWorkspaceAutoOpenSuppressed(f.W.workspaceKey('D:/B'),true);
+  const stop=f.W.installWorkspaceNavigation(f.ctx);await drain();f.setActive('B');await drain();
+  assert.equal(f.W.state().docsModeOn,false,'the document from A is tucked away');assert.equal(f.opens.length,0);stop();f.dispose();
+ });
+test('explicit Markdown open lifts the × memory',async()=>{
+  const f=make();f.setFetch(()=>({ok:true,value:{items:['D:/A/a.md']}}));f.W.setWorkspaceAutoOpenSuppressed(f.W.workspaceKey('D:/A'),true);
+  await f.W.openWorkspace(f.context());
+  assert.equal(f.W.workspaceAutoOpenSuppressed(f.W.workspaceKey('D:/A')),false);assert.equal(f.W.state().workbenchDoc.path,'D:/A/a.md');f.dispose();
+ });
+test('workbench × closes the editor and remembers the workspace',async()=>{
+  const f=make();await f.W.chooseWorkbenchDoc({path:'D:/A/a.md',address:'dsh-resource://file/absolute/D%3A/A/a.md',workspace:'D:/A',sessionId:'A'});
+  const tree=flatten(f.render(f.W.DocsWorkbench)),btn=tree.find(x=>x&&x.props&&x.props['data-mp-rail-action']==='close');
+  assert.ok(btn,'workbench close button is rendered');btn.props.onClick();await drain();
+  assert.equal(f.W.state().docsModeOn,false);assert.equal(f.W.workspaceAutoOpenSuppressed(f.W.workspaceKey('D:/A')),true);f.dispose();
+ });

@@ -926,6 +926,6 @@ Open the most recently used Markdown note for the current working directory, the
 
 ### MarkPilot for DSH 1.1.1 · A quieter open
 
-Switching conversations restores your note only when that working directory has one. A fresh directory keeps the conversation view quiet instead of opening the file list, and a document from another directory steps aside. The Files panel or a blank note opens when you click Markdown, following the settings under Settings → Markdown 编辑器 → 打开与切换. Conversations in the same directory keep the current document, unsaved edits included.
+Switching conversations restores your note only when that working directory has one. A fresh directory keeps the conversation view quiet instead of opening the file list, and a document from another directory steps aside. The Files panel or a blank note opens when you click Markdown, following the settings under Settings → Markdown 编辑器 → 打开与切换. Conversations in the same directory keep the current document, unsaved edits included. Closing the editor with × is remembered per working directory: conversations there open without the editor or the file list until you open Markdown again.
 
 [Get DSH plugin 1.1.1](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.1), or install `dsh-markdown-typora@1.1.1`.
