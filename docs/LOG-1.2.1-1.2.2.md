@@ -45,3 +45,15 @@
 
 - 右栏里由**旧版本遗留**的其它 md 标签（不是当前工作台那份文档）不会自动关闭：在它们自己的文档再次进中间时才会自我关闭；需要一次性手动关掉。
 - 「× 关闭记忆」跨重启保留；被压住的工作目录点会话仍然不会自动打开编辑器（按用户要求保持）。
+
+## 1.2.2 发布与验证（2026-11-07 23:05–23:12）
+
+- Git main `200fa4d`，标签 `dsh-markdown-typora-v1.2.2`（轻量标签，与既有标签一致）。说明：1.2.1 未对外发布，1.2.2 一并覆盖它的改动。
+- GitHub Release：https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.2.2 ，资产 `dsh-markdown-typora-1.2.2.tgz`，2,755,798 字节。
+- TGZ SHA-256：`c2a9d2f0cf5ccb4df5512e43e6f557188e1eb00eff8cea0c33cb83b614fba885`；GitHub 资产、npm 下载包、本地打包三方一致（GitHub asset digest 与 npm registry tarball 分别下载比对）。
+- npm：`dsh-markdown-typora@1.2.2` 已发布，`dist-tags.latest = 1.2.2`。本轮发布需要 web 登录：PTY 里打印 https://www.npmjs.com/auth/cli/… ，浏览器确认后 `npm publish` 完成（npm 一次性发布令牌再次过期）。
+- 官方市场：PR #12838 更新为 1.2.2（tarball 指向新 release，中英文描述补上「链接打开的文档会关掉右栏重复标签」），head `a045ef9`，CI 运行中。
+- 开放市场：issue #213（已关闭）追加 1.2.2 评论 [issuecomment-6708802245](https://github.com/polang233/dsh-plugin-index/issues/213#issuecomment-6708802245)。
+- 本机实装：`lib/client.js` 源与实装一致（SHA-256 前缀 `D7544898D7915AA4`），重启后生效。
+- 测试：`node --test test/*.test.mjs` 328 项，327 通过、1 项 POSIX 跳过、0 失败；导航测试 40 项全过。
+- README 只增不删：以 1.1.1 基线校验通过（README.md 913→965 行、README.en.md 920→972 行，原行全部按序保留）。
