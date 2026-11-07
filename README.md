@@ -17,6 +17,9 @@
 
 [下载 1.1.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.0) · [npm](https://www.npmjs.com/package/dsh-markdown-typora/v/1.1.0)
 
+
+
+**1.1.1：** 点开会话只恢复该工作目录上次打开的文档，不再自动弹出文件列表；文件列表与空白稿在点击左侧 **Markdown** 时按设置打开。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.1.1`
 *以下保留各产品与历史版本介绍；DSH 插件当前安装方式以本节 1.1.0 为准。*
 
 
@@ -910,3 +913,12 @@ CRLF 换行的文件改一个字保存后，以前会**整篇变成 LF**（记�
 在会话中点击 Markdown，继续编辑该工作目录最近打开的笔记；也可选择原生文件目录或空白文档，并单独设置没有最近文件时的行为。跨工作目录切换会话时，自动打开对应笔记；同目录切换保留当前文档，也可设置跨目录始终保持当前文档。空白稿首次保存直接写入所属工作目录。未保存提示常显，已保存提示三秒后隐去。
 
 [下载 DSH 插件 1.1.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.0)，或安装 `dsh-markdown-typora@1.1.0`。设置入口：设置 → Markdown 编辑器 → 打开与切换。
+
+
+
+
+### MarkPilot for DSH 1.1.1 · 打开更安静
+
+点开会话时，编辑器只恢复该工作目录上次打开的文档：该目录还没有文档，就保持安静的会话视图，不再弹出工作目录文件列表。文件列表或空白文档改为在点击左侧 Markdown 时按设置打开；同一目录内切换会话仍保留当前文档，未保存内容照常留在草稿里。
+
+[下载 DSH 插件 1.1.1](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.1)，或安装 `dsh-markdown-typora@1.1.1`。设置入口：设置 → Markdown 编辑器 → 打开与切换。

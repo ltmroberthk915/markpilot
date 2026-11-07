@@ -17,6 +17,9 @@
 
 [Get 1.1.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.0)
 
+
+
+**1.1.1:** switching conversations restores only the note from that working directory; the file list no longer opens by itself and appears when you click **Markdown**. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.1.1`
 *Historical product and version details remain below. Use the 1.1.0 instructions above for the current DSH plugin.*
 
 
@@ -917,3 +920,12 @@ Committed table-cell edits continue to autosave at the configured interval after
 Open the most recently used Markdown note for the current working directory, the native Files panel, or a blank document. Choose an independent fallback for directories with no recent note. Follow conversations across working directories or keep the current document; conversations in the same directory always preserve it. A blank note first saves directly into its working directory. Unsaved feedback stays visible; the saved receipt fades after three seconds.
 
 [Download DSH plugin 1.1.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.0), or install `dsh-markdown-typora@1.1.0`. Find the options in Settings → Markdown 编辑器 → 打开与切换.
+
+
+
+
+### MarkPilot for DSH 1.1.1 · A quieter open
+
+Switching conversations restores your note only when that working directory has one. A fresh directory keeps the conversation view quiet instead of opening the file list, and a document from another directory steps aside. The Files panel or a blank note opens when you click Markdown, following the settings under Settings → Markdown 编辑器 → 打开与切换. Conversations in the same directory keep the current document, unsaved edits included.
+
+[Get DSH plugin 1.1.1](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.1), or install `dsh-markdown-typora@1.1.1`.

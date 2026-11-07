@@ -15,6 +15,9 @@
 
 **开始使用：** `dsh plugin --profile desktop add dsh-markdown-typora@1.1.0`。重启 DSH，点击左侧 **Markdown**；打开策略位于 **设置 → Markdown 编辑器 → 打开与切换**。
 
+
+
+**1.1.1：** 点开会话只恢复该目录上次打开的文档，不再自动弹出文件列表；文件列表与空白稿在点击左侧 **Markdown** 时打开。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.1.1`
 [下载 1.1.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.0) · [npm](https://www.npmjs.com/package/dsh-markdown-typora/v/1.1.0)
 
 ## MarkPilot for DSH 1.1 · An IDE-style Markdown workspace beside your AI
@@ -30,6 +33,9 @@
 
 **Install:** `dsh plugin --profile desktop add dsh-markdown-typora@1.1.0`. Restart DSH and click **Markdown**. Opening preferences: **Settings → Markdown 编辑器 → 打开与切换**.
 
+
+
+**1.1.1:** conversation switching restores only the note from that working directory; the file list opens when you click **Markdown**. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.1.1`
 [Get 1.1.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.0)
 
 *以下保留各产品与历史版本介绍；DSH 插件当前安装方式以本节 1.1.0 为准。* *Historical product and version details remain below; the 1.1.0 instructions above are current.*
@@ -165,3 +171,14 @@ Switching to another working directory follows this opening choice by default. S
 Blank documents create no file until their first Ctrl/Cmd+S. That save creates a uniquely named `未命名-….md` directly in the original working directory; subsequent edits autosave. Rename the file using your normal file tools after saving. The top save indicator shows only **未保存** while dirty and **已保存** for three seconds after a confirmed save.
 
 Install `dsh-markdown-typora@1.1.0` or the matching GitHub release archive, then restart DSH. Windows and DSH 0.2.2-rc.1 are the validated combination for these workspace features; the bundled editor core remains 3.6.17.
+
+
+
+
+## MarkPilot for DSH 1.1.1 · 打开更安静 / A quieter open
+
+点开会话时，编辑器只恢复该工作目录上次打开的文档；该目录还没有文档时不弹文件列表、也不新建空白稿，跟随模式下会收起上一个目录的文档。文件列表与空白文档在点击左侧 Markdown 时按设置打开。同一目录内切换会话仍保留当前文档与未保存内容。
+
+Switching conversations restores only the note from that working directory. A directory without a note stays quiet: no file list, no blank document, and a document from another directory steps aside. The file list and blank notes open when you click Markdown, following the opening settings. Conversations in the same directory keep the current document and unsaved edits.
+
+Install `dsh-markdown-typora@1.1.1` or the matching GitHub release archive, then restart DSH.
