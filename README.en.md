@@ -1,5 +1,23 @@
 # MarkPilot
 
+## MarkPilot for DSH 1.1 · An IDE-style Markdown workspace beside your AI
+
+**Write, discuss and keep the result in your project.** Bring files, Markdown editing and DSH chat together for project docs, research notes and technical writing.
+
+- **Give AI exactly the context you choose.** Insert selected Markdown source and its file path into the chat composer with one click or Ctrl/Cmd+Shift+Enter. Reference the open document with `@mp`; review before sending.
+- **Arrange your workspace like an IDE.** Keep files, editor and chat side by side. Resize columns, tuck away the toolbar and restore the native layout when you close the editor.
+- **Pick up where each project left off.** Resume the last-opened note per working directory. Keep your document across same-directory conversations; follow a different project or keep the current note open.
+- **Start with an idea, save it where it belongs.** Open a blank note and save directly into its original directory, or start from recent notes or the Files panel. Choose a separate fallback for projects without history.
+- **Full Markdown editing, beautifully presented.** Typora-style live rendering, editable math and tables, offline Mermaid, ten themes and adjustable transparency.
+- **Stay informed without losing focus.** Autosave, version-conflict notices and draft recovery. Unsaved status stays visible; saved status clears after three seconds.
+
+**Install:** `dsh plugin --profile desktop add dsh-markdown-typora@1.1.0`. Restart DSH and click **Markdown**. Opening preferences: **Settings → Markdown 编辑器 → 打开与切换**.
+
+[Get 1.1.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.0)
+
+*Historical product and version details remain below. Use the 1.1.0 instructions above for the current DSH plugin.*
+
+
 **A free Typora alternative with live math, inline AI completion, and print-quality typography — for Windows, VS Code, Trae, and the DeepSeek Harness sidebar.**
 
 > ### Writing Markdown should feel like writing a sticky note.
