@@ -4,6 +4,8 @@
 
 **Write, discuss and keep the result in your project.** Bring files, Markdown editing and DSH chat together for project docs, research notes and technical writing.
 
+![Markdown editor and DSH chat side by side, sending a selected passage into the conversation](docs/screenshots/3.6.6/dsh-insert-to-chat.jpg)
+
 - **Give AI exactly the context you choose.** Insert selected Markdown source and its file path into the chat composer with one click or Ctrl/Cmd+Shift+Enter. Reference the open document with `@mp`; review before sending.
 - **Arrange your workspace like an IDE.** Keep files, editor and chat side by side. Resize columns, tuck away the toolbar and restore the native layout when you close the editor.
 - **Pick up where each project left off.** Resume the last-opened note per working directory. Keep your document across same-directory conversations; follow a different project or keep the current note open.
