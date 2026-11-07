@@ -60,13 +60,17 @@ test('legacy create A late result cannot replace selected B document',async()=>{
   assert.equal(f.W.state().workbenchDoc.path,'D:/B/b.md');f.dispose();
  });
 test('workspace aliases collapse dot segments',async()=>{const f=make();assert.equal(f.W.workspaceKey('D:/repo/sub/..'),f.W.workspaceKey('D:/repo'));f.dispose();});
-test('native repeated navigation revision reveals its Markdown above workbench',async()=>{
-  const f=make(),signal=new AbortController().signal;let tab={id:'native-md',contentId:'dsh-resource://file/absolute/D%3A/A/native.md',visible:true,navigation:{revision:1},signal};
+test('explicit navigation to another Markdown tab lands in the workbench and closes the sidebar tab',async()=>{
+  const f=make(),signal=new AbortController().signal,closed=[];
+  let tab={id:'native-md',contentId:'dsh-resource://file/absolute/D%3A/A/native.md',visible:true,navigation:{revision:1},signal,actions:{close:()=>closed.push('native')}};
   const props={sessionId:'A',useTabInfo:()=>({tab})};f.render(f.W.EditorTabRedirect,props);await drain();
   await f.W.chooseWorkbenchDoc({path:'D:/A/work.md',address:'dsh-resource://file/absolute/D%3A/A/work.md',workspace:'D:/A',sessionId:'A'});
-  assert.equal(f.W.state().docsModeOn,true);
+  assert.equal(f.W.state().docsModeOn,true);assert.equal(f.W.state().workbenchDoc.path,'D:/A/work.md');
   tab={...tab,navigation:{revision:2}};f.render(f.W.EditorTabRedirect,props);await drain();
-  assert.equal(f.W.state().docsModeOn,false,'native user navigation remains obscured by Workbench');assert.equal(f.W.state().overlayDoc.tab.id,'native-md');f.dispose();
+  await new Promise((resolve)=>setTimeout(resolve,200));
+  assert.equal(f.W.state().docsModeOn,true,'the workbench keeps the middle editor');
+  assert.equal(f.W.state().workbenchDoc.path,'D:/A/native.md','the navigated document is adopted');
+  assert.ok(closed.includes('native'),'the duplicate sidebar tab is closed');f.dispose();
  });
 test('native navigation must not bypass a refused document leave',async()=>{
   const f=make(),signal=new AbortController().signal;let tab={id:'native-md',contentId:'dsh-resource://file/absolute/D%3A/A/native.md',visible:true,navigation:{revision:1},signal};
@@ -236,20 +240,18 @@ test('adoption never takes over while an editor is already open',async()=>{
   assert.equal(f.W.adoptOpenNativeDocs(),false);assert.equal(f.W.state().workbenchDoc.path,'D:/A/work.md');f.dispose();
  });
 
-test('adopting Markdown preview tabs collapses a right sidebar that holds only Markdown',async()=>{
-  const f=make();
-  f.setOpenTabs([{sessionId:'A',tabId:'t1',kind:'text',contentId:'dsh-resource://file/absolute/D%3A/A/native.md'}]);
-  f.W.adoptOpenNativeDocs();await drain();
-  await new Promise((resolve)=>setTimeout(resolve,460));
-  assert.equal(f.rightbarCloses(),1,'the duplicate-only right sidebar is collapsed');f.dispose();
+test('opening a Markdown link into the workbench closes the duplicate sidebar tab',async()=>{
+  const f=make(),signal=new AbortController().signal,closed=[];
+  const tab={id:'native-md',contentId:'dsh-resource://file/absolute/D%3A/A/native.md',visible:true,navigation:{revision:1},signal,actions:{close:()=>closed.push('tab')}};
+  f.render(f.W.EditorTabRedirect,{sessionId:'A',useTabInfo:()=>({tab})});await drain();
+  assert.equal(f.W.state().docsModeOn,true);
+  await new Promise((resolve)=>setTimeout(resolve,380));
+  assert.deepEqual(closed,['tab'],'the duplicate sidebar tab is closed through tab.actions');f.dispose();
  });
-test('a right sidebar with other tabs is left alone',async()=>{
-  const f=make();
-  f.setOpenTabs([
-    {sessionId:'A',tabId:'t1',kind:'text',contentId:'dsh-resource://file/absolute/D%3A/A/native.md'},
-    {sessionId:'A',tabId:'t2',kind:'files',contentId:'dsh-resource://page/files'}
-  ]);
-  f.W.adoptOpenNativeDocs();await drain();
-  await new Promise((resolve)=>setTimeout(resolve,460));
-  assert.equal(f.rightbarCloses(),0);f.dispose();
+test('the legacy props.actions fallback also closes the duplicate tab',async()=>{
+  const f=make(),signal=new AbortController().signal,closed=[];
+  const tab={id:'native-md',contentId:'dsh-resource://file/absolute/D%3A/A/native.md',visible:true,navigation:{revision:1},signal};
+  f.render(f.W.EditorTabRedirect,{sessionId:'A',useTabInfo:()=>({tab}),actions:{close:()=>closed.push('tab')}});await drain();
+  await new Promise((resolve)=>setTimeout(resolve,380));
+  assert.deepEqual(closed,['tab']);f.dispose();
  });

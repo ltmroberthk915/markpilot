@@ -29,6 +29,9 @@
 
 **1.2.1:** Markdown tabs that DSH restores when the app starts now open in the document workspace too, instead of staying in the built-in right-side preview; a right sidebar holding nothing but those previews is collapsed. Disable the takeover with 被动打开的文档 → 全宽浮层. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.2.1`
 
+**1.2.2:** clicking a Markdown link opens the note in the middle workspace and closes the duplicate tab it leaves in the right sidebar, so the sidebar no longer pops open for the file. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.2.2`
+
+
 
 
 *Historical product and version details remain below. Use the 1.1.0 instructions above for the current DSH plugin.*
@@ -960,3 +963,9 @@ A Markdown file clicked in a conversation, or restored by a working directory wh
 When DSH starts it restores the Markdown tabs from the last session into its own right-side preview. The plugin now adopts those open notes into the document workspace, with the file list and the floating collapse/close buttons, and collapses a right sidebar that holds nothing but those previews. Turn it off with **Settings → Markdown 编辑器 → 打开与切换 → 被动打开的文档 → 全宽浮层**. A directory closed with × stays closed.
 
 [Get DSH plugin 1.2.1](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.2.1), or install `dsh-markdown-typora@1.2.1`.
+
+### MarkPilot for DSH 1.2.2 · Links stop popping the sidebar
+
+A Markdown link in a conversation opens the note in the middle workspace and closes the duplicate tab it leaves in the right sidebar; a sidebar holding nothing else collapses with it. The × memory and the passive-open setting are unchanged.
+
+[Get DSH plugin 1.2.2](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.2.2), or install `dsh-markdown-typora@1.2.2`.

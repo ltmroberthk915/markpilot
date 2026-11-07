@@ -29,6 +29,9 @@
 
 **1.2.1：** 修复：DSH 重启后恢复的 .md 标签会停在宿主预览里、不进中间编辑区；现在插件会把当前会话已打开的 Markdown 接管进文档工作台，并在右栏只剩这些 Markdown 时把右栏收起。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.2.1`
 
+**1.2.2：** 点对话里的 md 链接：文档进中间编辑区后，插件会把它在右侧栏留下的重复标签关掉（右栏只剩它时随之一并收起），不再出现「点链接弹右栏」。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.2.2`
+
+
 
 
 *以下保留各产品与历史版本介绍；DSH 插件当前安装方式以本节 1.1.0 为准。*
@@ -953,3 +956,9 @@ CRLF 换行的文件改一个字保存后，以前会**整篇变成 LF**（记�
 DSH 重启时会把上次打开的 Markdown 标签恢复成自带预览，停在右侧；现在插件启动后会把这些已打开的 .md 接管进文档工作台，左列表与左上角两个按钮照旧；接管后若右栏只剩这些 Markdown 预览，右栏会自动收起，不再出现「点了会话右侧栏自己弹出来」。不需要时可在 设置 → Markdown 编辑器 → 打开与切换 → 被动打开的文档 选「全宽浮层」。用 × 关掉的目录仍然保持关闭。
 
 [下载 DSH 插件 1.2.1](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.2.1)，或安装 `dsh-markdown-typora@1.2.1`。
+
+### MarkPilot for DSH 1.2.2 · 点链接不再弹右栏
+
+对话里的 Markdown 链接会把文档开进中间工作台，同时关掉它在右侧栏留下的重复标签；右栏里只剩这个标签时，右栏会一并收起。× 关闭记忆与「被动打开的文档」设置照旧。
+
+[下载 DSH 插件 1.2.2](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.2.2)，或安装 `dsh-markdown-typora@1.2.2`。

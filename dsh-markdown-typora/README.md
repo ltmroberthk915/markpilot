@@ -27,6 +27,9 @@
 
 **1.2.1：** DSH 重启后恢复的 .md 标签也会被接管进文档工作台，不再停在宿主预览里。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.2.1`
 
+**1.2.2：** 链接打开的 md 进中间后，右栏的重复标签会自动关闭，右栏不再为此弹出。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.2.2`
+
+
 
 
 [下载 1.1.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.0) · [npm](https://www.npmjs.com/package/dsh-markdown-typora/v/1.1.0)
@@ -55,6 +58,9 @@
 **1.2.0:** a Markdown file opened from a conversation link or restored by a working directory opens in the document workspace by default (file list and the floating collapse/close buttons); a setting switches back to the full-width view. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.2.0`
 
 **1.2.1:** Markdown tabs restored at startup are adopted into the document workspace instead of staying in the right-side preview. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.2.1`
+
+**1.2.2:** a Markdown link opens in the middle workspace and the duplicate right-sidebar tab closes itself. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.2.2`
+
 
 
 
@@ -232,3 +238,12 @@ DSH 重启后恢复的 .md 标签会被接管进文档工作台，不再停在�
 Markdown tabs restored at startup are adopted into the document workspace instead of staying in the right-side preview; the setting switches back to the full-width view. Closing with × keeps its meaning.
 
 Install `dsh-markdown-typora@1.2.1` or the matching GitHub release archive, then restart DSH.
+
+
+## MarkPilot for DSH 1.2.2 · 点链接不再弹右栏
+
+对话里的 Markdown 链接开进中间工作台后，右栏的重复标签会自动关闭；右栏只剩它时随之一并收起。
+
+A Markdown link opens in the middle workspace and the duplicate right-sidebar tab closes itself.
+
+Install `dsh-markdown-typora@1.2.2` or the matching GitHub release archive, then restart DSH.

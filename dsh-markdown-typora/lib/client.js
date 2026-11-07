@@ -3690,18 +3690,15 @@ const __test = {
     function InputFaceTap(props) {
       var sessionId = props && props.sessionId;
       var actions = props && props.inputActions;
-      var hasEffect = React && typeof React.useEffect === "function";
-      if (hasEffect) {
-        React.useEffect(function () {
-          if (!sessionId || !actions) return undefined;
-          inputFaces.set(sessionId, actions);
-          return function () {
-            if (inputFaces.get(sessionId) === actions) inputFaces.delete(sessionId);
-          };
-        }, [sessionId, actions]);
-      } else if (sessionId && actions) {
+      // 无条件调用：React 在模块加载时就已 require 成功（见文件顶部），
+      // 曾经的 if (hasEffect) 是条件 hook，环境变化时会打乱 hook 顺序。
+      React.useEffect(function () {
+        if (!sessionId || !actions) return undefined;
         inputFaces.set(sessionId, actions);
-      }
+        return function () {
+          if (inputFaces.get(sessionId) === actions) inputFaces.delete(sessionId);
+        };
+      }, [sessionId, actions]);
       return null;
     }
 
@@ -4161,7 +4158,7 @@ const __test = {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ op: "push", path: parsed.path, sessionId: sessionId || "", scope: parsed.scope, workspace:workspace || undefined }),
-        }).catch(function () { /* 记最近失败不影响编辑 */ });
+        }).catch(function (e1) { mpWarn("record-recent", "recording the recent document failed", e1); });
       } catch (e) { /* 忽略 */ }
     }
 
@@ -4198,7 +4195,7 @@ const __test = {
             if (lay && typeof lay.selectPanel === "function") lay.selectPanel(null);
             // 右侧栏没显示时不会有 session surface —— 先把它显出来
             if (lay && typeof lay.openRightbar === "function") {
-              try { lay.openRightbar(false, false); } catch (e2b) { /* 忽略 */ }
+              try { lay.openRightbar(false, false); } catch (e2b) { mpWarn("open-resource", "revealing the right sidebar for a resource failed", e2b); }
             }
           } catch (e2) { /* 忽略 */ }
           // 已知宿主限制：openResource 需要右侧栏已挂载会话（controller.require()），
@@ -4438,7 +4435,7 @@ const __test = {
               void (async function () {
                 // 先记下你关的是哪份文档的目录：会话可能已经切到别的目录，编辑区还停在这份上。
                 var docKey = displayedDocWorkspaceKey() || workspaceContext().key;
-                try { await closeWorkspaceEditor(); } catch (e) { /* 忽略 */ }
+                try { await closeWorkspaceEditor(); } catch (e) { mpWarn("rail-close", "closing the workspace editor failed", e); }
                 // 关成功了才记：这个工作目录的会话再点开时不要自动弹回来。
                 if (!docsModeOn) {
                   try { setWorkspaceAutoOpenSuppressed(docKey, true); } catch (e0) { /* 忽略 */ }
@@ -4516,7 +4513,7 @@ const __test = {
       props.children);
     }
 
-    function SettingsInputStyle(extra) {
+    function settingsInputStyle(extra) {
       return Object.assign({
         width: "100%", boxSizing: "border-box", padding: "7px 10px", fontSize: 12.5,
         borderRadius: 6, border: "1px solid var(--dsw-alias-border-l2, #3a4150)",
@@ -4537,7 +4534,7 @@ const __test = {
         h("input", {
           type: "number", min: props.min, max: props.max, step: props.step || 10,
           defaultValue: props.value,
-          style: SettingsInputStyle({ width: 140 }),
+          style: settingsInputStyle({ width: 140 }),
           onKeyDown: function (e) { if (e.key === "Enter") { try { e.currentTarget.blur(); } catch (err) { /* 忽略 */ } } },
           onBlur: function (e) {
             var raw = e.target.value;
@@ -4572,14 +4569,14 @@ const __test = {
           ["workspaceEmptyMode","没有最近文档时","独立于上方选项，仅在点击 Markdown、且该工作目录没有历史文档时生效；切换会话不会自动弹出。",[["files","工作目录文件列表"],["blank","新空白 Markdown"]]],
           ["workspaceSwitchMode","切换到其他工作目录","同一工作目录内切换会话始终保留当前文档。跨目录时只恢复该目录上次打开的文档；没有历史文档就收起编辑区，需点 Markdown 才按上方规则打开。",[["follow","恢复该目录上次的文档"],["keep","保持当前文档"]]],
           ["passiveOpenMode","被动打开的文档","对话里的文件链接、切换会话时恢复的 .md。默认与点击 Markdown 相同：带左侧文件列表和左上角的收起/关闭按钮。",[["workbench","与点 Markdown 相同"],["overlay","全宽浮层（仅右上角关闭）"]]]
-        ].map(([key,label,hint,choices])=>h(SettingsField,{key,label,hint},h("select",{value:settings[key],style:SettingsInputStyle({}),onChange:e=>save({[key]:e.target.value})},...choices.map(([value,label])=>h("option",{key:value,value},label))))),
+        ].map(([key,label,hint,choices])=>h(SettingsField,{key,label,hint},h("select",{value:settings[key],style:settingsInputStyle({}),onChange:e=>save({[key]:e.target.value})},...choices.map(([value,label])=>h("option",{key:value,value},label))))),
         h("div", { style: group }, "文档"),
         h(SettingsField, {
           label: "目标文档文件夹",
           hint: "新建文档的默认保存位置。留空时使用当前工作区。",
         }, h("input", {
           type: "text", value: settings.docsFolder, placeholder: "例如 D:\\Notes",
-          style: SettingsInputStyle({}),
+          style: settingsInputStyle({}),
           onChange: function (e) { save({ docsFolder: e.target.value }); },
         })),
         h(SettingsField, {
@@ -4587,7 +4584,7 @@ const __test = {
           hint: "新建时写入的初始内容。{title} 会替换成文件名。",
         }, h("textarea", {
           rows: 4, value: settings.docsTemplate, spellCheck: false,
-          style: SettingsInputStyle({ resize: "vertical", fontFamily: "ui-monospace, Consolas, monospace", lineHeight: 1.6 }),
+          style: settingsInputStyle({ resize: "vertical", fontFamily: "ui-monospace, Consolas, monospace", lineHeight: 1.6 }),
           onChange: function (e) { save({ docsTemplate: e.target.value }); },
         })),
 
@@ -4672,6 +4669,26 @@ const __test = {
       return React.createElement(EditorTabRedirect, props);
     }
 
+    /** 诊断开关：localStorage 里 dsh.markpilot.debug = "1" 时才写，正常安装不落盘。 */
+    const TAB_DIAG_KEY = "dsh.markpilot.tab-diag.v1";
+    function tabDiag(entry) {
+      try {
+        if (window.localStorage.getItem("dsh.markpilot.debug") !== "1") return;
+        var all = JSON.parse(window.localStorage.getItem(TAB_DIAG_KEY) || "[]");
+        if (!Array.isArray(all)) all = [];
+        all.push(Object.assign({ at: Date.now() }, entry));
+        window.localStorage.setItem(TAB_DIAG_KEY, JSON.stringify(all.slice(-40)));
+      } catch (e) { /* 忽略 */ }
+    }
+    var mpWarned = {};
+    /** 同族问题的护栏：核心路径的异常不再纯静默，按 scope 只警告一次。 */
+    function mpWarn(scope, message, error) {
+      if (mpWarned[scope]) return;
+      mpWarned[scope] = true;
+      try { console.warn("[dsh-markdown-typora] " + message, error); } catch (e) { /* 忽略 */ }
+    }
+    function warnTabOnce(key, message, error) { mpWarn("tab:" + key, message, error); }
+
     /** 原生 md 标签 → 工作台条目：被动打开时用它把文档接进带左列表的工作台。 */
     function workbenchEntryOfNative(tab, sessionId) {
       var native = parseFileAddress(tab && tab.contentId);
@@ -4684,41 +4701,19 @@ const __test = {
     }
 
     /** 被动打开的 .md（文件链接 / 切会话恢复）接进工作台；受「被动打开」设置与关闭记忆约束。 */
-    function routePassiveNativeDoc(tab, sessionId) {
+    function routePassiveNativeDoc(tab, sessionId, force) {
       try {
         if (readSettings(window.localStorage).passiveOpenMode === "overlay") return false;
         var key = docKeyOf(tab);
-        if (!key || !overlayDocs.has(key)) return false;   // 未公布，或已被用户显式关闭
+        if (!force && (!key || !overlayDocs.has(key))) return false;   // 未公布，或已被用户显式关闭
         var entry = workbenchEntryOfNative(tab, sessionId);
         if (!entry) return false;
-        if (docsModeOn && workbenchDoc && workspaceKey(workbenchDoc.path) === workspaceKey(entry.path)) return false;
+        if (docsModeOn && workbenchDoc && workspaceKey(workbenchDoc.path) === workspaceKey(entry.path)) return "same";
         void chooseWorkbenchDoc(entry);
-        setTimeout(function () { collapseDuplicateRightbar(); }, 400);
         return true;
       } catch (e) { return false; }
     }
 
-    /**
-     * 文档已经接进中间编辑区后，若右侧栏里只剩这些 Markdown 预览标签，就把右侧栏收起。
-     * 宿主在恢复会话布局时会自己把右栏展开，看起来像「点了会话就弹出文件栏」。
-     */
-    function collapseDuplicateRightbar() {
-      try {
-        var sr = hostSidebarRight || (docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("sidebarRight") : null);
-        var list = sr && sr.openTabs && typeof sr.openTabs.getSnapshot === "function" ? sr.openTabs.getSnapshot() : null;
-        if (!Array.isArray(list) || !list.length) return;
-        var context = workspaceContext();
-        var onlyMarkdown = list.every(function (item) {
-          if (!item || !item.contentId) return false;
-          if (context.sessionId && item.sessionId && item.sessionId !== context.sessionId) return true;
-          var native = parseFileAddress(item.contentId);
-          return !!(native && /\.(md|markdown)$/i.test(String(native.path || "")));
-        });
-        if (!onlyMarkdown) return;
-        var lay = docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("layout") : null;
-        if (lay && typeof lay.closeRightbar === "function") lay.closeRightbar();
-      } catch (e) { /* 忽略 */ }
-    }
 
     /**
      * 接管宿主已经打开 / 重启后恢复的 .md 标签：DSH 会先把上次的 md 标签恢复成自带预览，
@@ -4748,7 +4743,6 @@ const __test = {
           if (workspaceAutoOpenSuppressed(workspaceKey(entry.workspace || context.cwd))) continue;
           if (workbenchDoc && workspaceKey(workbenchDoc.path) === workspaceKey(entry.path)) return false;
           void chooseWorkbenchDoc(entry);
-          setTimeout(function () { collapseDuplicateRightbar(); }, 400);
           return true;
         }
         return false;
@@ -4763,10 +4757,43 @@ const __test = {
       var key = docKeyOf(tab);
       var visible = !(tab && tab.visible === false);
       var navigation = tab?.navigation?.revision;
+      // 关掉右栏里这个重复标签：tab.actions 是宿主 Tab 域绑定到它自己会话的公开动作，
+      // props.actions 是旧契约的兜底。
+      var sidebarTabClosed = false;
+      var closeThisSidebarTab = function () {
+        if (sidebarTabClosed) return;
+        sidebarTabClosed = true;
+        try {
+          // 必须用渲染期抓到的 tab 记录：hook 不能在回调里调用（React #321）。
+          var actions = (tab && tab.actions) || props.actions;
+          var viaTab = !!(tab && tab.actions && typeof tab.actions.close === "function");
+          var viaProps = !!(props.actions && typeof props.actions.close === "function");
+          if (actions && typeof actions.close === "function") {
+            actions.close();
+            tabDiag({ where: "closed", viaTab: viaTab, viaProps: viaProps });
+          } else {
+            sidebarTabClosed = false;
+            tabDiag({ where: "no-close-action", viaTab: viaTab, viaProps: viaProps, tabKeys: tab ? Object.keys(tab).slice(0, 24) : null });
+          }
+        } catch (e) { sidebarTabClosed = false; tabDiag({ where: "close-throw", message: String(e && e.message || e) }); warnTabOnce("close", "closing the duplicate sidebar tab failed", e); }
+      };
       var previousNavigation = React.useRef({key,signal:tab?.signal,revision:navigation});
       var rerender = React.useState(0)[1];
       React.useEffect(function () {
-        var off = subscribeOverlayDoc(function () { rerender(function (n) { return n + 1; }); });
+        // 这个标签自己的文档已经在中间工作台里时，它只是重复的占位：关掉它。
+        // 覆盖「打开过一次后残留在右栏的旧标签」，也覆盖工作台切换文档后的收敛。
+        var closeIfDuplicate = function () {
+          try {
+            if (!docsModeOn || !workbenchDoc || !workbenchDoc.path) return;
+            var native = parseFileAddress(tab && tab.contentId);
+            if (!native) return;
+            var path = absolutePath(native.path, currentCwd(native.sessionId || props.sessionId));
+            if (!path || workspaceKey(path) !== workspaceKey(workbenchDoc.path)) return;
+            closeThisSidebarTab();
+          } catch (e) { /* 忽略 */ }
+        };
+        var off = subscribeOverlayDoc(function () { rerender(function (n) { return n + 1; }); closeIfDuplicate(); });
+        closeIfDuplicate();
         return off;
       }, []);
       React.useEffect(function () {
@@ -4774,10 +4801,20 @@ const __test = {
         var explicit=previous.key===key && previous.signal===tab?.signal && navigation>previous.revision;
         previousNavigation.current={key,signal:tab?.signal,revision:navigation};
         publishOverlayDoc({ tab: tab, sessionId: props.sessionId, inputActions: props.inputActions, explicit:explicit });
-        // 被动打开（对话里的文件链接、切会话恢复的文档）：默认接进文档工作台，
-        // 左侧列表与左上角「收起/关闭」两个按钮就与点 Markdown 打开时一致；
-        // 设置里选「全宽浮层」时保持原样（只有右上角关闭按钮）。
-        if (!explicit && visible) routePassiveNativeDoc(tab, props.sessionId);
+        try {
+          var diagTab = tab || {};
+          tabDiag({ where: "effect", explicit: explicit, visible: visible, docsModeOn: docsModeOn,
+            contentId: String(diagTab.contentId || "").slice(0, 140), tabKeys: Object.keys(diagTab).slice(0, 24),
+            hasTabClose: !!(diagTab.actions && typeof diagTab.actions.close === "function"),
+            hasPropClose: !!(props.actions && typeof props.actions.close === "function") });
+        } catch (eDiag) { /* 忽略 */ }
+        // 文档一律进中间工作台：对话里的文件链接、会话恢复的标签、以及用户在右栏显式导航，
+        // 都接进工作台；随后把这个重复的右栏标签关掉（右栏只剩它时宿主会把右栏一起收起）。
+        // 设置里选「全宽浮层」时保持旧行为（只有右上角关闭按钮）。
+        if (visible) {
+          var routed = routePassiveNativeDoc(tab, props.sessionId, explicit);
+          if (routed) setTimeout(closeThisSidebarTab, explicit ? 140 : 320);
+        } else if (docKeyOf(tab) !== key) { /* noop */ }
         return function () { unpublishOverlayDoc(tab); };
       }, [key, visible, navigation]);
       var shown = !docsModeOn && !!(overlayDoc && docKeyOf(overlayDoc.tab) === key);
@@ -4889,7 +4926,7 @@ const __test = {
         onClick: function () {
           // 显式关掉编辑区：先确实收起浮层，再记住这份文档所属的工作目录别再自动弹回来。
           var docKey = displayedDocWorkspaceKey() || workspaceContext().key;
-          try { clearOverlayDoc(); } catch (e) { /* 忽略 */ }
+          try { clearOverlayDoc(); } catch (e) { mpWarn("overlay-close", "closing the overlay document failed", e); }
           if (!overlayDoc) { try { setWorkspaceAutoOpenSuppressed(docKey, true); } catch (e0) { /* 忽略 */ } }
         },
         style: {
