@@ -3919,6 +3919,18 @@ const __test = {
       } catch(e) { return {sessionId:"",cwd:"",key:""}; }
     }
     function workspaceMessage(message) { workspaceNotice=message; bumpOverlay(); }
+    /** 当前展示的文档属于哪个工作目录：× 关闭记的是「你关掉的那份文档」的目录，不是此刻会话的目录。 */
+    function displayedDocWorkspaceKey() {
+      try {
+        if (docsModeOn && workbenchDoc && workbenchDoc.workspace) return workspaceKey(workbenchDoc.workspace);
+        if (overlayDoc && overlayDoc.sessionId) {
+          var cwd=currentCwd(overlayDoc.sessionId);
+          if (cwd) return workspaceKey(cwd);
+        }
+        if (workbenchDoc && workbenchDoc.workspace) return workspaceKey(workbenchDoc.workspace);
+      } catch (e) { /* 忽略 */ }
+      return "";
+    }
     function pendingWorkspaceDraft(context, value) {
       try {
         var all=JSON.parse(window.localStorage.getItem(WORKSPACE_DRAFT_KEY)||"{}");
@@ -3965,11 +3977,11 @@ const __test = {
         window.localStorage.setItem(WORKSPACE_EDITOR_KEY, JSON.stringify(all));
       } catch (e) { /* 存储不可用时按未记忆处理 */ }
     }
-    async function prepareWorkspaceLeave() {
+    async function prepareWorkspaceLeave(refusal) {
       var leases=[];
       for (var guard of editorLeaveGuards.values()) {
         var lease=await guard();
-        if (!lease) { workspaceMessage("当前文档尚未安全留存，请完成输入或保存后再切换。"); return null; }
+        if (!lease) { workspaceMessage(refusal || "当前文档尚未安全留存，请完成输入或保存后再切换。"); return null; }
         leases.push(lease);
       }
       return () => leases.every(check=>check());
@@ -4016,7 +4028,7 @@ const __test = {
         // 跟随模式收掉上一个目录的文档（编辑区回到原生布局），避免跨目录误编辑。
         const tuckAway=async()=>{
           if(!docsModeOn) return;
-          var leave=await prepareWorkspaceLeave();
+          var leave=await prepareWorkspaceLeave("上一个工作目录的文档还没有安全留存，编辑区保持打开。");
           if(current() && leave && leave()) closeDocsWorkbench();
         };
         // 这个工作目录上次是被 × 关掉的：会话再被点开时不弹回来。
@@ -4415,10 +4427,12 @@ const __test = {
             key: "workbench-close", type: "button", title: "关闭文档工作台", "aria-label": "关闭文档工作台", "data-mp-rail-action": "close",
             onClick: function () {
               void (async function () {
+                // 先记下你关的是哪份文档的目录：会话可能已经切到别的目录，编辑区还停在这份上。
+                var docKey = displayedDocWorkspaceKey() || workspaceContext().key;
                 try { await closeWorkspaceEditor(); } catch (e) { /* 忽略 */ }
                 // 关成功了才记：这个工作目录的会话再点开时不要自动弹回来。
                 if (!docsModeOn) {
-                  try { setWorkspaceAutoOpenSuppressed(workspaceContext().key, true); } catch (e0) { /* 忽略 */ }
+                  try { setWorkspaceAutoOpenSuppressed(docKey, true); } catch (e0) { /* 忽略 */ }
                 }
               })();
             },
@@ -4776,9 +4790,10 @@ const __test = {
         title: "关闭编辑区",
         "aria-label": "关闭编辑区",
         onClick: function () {
-          // 显式关掉编辑区：记住这个工作目录别再自动弹回来，再收起浮层。
-          try { setWorkspaceAutoOpenSuppressed(workspaceContext().key, true); } catch (e0) { /* 忽略 */ }
+          // 显式关掉编辑区：先确实收起浮层，再记住这份文档所属的工作目录别再自动弹回来。
+          var docKey = displayedDocWorkspaceKey() || workspaceContext().key;
           try { clearOverlayDoc(); } catch (e) { /* 忽略 */ }
+          if (!overlayDoc) { try { setWorkspaceAutoOpenSuppressed(docKey, true); } catch (e0) { /* 忽略 */ } }
         },
         style: {
           position: "absolute", top: 4, right: 6, zIndex: 2,

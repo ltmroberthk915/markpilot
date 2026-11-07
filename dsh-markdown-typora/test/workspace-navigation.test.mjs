@@ -145,3 +145,37 @@ test('workbench × closes the editor and remembers the workspace',async()=>{
   assert.ok(btn,'workbench close button is rendered');btn.props.onClick();await drain();
   assert.equal(f.W.state().docsModeOn,false);assert.equal(f.W.workspaceAutoOpenSuppressed(f.W.workspaceKey('D:/A')),true);f.dispose();
  });
+
+test('workbench × marks the displayed document directory, not the current session',async()=>{
+  const f=make();await f.W.chooseWorkbenchDoc({path:'D:/A/a.md',address:'dsh-resource://file/absolute/D%3A/A/a.md',workspace:'D:/A',sessionId:'A'});
+  f.setActive('B',false); // 会话已切到 B，A 的文档还开着
+  const tree=flatten(f.render(f.W.DocsWorkbench)),btn=tree.find(x=>x&&x.props&&x.props['data-mp-rail-action']==='close');
+  btn.props.onClick();await drain();
+  assert.equal(f.W.workspaceAutoOpenSuppressed(f.W.workspaceKey('D:/A')),true,'the displayed document directory is remembered');
+  assert.equal(f.W.workspaceAutoOpenSuppressed(f.W.workspaceKey('D:/B')),false,'the session directory stays untouched');f.dispose();
+ });
+test('a refused close leaves no × memory behind',async()=>{
+  const f=make();await f.W.chooseWorkbenchDoc({path:'D:/A/a.md',address:'dsh-resource://file/absolute/D%3A/A/a.md',workspace:'D:/A',sessionId:'A'});
+  f.W.editorLeaveGuards.set('unsafe',async()=>null);
+  const tree=flatten(f.render(f.W.DocsWorkbench)),btn=tree.find(x=>x&&x.props&&x.props['data-mp-rail-action']==='close');
+  btn.props.onClick();await drain();
+  assert.equal(f.W.state().docsModeOn,true,'the editor stays open');assert.equal(f.W.workspaceAutoOpenSuppressed(f.W.workspaceKey('D:/A')),false);f.dispose();
+ });
+test('recording a recent document lifts the × memory',async()=>{
+  const f=make();f.W.setWorkspaceAutoOpenSuppressed(f.W.workspaceKey('D:/A'),true);
+  f.W.recordRecentDoc({path:'D:/A/a.md',scope:'absolute'},'A','D:/A');await drain();
+  assert.equal(f.W.workspaceAutoOpenSuppressed(f.W.workspaceKey('D:/A')),false);f.dispose();
+ });
+test('× memory is capped and drops the oldest entries',async()=>{
+  const f=make();for(let i=0;i<200;i++)f.W.setWorkspaceAutoOpenSuppressed('d:/w'+i,true);
+  f.W.setWorkspaceAutoOpenSuppressed('d:/extra',true);
+  assert.equal(f.W.workspaceAutoOpenSuppressed('d:/w0'),false,'the oldest entry is pruned');assert.equal(f.W.workspaceAutoOpenSuppressed('d:/extra'),true);f.dispose();
+ });
+test('overlay × marks the document directory and closes the stage',async()=>{
+  const f=make(),signal=new AbortController().signal;
+  f.W.publishOverlayDoc({tab:{id:'native-md',contentId:'dsh-resource://file/absolute/D%3A/A/native.md',visible:true,navigation:{revision:1},signal},sessionId:'A'});
+  f.setActive('B',false);
+  const tree=flatten(f.render(f.W.EditorOverlayStage,{}));const btn=tree.find(x=>x&&x.props&&x.props.title==='关闭编辑区');
+  assert.ok(btn,'overlay close button is rendered');btn.props.onClick();await drain();
+  assert.equal(f.W.state().overlayDoc,null);assert.equal(f.W.workspaceAutoOpenSuppressed(f.W.workspaceKey('D:/A')),true);f.dispose();
+ });

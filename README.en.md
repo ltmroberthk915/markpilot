@@ -20,6 +20,11 @@
 
 
 **1.1.1:** switching conversations restores only the note from that working directory; the file list no longer opens by itself and appears when you click **Markdown**. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.1.1`
+
+
+
+**1.1.2:** the × close memory follows the document you actually closed, and only a real close counts; open a document from that directory again to restore automatic opening. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.1.2`
+
 *Historical product and version details remain below. Use the 1.1.0 instructions above for the current DSH plugin.*
 
 
@@ -926,6 +931,14 @@ Open the most recently used Markdown note for the current working directory, the
 
 ### MarkPilot for DSH 1.1.1 · A quieter open
 
-Switching conversations restores your note only when that working directory has one. A fresh directory keeps the conversation view quiet instead of opening the file list, and a document from another directory steps aside. The Files panel or a blank note opens when you click Markdown, following the settings under Settings → Markdown 编辑器 → 打开与切换. Conversations in the same directory keep the current document, unsaved edits included. Closing the editor with × is remembered per working directory: conversations there open without the editor or the file list until you open Markdown again.
+Switching conversations restores your note only when that working directory has one. A fresh directory keeps the conversation view quiet instead of opening the file list, and a document from another directory steps aside. The Files panel or a blank note opens when you click Markdown, following the settings under Settings → Markdown 编辑器 → 打开与切换. Conversations in the same directory keep the current document, unsaved edits included. Closing the editor with × is remembered per working directory: conversations there open without the editor or the file list until you open a document from that directory again (click Markdown, or open it from the file tree). Unsaved drafts stay on disk and are restored when you click Markdown.
 
 [Get DSH plugin 1.1.1](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.1), or install `dsh-markdown-typora@1.1.1`.
+
+
+
+### MarkPilot for DSH 1.1.2 · The project you closed is the project that stays quiet
+
+Closing the editor with × remembers the working directory of the document you actually closed. Close a note that belongs to one project while a conversation from another project is in front, and the note’s own directory is what stays closed; other projects keep following the opening rules. A close that cannot complete yet (content still being kept safe) leaves no memory and the editor stays open with a notice. Opening a document from that directory again — Markdown, the recent list, or the file tree — restores automatic opening.
+
+[Get DSH plugin 1.1.2](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.2), or install `dsh-markdown-typora@1.1.2`.
