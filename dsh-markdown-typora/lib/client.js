@@ -3965,12 +3965,19 @@ const __test = {
       if (!check || intent!==workspaceIntent || !check()) return;
       closeDocsWorkbench();
     }
-    async function openWorkspace(context) {
+    /**
+     * 打开当前会话工作目录的文档。
+     * options.auto：会话自动切换（点开会话、跨工作目录）触发。此时只恢复该目录**上一次打开的 Markdown**
+     * （含未保存的空白草稿），没有历史文档就什么都不打开——文件列表 / 空白稿只属于「点击 Markdown」的显式打开；
+     * 跟随模式下同时收起上一个目录的文档，避免跨目录误编辑。
+     */
+    async function openWorkspace(context, options) {
+      var auto=!!(options && options.auto);
       var intent=++workspaceIntent, cfg=readSettings(window.localStorage);
       const current=()=>intent===workspaceIntent && workspaceContext().sessionId===context.sessionId && workspaceContext().key===context.key;
-      if (!context.sessionId || !context.key) { workspaceMessage("请先选择有工作目录的会话。"); return; }
+      if (!context.sessionId || !context.key) { if(!auto) workspaceMessage("请先选择有工作目录的会话。"); return; }
       try {
-        var mode=cfg.workspaceOpenMode, entry=null;
+        var mode=auto ? "recent" : cfg.workspaceOpenMode, entry=null;
         if (mode==="recent") {
           var pending=pendingWorkspaceDraft(context);
           if (pending && pending.draft?.id && workspaceKey(pending.draft.cwd)===context.key) entry=pending;
@@ -3980,6 +3987,13 @@ const __test = {
             if (!result.ok) throw new Error(result.error?.message || "无法读取最近文档");
             var paths=result.value?.items || [];
             if (paths.length) entry={path:paths[0],address:absoluteFileAddress(paths[0]),workspace:context.cwd,sessionId:context.sessionId};
+            else if (auto) {
+              // 该工作目录没有上次打开的文档：不弹文件列表、不建空白稿。
+              // 若上个目录的文档还开着，跟随模式下把它收起（编辑区回到原生布局），
+              // 免得工作台列表已是新目录、编辑区还停在别处的文件上。
+              if (docsModeOn) { var leave=await prepareWorkspaceLeave(); if (current() && leave && leave()) closeDocsWorkbench(); }
+              return;
+            }
             else mode=cfg.workspaceEmptyMode;
           }
         }
@@ -4011,7 +4025,12 @@ const __test = {
         if (entry.draft && !pendingWorkspaceDraft(context,entry)) throw new Error("无法保留空白草稿，请检查本机存储空间。");
         workbenchDoc=entry; workspaceNotice=""; docsModeOn=true; clearClosedOverlayKeys();
         enableWorkbench(); bumpOverlay();
-      } catch(e) { if(current()) workspaceMessage(String(e?.message||e)); }
+      } catch(e) {
+        if(current()) {
+          if(!auto) workspaceMessage(String(e?.message||e));
+          else { try { console.warn("[markpilot] 自动恢复文档失败：",e); } catch(e2) { /* 忽略 */ } }
+        }
+      }
     }
     function installWorkspaceNavigation(ctx) {
       var stops=[], disposed=false, queued=false, previous=null;
@@ -4025,7 +4044,7 @@ const __test = {
           if(now.sessionId===previous.sessionId){previous=now;return;}
           var changed=now.key!==previous.key; previous=now;
           ++workspaceIntent; bumpOverlay();
-          if(changed && readSettings(window.localStorage).workspaceSwitchMode!=="keep")void openWorkspace(now);
+          if(changed && readSettings(window.localStorage).workspaceSwitchMode!=="keep")void openWorkspace(now,{auto:true});
         });
       }
       const bind=(c)=>{
@@ -4475,8 +4494,8 @@ const __test = {
         h("div", { style: group }, "打开与切换"),
         ...[
           ["workspaceOpenMode","点击 Markdown 时","按当前会话的工作目录打开。",[["recent","最近打开的 Markdown"],["files","工作目录文件列表"],["blank","新空白 Markdown"]]],
-          ["workspaceEmptyMode","没有最近文档时","独立于上方选项，仅在没有可用历史文档时生效。",[["files","工作目录文件列表"],["blank","新空白 Markdown"]]],
-          ["workspaceSwitchMode","切换到其他工作目录","同一工作目录内切换会话始终保留当前文档。",[["follow","按打开规则切换"],["keep","保持当前文档"]]]
+          ["workspaceEmptyMode","没有最近文档时","独立于上方选项，仅在点击 Markdown、且该工作目录没有历史文档时生效；切换会话不会自动弹出。",[["files","工作目录文件列表"],["blank","新空白 Markdown"]]],
+          ["workspaceSwitchMode","切换到其他工作目录","同一工作目录内切换会话始终保留当前文档。跨目录时只恢复该目录上次打开的文档；没有历史文档就收起编辑区，需点 Markdown 才按上方规则打开。",[["follow","恢复该目录上次的文档"],["keep","保持当前文档"]]]
         ].map(([key,label,hint,choices])=>h(SettingsField,{key,label,hint},h("select",{value:settings[key],style:SettingsInputStyle({}),onChange:e=>save({[key]:e.target.value})},...choices.map(([value,label])=>h("option",{key:value,value},label))))),
         h("div", { style: group }, "文档"),
         h(SettingsField, {

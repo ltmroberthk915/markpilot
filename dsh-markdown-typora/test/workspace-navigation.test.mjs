@@ -4,11 +4,34 @@ import fixture from './fixtures/workspace-navigation.cjs';
 const {make,drain}=fixture;
 const flatten=t=>{const out=[];function visit(x){if(x===null||x===undefined)return;if(typeof x!=='object'){out.push(String(x));return;}out.push(x);for(const child of x.children||[])visit(child);}visit(t);return out;};
 
-test('navigation: seed/list/metadata/same-cwd do not open; closed cross-cwd does',async()=>{
+test('navigation: seed/list/metadata/same-cwd do not open',async()=>{
   const f=make(),stop=f.W.installWorkspaceNavigation(f.ctx);await drain();assert.equal(f.requests.length,0);
   f.setCwd('C','D:/Elsewhere');await drain();assert.equal(f.requests.length,0);
   f.setActive('A2');await drain();assert.equal(f.requests.length,0);
-  f.setActive('B');await drain();assert.equal(f.requests.length,1);assert.equal(f.W.state().docsModeOn,true);assert.equal(f.W.state().workbenchDoc.workspace,'D:/B');stop();f.dispose();
+  stop();f.dispose();
+ });
+test('navigation: cross-workspace switch restores that directory’s remembered document',async()=>{
+  const f=make();f.setFetch(()=>({ok:true,value:{items:['D:/B/b.md']}}));
+  const stop=f.W.installWorkspaceNavigation(f.ctx);await drain();
+  f.setActive('B');await drain();
+  assert.equal(f.W.state().docsModeOn,true);assert.equal(f.W.state().workbenchDoc.path,'D:/B/b.md');
+  assert.equal(f.opens.length,0,'session switch must not open the file list');stop();f.dispose();
+ });
+test('navigation: cross-workspace switch without a remembered document opens nothing',async()=>{
+  const blank=make(),stopB=blank.W.installWorkspaceNavigation(blank.ctx);await drain();
+  blank.setActive('B');await drain();
+  assert.equal(blank.opens.length,0,'no file list on session switch');assert.equal(blank.W.state().docsModeOn,false);assert.equal(blank.W.state().workbenchDoc,null);stopB();blank.dispose();
+  const files=make({settings:{workspaceEmptyMode:'files'}}),stopF=files.W.installWorkspaceNavigation(files.ctx);await drain();
+  files.setActive('B');await drain();
+  assert.equal(files.opens.length,0,'native files panel must not pop up on session switch');assert.equal(files.W.state().docsModeOn,false);stopF();files.dispose();
+ });
+test('explicit open still applies the empty fallback: files panel',async()=>{
+  const f=make({settings:{workspaceEmptyMode:'files'}});await f.W.openWorkspace(f.context());
+  assert.equal(f.opens.length,1);assert.equal(f.opens[0].kind,'files');assert.equal(f.W.state().docsModeOn,false);f.dispose();
+ });
+test('explicit open still applies the empty fallback: blank document',async()=>{
+  const f=make({settings:{workspaceEmptyMode:'blank'}});await f.W.openWorkspace(f.context());
+  assert.equal(f.opens.length,0);assert.equal(f.W.state().docsModeOn,true);assert.match(f.W.state().workbenchDoc.path,/^D:\/A\/未命名-/);f.dispose();
  });
 test('open intent: late B cannot replace newer C',async()=>{
   const f=make(),pending=[];f.setFetch(req=>new Promise(resolve=>pending.push({req,resolve})));
@@ -75,4 +98,25 @@ test('native target hidden during durable leave must not replace workbench',asyn
   await f.W.chooseWorkbenchDoc({path:'D:/A/work.md',address:'dsh-resource://file/absolute/D%3A/A/work.md'});let release;
   f.W.editorLeaveGuards.set('held',()=>new Promise(resolve=>release=resolve));tab={...tab,navigation:{revision:2}};f.render(f.W.EditorTabRedirect,props);await drain();assert.equal(typeof release,'function');
   tab={...tab,visible:false};f.render(f.W.EditorTabRedirect,props);release(()=>true);await drain();assert.equal(f.W.state().docsModeOn,true);f.dispose();
+ });
+
+test('navigation: switching to a workspace without history closes the previous document',async()=>{
+  const f=make();await f.W.chooseWorkbenchDoc({path:'D:/A/a.md',address:'dsh-resource://file/absolute/D%3A/A/a.md',workspace:'D:/A',sessionId:'A'});
+  assert.equal(f.W.state().docsModeOn,true);
+  const stop=f.W.installWorkspaceNavigation(f.ctx);await drain();f.setActive('B');await drain();
+  assert.equal(f.opens.length,0,'no file list on session switch');assert.equal(f.W.state().docsModeOn,false,'the previous document is tucked away');stop();f.dispose();
+ });
+test('navigation: an unsaved blank draft is restored on switch',async()=>{
+  const f=make();f.storage.set('dsh.markpilot.workspace-drafts.v1',JSON.stringify({'d:/b':{path:'D:/B/未命名-abc.md',address:'dsh-resource://file/absolute/D%3A/B/%E6%9C%AA%E5%91%BD%E5%90%8D-abc.md',workspace:'D:/B',sessionId:'B',draft:{id:'abc',cwd:'D:/B'}}}));
+  const stop=f.W.installWorkspaceNavigation(f.ctx);await drain();f.setActive('B');await drain();
+  assert.equal(f.W.state().docsModeOn,true);assert.match(f.W.state().workbenchDoc.path,/未命名-abc/);assert.equal(f.requests.length,0,'a blank draft needs no recent query');stop();f.dispose();
+ });
+test('navigation: a failed recent query neither notifies nor opens',async()=>{
+  const f=make();f.setFetch(()=>({ok:false,error:{message:'boom'}}));const warns=[],real=console.warn;console.warn=(...a)=>warns.push(a.join(' '));
+  let stop;try{stop=f.W.installWorkspaceNavigation(f.ctx);await drain();f.setActive('B');await drain();}finally{console.warn=real;stop&&stop();}
+  assert.equal(f.W.state().workspaceNotice,'');assert.equal(f.W.state().docsModeOn,false);assert.ok(warns.length>=1,'auto failures leave a diagnostic warning');f.dispose();
+ });
+test('navigation: an empty switch issues exactly one recent query',async()=>{
+  const f=make();const stop=f.W.installWorkspaceNavigation(f.ctx);await drain();f.setActive('B');await drain();
+  assert.equal(f.requests.length,1);assert.equal(f.requests[0].payload.op,'list');assert.equal(f.requests[0].payload.workspace,'D:/B');assert.equal(f.W.state().workspaceNotice,'');stop();f.dispose();
  });
