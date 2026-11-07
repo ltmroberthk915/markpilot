@@ -25,6 +25,9 @@
 
 **1.1.2:** the × close memory follows the document you actually closed, and only a real close counts; open a document from that directory again to restore automatic opening. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.1.2`
 
+**1.2.0:** Markdown files opened from a conversation link or restored by a working directory now open in the same workspace as clicking Markdown, with the file list and the floating collapse/close buttons; **Settings → Markdown 编辑器 → 打开与切换 → 被动打开的文档** switches back to the full-width view. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.2.0`
+
+
 *Historical product and version details remain below. Use the 1.1.0 instructions above for the current DSH plugin.*
 
 
@@ -942,3 +945,9 @@ Switching conversations restores your note only when that working directory has 
 Closing the editor with × remembers the working directory of the document you actually closed. Close a note that belongs to one project while a conversation from another project is in front, and the note’s own directory is what stays closed; other projects keep following the opening rules. A close that cannot complete yet (content still being kept safe) leaves no memory and the editor stays open with a notice. Opening a document from that directory again — Markdown, the recent list, or the file tree — restores automatic opening.
 
 [Get DSH plugin 1.1.2](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.2), or install `dsh-markdown-typora@1.1.2`.
+
+### MarkPilot for DSH 1.2.0 · The same controls wherever a document opens
+
+A Markdown file clicked in a conversation, or restored by a working directory when you switch conversations, used to open with a single close button. It now opens in the document workspace by default: the file list and recent notes on the left, and the collapse/close buttons in the top-left corner, exactly like clicking Markdown. Prefer the full-width view? **Settings → Markdown 编辑器 → 打开与切换 → 被动打开的文档** switches to “全宽浮层（仅右上角关闭）”. Closing with × is still remembered.
+
+[Get DSH plugin 1.2.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.2.0), or install `dsh-markdown-typora@1.2.0`.

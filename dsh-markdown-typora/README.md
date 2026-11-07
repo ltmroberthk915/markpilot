@@ -23,6 +23,9 @@
 
 **1.1.2：** × 关闭记忆按你关掉的那份文档所属目录记录，关闭成功才生效。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.1.2`
 
+**1.2.0：** 对话里的文件链接、切会话恢复的 Markdown 默认按文档工作台打开（左列表 + 左上角收起/关闭按钮）；设置里可改回全宽浮层。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.2.0`
+
+
 [下载 1.1.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.0) · [npm](https://www.npmjs.com/package/dsh-markdown-typora/v/1.1.0)
 
 ## MarkPilot for DSH 1.1 · An IDE-style Markdown workspace beside your AI
@@ -45,6 +48,9 @@
 
 
 **1.1.2:** the × close memory follows the document you actually closed, and only a real close counts. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.1.2`
+
+**1.2.0:** a Markdown file opened from a conversation link or restored by a working directory opens in the document workspace by default (file list and the floating collapse/close buttons); a setting switches back to the full-width view. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.2.0`
+
 
 [Get 1.1.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.0)
 
@@ -202,3 +208,12 @@ Install `dsh-markdown-typora@1.1.1` or the matching GitHub release archive, then
 Closing the editor with × remembers the working directory of the document you actually closed, not the conversation in front. A close that cannot complete yet leaves no memory. Opening a document from that directory again restores automatic opening.
 
 Install `dsh-markdown-typora@1.1.2` or the matching GitHub release archive, then restart DSH.
+
+
+## MarkPilot for DSH 1.2.0 · 被动打开也带那组按钮 / Same controls wherever a document opens
+
+对话里的文件链接、切会话时恢复的 Markdown 默认按文档工作台打开（左列表 + 左上角收起/关闭按钮），与点 Markdown 一致；可在设置里改回全宽浮层。
+
+A Markdown file opened from a conversation link or restored by a working directory opens in the document workspace by default, with the file list and the floating collapse/close buttons. A setting switches back to the full-width view.
+
+Install `dsh-markdown-typora@1.2.0` or the matching GitHub release archive, then restart DSH.

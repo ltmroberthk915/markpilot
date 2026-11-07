@@ -2073,6 +2073,9 @@ const SETTINGS_DEFAULTS = {
   workspaceOpenMode: "recent",
   workspaceEmptyMode: "files",
   workspaceSwitchMode: "follow",
+  // 被动打开（对话里的文件链接、切会话恢复的 md）：默认与点击 Markdown 相同（文档工作台），
+  // 也可选回"全宽浮层"（只有右上角关闭按钮）。没有显式设置过的存档按默认走。
+  passiveOpenMode: "workbench",
   docsTemplate: "# {title}\n\n",
   transparent: true,     // 编辑区透明：让应用背景（含 dream-skin 皮肤）透上来
   keepResizeHandlesAfterClose: false,
@@ -2096,6 +2099,7 @@ function readSettings(storage) {
     workspaceOpenMode: SETTINGS_DEFAULTS.workspaceOpenMode,
     workspaceEmptyMode: SETTINGS_DEFAULTS.workspaceEmptyMode,
     workspaceSwitchMode: SETTINGS_DEFAULTS.workspaceSwitchMode,
+    passiveOpenMode: SETTINGS_DEFAULTS.passiveOpenMode,
     docsTemplate: SETTINGS_DEFAULTS.docsTemplate,
     transparent: SETTINGS_DEFAULTS.transparent,
     docsListCollapsed: SETTINGS_DEFAULTS.docsListCollapsed,
@@ -2121,6 +2125,7 @@ function readSettings(storage) {
     if (["recent", "files", "blank"].includes(s.workspaceOpenMode)) out.workspaceOpenMode=s.workspaceOpenMode;
     if (["files", "blank"].includes(s.workspaceEmptyMode)) out.workspaceEmptyMode=s.workspaceEmptyMode;
     if (["follow", "keep"].includes(s.workspaceSwitchMode)) out.workspaceSwitchMode=s.workspaceSwitchMode;
+    if (["workbench", "overlay"].includes(s.passiveOpenMode)) out.passiveOpenMode=s.passiveOpenMode;
     if (typeof s.docsTemplate === "string") out.docsTemplate = s.docsTemplate;
     if (typeof s.transparent === "boolean") out.transparent = s.transparent;
     if (typeof s.keepResizeHandlesAfterClose === "boolean") out.keepResizeHandlesAfterClose = s.keepResizeHandlesAfterClose;
@@ -2147,6 +2152,7 @@ function writeSettings(storage, patch) {
   if (!["recent", "files", "blank"].includes(next.workspaceOpenMode)) next.workspaceOpenMode="recent";
   if (!["files", "blank"].includes(next.workspaceEmptyMode)) next.workspaceEmptyMode="files";
   if (!["follow", "keep"].includes(next.workspaceSwitchMode)) next.workspaceSwitchMode="follow";
+  if (!["workbench", "overlay"].includes(next.passiveOpenMode)) next.passiveOpenMode="workbench";
   if (typeof next.docsFolder !== "string") next.docsFolder = "";
   if (typeof next.docsTemplate !== "string") next.docsTemplate = SETTINGS_DEFAULTS.docsTemplate;
   next.transparent = next.transparent !== false;
@@ -4561,7 +4567,8 @@ const __test = {
         ...[
           ["workspaceOpenMode","点击 Markdown 时","按当前会话的工作目录打开。",[["recent","最近打开的 Markdown"],["files","工作目录文件列表"],["blank","新空白 Markdown"]]],
           ["workspaceEmptyMode","没有最近文档时","独立于上方选项，仅在点击 Markdown、且该工作目录没有历史文档时生效；切换会话不会自动弹出。",[["files","工作目录文件列表"],["blank","新空白 Markdown"]]],
-          ["workspaceSwitchMode","切换到其他工作目录","同一工作目录内切换会话始终保留当前文档。跨目录时只恢复该目录上次打开的文档；没有历史文档就收起编辑区，需点 Markdown 才按上方规则打开。",[["follow","恢复该目录上次的文档"],["keep","保持当前文档"]]]
+          ["workspaceSwitchMode","切换到其他工作目录","同一工作目录内切换会话始终保留当前文档。跨目录时只恢复该目录上次打开的文档；没有历史文档就收起编辑区，需点 Markdown 才按上方规则打开。",[["follow","恢复该目录上次的文档"],["keep","保持当前文档"]]],
+          ["passiveOpenMode","被动打开的文档","对话里的文件链接、切换会话时恢复的 .md。默认与点击 Markdown 相同：带左侧文件列表和左上角的收起/关闭按钮。",[["workbench","与点 Markdown 相同"],["overlay","全宽浮层（仅右上角关闭）"]]]
         ].map(([key,label,hint,choices])=>h(SettingsField,{key,label,hint},h("select",{value:settings[key],style:SettingsInputStyle({}),onChange:e=>save({[key]:e.target.value})},...choices.map(([value,label])=>h("option",{key:value,value},label))))),
         h("div", { style: group }, "文档"),
         h(SettingsField, {
@@ -4662,6 +4669,31 @@ const __test = {
       return React.createElement(EditorTabRedirect, props);
     }
 
+    /** 原生 md 标签 → 工作台条目：被动打开时用它把文档接进带左列表的工作台。 */
+    function workbenchEntryOfNative(tab, sessionId) {
+      var native = parseFileAddress(tab && tab.contentId);
+      if (!native) return null;
+      var sid = native.sessionId || sessionId || "";
+      var cwd = currentCwd(sid) || "";
+      var path = absolutePath(native.path, cwd);
+      if (!path) return null;
+      return { path: path, address: absoluteFileAddress(path), workspace: cwd, sessionId: sid };
+    }
+
+    /** 被动打开的 .md（文件链接 / 切会话恢复）接进工作台；受「被动打开」设置与关闭记忆约束。 */
+    function routePassiveNativeDoc(tab, sessionId) {
+      try {
+        if (readSettings(window.localStorage).passiveOpenMode === "overlay") return false;
+        var key = docKeyOf(tab);
+        if (!key || !overlayDocs.has(key)) return false;   // 未公布，或已被用户显式关闭
+        var entry = workbenchEntryOfNative(tab, sessionId);
+        if (!entry) return false;
+        if (docsModeOn && workbenchDoc && workspaceKey(workbenchDoc.path) === workspaceKey(entry.path)) return false;
+        void chooseWorkbenchDoc(entry);
+        return true;
+      } catch (e) { return false; }
+    }
+
     /** 布局开启时：公布文档、渲染占位，把 iframe 让给浮层。
      *  deps 里带上 visible：切到另一个 md tab 时本 tab 会变不可见，
      *  必须重发布一次让活跃文档跟着切换。 */
@@ -4681,6 +4713,10 @@ const __test = {
         var explicit=previous.key===key && previous.signal===tab?.signal && navigation>previous.revision;
         previousNavigation.current={key,signal:tab?.signal,revision:navigation};
         publishOverlayDoc({ tab: tab, sessionId: props.sessionId, inputActions: props.inputActions, explicit:explicit });
+        // 被动打开（对话里的文件链接、切会话恢复的文档）：默认接进文档工作台，
+        // 左侧列表与左上角「收起/关闭」两个按钮就与点 Markdown 打开时一致；
+        // 设置里选「全宽浮层」时保持原样（只有右上角关闭按钮）。
+        if (!explicit && visible) routePassiveNativeDoc(tab, props.sessionId);
         return function () { unpublishOverlayDoc(tab); };
       }, [key, visible, navigation]);
       var shown = !docsModeOn && !!(overlayDoc && docKeyOf(overlayDoc.tab) === key);

@@ -179,3 +179,37 @@ test('overlay × marks the document directory and closes the stage',async()=>{
   assert.ok(btn,'overlay close button is rendered');btn.props.onClick();await drain();
   assert.equal(f.W.state().overlayDoc,null);assert.equal(f.W.workspaceAutoOpenSuppressed(f.W.workspaceKey('D:/A')),true);f.dispose();
  });
+
+test('a passive native Markdown tab opens in the workbench by default',async()=>{
+  const f=make(),signal=new AbortController().signal;
+  const tab={id:'native-md',contentId:'dsh-resource://file/absolute/D%3A/A/native.md',visible:true,navigation:{revision:1},signal};
+  f.render(f.W.EditorTabRedirect,{sessionId:'A',useTabInfo:()=>({tab})});await drain();
+  assert.equal(f.W.state().docsModeOn,true,'the workbench opens with the document');
+  assert.equal(f.W.state().workbenchDoc.path,'D:/A/native.md');
+  const tree=flatten(f.render(f.W.DocsWorkbench));
+  assert.ok(tree.find(x=>x&&x.props&&x.props['data-mp-rail-action']==='close'),'the floating close button is rendered');
+  assert.ok(tree.find(x=>x&&x.props&&x.props['data-mp-rail-action']==='toggle'),'the list toggle is rendered');f.dispose();
+ });
+test('the overlay setting keeps a passive native tab full-width',async()=>{
+  const f=make({settings:{passiveOpenMode:'overlay'}}),signal=new AbortController().signal;
+  const tab={id:'native-md',contentId:'dsh-resource://file/absolute/D%3A/A/native.md',visible:true,navigation:{revision:1},signal};
+  f.render(f.W.EditorTabRedirect,{sessionId:'A',useTabInfo:()=>({tab})});await drain();
+  assert.equal(f.W.state().docsModeOn,false);assert.equal(f.W.state().overlayDoc.tab.id,'native-md');f.dispose();
+ });
+test('a document closed with × is not reopened by a restored native tab',async()=>{
+  const f=make(),signal=new AbortController().signal;
+  const tab={id:'native-md',contentId:'dsh-resource://file/absolute/D%3A/A/native.md',visible:true,navigation:{revision:1},signal};
+  f.render(f.W.EditorTabRedirect,{sessionId:'A',useTabInfo:()=>({tab})});await drain();
+  const tree=flatten(f.render(f.W.DocsWorkbench));
+  tree.find(x=>x&&x.props&&x.props['data-mp-rail-action']==='close').props.onClick();await drain();
+  assert.equal(f.W.state().docsModeOn,false);
+  const reopened=f.W.routePassiveNativeDoc(tab,'A');await drain();
+  assert.equal(reopened,false,'the × memory keeps the restored tab out of the workbench');
+  assert.equal(f.W.state().docsModeOn,false);f.dispose();
+ });
+test('passive open mode validates and defaults to the workbench',async()=>{
+  const f=make(),s={getItem:k=>f.storage.get(k)||null,setItem:(k,v)=>f.storage.set(k,v)};
+  assert.equal(f.W.readSettings(s).passiveOpenMode,'workbench');
+  f.W.writeSettings(s,{passiveOpenMode:'bad'});assert.equal(f.W.readSettings(s).passiveOpenMode,'workbench');
+  f.W.writeSettings(s,{passiveOpenMode:'overlay'});assert.equal(f.W.readSettings(s).passiveOpenMode,'overlay');f.dispose();
+ });

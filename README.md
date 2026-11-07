@@ -25,6 +25,9 @@
 
 **1.1.2：** × 关闭记忆按你关掉的那份文档所属目录记录，关闭成功才生效；重新打开该目录的文档即恢复自动打开。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.1.2`
 
+**1.2.0：** 对话里的文件链接、切会话恢复的 Markdown 默认按「文档工作台」打开，左侧文件列表与左上角收起/关闭按钮和点 Markdown 一致；可在 设置 → Markdown 编辑器 → 打开与切换 → 被动打开的文档 改回全宽浮层。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.2.0`
+
+
 *以下保留各产品与历史版本介绍；DSH 插件当前安装方式以本节 1.1.0 为准。*
 
 
@@ -935,3 +938,9 @@ CRLF 换行的文件改一个字保存后，以前会**整篇变成 LF**（记�
 用 × 关掉编辑区时，记住的是你关掉的那份文档所属的工作目录：在别的项目对话前关掉另一份笔记，被记住的是那份笔记自己的目录，其他项目照常按规则打开。关闭没真正完成（内容还在安全留存中）时不会留下记忆，编辑区保持打开并给出提示。重新打开该目录里的文档（点 Markdown、从最近列表选择，或从文件树打开）即恢复自动打开。
 
 [下载 DSH 插件 1.1.2](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.2)，或安装 `dsh-markdown-typora@1.1.2`。
+
+### MarkPilot for DSH 1.2.0 · 被动打开也带那组按钮
+
+对话里的文件链接、切会话时恢复的 Markdown，以前只在右上角有一个关闭按钮；现在默认按「文档工作台」打开：左侧是文件列表与最近文档，左上角是收起文件列表、关闭工作台两个按钮，和点 Markdown 打开完全一致。想回到全宽只看文档，去 设置 → Markdown 编辑器 → 打开与切换 → 被动打开的文档 选「全宽浮层（仅右上角关闭）」。用 × 关掉编辑区的记忆照旧生效。
+
+[下载 DSH 插件 1.2.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.2.0)，或安装 `dsh-markdown-typora@1.2.0`。
