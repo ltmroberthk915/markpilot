@@ -213,3 +213,43 @@ test('passive open mode validates and defaults to the workbench',async()=>{
   f.W.writeSettings(s,{passiveOpenMode:'bad'});assert.equal(f.W.readSettings(s).passiveOpenMode,'workbench');
   f.W.writeSettings(s,{passiveOpenMode:'overlay'});assert.equal(f.W.readSettings(s).passiveOpenMode,'overlay');f.dispose();
  });
+
+test('a host-restored Markdown preview tab is adopted into the workbench',async()=>{
+  const f=make();
+  f.setOpenTabs([{sessionId:'A',tabId:'t1',kind:'text',contentId:'dsh-resource://file/absolute/D%3A/A/native.md'}]);
+  const adopted=f.W.adoptOpenNativeDocs();await drain();
+  assert.equal(adopted,true);assert.equal(f.W.state().docsModeOn,true);assert.equal(f.W.state().workbenchDoc.path,'D:/A/native.md');
+  f.dispose();
+ });
+test('adoption stays off in the overlay mode and for suppressed directories',async()=>{
+  const overlay=make({settings:{passiveOpenMode:'overlay'}});
+  overlay.setOpenTabs([{sessionId:'A',tabId:'t1',kind:'text',contentId:'dsh-resource://file/absolute/D%3A/A/native.md'}]);
+  assert.equal(overlay.W.adoptOpenNativeDocs(),false);assert.equal(overlay.W.state().docsModeOn,false);overlay.dispose();
+  const closed=make();
+  closed.W.setWorkspaceAutoOpenSuppressed(closed.W.workspaceKey('D:/A'),true);
+  closed.setOpenTabs([{sessionId:'A',tabId:'t1',kind:'text',contentId:'dsh-resource://file/absolute/D%3A/A/native.md'}]);
+  assert.equal(closed.W.adoptOpenNativeDocs(),false,'a directory closed with × stays closed');assert.equal(closed.W.state().docsModeOn,false);closed.dispose();
+ });
+test('adoption never takes over while an editor is already open',async()=>{
+  const f=make();await f.W.chooseWorkbenchDoc({path:'D:/A/work.md',address:'dsh-resource://file/absolute/D%3A/A/work.md',workspace:'D:/A',sessionId:'A'});
+  f.setOpenTabs([{sessionId:'A',tabId:'t1',kind:'text',contentId:'dsh-resource://file/absolute/D%3A/A/native.md'}]);
+  assert.equal(f.W.adoptOpenNativeDocs(),false);assert.equal(f.W.state().workbenchDoc.path,'D:/A/work.md');f.dispose();
+ });
+
+test('adopting Markdown preview tabs collapses a right sidebar that holds only Markdown',async()=>{
+  const f=make();
+  f.setOpenTabs([{sessionId:'A',tabId:'t1',kind:'text',contentId:'dsh-resource://file/absolute/D%3A/A/native.md'}]);
+  f.W.adoptOpenNativeDocs();await drain();
+  await new Promise((resolve)=>setTimeout(resolve,460));
+  assert.equal(f.rightbarCloses(),1,'the duplicate-only right sidebar is collapsed');f.dispose();
+ });
+test('a right sidebar with other tabs is left alone',async()=>{
+  const f=make();
+  f.setOpenTabs([
+    {sessionId:'A',tabId:'t1',kind:'text',contentId:'dsh-resource://file/absolute/D%3A/A/native.md'},
+    {sessionId:'A',tabId:'t2',kind:'files',contentId:'dsh-resource://page/files'}
+  ]);
+  f.W.adoptOpenNativeDocs();await drain();
+  await new Promise((resolve)=>setTimeout(resolve,460));
+  assert.equal(f.rightbarCloses(),0);f.dispose();
+ });

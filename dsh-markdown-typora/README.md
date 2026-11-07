@@ -25,6 +25,9 @@
 
 **1.2.0：** 对话里的文件链接、切会话恢复的 Markdown 默认按文档工作台打开（左列表 + 左上角收起/关闭按钮）；设置里可改回全宽浮层。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.2.0`
 
+**1.2.1：** DSH 重启后恢复的 .md 标签也会被接管进文档工作台，不再停在宿主预览里。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.2.1`
+
+
 
 [下载 1.1.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.0) · [npm](https://www.npmjs.com/package/dsh-markdown-typora/v/1.1.0)
 
@@ -50,6 +53,9 @@
 **1.1.2:** the × close memory follows the document you actually closed, and only a real close counts. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.1.2`
 
 **1.2.0:** a Markdown file opened from a conversation link or restored by a working directory opens in the document workspace by default (file list and the floating collapse/close buttons); a setting switches back to the full-width view. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.2.0`
+
+**1.2.1:** Markdown tabs restored at startup are adopted into the document workspace instead of staying in the right-side preview. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.2.1`
+
 
 
 [Get 1.1.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.1.0)
@@ -217,3 +223,12 @@ Install `dsh-markdown-typora@1.1.2` or the matching GitHub release archive, then
 A Markdown file opened from a conversation link or restored by a working directory opens in the document workspace by default, with the file list and the floating collapse/close buttons. A setting switches back to the full-width view.
 
 Install `dsh-markdown-typora@1.2.0` or the matching GitHub release archive, then restart DSH.
+
+
+## MarkPilot for DSH 1.2.1 · 重启后恢复的文档也进工作台
+
+DSH 重启后恢复的 .md 标签会被接管进文档工作台，不再停在宿主预览；只含这些预览的右栏会被收起；设置里可改回全宽浮层。× 关闭记忆保持不变。
+
+Markdown tabs restored at startup are adopted into the document workspace instead of staying in the right-side preview; the setting switches back to the full-width view. Closing with × keeps its meaning.
+
+Install `dsh-markdown-typora@1.2.1` or the matching GitHub release archive, then restart DSH.

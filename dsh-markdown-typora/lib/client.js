@@ -4106,6 +4106,9 @@ const __test = {
           var changed=now.key!==previous.key; previous=now;
           ++workspaceIntent; bumpOverlay();
           if(changed && readSettings(window.localStorage).workspaceSwitchMode!=="keep")void openWorkspace(now,{auto:true});
+          // 自动恢复没打开文档时（例如该目录被 × 记忆压住、或没有历史文档），
+          // 把宿主右栏已经打开的 md 标签接进中间，别让会话看起来「点了没反应」。
+          setTimeout(function(){ if(!disposed) adoptOpenNativeDocs(); }, 260);
         });
       }
       const bind=(c)=>{
@@ -4690,7 +4693,65 @@ const __test = {
         if (!entry) return false;
         if (docsModeOn && workbenchDoc && workspaceKey(workbenchDoc.path) === workspaceKey(entry.path)) return false;
         void chooseWorkbenchDoc(entry);
+        setTimeout(function () { collapseDuplicateRightbar(); }, 400);
         return true;
+      } catch (e) { return false; }
+    }
+
+    /**
+     * 文档已经接进中间编辑区后，若右侧栏里只剩这些 Markdown 预览标签，就把右侧栏收起。
+     * 宿主在恢复会话布局时会自己把右栏展开，看起来像「点了会话就弹出文件栏」。
+     */
+    function collapseDuplicateRightbar() {
+      try {
+        var sr = hostSidebarRight || (docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("sidebarRight") : null);
+        var list = sr && sr.openTabs && typeof sr.openTabs.getSnapshot === "function" ? sr.openTabs.getSnapshot() : null;
+        if (!Array.isArray(list) || !list.length) return;
+        var context = workspaceContext();
+        var onlyMarkdown = list.every(function (item) {
+          if (!item || !item.contentId) return false;
+          if (context.sessionId && item.sessionId && item.sessionId !== context.sessionId) return true;
+          var native = parseFileAddress(item.contentId);
+          return !!(native && /\.(md|markdown)$/i.test(String(native.path || "")));
+        });
+        if (!onlyMarkdown) return;
+        var lay = docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("layout") : null;
+        if (lay && typeof lay.closeRightbar === "function") lay.closeRightbar();
+      } catch (e) { /* 忽略 */ }
+    }
+
+    /**
+     * 接管宿主已经打开 / 重启后恢复的 .md 标签：DSH 会先把上次的 md 标签恢复成自带预览，
+     * 那一步早于本插件注册 tab 类型，所以它们不会经过 EditorTabRedirect。这里从
+     * sidebarRight.openTabs 清单里找出来，接进文档工作台（与点 Markdown 一致的形态）。
+     * 只在「当前还没有编辑器开着」时接管，避免抢掉自动恢复已经打开的文档。
+     */
+    function adoptOpenNativeDocs() {
+      try {
+        if (readSettings(window.localStorage).enabled !== true) return false;
+        if (readSettings(window.localStorage).passiveOpenMode === "overlay") return false;
+        if (docsModeOn) return false;
+        var sr = hostSidebarRight || (docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("sidebarRight") : null);
+        var store = sr && sr.openTabs;
+        if (!store || typeof store.getSnapshot !== "function") return false;
+        var list = store.getSnapshot();
+        if (!Array.isArray(list) || !list.length) return false;
+        var context = workspaceContext();
+        for (var item of list) {
+          if (!item || !item.contentId) continue;
+          if (context.sessionId && item.sessionId && item.sessionId !== context.sessionId) continue;
+          if (item.kind === TAB_KIND) continue;                       // 已经是本插件的标签
+          var native = parseFileAddress(item.contentId);
+          if (!native || !/\.(md|markdown)$/i.test(String(native.path || ""))) continue;
+          var entry = workbenchEntryOfNative({ contentId: item.contentId }, item.sessionId || context.sessionId);
+          if (!entry) continue;
+          if (workspaceAutoOpenSuppressed(workspaceKey(entry.workspace || context.cwd))) continue;
+          if (workbenchDoc && workspaceKey(workbenchDoc.path) === workspaceKey(entry.path)) return false;
+          void chooseWorkbenchDoc(entry);
+          setTimeout(function () { collapseDuplicateRightbar(); }, 400);
+          return true;
+        }
+        return false;
       } catch (e) { return false; }
     }
 
@@ -6391,6 +6452,18 @@ const __test = {
           });
         } catch (e) { /* 忽略 */ }
       }
+
+      // ①-b 启动接管：DSH 会先把上次的 md 标签恢复成自带预览，那一步早于本插件注册 tab 类型，
+      //     这批标签不会经过 EditorTabRedirect。开机后分几个时间点扫一次 openTabs，把它们接进工作台。
+      try {
+        runEffect(() => {
+          var timers = [];
+          [0, 350, 1200, 3000, 6000].forEach(function (delay) {
+            timers.push(setTimeout(function () { adoptOpenNativeDocs(); }, delay));
+          });
+          return function () { for (var t of timers) clearTimeout(t); };
+        }, "dsh-markdown-typora: adopt open documents");
+      } catch (e) { /* 忽略 */ }
 
       // 诊断：哪些宿主服务在插件上下文里真的可达（决定 openResource 能不能用）。
       try {
