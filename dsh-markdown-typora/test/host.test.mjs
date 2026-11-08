@@ -17,12 +17,15 @@ import {
   isNotModified,
   cacheControlFor,
   mimeFor,
-  isTrustedLoopbackRequest,
+  hostAuthCapability,
   errorCode,
   BODY_MAX_BYTES,
 } from '../lib/index.js';
 
 const SILENT_LOG = { info() {}, warn() {} };
+/** 测试默认宿主：有 connection 认证能力且放行（真实宿主由 connection 服务判定）。 */
+const ALLOW_CONNECTION = { requestRejection: () => undefined };
+const ALLOW_PROVIDER = () => ALLOW_CONNECTION;
 
 /** 统一成普通 JSON 值，避免不同来源对象原型差异影响 deepEqual。 */
 function plain(value) {
@@ -113,7 +116,7 @@ function createMockContext(fs, options = {}) {
     fs,
     get(name) {
       if (name === 'fs') return fs;
-      if (name === 'connection') return options.connection;
+      if (name === 'connection') return 'connection' in options ? options.connection : ALLOW_CONNECTION;
       return undefined;
     },
     webServer: {
@@ -314,14 +317,13 @@ test('路径穿越防护：../、编码 ..、绝对路径、盘符、NUL、坏�
   for (const candidate of bad) assert.equal(resolveStaticTarget(root, candidate), null, String(candidate));
 });
 
-test('loopback 栅栏：host / sec-fetch-site / origin 三查', () => {
-  assert.equal(isTrustedLoopbackRequest({ headers: { host: '127.0.0.1:8080' } }), true);
-  assert.equal(isTrustedLoopbackRequest({ headers: { host: 'localhost:8080' } }), true);
-  assert.equal(isTrustedLoopbackRequest({ headers: { host: 'evil.example' } }), false);
-  assert.equal(isTrustedLoopbackRequest({ headers: { host: '127.0.0.1:8080', 'sec-fetch-site': 'cross-site' } }), false);
-  assert.equal(isTrustedLoopbackRequest({ headers: { host: '127.0.0.1:8080', origin: 'http://127.0.0.1:8080' } }), true);
-  assert.equal(isTrustedLoopbackRequest({ headers: { host: '127.0.0.1:8080', origin: 'http://evil.example' } }), false);
-  assert.equal(isTrustedLoopbackRequest({ headers: {} }), false);
+test('宿主认证能力检测：只有函数形态的 requestRejection 才算可用', () => {
+  assert.equal(hostAuthCapability({ requestRejection: () => undefined }), true);
+  assert.equal(hostAuthCapability({ requestRejection: true }), false);
+  assert.equal(hostAuthCapability({ requestRejection: null }), false);
+  assert.equal(hostAuthCapability({}), false);
+  assert.equal(hostAuthCapability(undefined), false);
+  assert.equal(hostAuthCapability(null), false);
 });
 
 test('错误码原样透传（含 cause.code / AbortError）', () => {
@@ -424,11 +426,8 @@ test('apply(ctx) 挂 prefix 路由；open/save/stat/edit 走 mock ctx.fs 与真�
     });
     assert.equal(wrongType.status, 415);
 
-    // loopback 栅栏：外部 Host / 跨站 Origin 一律 403
-    const evilHost = await postJson(port, '/dsh-markdown-typora/api/open', { path: 'D:/docs/a.md' }, { host: 'evil.example' });
-    assert.equal(evilHost.status, 403);
-    const evilOrigin = await postJson(port, '/dsh-markdown-typora/api/open', { path: 'D:/docs/a.md' }, { origin: 'http://evil.example' });
-    assert.equal(evilOrigin.status, 403);
+    // Host/Origin 判定完全交给宿主 requestRejection（本用例默认放行）；插件不再自带
+    // loopback 判定 —— 放行/拒绝的边界见“requestRejection 决定放行/拒绝”用例。
   } finally {
     destroySse(sseMain);
     destroySse(sseOther);
@@ -436,7 +435,7 @@ test('apply(ctx) 挂 prefix 路由；open/save/stat/edit 走 mock ctx.fs 与真�
   }
 });
 
-test('requestRejection 可用时以方法调用（优先于 loopback 栅栏）', async () => {
+test('requestRejection 决定放行/拒绝（宿主栅栏，插件不做 Host/Origin 判定）', async () => {
   const fs = createMockFs({ 'D:/d/x.md': 'x' });
   const connection = {
     requestRejection(req) {
@@ -447,7 +446,7 @@ test('requestRejection 可用时以方法调用（优先于 loopback 栅栏）',
   apply(ctx);
   const { server, port } = await startServer(routes[0]);
   try {
-    // 外部 Host 也能通过：说明栅栏交给 connection（方法形式）而不是本地 loopback 判定
+    // 外部 Host 也放行：栅栏完全交给 connection，插件不再有 loopback 兜底
     const allowed = await postJson(port, '/dsh-markdown-typora/api/stat', { path: 'D:/d/x.md' }, { host: 'evil.example' });
     assert.equal(allowed.status, 200);
     assert.equal(allowed.json.ok, true);
@@ -458,12 +457,53 @@ test('requestRejection 可用时以方法调用（优先于 loopback 栅栏）',
   }
 });
 
+test('宿主无 connection / 无 requestRejection：fail-closed 503 host-auth-unavailable', async () => {
+  for (const connection of [undefined, {}, { requestRejection: 'nope' }]) {
+    const fs = createMockFs({ 'D:/d/x.md': 'x' });
+    const { ctx, routes } = createMockContext(fs, { connection });
+    apply(ctx);
+    const { server, port } = await startServer(routes[0]);
+    try {
+      const api = await postJson(port, '/dsh-markdown-typora/api/stat', { path: 'D:/d/x.md' });
+      assert.equal(api.status, 503);
+      assert.equal(api.json.ok, false);
+      assert.equal(api.json.error.code, 'host-auth-unavailable');
+      const page = await rawRequest(port, { method: 'GET', path: '/dsh-markdown-typora/core.json' });
+      assert.equal(page.status, 503);
+      assert.equal(page.body, 'host-auth-unavailable');
+    } finally {
+      await stopServer(server);
+    }
+  }
+});
+
+test('requestRejection 抛错 → 403；401 → 401（不吞不降级）', async () => {
+  const cases = [
+    [() => { throw new Error('boom'); }, 403],
+    [() => 401, 401],
+    [() => 403, 403],
+  ];
+  for (const [requestRejection, expected] of cases) {
+    const fs = createMockFs({ 'D:/d/x.md': 'x' });
+    const { ctx, routes } = createMockContext(fs, { connection: { requestRejection } });
+    apply(ctx);
+    const { server, port } = await startServer(routes[0]);
+    try {
+      const res = await postJson(port, '/dsh-markdown-typora/api/stat', { path: 'D:/d/x.md' });
+      assert.equal(res.status, expected);
+      assert.equal(res.json.error.code, expected === 401 ? 'unauthorized' : 'forbidden');
+    } finally {
+      await stopServer(server);
+    }
+  }
+});
+
 /* ───────────────────────── 静态路由 / core.json / ETag ───────────────────────── */
 
 test('静态路由：MIME/ETag/304/no-cache/fonts 长缓存/HEAD/core.json/穿越防护', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dshmd-static-'));
   const fs = createMockFs({});
-  const host = createHost({ fs, rootDir: root, log: SILENT_LOG });
+  const host = createHost({ fs, rootDir: root, log: SILENT_LOG, connectionProvider: ALLOW_PROVIDER });
   await mkdir(join(root, 'renderer-cm6', 'cm6', 'fonts'), { recursive: true });
   await writeFile(join(root, 'renderer-cm6', 'index.html'), '<!doctype html><html><body></body></html>', 'utf8');
   await writeFile(join(root, 'renderer-cm6', 'app.js'), 'console.log(1);\n', 'utf8');
@@ -529,7 +569,7 @@ test('静态路由：MIME/ETag/304/no-cache/fonts 长缓存/HEAD/core.json/穿�
 
     // core.json 不存在 → 404 JSON，客户端不崩
     const missingRoot = await mkdtemp(join(tmpdir(), 'dshmd-nocore-'));
-    const hostNoCore = createHost({ fs, rootDir: missingRoot, log: SILENT_LOG });
+    const hostNoCore = createHost({ fs, rootDir: missingRoot, log: SILENT_LOG, connectionProvider: ALLOW_PROVIDER });
     const noCore = await startServer(hostNoCore.route);
     try {
       const core404 = await rawRequest(noCore.port, { path: '/dsh-markdown-typora/core.json' });
@@ -586,7 +626,7 @@ test('decodeImageRequestPath：盘符/UNC 绝对路径逐段解码；穿越/非�
 test('本地图片路由：真实文件 200/304/HEAD/404/400，字节与 MIME 正确且不走 body', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dshmd-img-'));
   const fs = createMockFs({});
-  const host = createHost({ fs, rootDir: root, log: SILENT_LOG });
+  const host = createHost({ fs, rootDir: root, log: SILENT_LOG, connectionProvider: ALLOW_PROVIDER });
   const docDir = join(root, 'docs');
   await mkdir(join(docDir, 'assets'), { recursive: true });
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4, 5, 6]);
@@ -642,7 +682,7 @@ test('本地图片路由：真实文件 200/304/HEAD/404/400，字节与 MIME �
 
 test('SSE watch：fs.watch 变更 120ms 防抖广播', async () => {
   const fs = createMockFs({ 'D:/d/w.md': 'one' });
-  const host = createHost({ fs, log: SILENT_LOG, watchDebounceMs: 25, watchProbeMs: 30, heartbeatMs: 5000 });
+  const host = createHost({ fs, log: SILENT_LOG, watchDebounceMs: 25, watchProbeMs: 30, heartbeatMs: 5000, connectionProvider: ALLOW_PROVIDER });
   const { server, port } = await startServer(host.route);
   const sse = await openSse(port, '/dsh-markdown-typora/api/watch?path=' + encodeURIComponent('D:/d/w.md'));
   try {
@@ -672,7 +712,7 @@ test('SSE watch：fs.watch 变更 120ms 防抖广播', async () => {
 test('SSE watch：fs.watch 不可用时降级为探测（2s 默认档在测试里缩短）', async () => {
   const fs = createMockFs({ 'D:/d/p.md': 'a' });
   fs.watchMode = 'reject';
-  const host = createHost({ fs, log: SILENT_LOG, watchDebounceMs: 10, watchProbeMs: 30, heartbeatMs: 5000 });
+  const host = createHost({ fs, log: SILENT_LOG, watchDebounceMs: 10, watchProbeMs: 30, heartbeatMs: 5000, connectionProvider: ALLOW_PROVIDER });
   const { server, port } = await startServer(host.route);
   const sse = await openSse(port, '/dsh-markdown-typora/api/watch?path=' + encodeURIComponent('D:/d/p.md'));
   try {
@@ -690,7 +730,7 @@ test('SSE watch：fs.watch 不可用时降级为探测（2s 默认档在测试�
 
 test('body 上限：超过配置即 413，不静默截断', async () => {
   const fs = createMockFs({ 'D:/d/big.md': 'small' });
-  const host = createHost({ fs, log: SILENT_LOG, bodyLimit: 128 });
+  const host = createHost({ fs, log: SILENT_LOG, bodyLimit: 128, connectionProvider: ALLOW_PROVIDER });
   const { server, port } = await startServer(host.route);
   try {
     const huge = await postJson(port, '/dsh-markdown-typora/api/save', {
@@ -770,7 +810,7 @@ test('两个本地宿主竞争同一基准时只有一个可提交，且保留 U
     const s = await stat(target.targetKey, { bigint: true });
     return { type: 'file', size: Number(s.size), version: `${s.dev}:${s.ino}:${s.size}:${s.mtimeNs}:${s.ctimeNs}` };
   };
-  const hosts = [createHost({fs: service, log: SILENT_LOG}), createHost({fs: service, log: SILENT_LOG})];
+  const hosts = [createHost({fs: service, log: SILENT_LOG, connectionProvider: ALLOW_PROVIDER}), createHost({fs: service, log: SILENT_LOG, connectionProvider: ALLOW_PROVIDER})];
   try {
     await writeFile(file, encoded('初稿\n'));
     const opened = await hosts[0].dispatch('open', { path: file });

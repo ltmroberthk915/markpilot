@@ -11,7 +11,8 @@
 //   · 写成功后向所有 SSE 连接广播 version（客户端按 path 过滤 + 脏缓冲不覆盖）。
 //
 // 保留的既有不变量：
-//   1. 信任栅栏：ctx.connection.requestRejection 可用就以方法形式调用；否则只放行 loopback。
+//   1. 信任栅栏：只信 ctx.connection.requestRejection（fail-closed）。宿主缺该能力时
+//      插件一律 503 host-auth-unavailable，不再退回 loopback Host/Origin 放行。
 //   2. body 上限 64MB：含内联图的 Markdown 十几 MB 在真实用户里常见（8MB 曾把 8.13MB 文档拒之门外）。
 //   3. fs.watch 是 async（返回 close 函数）；不支持时降级为 2s 探测。旧实现把它当同步调用 ⇒
 //      unhandled rejection + watcher 泄漏。这里 await 捕获并幂等 close。
@@ -320,7 +321,6 @@ const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
 const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'diag']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
-const LOOPBACK_HOSTNAMES = new Set(['127.0.0.1', 'localhost', '::1']);
 
 /** 请求体上限：64MB。含内联图文档常见 10MB+；上限之外明确 413，不静默截断。 */
 export const BODY_MAX_BYTES = 64 * 1024 * 1024;
@@ -453,7 +453,7 @@ export function resolveStaticTarget(rootDir, rawRelative) {
  *   ① 形态：只接受盘符绝对路径（D:/x/y.png）或 UNC（//server/share/y.png），
  *      拒空段 / 单点 / 双点 / NUL / 坏编码 —— 归一化不靠浏览器，自己逐段验；
  *   ② 扩展名：图片白名单之外一律不服务（本路由不是通用文件服务）；
- *   ③ 只在既有信任栅栏之后（loopback + 宿主鉴权），且只读、只 GET/HEAD。
+ *   ③ 只在宿主鉴权栅栏之后（connection.requestRejection；缺能力即 503），且只读、只 GET/HEAD。
  * 说明：该读面不强于既有 /api/open（它本来就能读任意路径文本）。 */
 
 /** 图片 MIME（本路由专用；比静态表窄，且不接受 fonts/wasm 之类）。 */
@@ -649,29 +649,14 @@ function badRequest(message) {
   return { ok: false, error: { code: 'bad-request', message } };
 }
 
-function hostnameOf(hostHeader) {
-  if (typeof hostHeader !== 'string' || hostHeader.length === 0) return '';
-  if (hostHeader.startsWith('[')) {
-    const end = hostHeader.indexOf(']');
-    return end > 0 ? hostHeader.slice(1, end).toLowerCase() : '';
-  }
-  return hostHeader.split(':')[0].toLowerCase();
-}
-
-/** loopback 兜底栅栏：Host 必须本机；跨站请求拒绝；有 Origin 时必须与 Host 同源。 */
-export function isTrustedLoopbackRequest(req) {
-  const host = req?.headers?.host;
-  if (!host) return false;
-  const hostname = hostnameOf(host);
-  if (!LOOPBACK_HOSTNAMES.has(hostname)) return false;
-  if (req.headers['sec-fetch-site'] === 'cross-site') return false;
-  const origin = req.headers.origin;
-  if (origin === undefined) return true;
-  try {
-    return new URL(origin).host.toLowerCase() === String(host).toLowerCase();
-  } catch {
-    return false;
-  }
+/**
+ * 宿主兼容性检测：`connection` 服务是否提供 `requestRejection` 能力。
+ *
+ * 这是文件 API 唯一的信任来源。宿主没有该能力时插件会 fail-closed（503），
+ * 不再退回 loopback Host/Origin 判定 —— 那条兜底在认证缺失时等于跳过鉴权。
+ */
+export function hostAuthCapability(connection) {
+  return typeof connection?.requestRejection === 'function';
 }
 
 /**
@@ -1448,22 +1433,39 @@ export function createHost(options = {}) {
     }
   }
 
-  /** 信任栅栏：requestRejection 以方法调用；不可用时只放行 loopback。 */
+  /** 认证能力缺失时只告警一次；该宿主的全部请求都会 503，日志必须能定位。 */
+  let authCapabilityWarned = false;
+  function warnAuthCapabilityMissing() {
+    if (authCapabilityWarned) return;
+    authCapabilityWarned = true;
+    try {
+      log.warn?.('%s: host does not expose connection.requestRejection — file API fails closed (503 host-auth-unavailable); MarkPilot 1.3+ requires a host with connection authentication', name);
+    } catch { /* 日志失败不影响拒绝 */ }
+  }
+
+  /**
+   * 信任栅栏（fail-closed）：只信宿主 connection.requestRejection。
+   *
+   * 缺 connection 服务或该能力 = 认证不可用 ⇒ 一律 503，不再退回 loopback
+   * Host/Origin 兜底放行（它在认证缺失时等于跳过鉴权）。1.3.0 起放弃对无该
+   * 能力旧宿主的兼容：宁可插件不可用，也不放行未认证的文件读写。
+   */
   function fenceStatus(req) {
+    let connection;
+    try { connection = connectionProvider(); } catch { connection = undefined; }
+    if (!hostAuthCapability(connection)) {
+      warnAuthCapabilityMissing();
+      return { status: 503, code: 'host-auth-unavailable' };
+    }
     let rejection;
     try {
-      let connection;
-      try { connection = connectionProvider(); } catch { connection = undefined; }
-      if (typeof connection?.requestRejection === 'function') {
-        try { rejection = connection.requestRejection.call(connection, req); } catch { rejection = 403; }
-      } else if (!isTrustedLoopbackRequest(req)) {
-        rejection = 403;
-      }
+      rejection = connection.requestRejection.call(connection, req);
     } catch {
-      rejection = isTrustedLoopbackRequest(req) ? undefined : 403;
+      return { status: 403, code: 'forbidden' };
     }
     if (rejection === undefined) return undefined;
-    return typeof rejection === 'number' ? rejection : 403;
+    if (rejection === 401) return { status: 401, code: 'unauthorized' };
+    return { status: 403, code: 'forbidden' };
   }
 
   async function handleApiPost(req, res, url) {
@@ -1507,7 +1509,19 @@ export function createHost(options = {}) {
       try {
         const rejection = fenceStatus(req);
         if (rejection !== undefined) {
-          sendText(res, rejection, rejection === 401 ? 'unauthorized' : 'forbidden');
+          if (typeof req.url === 'string' && req.url.startsWith(API_PREFIX)) {
+            sendJson(res, rejection.status, {
+              ok: false,
+              error: {
+                code: rejection.code,
+                message: rejection.status === 503
+                  ? 'host does not expose connection.requestRejection; MarkPilot 1.3+ requires a DSH host with connection authentication'
+                  : rejection.code,
+              },
+            });
+          } else {
+            sendText(res, rejection.status, rejection.code);
+          }
           return;
         }
         let url;
@@ -1612,6 +1626,14 @@ export function apply(ctx) {
   if (!fsService) {
     log.warn?.('%s: ctx.fs unavailable — plugin disabled', name);
     return;
+  }
+
+  // 兼容性检测（启动期）：connection 服务已就位但没有 requestRejection ⇒ 旧宿主。
+  // 此时文件 API 会 fail-closed（503 host-auth-unavailable）；服务稍后才注册的场景
+  // 由每次请求的 fenceStatus 兜底。1.3.0 起不再对这类宿主做 loopback 兼容。
+  const startupConnection = safeGet(ctx, 'connection');
+  if (startupConnection !== undefined && !hostAuthCapability(startupConnection)) {
+    log.warn?.('%s: host connection service lacks requestRejection — file API will fail closed (503 host-auth-unavailable); MarkPilot 1.3+ requires connection authentication', name);
   }
 
   let host;

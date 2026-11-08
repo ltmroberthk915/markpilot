@@ -177,7 +177,7 @@ node dsh-markdown-typora/scripts/sync-core.mjs --check
 - Image references are resolved against the document's folder, so relative paths (`assets/…`, `../figures/…`) work; an absolute Windows path (`![](D:\pics\a.png)`) does not render in DSH, and a reference whose filename contains `#`, `?` or `%` cannot be addressed as a URL.
 - A selection over 256 KiB is rejected with a message instead of being silently truncated.
 - Insertion does not steal focus; undo it from the composer.
-- Tested against DSH 0.2.1-rc.3; the plugin requires `dsh >= 0.2.0-rc.2`.
+- Requires a DSH host whose `connection` service exposes `requestRejection` (verified on DSH 0.2.1-rc.5). Hosts without it are refused with `503 host-auth-unavailable`; 1.3+ deliberately does not fall back to loopback authentication.
 
 ## License
 
@@ -247,3 +247,11 @@ Install `dsh-markdown-typora@1.2.1` or the matching GitHub release archive, then
 A Markdown link opens in the middle workspace and the duplicate right-sidebar tab closes itself.
 
 Install `dsh-markdown-typora@1.2.2` or the matching GitHub release archive, then restart DSH.
+
+## MarkPilot for DSH 1.3.0 · 认证 fail-closed / Fail-closed authentication
+
+文件 API 的信任栅栏现在只认宿主的 `connection.requestRejection`：宿主缺少这个能力（或 `connection` 服务不存在）时，插件对自身全部路由返回 `503 host-auth-unavailable`，并打一条明确的启动日志。此前的 loopback Host/Origin 兜底放行已删除——它在认证能力缺失时等于跳过鉴权；1.3.0 起不再兼容这类旧宿主，宁可插件不可用，也不放行未认证的文件读写。
+
+The file API's trust fence now trusts only the host's `connection.requestRejection`. A host that lacks the capability — or has no `connection` service — receives `503 host-auth-unavailable` on every plugin route, and a single startup warning explains why. The loopback Host/Origin fallback is gone: when authentication is unavailable it silently skipped the check, so 1.3.0 drops compatibility with such hosts instead of failing open. This is the fail-closed behavior requested in [polang233/dsh-plugin-index#213](https://github.com/polang233/dsh-plugin-index/issues/213).
+
+Install `dsh-markdown-typora@1.3.0` or the matching GitHub release archive, then restart DSH.
