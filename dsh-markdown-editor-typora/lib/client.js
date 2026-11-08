@@ -3719,8 +3719,9 @@ const __test = {
   .mp-rail-btn{width:20px;min-width:20px;height:20px}
   .mp-rail-actions{gap:1px}
   .mp-rail-status{width:6px;min-width:6px;max-width:6px;height:6px;flex-basis:6px}
-  .mp-rail-popover{left:8px !important;right:8px !important}
-  .mp-rail-recovered{display:none}
+  .mp-rail-popover{left:calc(8px + var(--mp-rail-inset-left,0px)) !important;right:calc(8px + var(--mp-rail-inset-right,0px)) !important}
+  .mp-rail-date{flex:1 1 100% !important;white-space:normal !important}
+  .mp-rail-recovered,.mp-rail-notices{display:none}
   .mp-rail-status[data-mp-save-status="saved"]{background:transparent;border:1.5px solid #4caf50;box-sizing:border-box}
 }
 @media (prefers-reduced-motion:reduce){.mp-rail-btn{transition:none}}
@@ -5175,7 +5176,7 @@ const __test = {
         if (win) { try { win.postMessage({ __dshmd: true, dir: "down", type: "appearance", content: editorAppearance() }, "*"); } catch (e) { /* load/ready retries */ } }
       }, [props.workbenchCollapsed]);
 
-      const [ui, setUi] = React.useState({ phase: "loading", detail: "", notice: "", recovery: null, recovered: null, saveStatus: "" });
+      const [ui, setUi] = React.useState({ phase: "loading", detail: "", notice: "", recovery: null, recovered: null, saveStatus: "", notices: [] });
       const setUiIfChanged = React.useCallback((next) => {
         setUi((prev) => {
           if (prev.phase === next.phase && prev.detail === next.detail && prev.notice === next.notice) return prev;
@@ -5241,7 +5242,7 @@ const __test = {
           copyMine: null,
         };
         st.doc = doc;
-        setUi((prev) => ({ ...prev, phase: "loading", detail: "", notice: "", recovery: null, railOpen: false }));
+        setUi((prev) => ({ ...prev, phase: "loading", detail: "", notice: "", recovery: null, railOpen: false, notices: [] }));
         setUi((prev) => (prev.recovered || prev.saveStatus ? { ...prev, recovered: null, saveStatus: "" } : prev));   // 新文档代际不继承恢复提示或保存回执
 
         const ticket = ticketOf(doc.sessionId, doc.absPath, doc.gen);
@@ -5287,7 +5288,77 @@ const __test = {
           try { return frameRef.current ? frameRef.current.contentWindow : null; } catch (e) { return null; }
         }
 
+        const noticeTimers = new Map();
+        const noticeTexts = new Map();
+        let noticeSeq = 0;
+        function notify(message, options) {
+          if (!alive()) return;
+          const text = String(message == null ? "" : message);
+          if (!text) return;
+          const opts = options || {};
+          const actions = Array.isArray(opts.actions) ? opts.actions.slice() : [];
+          const archive = /^已归档旧草稿副本[：:](.+)$/.exec(text);
+          if (archive && !actions.length) {
+            const archivePath = archive[1].trim();
+            actions.push({
+              label: "复制路径", icon: "⧉", title: "复制归档路径",
+              run: () => {
+                const clipboard = clipboardOf();
+                if (!clipboard || typeof clipboard.writeText !== "function") { notify("剪贴板不可用，请手动选择复制路径"); return; }
+                clipboard.writeText(archivePath).then(
+                  () => notify("已复制归档路径"),
+                  (error) => notify("复制失败：" + String(error && error.message || error)),
+                );
+              },
+            });
+          }
+          const id = ++noticeSeq;
+          const item = { id, text, kind: opts.kind || (archive ? "archive" : "info"), ts: Date.now(), actions };
+          const ttl = Number.isFinite(opts.ttlMs) ? Math.max(1500, opts.ttlMs) : (archive ? 10000 : 6000);
+          if (noticeTexts.has(text)) return;
+          if (noticeTexts.size >= 5) {
+            const oldest = noticeTexts.entries().next().value;
+            if (oldest) {
+              const [oldestText, oldestId] = oldest;
+              const oldTimer = noticeTimers.get(oldestId);
+              if (oldTimer) { try { clearTimeout(oldTimer); } catch (e) { /* 忽略 */ } }
+              noticeTimers.delete(oldestId);
+              noticeTexts.delete(oldestText);
+            }
+          }
+          noticeTexts.set(text, id);
+          setUi((prev) => {
+            const list = Array.isArray(prev.notices) ? prev.notices : [];
+            return { ...prev, notices: [...list.slice(-4), item] };
+          });
+          const timer = setTimeout(() => {
+            noticeTimers.delete(id);
+            noticeTexts.delete(text);
+            setUi((prev) => {
+              const list = Array.isArray(prev.notices) ? prev.notices : [];
+              if (!list.some((entry) => entry.id === id)) return prev;
+              const next = list.filter((entry) => entry.id !== id);
+              return { ...prev, notices: next, ...(next.length === 0 && !(prev.recovered && prev.recovered.length) ? { railOpen: false } : {}) };
+            });
+          }, ttl);
+          noticeTimers.set(id, timer);
+        }
+        cleanups.push(() => {
+          for (const timer of noticeTimers.values()) { try { clearTimeout(timer); } catch (e) { /* 忽略 */ } }
+          noticeTimers.clear();
+          noticeTexts.clear();
+        });
+        function clearRailNotices() {
+          for (const timer of noticeTimers.values()) { try { clearTimeout(timer); } catch (e) { /* 忽略 */ } }
+          noticeTimers.clear();
+          noticeTexts.clear();
+          setUi((prev) => ({ ...prev, notices: [], railOpen: false }));
+        }
+
         function post(type, content) {
+          // B1b: parent-side toasts live in the rail now; never fall back to the
+          // iframe's bottom toast (engine-internal toasts are a separate path).
+          if (type === "toast") { notify(content); return true; }
           const win = doc.win || currentFrameWin();
           if (!win) return false;
           try {
@@ -5581,8 +5652,8 @@ const __test = {
         }
         function showNotice(message) {
           if (!alive()) return;
-          // Non-status feedback uses the existing bottom editor toast. It must
-          // never replace or extend the top save acknowledgement.
+          // B1b: non-status feedback is a rail notice; it must never replace
+          // or extend the top save acknowledgement.
           post("toast", message);
         }
 
@@ -6453,6 +6524,7 @@ const __test = {
           copyMine: copyMine,
           restoreRecovery: restoreRecovery,
           discardRecovery: discardRecovery,
+          clearNotices: clearRailNotices,
           copyRecoveredPath: (index) => {
             const items = doc.liveRecoveredItems || [];
             const item = items[index];
@@ -6591,6 +6663,9 @@ const __test = {
       const restoreHint = ui.saveStatus === "unsaved" && typeof ui.detail === "string" && ui.detail.includes("未写盘");
       const saveText = ui.saveStatus === "unsaved" ? (restoreHint ? "未保存 · 按 Ctrl+S 保存" : "未保存") : ui.saveStatus === "saved" ? "已保存" : "";
       const recoveredItems = Array.isArray(ui.recovered) ? ui.recovered : [];
+      const noticeItems = Array.isArray(ui.notices) ? ui.notices : [];
+      const latestNotice = noticeItems[noticeItems.length - 1];
+      const hasPopover = recoveredItems.length > 0 || noticeItems.length > 0;
       const toggleRail = () => setUi((prev) => ({ ...prev, railOpen: !prev.railOpen }));
       const actions = [];
       let primaryText = "", primaryTone = "info";
@@ -6621,6 +6696,15 @@ const __test = {
       } else if (recoveredItems.length) {
         actions.push({ label: "♻ " + recoveredItems.length, icon: "♻", className: "mp-rail-recovered", title: "查看共享会话恢复的草稿副本", run: toggleRail, aria: { "aria-expanded": !!ui.railOpen } });
       }
+      if (!primaryText && latestNotice) {
+        primaryText = latestNotice.text;
+        primaryTone = latestNotice.kind === "warn" || latestNotice.kind === "error" ? "warn" : "info";
+        for (const item of latestNotice.actions || []) actions.push(item);
+      }
+      if (noticeItems.length) {
+        const extra = latestNotice && primaryText === latestNotice.text ? noticeItems.length - 1 : noticeItems.length;
+        if (extra > 0) actions.push({ label: "＋" + extra, icon: "≡", className: "mp-rail-notices", title: "查看全部通知（" + extra + "）", run: toggleRail, aria: { "aria-expanded": !!ui.railOpen, "aria-label": "查看全部通知（" + extra + "）" } });
+      }
       const frameName = "dsh-markdown-editor-typora-" + String((tab && (tab.id || tab.occurrenceId)) || "tab");
       const actionButton = (item, index) => h("button", {
         key: "rail-action-" + index,
@@ -6635,7 +6719,10 @@ const __test = {
       // banners and save status never change the editor geometry.
       return h("div", {
         ref: rootRef,
-        style: { position: "relative", width: "100%", height: "100%", display: "flex", flexDirection: "column", minHeight: 0, containerType: "inline-size" },
+        onKeyDown: (event) => {
+          if (event.key === "Escape" && ui.railOpen) setUi((prev) => ({ ...prev, railOpen: false }));
+        },
+        style: { position: "relative", width: "100%", height: "100%", display: "flex", flexDirection: "column", minHeight: 0, containerType: "inline-size", "--mp-rail-inset-left": railInsetLeft + "px", "--mp-rail-inset-right": railInsetRight + "px" },
       },
         h("style", { key: "rail-css" }, RAIL_CSS),
         h("div", {
@@ -6661,16 +6748,16 @@ const __test = {
           }, saveText) : null,
           primaryText ? h("span", {
             className: "mp-rail-text",
-            title: primaryText + (recoveredItems.length ? "；点击查看共享会话恢复的草稿副本" : ""),
+            title: primaryText + (hasPopover ? "；点击查看通知与恢复副本" : ""),
             role: primaryTone === "warn" ? "alert" : "status",
-            tabIndex: recoveredItems.length ? 0 : undefined,
-            "aria-expanded": recoveredItems.length ? !!ui.railOpen : undefined,
-            style: recoveredItems.length ? { cursor: "pointer" } : undefined,
-            onClick: recoveredItems.length ? toggleRail : undefined,
-            onKeyDown: recoveredItems.length ? (event) => {
+            tabIndex: hasPopover ? 0 : undefined,
+            "aria-expanded": hasPopover ? !!ui.railOpen : undefined,
+            style: hasPopover ? { cursor: "pointer" } : undefined,
+            onClick: hasPopover ? toggleRail : undefined,
+            onKeyDown: hasPopover ? (event) => {
               if (event.key === "Enter" || event.key === " ") { try { event.preventDefault(); } catch (e) { /* 忽略 */ } toggleRail(); }
             } : undefined,
-          }, primaryText + (recoveredItems.length ? " ♻" : "")) : (saveText ? null : h("span", { className: "mp-rail-text", style: { opacity: 0.6 } }, "就绪")),
+          }, primaryText + (recoveredItems.length ? " ♻" : (noticeItems.length ? " ≡" : ""))) : (saveText ? null : h("span", { className: "mp-rail-text", style: { opacity: 0.6 } }, "就绪")),
           h("div", { className: "mp-rail-actions" }, ...actions.map(actionButton))),
         h("iframe", {
           key: depKey,
@@ -6694,11 +6781,11 @@ const __test = {
           },
           style: { width: "100%", border: 0, background: "transparent", flex: "1 1 auto", minHeight: 0, height: "auto" },
         }),
-        recoveredItems.length ? h("div", {
+        hasPopover ? h("div", {
           key: "rail-popover",
           className: "mp-rail-popover",
           role: "dialog",
-          "aria-label": "共享会话恢复的草稿副本",
+          "aria-label": "通知与共享会话恢复的草稿副本",
           style: {
             position: "absolute", top: 34, left: 8 + railInsetLeft, right: 8 + railInsetRight,
             maxHeight: "calc(100% - 42px)", overflow: "auto", overflowX: "hidden", zIndex: 40,
@@ -6713,19 +6800,33 @@ const __test = {
             fontSize: 12,
           },
         },
-          h("div", { style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 8 } },
+          recoveredItems.length ? h("div", { style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 8 } },
             h("strong", { style: { flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, "♻ 共享会话恢复的草稿副本（原件未被覆盖）"),
             h("button", {
               type: "button", className: "mp-rail-btn", "data-icon": "✓", title: "知道了",
               onClick: () => { try { st.actions.dismissRecovered && st.actions.dismissRecovered(); } catch (e) { /* 忽略 */ } },
-            }, "知道了")),
+            }, "知道了")) : null,
           ...recoveredItems.map((item, index) => h("div", { key: item.recoveryPath + ":" + index, style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", padding: "4px 0", borderTop: "1px solid color-mix(in srgb, currentColor 10%, transparent)" } },
             h("code", { style: { userSelect: "all", wordBreak: "break-all", fontSize: 11, flex: "1 1 0", minWidth: 0 } }, item.recoveryPath),
             item.at ? h("span", { className: "mp-rail-date", style: { opacity: 0.65, fontSize: 11, whiteSpace: "nowrap", flex: "0 0 auto" } }, new Date(item.at).toLocaleString()) : null,
             h("button", {
               type: "button", className: "mp-rail-btn", "data-icon": "⧉", title: "复制路径",
               onClick: () => { try { st.actions.copyRecoveredPath && st.actions.copyRecoveredPath(index); } catch (e) { /* 忽略 */ } },
-            }, "复制路径")))) : null);
+            }, "复制路径"))),
+          noticeItems.length ? h("div", { style: { borderTop: "1px solid color-mix(in srgb, currentColor 14%, transparent)", marginTop: 6, paddingTop: 6 } },
+            h("div", { style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 4 } },
+              h("strong", { style: { flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, "通知（" + noticeItems.length + "）"),
+              h("button", {
+                type: "button", className: "mp-rail-btn", "data-icon": "⌫", title: "清除通知",
+                onClick: () => { try { st.actions.clearNotices && st.actions.clearNotices(); } catch (e) { /* 忽略 */ } },
+              }, "清除")),
+            ...noticeItems.map((notice) => h("div", { key: "notice-" + notice.id, style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", padding: "3px 0" } },
+              h("span", { style: { flex: "1 1 240px", minWidth: 0, overflowWrap: "anywhere", fontSize: 11.5 } }, notice.text),
+              ...(notice.actions || []).map((action, actionIndex) => h("button", {
+                key: "notice-action-" + notice.id + "-" + actionIndex,
+                type: "button", className: "mp-rail-btn", "data-icon": action.icon || "⧉", title: action.title || action.label,
+                onClick: () => { try { action.run && action.run(); } catch (e) { /* 忽略 */ } },
+              }, action.label))))) : null) : null);
     }
 
     /* ───────────────────────── @mp 引用源（可失败，不阻塞主功能） ───────────────────────── */

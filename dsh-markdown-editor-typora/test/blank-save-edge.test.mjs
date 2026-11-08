@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fixture from './fixtures/client-save-status.cjs';
 const {make,drain}=fixture;
+const text=n=>typeof n==='string'?n:!n||typeof n!=='object'?'':(n.children||[]).map(text).join('');
 const cwd='D:/probe',id='fixture-draft',file=`${cwd}/未命名-${id}.md`;
 const address='dsh-resource://file/absolute/D%3A/probe/'+encodeURIComponent(`未命名-${id}.md`);
 const options={address,workspace:cwd,draft:{id,cwd}};
@@ -19,7 +20,7 @@ test('blank successful create remains saved when recovery mark throws',async()=>
  h.setFetch(r=>r.endpoint==='create'?{ok:true,value:{path:file,version:'v1'}}:{ok:true,value:{version:'v1'}});
  h.message('manual-save');await drain();
  assert(!h.st.doc.untitled&&!h.st.doc.dirty);assert.equal(h.ui().phase,'ready');assert.equal(h.ui().saveStatus,'saved');
- assert(h.posts.some(p=>p.type==='toast'&&String(p.content).includes('FIXTURE_RECOVERY_MARK')));
+ assert(text(h.render()).includes('FIXTURE_RECOVERY_MARK'));
  assert.equal(h.requests.filter(r=>r.endpoint==='create').length,1);h.cleanup();
 });
 test('blank canonical junction receipt accepts matching requested path',async()=>{

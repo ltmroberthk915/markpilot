@@ -21,7 +21,11 @@ test('stale recovery slot is archived instead of offered for restore', async () 
   assert.equal(archive.length, 1);
   assert.equal(archive[0].payload.tag, 'stale-draft');
   assert.equal(archive[0].payload.text, 'OLD-DRAFT');
-  assert.ok(h.posts.some((p) => p.type === 'toast' && String(p.content).includes('已归档旧草稿副本')));
+  assert.ok(text(h.render()).includes('已归档旧草稿副本'));
+  const copyArchive = button(h, '复制路径');
+  assert(copyArchive, 'archive notice exposes copy-path');
+  copyArchive.props.onClick();
+  assert.ok(text(h.render()).includes('剪贴板不可用'), 'copy action falls back when clipboard is unavailable');
   h.cleanup();
 });
 
@@ -149,7 +153,7 @@ test('Ctrl+S while the recovery banner is visible is refused with a notice', asy
   h.message('manual-save');
   await drain();
   assert.equal(h.requests.filter((r) => r.endpoint === 'save').length, 0);
-  assert.ok(h.posts.some((p) => p.type === 'toast' && String(p.content).includes('未保存的恢复内容')));
+  assert.ok(text(h.render()).includes('未保存的恢复内容'));
   assert.notEqual(h.ui().saveStatus, 'saved');
   await h.st.actions.discardRecovery();
   await drain();
