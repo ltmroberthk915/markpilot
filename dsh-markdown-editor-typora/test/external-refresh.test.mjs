@@ -8,6 +8,7 @@ import { mkdtemp, writeFile, readFile, stat, rename, rm, appendFile } from 'node
 import { tmpdir } from 'node:os';
 import { join, dirname, normalize, isAbsolute, basename } from 'node:path';
 import { createHost } from '../lib/index.js';
+import liveStore from '../host/live-documents.js';
 
 const SILENT_LOG = { info() {}, warn() {} };
 const ALLOW_CONNECTION = { requestRejection: () => undefined };
@@ -82,14 +83,22 @@ async function startHost(fsAdapter) {
     server: { register: () => () => {} },
     settings: { register: () => () => {} },
   };
-  const host = createHost({ fs: fsAdapter, rootDir: new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'), log: SILENT_LOG, connectionProvider: ALLOW_PROVIDER });
+  // Never touch the user's %LOCALAPPDATA%\.markpilot\live-v1: each test gets its own room directory.
+  const liveDir = await mkdtemp(join(tmpdir(), 'mp-refresh-live-db-'));
+  const liveDocuments = new liveStore.LiveDocuments({ directory: liveDir });
+  const host = createHost({ fs: fsAdapter, liveDocuments, rootDir: new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'), log: SILENT_LOG, connectionProvider: ALLOW_PROVIDER });
   const server = http.createServer((req, res) => { host.route.handler(req, res); });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
   return {
     port,
     host,
-    close: async () => { await new Promise((r) => server.close(r)); host.close?.(); },
+    close: async () => {
+      await new Promise((r) => server.close(r));
+      host.close?.();
+      try { liveStore.retireLiveStorage(); } catch { /* best effort */ }
+      await rm(liveDir, { recursive: true, force: true }).catch(() => {});
+    },
   };
 }
 

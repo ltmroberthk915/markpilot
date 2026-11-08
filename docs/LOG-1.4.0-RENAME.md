@@ -52,3 +52,22 @@
 - `package.json` name=`dsh-markdown-editor-typora` version=`1.4.0`，repository.directory/homepage 已指向新目录。
 - 解包复核：`cordis.patch.yml` id/name 均为新名；shipped js 中无旧路由 `/dsh-markdown-typora`、旧 tab `dsh-markdown-typora/editor`、旧恢复槽前缀。
 - `node scripts/sync-core.mjs --check` 通过；`node scripts/sync-host.mjs` → `HOST_SYNC_OK 9 files`。
+
+## 独立对抗验证（子代理）与处置（2026-11-08 13:20–13:45）
+
+子代理在隔离 harness（真实 HTTP + 真实文件系统 + 临时 LOCALAPPDATA 的 rooms.sqlite）自建 48 个对抗用例，结论：**未能证伪核心刷新修复**（48/48 通过；官方 external-refresh 9/9；仓库 342 项 341 pass / 1 skip）。核心链路 SSE → host refresh → 房间 adopt → exchange delta → 正文，在写类型、大文件、Unicode/路径别名、冲突、双窗口、双外部写者下自洽。
+
+### 已按报告处置
+
+- **R1（编辑中误采纳）**：`refreshLiveRoom()` 在非 discard 路径先检查 `doc.dirty / doc.conflict / doc.saving`，命中就只弹冲突横幅、不自动采纳。
+- **R2（失败静默）**：refresh 失败改为冲突横幅（带错误码），不再 `return null` 静默；外部删除/编码错误可见。
+- **R3（瞬时冲突不重试）**：`MP_FILE_CONFLICT / MP_FILE_MISSING / MP_FILE_BUSY` 有界重试（最多 2 次，300/600ms）。
+- **R5（成功后 phase 不重置）**：refresh 成功且无脏草稿时，若仍停在 conflict 则回到 ready。
+- **R-extra（官方测试碰真实数据库）**：`test/external-refresh.test.mjs` 改为给 `createHost` 传临时目录的 `LiveDocuments`，结束 `retireLiveStorage()` 并删临时目录；跑测试不再 sweep 用户真实 `%LOCALAPPDATA%\.markpilot\live-v1`（已核对真实 rooms.sqlite 的 mtime 不再变化）。
+
+### 记录在案、暂不改动
+
+- **R4（banner 的「重载磁盘版本」走 forceReload 而非 refresh(discard)）**：现有 forceReload（leave→以磁盘重载）经子代理 15/15 并发用例验证可用；`refresh(discard)` 的宿主路径也已由 C1/C2 验证。UI 改走 discard 会改变“关房间/丢房间草稿”的语义，留到 1.4.1 在真实浏览器复验后处理，避免在改名发版这一版引入新的编辑期风险。
+- **R6（无浏览器级验证）**：`post("live-refresh")` 是 fire-and-forget，facade 重基只能在真实 DSH 窗口验证——由用户重启后实测。
+- **R7（无跨 OS 进程/UNC/慢盘/>2MB/MP_SAVE_BUSY 覆盖）**：同进程双 host + SQLite/WAL 已验证；跨进程与极端 IO 属后续测试扩展。
+- **R8（Windows 句柄语义）**：目标被打开时 rename 返回 EPERM，是 Windows 行为，不是插件缺陷。
