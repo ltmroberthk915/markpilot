@@ -60,6 +60,14 @@ jobs:
           }
           if (-not $tag) { $tag = "v$version" }
           if ($version -notmatch '^\d+(\.\d+){2,3}$') {
+            # DSH plugin releases use tags like dsh-markdown-typora-v1.2.2 and have
+            # no MarkPilot Setup exe: skip them instead of failing the run. A manual
+            # dispatch still fails loudly, because there the version is an input.
+            if ($env:EVENT_NAME -eq 'release') {
+              Write-Host "Skipping: '$tag' is not a MarkPilot desktop release tag."
+              "SKIP=true" >> $env:GITHUB_OUTPUT
+              exit 0
+            }
             throw "Unsupported version '$version' (expected 2-4 numeric components, e.g. 3.5.9)"
           }
           $installer = "$env:INPUT_INSTALLER_URL".Trim()
@@ -82,6 +90,7 @@ jobs:
 
       - name: Check whether winget already has this version
         id: check
+        if: steps.resolve.outputs.SKIP != 'true'
         shell: pwsh
         run: |
           $path = "manifests/m/MarkPilot/MarkPilot/${{ steps.resolve.outputs.VERSION }}"
@@ -97,7 +106,7 @@ jobs:
           exit 0
 
       - name: Check WINGET_TOKEN secret
-        if: steps.check.outputs.EXISTS != 'true'
+        if: steps.check.outputs.EXISTS != 'true' && steps.resolve.outputs.SKIP != 'true'
         shell: pwsh
         run: |
           if ([string]::IsNullOrWhiteSpace($env:WINGET_CREATE_GITHUB_TOKEN)) {
@@ -105,7 +114,7 @@ jobs:
           }
 
       - name: Download and verify wingetcreate
-        if: steps.check.outputs.EXISTS != 'true'
+        if: steps.check.outputs.EXISTS != 'true' && steps.resolve.outputs.SKIP != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -117,7 +126,7 @@ jobs:
           "WINGETCREATE_EXE=$exe" >> $env:GITHUB_ENV
 
       - name: Submit winget update PR
-        if: steps.check.outputs.EXISTS != 'true'
+        if: steps.check.outputs.EXISTS != 'true' && steps.resolve.outputs.SKIP != 'true'
         shell: pwsh
         env:
           VERSION: ${{ steps.resolve.outputs.VERSION }}
