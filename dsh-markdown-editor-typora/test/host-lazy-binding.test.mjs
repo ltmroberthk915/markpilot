@@ -1,4 +1,4 @@
-// dsh-markdown-typora/test/host-lazy-binding.test.mjs
+// dsh-markdown-editor-typora/test/host-lazy-binding.test.mjs
 // Public portable regression for the host-graph **local require ownership** (issue: request-time
 // lazy `require('./document-store')` from live-documents.readDisk picking up a drifted global
 // cache entry after HMR; symptom: `liveCommitDirectory is not a function` on open/live).
@@ -31,7 +31,7 @@ const require = createRequire(import.meta.url);
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const MODULE_LOAD = Module._load; // whole-process loader reference, captured before any plugin import
-const GRAPH_KEY = Symbol.for('dsh-markdown-typora:host-graph');
+const GRAPH_KEY = Symbol.for('dsh-markdown-editor-typora:host-graph');
 const ABI = 2;
 
 function findPackageRoot(start) {

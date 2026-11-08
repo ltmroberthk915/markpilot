@@ -1,9 +1,9 @@
-// dsh-markdown-typora 客户端半边（DSH 0.2.1 契约版）：右侧栏 tab 类型 + iframe 编辑面壳。
+// dsh-markdown-editor-typora 客户端半边（DSH 0.2.1 契约版）：右侧栏 tab 类型 + iframe 编辑面壳。
 //
 // 架构（见 README.md）：引擎在 iframe 里跑构建好的 CM6 核心，
 // 本文件只做 DSH 皮/桥：
 //   · 一个 tab 类型（*.md / *.markdown，priority=extension）吃下 dsh-resource://file/ 资源；
-//   · 一个 tab body（sidebar.right.pane.tab, key=dsh-markdown-typora/editor）承载 iframe；
+//   · 一个 tab body（sidebar.right.pane.tab, key=dsh-markdown-editor-typora/editor）承载 iframe；
 //   · iframe 生命周期：bridge-ready/init 后先发 theme 再 open；文档身份=sessionId+path+generation，
 //     过期回执直接丢弃；切 tab / 关 tab / path 变化时 abort 或置 dead；
 //   · 保存：引擎回执确认文档版本，连续增量在父窗口保留，防抖后按基准版本串行写盘。
@@ -23,7 +23,7 @@
 // 防御纪律：一个抛错的工厂会把整个 web shell 带崩（"entries did not activate" → 白屏），
 // 所以每个服务种子独立 try，绝不上抛。
 window.__ModuleLoader__.load({
-  id: "dsh-markdown-typora",
+  id: "dsh-markdown-editor-typora",
   factory: (require) => {
     var module = { exports: {} };
     var exports = module.exports;
@@ -35,15 +35,15 @@ window.__ModuleLoader__.load({
 
 
     /* ───────────────────────── 常量 ───────────────────────── */
-    const TAB_TYPE_ID = "dsh-markdown-typora/editor";
+    const TAB_TYPE_ID = "dsh-markdown-editor-typora/editor";
     const TAB_KIND = "markdown-editor";
     const FILE_ADDRESS_PREFIX = "dsh-resource://file/";
-    const API_BASE = "/dsh-markdown-typora/api/";
-    const FRAME_SRC = "/dsh-markdown-typora/renderer-cm6/index.html";
+    const API_BASE = "/dsh-markdown-editor-typora/api/";
+    const FRAME_SRC = "/dsh-markdown-editor-typora/renderer-cm6/index.html";
     const SAVE_DEBOUNCE_MS = 1500;   // 与桌面壳 _autoSaveTimer 同拍
     const PULL_TIMEOUT_MS = 2000;    // requestText 超时：超时就不保存，绝不拿旧缓存盖新内容
     const FLUSH_WAIT_MS = 120;       // 关闭后接收已排队输入消息的宽限期
-    const RECOVERY_PREFIX = "dsh-markdown-typora:recovery:";
+    const RECOVERY_PREFIX = "dsh-markdown-editor-typora:recovery:";
     const POLL_FAST_MS = 2000;       // SSE 断开后的首档轮询
     const POLL_SLOW_MS = 6000;       // 连续失败后的降频档
     const MAX_TEXT_CHARS = 512 * 1024; // 恢复槽上限：localStorage 5MB 配额，超限不写并告警
@@ -59,8 +59,8 @@ function createDraftStore(options = {}) {
   let storage = options.storage;
   if (storage === undefined) { try { storage = globalThis.localStorage; } catch {} }
   const onError = typeof options.onError === 'function' ? options.onError : () => {};
-  const dbName = options.dbName || 'dsh-markdown-typora-drafts-v2';
-  const prefix = options.prefix || 'dsh-markdown-typora:journal:v2:';
+  const dbName = options.dbName || 'dsh-markdown-editor-typora-drafts-v2';
+  const prefix = options.prefix || 'dsh-markdown-editor-typora:journal:v2:';
   const maxSyncChars = options.maxSyncChars ?? 512 * 1024;
   const states = new Map(), jobs = new Map();
   let database, opening, serial = 0;
@@ -461,7 +461,7 @@ function applyMirrorDelta(mirror,event){
       return na === nb;
     }
 
-    /** 恢复槽键（要求口径）：dsh-markdown-typora:recovery:<path>。 */
+    /** 恢复槽键（要求口径）：dsh-markdown-editor-typora:recovery:<path>。 */
     function recoveryKey(path) {
       return RECOVERY_PREFIX + String(path == null ? "" : path);
     }
@@ -1262,7 +1262,7 @@ function applyMirrorDelta(mirror,event){
      * ═══════════════════════════════════════════════════════════════════════ */
     var USE_NEW_LAYOUT = true;                       // 总闸：任何异常可整体回退
     var MP_GRID_ATTR = "data-mp-grid";
-    var MP_GRID_STYLE_ID = "dsh-markdown-typora-grid-style";
+    var MP_GRID_STYLE_ID = "dsh-markdown-editor-typora-grid-style";
     /*
      * 注意两件事（第五轮审查 B1/#4）：
      * 1) **绝不能**在这里把宿主手柄 display:none —— 我们的命中判定仍靠量它的矩形，
@@ -1949,7 +1949,7 @@ function applyMirrorDelta(mirror,event){
       handleLifecycleStop = stop;
       window.__mpHandleLifecycleDispose = stop;
       sync();
-      if (ctx && typeof ctx.effect === "function") ctx.effect(function () { return stop; }, "dsh-markdown-typora: handle lifecycle");
+      if (ctx && typeof ctx.effect === "function") ctx.effect(function () { return stop; }, "dsh-markdown-editor-typora: handle lifecycle");
       return stop;
     }
 
@@ -2046,7 +2046,7 @@ var squeezeForTests = null;
  * 同时 right 的定位会把手柄推出列外。所以布局激活期间直接隐藏它。
  * 手柄有稳定属性 data-width-handle（不依赖哈希类名）。
  */
-const LAYOUT_STYLE_ID = "dsh-markdown-typora-layout-style";
+const LAYOUT_STYLE_ID = "dsh-markdown-editor-typora-layout-style";
 const LAYOUT_STYLE_CSS = '[data-mp-layout="on"] [data-width-handle]{display:none !important}';
 
 function ensureLayoutStyle(doc) {
@@ -2080,7 +2080,7 @@ function layoutClamp(value, lo, hi) {
  * 所以写设置时把布局三字段同步回旧键 —— 两边永远一致，用户之前的配置也不会丢。
  */
 const SETTINGS_KEY = "dsh.markpilot.settings.v1";
-const SETTINGS_CHANGED_EVENT = "dsh-markdown-typora:settings-changed";
+const SETTINGS_CHANGED_EVENT = "dsh-markdown-editor-typora:settings-changed";
 function readAppearance() {
   var storage = null;
   try { storage = window.localStorage; } catch (e) { /* use defaults */ }
@@ -2680,7 +2680,7 @@ function createLayoutEngine(options) {
             guardD += 1;
           }
           try {
-            fetch("/dsh-markdown-typora/api/diag", {
+            fetch("/dsh-markdown-editor-typora/api/diag", {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ kind: "composer-chain", chatW: geo.chatW, colW: rect.width, chain: chain })
@@ -3211,7 +3211,7 @@ function mountLayout(ctx, overrides) {
       }
       if (win) win.__mpLayoutDispose = teardownHostLayout;
       try {
-        if (ctx && typeof ctx.effect === "function") ctx.effect(function () { return teardownHostLayout; }, "dsh-markdown-typora: layout restore");
+        if (ctx && typeof ctx.effect === "function") ctx.effect(function () { return teardownHostLayout; }, "dsh-markdown-editor-typora: layout restore");
       } catch (e) { /* 忽略 */ }
       return hostEngine;
     }
@@ -3342,12 +3342,12 @@ function mountLayout(ctx, overrides) {
     }
     if (win) win.__mpLayoutDispose = teardown;
     try {
-      if (ctx && typeof ctx.effect === "function") ctx.effect(function () { return teardown; }, "dsh-markdown-typora: layout restore");
+      if (ctx && typeof ctx.effect === "function") ctx.effect(function () { return teardown; }, "dsh-markdown-editor-typora: layout restore");
     } catch (e) { /* 无 effect 能力时退化为不自动还原 */ }
     engine.__waiter = waiter;
     return engine;
   } catch (e) {
-    try { console.warn("[dsh-markdown-typora] layout mount failed:", e); } catch (ignored) { /* 无 console */ }
+    try { console.warn("[dsh-markdown-editor-typora] layout mount failed:", e); } catch (ignored) { /* 无 console */ }
     return null;
   }
 }
@@ -4316,7 +4316,7 @@ const __test = {
       }).then(function (r) { return r.json(); });
     }
 
-    var DOCS_PANEL_ID = "dsh-markdown-typora-docs";
+    var DOCS_PANEL_ID = "dsh-markdown-editor-typora-docs";
 
     function DocsPanelIcon(props) {
       var size = (props && typeof props.size === "number") ? props.size : 16;
@@ -4586,7 +4586,7 @@ const __test = {
         h("div", { style: { flex: "1 1 auto", minWidth: 0, minHeight: 0, display: "flex" } },
           active
             ? h(EditorTabBodyInner, {
-                useTabInfo: function () { return { tab: { contentId: active.address, id: "dsh-markdown-typora-docs", draft:active.draft, workspace:active.workspace } }; },
+                useTabInfo: function () { return { tab: { contentId: active.address, id: "dsh-markdown-editor-typora-docs", draft:active.draft, workspace:active.workspace } }; },
                 sessionId: active.sessionId || context.sessionId, workbenchCollapsed: collapsed,
               })
             : h("div", { style: { margin: "auto", textAlign: "center", fontSize: 12.5, ...sub, opacity: 0.8 } },
@@ -4601,7 +4601,7 @@ const __test = {
      *   label 可以是字符串或函数；组件额外收到宿主的 { close } 属性（本页不用）。
      * 本页只做「读写设置」，不承载业务；文档中心与布局引擎都从这里取值。
      */
-    var SETTINGS_SECTION_ID = "dsh-markdown-typora";
+    var SETTINGS_SECTION_ID = "dsh-markdown-editor-typora";
 
     function SettingsField(props) {
       var h = React.createElement;
@@ -4649,7 +4649,7 @@ const __test = {
       var settings = readSettings(window.localStorage);
       var save = function (patch) {
         writeSettings(window.localStorage, patch);
-        try { window.dispatchEvent(new CustomEvent("dsh-markdown-typora:settings-changed")); } catch (e) { /* 忽略 */ }
+        try { window.dispatchEvent(new CustomEvent("dsh-markdown-editor-typora:settings-changed")); } catch (e) { /* 忽略 */ }
         bump(function (n) { return n + 1; });
       };
       var reload = function () { try { window.location.reload(); } catch (e) { /* 忽略 */ } };
@@ -4760,7 +4760,7 @@ const __test = {
     function EditorTabBody(props) {
       if (!React) return null;
       if (typeof props.useTabInfo !== "function") {
-        return React.createElement("div", { style: emptyStyle }, "dsh-markdown-typora: useTabInfo unavailable");
+        return React.createElement("div", { style: emptyStyle }, "dsh-markdown-editor-typora: useTabInfo unavailable");
       }
       // 布局关闭 ⇒ 旧行为（iframe 仍在这里）
       if (!layoutEnabled()) return React.createElement(EditorTabBodyInner, props);
@@ -4783,7 +4783,7 @@ const __test = {
     function mpWarn(scope, message, error) {
       if (mpWarned[scope]) return;
       mpWarned[scope] = true;
-      try { console.warn("[dsh-markdown-typora] " + message, error); } catch (e) { /* 忽略 */ }
+      try { console.warn("[dsh-markdown-editor-typora] " + message, error); } catch (e) { /* 忽略 */ }
     }
     function warnTabOnce(key, message, error) { mpWarn("tab:" + key, message, error); }
 
@@ -5866,30 +5866,55 @@ const __test = {
         }
 
         /** 外部磁盘变更：live 房间先从磁盘采纳（干净时自动进正文；有草稿时报告冲突）。 */
+        const LIVE_RETRY_CODES = { MP_FILE_CONFLICT: 1, MP_FILE_MISSING: 1, MP_FILE_BUSY: 1 };
         async function refreshLiveRoom(options) {
           const opts = options || {};
           if (!doc.live) return null;
-          try {
-            const result = await api("live", { client: doc.live.client, action: "refresh", request: { epoch: doc.live.epoch, discard: opts.discard === true } });
+          // R1：本地有未提交/编辑中的内容时不自动采纳磁盘，避免丢掉尚在交换途中的按键。
+          if (!opts.discard && (doc.dirty || doc.conflict || doc.saving)) {
+            doc.externalStale = true;
+            showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
+            return null;
+          }
+          let attempt = 0;
+          for (;;) {
+            let result = null;
+            try {
+              result = await api("live", { client: doc.live.client, action: "refresh", request: { epoch: doc.live.epoch, discard: opts.discard === true } });
+            } catch (e) { result = null; }
             if (!alive() || !doc.live) return null;
-            if (result.ok !== true) return null;
-            const value = result.value || {};
-            if (value.changed) post("live-refresh", { protocol: 2, docToken: doc.token });
-            if (value.unsavedDraft && !opts.discard) {
-              doc.externalStale = true;
-              showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
+            if (result && result.ok === true) {
+              const value = result.value || {};
+              if (value.changed) post("live-refresh", { protocol: 2, docToken: doc.token });
+              if (value.unsavedDraft && !opts.discard) {
+                doc.externalStale = true;
+                showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
+                return value;
+              }
+              doc.externalStale = false;
+              doc.staleNotified = false;
+              if (doc.phase === "conflict" && !doc.dirty) showPhase("ready", "");   // R5：恢复后不再停留在冲突态
+              if (value.changed) {
+                try {
+                  const stat = await api("stat", { path: doc.absPath });
+                  if (alive() && stat.ok === true && stat.value) doc.lastVersion = stat.value.version;
+                } catch (e) { /* 版本对账失败不影响正文 */ }
+              }
               return value;
             }
-            doc.externalStale = false;
-            doc.staleNotified = false;
-            if (value.changed) {
-              try {
-                const stat = await api("stat", { path: doc.absPath });
-                if (alive() && stat.ok === true && stat.value) doc.lastVersion = stat.value.version;
-              } catch (e) { /* 版本对账失败不影响正文 */ }
+            // R3：文档存储在写盘瞬间会抛冲突/缺失；有界重试，不把瞬时失败当终态。
+            const code = result && result.error ? String(result.error.code || "") : "";
+            if (LIVE_RETRY_CODES[code] && attempt < 2) {
+              attempt += 1;
+              await new Promise(function (resolve) { setTimeout(resolve, 300 * attempt); });
+              if (!alive() || !doc.live) return null;
+              continue;
             }
-            return value;
-          } catch (e) { return null; }
+            // R2：失败不能静默——外部删除/编码错误/存储冲突都要让用户看见。
+            doc.externalStale = true;
+            showPhase("conflict", "磁盘上的更新未能读取（" + (code || "读取失败") + "）；点「重载磁盘版本」重试，或用「复制我的内容」保留当前编辑");
+            return null;
+          }
         }
 
         function onExternalEvent(event) {
@@ -6031,7 +6056,7 @@ const __test = {
                 showNotice("已发送给 AI");
                 return;
               }
-              log.warn?.("dsh-markdown-typora: 直发失败：%s", String(direct.reason || "unknown"));
+              log.warn?.("dsh-markdown-editor-typora: 直发失败：%s", String(direct.reason || "unknown"));
             }
           }
           const outcome = await insertSelectionToChat(acts0, payload, {
@@ -6337,7 +6362,7 @@ const __test = {
       }, [tabVisible]);
 
       if (!parsed) {
-        return h("div", { style: emptyStyle }, "dsh-markdown-typora: 无法解析文件地址 " + String(address == null ? "" : address));
+        return h("div", { style: emptyStyle }, "dsh-markdown-editor-typora: 无法解析文件地址 " + String(address == null ? "" : address));
       }
 
       let banner = null;
@@ -6378,7 +6403,7 @@ const __test = {
             h("button", { style: btnStyle, onClick: () => { try { st.actions.copyRecoveredPath && st.actions.copyRecoveredPath(index); } catch (e) { /* 忽略 */ } } }, "复制路径"))));
       }
 
-      const frameName = "dsh-markdown-typora-" + String((tab && (tab.id || tab.occurrenceId)) || "tab");
+      const frameName = "dsh-markdown-editor-typora-" + String((tab && (tab.id || tab.occurrenceId)) || "tab");
       // position:relative —— 让轻提示(toastStyle)能绝对定位悬浮，不占布局高度。
       return h("div", { ref: rootRef, style: { position: "relative", width: "100%", height: "100%", display: "flex", flexDirection: "column", minHeight: 0 } },
         banner,
@@ -6417,7 +6442,7 @@ const __test = {
           try {
             const triggers = scope.inputTriggers || (scope.get && scope.get("inputTriggers"));
             if (!triggers || typeof triggers.registerSource !== "function") {
-              log.warn?.("dsh-markdown-typora: inputTriggers unavailable, @mp source not registered");
+              log.warn?.("dsh-markdown-editor-typora: inputTriggers unavailable, @mp source not registered");
               return;
             }
             const sidebarRight = (() => { try { return scope.get ? scope.get("sidebarRight") : undefined; } catch (e) { return undefined; } })();
@@ -6465,16 +6490,16 @@ const __test = {
                 }
               },
             };
-            if (typeof scope.effect === "function") scope.effect(() => triggers.registerSource(source), "dsh-markdown-typora: @mp source");
+            if (typeof scope.effect === "function") scope.effect(() => triggers.registerSource(source), "dsh-markdown-editor-typora: @mp source");
             else triggers.registerSource(source);
             try { if (window.__DSH_MARKDOWN__) window.__DSH_MARKDOWN__.mpSourceRegistered = true; } catch (e) { /* 诊断位 */ }
-            log.info?.("dsh-markdown-typora: @mp source registered");
+            log.info?.("dsh-markdown-editor-typora: @mp source registered");
           } catch (error) {
-            log.warn?.("dsh-markdown-typora: @mp source inner failed: %s", String(error && error.message ? error.message : error));
+            log.warn?.("dsh-markdown-editor-typora: @mp source inner failed: %s", String(error && error.message ? error.message : error));
           }
         });
       } catch (error) {
-        log.warn?.("dsh-markdown-typora: @mp source failed: %s", String(error && error.message ? error.message : error));
+        log.warn?.("dsh-markdown-editor-typora: @mp source failed: %s", String(error && error.message ? error.message : error));
       }
     }
 
@@ -6493,7 +6518,7 @@ const __test = {
     // 失败绝不影响插件其余能力（mountLayout 内部已 try/catch + 日志）。
     try { mountLayout(ctx); } catch (e) { /* 见 mountLayout */ }
       const log = (() => {
-        try { return typeof ctx.logger === "function" ? ctx.logger("dsh-markdown-typora") : console; } catch (e) { return console; }
+        try { return typeof ctx.logger === "function" ? ctx.logger("dsh-markdown-editor-typora") : console; } catch (e) { return console; }
       })();
       const get = (name) => {
         try { return ctx.get(name); } catch (e) { return undefined; }
@@ -6503,7 +6528,7 @@ const __test = {
           if (typeof ctx.effect === "function") ctx.effect(fn, label);
           else fn();
         } catch (error) {
-          log.warn?.("dsh-markdown-typora: effect failed (%s): %s", label, String(error && error.message ? error.message : error));
+          log.warn?.("dsh-markdown-editor-typora: effect failed (%s): %s", label, String(error && error.message ? error.message : error));
         }
       };
 
@@ -6520,21 +6545,21 @@ const __test = {
         style.textContent = "[data-composer-seat]:has(.balance-float){will-change:auto!important}";
         (document.head || document.documentElement).appendChild(style);
         return () => { style.remove(); };
-      }, "dsh-markdown-typora: composer compatibility");
+      }, "dsh-markdown-editor-typora: composer compatibility");
 
       let tabTypeRegistered = false;
       const registerTabType = (tabs) => {
         if (tabTypeRegistered) return;
         if (!tabs || typeof tabs.register !== "function") {
-          log.warn?.("dsh-markdown-typora: sidebarRightTabs.register unavailable, tab type not registered");
+          log.warn?.("dsh-markdown-editor-typora: sidebarRightTabs.register unavailable, tab type not registered");
           return;
         }
         try {
-          runEffect(() => tabs.register(buildTabDefinition()), "dsh-markdown-typora: tab type");
+          runEffect(() => tabs.register(buildTabDefinition()), "dsh-markdown-editor-typora: tab type");
           tabTypeRegistered = true;
-          log.info?.("dsh-markdown-typora: tab type registered");
+          log.info?.("dsh-markdown-editor-typora: tab type registered");
         } catch (error) {
-          log.warn?.("dsh-markdown-typora: tab type failed: %s", String(error && error.message ? error.message : error));
+          log.warn?.("dsh-markdown-editor-typora: tab type failed: %s", String(error && error.message ? error.message : error));
         }
       };
 
@@ -6546,13 +6571,13 @@ const __test = {
         } else if (typeof ctx.inject === "function") {
           ctx.inject(["sidebarRightTabs"], (scope) => {
             try { registerTabType(scope.sidebarRightTabs || (scope.get && scope.get("sidebarRightTabs"))); }
-            catch (error) { log.warn?.("dsh-markdown-typora: tab type late registration failed: %s", String(error && error.message ? error.message : error)); }
+            catch (error) { log.warn?.("dsh-markdown-editor-typora: tab type late registration failed: %s", String(error && error.message ? error.message : error)); }
           });
         } else {
-          log.warn?.("dsh-markdown-typora: sidebarRightTabs unavailable, tab type not registered");
+          log.warn?.("dsh-markdown-editor-typora: sidebarRightTabs unavailable, tab type not registered");
         }
       } catch (error) {
-        log.warn?.("dsh-markdown-typora: tab type seed failed: %s", String(error && error.message ? error.message : error));
+        log.warn?.("dsh-markdown-editor-typora: tab type seed failed: %s", String(error && error.message ? error.message : error));
       }
 
       // ② tab body：只有这一个入口渲染 iframe（引擎在 iframe 内，宿主不订阅文档文本）。
@@ -6561,14 +6586,14 @@ const __test = {
           runEffect(() => ctx.slots.inject("sidebar.right.pane.tab", () => ctx.slots.register({
             name: "sidebar.right.pane.tab",
             key: TAB_TYPE_ID,
-          }, EditorTabBody)), "dsh-markdown-typora: tab body");
+          }, EditorTabBody)), "dsh-markdown-editor-typora: tab body");
         } else if (ctx.slots && typeof ctx.slots.register === "function") {
-          runEffect(() => ctx.slots.register({ name: "sidebar.right.pane.tab", key: TAB_TYPE_ID }, EditorTabBody), "dsh-markdown-typora: tab body");
+          runEffect(() => ctx.slots.register({ name: "sidebar.right.pane.tab", key: TAB_TYPE_ID }, EditorTabBody), "dsh-markdown-editor-typora: tab body");
         } else {
-          log.warn?.("dsh-markdown-typora: slots service unavailable, tab body not registered");
+          log.warn?.("dsh-markdown-editor-typora: slots service unavailable, tab body not registered");
         }
       } catch (error) {
-        log.warn?.("dsh-markdown-typora: tab body seed failed: %s", String(error && error.message ? error.message : error));
+        log.warn?.("dsh-markdown-editor-typora: tab body seed failed: %s", String(error && error.message ? error.message : error));
       }
 
       // ②-b 会话输入面守卫：dock 是列表槽位，旁路读取，不接管宿主 composer。
@@ -6577,12 +6602,12 @@ const __test = {
         if (ctx.slots && typeof ctx.slots.inject === "function") {
           runEffect(() => ctx.slots.inject("conversation.composer.dock", () => ctx.slots.register({
             name: "conversation.composer.dock",
-            id: "dsh-markdown-typora-input-face",
+            id: "dsh-markdown-editor-typora-input-face",
             order: 900,
-          }, InputFaceTap)), "dsh-markdown-typora: input face tap");
+          }, InputFaceTap)), "dsh-markdown-editor-typora: input face tap");
         }
       } catch (error) {
-        log.warn?.("dsh-markdown-typora: input face tap seed failed: %s", String(error && error.message ? error.message : error));
+        log.warn?.("dsh-markdown-editor-typora: input face tap seed failed: %s", String(error && error.message ? error.message : error));
       }
 
       // ③ M1 浮层舞台：编辑器的唯一挂载点。布局开关关闭时组件返回 null，不产生任何影响。
@@ -6590,14 +6615,14 @@ const __test = {
         if (ctx.slots && typeof ctx.slots.inject === "function") {
           runEffect(() => ctx.slots.inject("shell.overlay", () => ctx.slots.register({
             name: "shell.overlay",
-            id: "dsh-markdown-typora-stage",
+            id: "dsh-markdown-editor-typora-stage",
             order: 90,
-          }, EditorOverlayStage)), "dsh-markdown-typora: overlay stage");
+          }, EditorOverlayStage)), "dsh-markdown-editor-typora: overlay stage");
         } else {
-          log.warn?.("dsh-markdown-typora: slots.inject unavailable, overlay stage not registered");
+          log.warn?.("dsh-markdown-editor-typora: slots.inject unavailable, overlay stage not registered");
         }
       } catch (error) {
-        log.warn?.("dsh-markdown-typora: overlay stage seed failed: %s", String(error && error.message ? error.message : error));
+        log.warn?.("dsh-markdown-editor-typora: overlay stage seed failed: %s", String(error && error.message ? error.message : error));
       }
 
       docsCtx = ctx;
@@ -6624,7 +6649,7 @@ const __test = {
             timers.push(setTimeout(function () { adoptOpenNativeDocs(); }, delay));
           });
           return function () { for (var t of timers) clearTimeout(t); };
-        }, "dsh-markdown-typora: adopt open documents");
+        }, "dsh-markdown-editor-typora: adopt open documents");
       } catch (e) { /* 忽略 */ }
 
       // 诊断：哪些宿主服务在插件上下文里真的可达（决定 openResource 能不能用）。
@@ -6650,16 +6675,16 @@ const __test = {
           }, DocsPanelIcon);
           try {
             window.__MP_DOCS_ENTRY = { registered: true, id: DOCS_PANEL_ID, hasDisposer: typeof dispose === "function" };
-            log.info?.("dsh-markdown-typora: sidebar.panellist entry registered");
+            log.info?.("dsh-markdown-editor-typora: sidebar.panellist entry registered");
           } catch (e) { /* 忽略 */ }
           return dispose;
-        }), "dsh-markdown-typora: sidebar entry");
+        }), "dsh-markdown-editor-typora: sidebar entry");
         runEffect(() => ctx.slots.inject("main", () => ctx.slots.register({
           name: "main",
           key: DOCS_PANEL_ID,
-        }, DocsEntryRedirect)), "dsh-markdown-typora: docs page");
+        }, DocsEntryRedirect)), "dsh-markdown-editor-typora: docs page");
       } catch (error) {
-        log.warn?.("dsh-markdown-typora: sidebar entry seed failed: %s", String(error && error.message ? error.message : error));
+        log.warn?.("dsh-markdown-editor-typora: sidebar entry seed failed: %s", String(error && error.message ? error.message : error));
       }
 
       // ⑤ 官方设置页 section：「Markdown 编辑器」
@@ -6673,18 +6698,18 @@ const __test = {
           }, MarkdownSettingsSection);
           try {
             window.__MP_SETTINGS_SEED = { registered: true, id: SETTINGS_SECTION_ID, hasDisposer: typeof dispose === "function" };
-            log.info?.("dsh-markdown-typora: settings.section registered");
+            log.info?.("dsh-markdown-editor-typora: settings.section registered");
           } catch (e) { /* 忽略 */ }
           return dispose;
-        }), "dsh-markdown-typora: settings section");
+        }), "dsh-markdown-editor-typora: settings section");
       } catch (error) {
-        log.warn?.("dsh-markdown-typora: settings section seed failed: %s", String(error && error.message ? error.message : error));
+        log.warn?.("dsh-markdown-editor-typora: settings section seed failed: %s", String(error && error.message ? error.message : error));
       }
 
       // ③ sessions 旁路（cwd 解析用；服务晚到也没关系，每次 open 现取）。
       try { SessionsBridge.getSessions = () => get("sessions"); } catch (e) { /* 忽略 */ }
-      ctx.effect(() => installWorkspaceNavigation(ctx), "dsh-markdown-typora: workspace navigation");
-      ctx.effect(() => installFileLinkInterceptor(), "dsh-markdown-typora: document links");
+      ctx.effect(() => installWorkspaceNavigation(ctx), "dsh-markdown-editor-typora: workspace navigation");
+      ctx.effect(() => installFileLinkInterceptor(), "dsh-markdown-editor-typora: document links");
 
       // Rightbar preferences apply only to the editor-owned grid.
 
@@ -6708,7 +6733,7 @@ const __test = {
 
     exports.apply = apply;
     exports.inject = inject;
-    exports.name = "dsh-markdown-typora";
+    exports.name = "dsh-markdown-editor-typora";
     exports.__test = __test;
 
     // 调试面（只读镜像，方便宿主/桌面工具观察；不影响渲染）。

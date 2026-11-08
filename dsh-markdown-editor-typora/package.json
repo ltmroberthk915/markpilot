@@ -1,6 +1,6 @@
 {
-  "name": "dsh-markdown-typora",
-  "version": "1.3.2",
+  "name": "dsh-markdown-editor-typora",
+  "version": "1.4.0",
   "description": "MarkPilot CM6 3.6.17 Markdown editor for the DeepSeek Harness sidebar with version-guarded atomic saves and durable draft recovery.",
   "license": "MIT",
   "type": "module",
@@ -63,9 +63,9 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ltmroberthk915/markpilot.git",
-    "directory": "dsh-markdown-typora"
+    "directory": "dsh-markdown-editor-typora"
   },
-  "homepage": "https://github.com/ltmroberthk915/markpilot/tree/main/dsh-markdown-typora",
+  "homepage": "https://github.com/ltmroberthk915/markpilot/tree/main/dsh-markdown-editor-typora",
   "bugs": {
     "url": "https://github.com/ltmroberthk915/markpilot/issues"
   }

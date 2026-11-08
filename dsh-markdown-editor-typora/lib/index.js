@@ -1,4 +1,4 @@
-// dsh-markdown-typora 宿主半边（DSH 0.2.1 契约版）：
+// dsh-markdown-editor-typora 宿主半边（DSH 0.2.1 契约版）：
 //   renderer-cm6 静态路由 + 版本守卫编辑面 API（open/save/stat/edit）+ SSE watch + markdown 模型工具。
 //
 // 插件三件套形状（宿主 cordis loader 读的就是这个）：
@@ -61,7 +61,7 @@ const OWNED_ORIGINALS = new WeakMap();
  *      GC（含其模块级 SQLite databases）；新代冷启不受旧代 closing 影响；
  *   ⑤ 同代多 host/多 live 窗口共享一张图：单 host.close 只减计数，最后一个才释放。
  * 不降级、不换目录、共享房间/原子写语义不变。 */
-const HOST_GRAPH_KEY = Symbol.for('dsh-markdown-typora:host-graph');
+const HOST_GRAPH_KEY = Symbol.for('dsh-markdown-editor-typora:host-graph');
 const HOST_ENTRY_ORDER = ['text-codec.js', 'safe-file.js', 'live-documents.js', 'document-store.js'];   // 依赖拓扑序
 function hostGraphSlot(hostDir) {
   const root = (globalThis[HOST_GRAPH_KEY] ??= new Map());
@@ -305,12 +305,12 @@ function unregisterHost(token) {
 }
 void rawDiskStore; void rawLiveStore; void rawTextCodec;
 
-export const name = 'dsh-markdown-typora';
+export const name = 'dsh-markdown-editor-typora';
 
 /** 必需服务：webServer（路由挂载点）+ fs（版本守卫读写）。 */
 export const inject = ['webServer', 'fs'];
 
-const ROUTE_PREFIX = '/dsh-markdown-typora';
+const ROUTE_PREFIX = '/dsh-markdown-editor-typora';
 const STATIC_PREFIX = ROUTE_PREFIX + '/renderer-cm6/';
 const API_PREFIX = ROUTE_PREFIX + '/api/';
 // Only the editor's explicit local-file actions use its native file capability.
@@ -443,9 +443,9 @@ export function resolveStaticTarget(rootDir, rawRelative) {
  * resolveImageSource）；桌面壳把它拼成 file:// 并靠 file 页面读盘。DSH 的编辑面是
  * **http 源**：CSP 的 img-src 不含 file:，Chromium 也禁止 http 页面加载 file:// 子资源
  * ⇒ 相对路径图必然"图片加载失败"。所以由插件提供唯一合法的本地图片通道：
- *   GET /dsh-markdown-typora/img/<绝对本地路径（逐段百分号编码，保留 /）>
+ *   GET /dsh-markdown-editor-typora/img/<绝对本地路径（逐段百分号编码，保留 /）>
  * 桥（renderer-cm6/dsh-bridge.js）在 open 时把 <base href> 指到
- *   /dsh-markdown-typora/img/<文档目录>/
+ *   /dsh-markdown-editor-typora/img/<文档目录>/
  * ⇒ 引擎发出的相对 URL 原样落到本路由。浏览器按 RFC 3986 自己归一化 `../`，
  * 因此这里拿到的永远是规整的绝对路径。
  *
@@ -722,7 +722,7 @@ function sendText(res, status, text, extraHeaders) {
 export function createHost(options = {}) {
   const fs = options.fs;
   if (!fs || typeof fs.resolve !== 'function' || typeof fs.writeText !== 'function') {
-    throw new Error('dsh-markdown-typora: a filesystem service (ctx.fs) is required');
+    throw new Error('dsh-markdown-editor-typora: a filesystem service (ctx.fs) is required');
   }
   const log = options.log ?? console;
   const rootDir = normalize(options.rootDir ?? PLUGIN_ROOT);
@@ -956,7 +956,7 @@ export function createHost(options = {}) {
     res.end(req.method === 'HEAD' ? undefined : data);
   }
 
-  /** GET /dsh-markdown-typora/api/watch?path=…：SSE 外部变更流；心跳 15s；close 幂等清理。 */
+  /** GET /dsh-markdown-editor-typora/api/watch?path=…：SSE 外部变更流；心跳 15s；close 幂等清理。 */
   async function handleWatch(req, res, url) {
     const path = url.searchParams.get('path') ?? '';
     if (!path) {
@@ -1287,7 +1287,7 @@ export function createHost(options = {}) {
   }
 
 
-  const workspaceRecentJobs = (globalThis[Symbol.for('dsh-markdown-typora:workspace-recent-jobs')] ??= new Map());
+  const workspaceRecentJobs = (globalThis[Symbol.for('dsh-markdown-editor-typora:workspace-recent-jobs')] ??= new Map());
   const workspaceRecentFile=()=>join(process.env.APPDATA || process.env.XDG_STATE_HOME || join(process.env.HOME || tmpdir(),'.local','state'),'MarkPilot','workspace-recents.json');
   const insideWorkspace=(cwd,file)=>{const rel=pathRelative(pathKey(cwd),pathKey(file));return rel==='' || (!rel.startsWith('..'+sep) && rel!=='..' && !isAbsolute(rel));};
   async function workspaceRecent(payload) {
@@ -1664,7 +1664,7 @@ export function apply(ctx) {
           try { if (typeof dispose === 'function') dispose(); } catch { /* 已清理 */ }
           try { host.close(); } catch { /* 已清理 */ }
         };
-      }, 'dsh-markdown-typora: routes');
+      }, 'dsh-markdown-editor-typora: routes');
     } else {
       ctx.webServer.register(host.route);
     }
@@ -1775,7 +1775,7 @@ export function createMarkdownToolDefinition(dispatch) {
  */
 export function registerMarkdownTool(ctx, { dispatch, log } = {}) {
   const onWarn = (error) => {
-    try { log?.warn?.('dsh-markdown-typora: model tool disabled: %s', String(error?.message ?? error)); } catch { /* 忽略 */ }
+    try { log?.warn?.('dsh-markdown-editor-typora: model tool disabled: %s', String(error?.message ?? error)); } catch { /* 忽略 */ }
   };
   try {
     if (typeof ctx?.inject !== 'function') return;
@@ -1805,7 +1805,7 @@ export function registerMarkdownTool(ctx, { dispatch, log } = {}) {
             stopped = true;
             try { if (typeof dispose === 'function') dispose(); } catch (error) { onWarn(error); }
           };
-        }, 'dsh-markdown-typora: markdown tool');
+        }, 'dsh-markdown-editor-typora: markdown tool');
       } catch (error) {
         onWarn(error);
       }

@@ -1,4 +1,4 @@
-// dsh-markdown-typora 宿主半边：HMR/多宿主运行时回归。
+// dsh-markdown-editor-typora 宿主半边：HMR/多宿主运行时回归。
 // 运行：node --test test/hmr-host-runtime.test.mjs
 //
 // 覆盖（功能断言全部走公开 createHost/dispatch 面；热导使用 lib/index.js 公开

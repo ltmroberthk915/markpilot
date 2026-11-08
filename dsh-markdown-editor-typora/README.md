@@ -1,3 +1,5 @@
+> **更名（1.4.0 起）：** 本插件包名改为 **`dsh-markdown-editor-typora`**（原 `dsh-markdown-typora` 停在 1.3.x）。安装：`dsh plugin --profile desktop add dsh-markdown-editor-typora@1.4.0`。
+
 # dsh-markdown-typora
 
 ## MarkPilot for DSH 1.1 · IDE 式 Markdown × AI 工作台
@@ -32,6 +34,9 @@
 **1.3.1：** 消息里的 `file://` Markdown 链接（此前点了没反应）与绝对路径 `.md` 芯片现在都在捕获阶段被接管，解析成本地路径后直接进中间工作台，不再弹出右栏的改动对比；1.3.0 的认证 fail-closed 宿主修复一并包含。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.3.1`
 
 **1.3.2：** 修外部修改不刷新（1–2 秒内自动采纳；有草稿时显示可操作的冲突横幅）；修主题不保持（保留所选主题，宿主明暗切换只切同族）；修左右侧栏手柄位置不保持（切会话回来按上次拖动恢复）；透明模式下重新应用设置会恢复透明。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.3.2`
+
+**1.4.0（更名）：** 包名改为 `dsh-markdown-editor-typora`；含 1.3.2 的三项修复 + live 刷新路径加固。安装：`dsh plugin --profile desktop add dsh-markdown-editor-typora@1.4.0`
+
 
 
 
@@ -70,6 +75,9 @@
 **1.3.1:** `file://` Markdown links in a message (previously inert) and absolute `.md` path chips are taken over in the capture phase and opened in the middle workspace instead of bringing up the sidebar change preview. This build includes the 1.3.0 fail-closed host authentication fix. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.3.1`
 
 **1.3.2:** external edits reach the editor (1–2 s; unsaved drafts show an actionable banner); the chosen editor theme survives host light/dark switches and conversation switches; dragged sidebar/right-bar widths are restored after a conversation switch; re-applying the transparency setting restores transparency. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.3.2`
+
+**1.4.0 (renamed):** the package is now `dsh-markdown-editor-typora`. It carries the 1.3.2 fixes plus hardening of the live refresh path. Install: `dsh plugin --profile desktop add dsh-markdown-editor-typora@1.4.0`
+
 
 
 
@@ -287,3 +295,12 @@ Install `dsh-markdown-typora@1.3.1` or the matching GitHub release archive, then
 External edits now reach the editor: a live room adopts the disk text before pushing deltas, and an unsaved draft surfaces an actionable banner instead of stale content.
 
 Install `dsh-markdown-typora@1.3.2` or the matching GitHub release archive, then restart DSH.
+
+
+## MarkPilot for DSH 1.4.0 · 更名
+
+包名改为 `dsh-markdown-editor-typora`（原 `dsh-markdown-typora` 停在 1.3.x）。内部路由前缀、tab 类型与恢复槽键随包名一起更新；设置与最近文档存储键（`dsh.markpilot.*`）保持不变，升级后用户设置不丢。
+
+The package is renamed to `dsh-markdown-editor-typora`; internal route prefix, tab type and recovery-slot keys follow the new name, while `dsh.markpilot.*` settings storage is unchanged.
+
+Install `dsh-markdown-editor-typora@1.4.0` or the matching GitHub release archive, then restart DSH.

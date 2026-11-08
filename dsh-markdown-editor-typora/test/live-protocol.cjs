@@ -32,7 +32,7 @@ function findRepoRoot(start) {
   throw new Error('cannot locate MarkPilot-CM6/shell from ' + start);
 }
 const REPO = findRepoRoot(CANDIDATE);
-const API = '/dsh-markdown-typora/api/';
+const API = '/dsh-markdown-editor-typora/api/';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 function shellVersion(p) {

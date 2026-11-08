@@ -1,3 +1,5 @@
+> **更名（1.4.0 起）：** 插件包名从 `dsh-markdown-typora` 改为 **`dsh-markdown-editor-typora`**。安装/升级：`dsh plugin --profile desktop add dsh-markdown-editor-typora@1.4.0`；旧包停在 1.3.x，不再更新。下文旧版本记录里的旧包名保留原样。
+
 # MarkPilot · 万可百律
 
 ## MarkPilot for DSH 1.1 · IDE 式 Markdown × AI 工作台
@@ -34,6 +36,9 @@
 **1.3.1：** 消息里的 `file://` Markdown 链接（此前点了没反应）与绝对路径 `.md` 芯片现在都进中间工作台，不再弹出右栏的改动对比；1.3.0 的认证 fail-closed 宿主修复一并包含。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.3.1`
 
 **1.3.2：** 修外部修改不刷新（外部进程改写 md 后 1–2 秒内自动采纳；有草稿时显示可操作的「文件已在磁盘上更新」横幅）；修主题不保持（工具岛切换明暗后，编辑器主题及其明暗同族不再被重置）；修左右侧栏手柄位置不保持（切会话回来按上次拖动恢复）——透明模式下重新应用设置会恢复透明。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.3.2`
+
+**1.4.0（更名）：** 包名改为 `dsh-markdown-editor-typora`；包含 1.3.2 三项修复（外部修改自动刷新、主题保持、侧栏手柄位置恢复、透明恢复）与针对 live 刷新路径的对抗性加固（编辑中不自动采纳、失败可见、瞬时冲突重试）。安装：`dsh plugin --profile desktop add dsh-markdown-editor-typora@1.4.0`
+
 
 
 
@@ -980,3 +985,9 @@ DSH 重启时会把上次打开的 Markdown 标签恢复成自带预览，停在
 外部进程改写正在打开的 md 后，编辑器会在 1–2 秒内自动采纳磁盘内容；有未保存草稿时显示可操作的「文件已在磁盘上更新」横幅（重载磁盘版本 / 复制我的内容）。
 
 [下载 DSH 插件 1.3.2](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.3.2)，或安装 `dsh-markdown-typora@1.3.2`。
+
+### MarkPilot for DSH 1.4.0 · 更名 dsh-markdown-editor-typora
+
+插件包名改为 `dsh-markdown-editor-typora`（原 `dsh-markdown-typora` 停在 1.3.x）。本版包含外部修改自动刷新、主题保持、侧栏手柄位置恢复、透明恢复，以及 live 刷新路径的对抗性加固。
+
+[下载 DSH 插件 1.4.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-editor-typora-v1.4.0)，或安装 `dsh-markdown-editor-typora@1.4.0`。

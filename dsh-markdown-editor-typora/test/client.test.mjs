@@ -1,4 +1,4 @@
-// dsh-markdown-typora 客户端半边：纯逻辑 + 工厂形态测试（不启宿主、不碰 DOM）。
+// dsh-markdown-editor-typora 客户端半边：纯逻辑 + 工厂形态测试（不启宿主、不碰 DOM）。
 // 运行：node --test test/client.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -29,7 +29,7 @@ async function loadClientFactory() {
   vm.createContext(sandbox);
   vm.runInContext(source, sandbox, { filename: 'client.js' });
   assert.ok(captured, 'window.__ModuleLoader__.load was not called');
-  assert.equal(captured.id, 'dsh-markdown-typora');
+  assert.equal(captured.id, 'dsh-markdown-editor-typora');
   assert.equal(typeof captured.factory, 'function');
   const mod = captured.factory((name) => {
     if (name === 'react') return null; // 纯函数测试不需要 React
@@ -57,7 +57,7 @@ function fakeStorage() {  const map = new Map();
 
 test('loader 形态与导出纪律', async () => {
   const { mod } = await loadClientFactory();
-  assert.equal(mod.name, 'dsh-markdown-typora');
+  assert.equal(mod.name, 'dsh-markdown-editor-typora');
   assert.ok(Array.isArray(mod.inject));
   assert.ok(mod.inject.includes('slots'));
   assert.equal(typeof mod.apply, 'function');
@@ -84,7 +84,7 @@ test('文件地址解析：session / absolute / 编码 / 非法', async () => {
 test('tab 类型定义：id / patterns / priority / keepMounted / canOpen', async () => {
   const { test: T } = await loadClientFactory();
   const def = T.buildTabDefinition();
-  assert.equal(def.id, 'dsh-markdown-typora/editor');
+  assert.equal(def.id, 'dsh-markdown-editor-typora/editor');
   assert.deepEqual(plain(def.patterns), ['*.md', '*.markdown']);
   assert.equal(def.priority, 'extension');
   assert.equal(def.keepMounted, true);
@@ -96,9 +96,9 @@ test('tab 类型定义：id / patterns / priority / keepMounted / canOpen', asyn
   assert.equal(def.title('not-an-address'), 'Markdown');
 });
 
-test('恢复槽键与读写清理（dsh-markdown-typora:recovery:<path>）', async () => {
+test('恢复槽键与读写清理（dsh-markdown-editor-typora:recovery:<path>）', async () => {
   const { test: T } = await loadClientFactory();
-  assert.equal(T.recoveryKey('D:/docs/a.md'), 'dsh-markdown-typora:recovery:D:/docs/a.md');
+  assert.equal(T.recoveryKey('D:/docs/a.md'), 'dsh-markdown-editor-typora:recovery:D:/docs/a.md');
   const storage = fakeStorage();
   const slot = { text: '未保存内容', baseVersion: 'v1', ts: 1700000000000, path: 'D:/docs/a.md' };
   assert.equal(T.writeRecoverySlot(storage, slot), true);
@@ -270,7 +270,7 @@ test('apply 防御性：tab 类型 + tab body 各自注册，服务缺失不抛'
   };
   assert.doesNotThrow(() => mod.apply(ctx));
   assert.equal(registered.tabs.length, 1);
-  assert.equal(registered.tabs[0].id, 'dsh-markdown-typora/editor');
+  assert.equal(registered.tabs[0].id, 'dsh-markdown-editor-typora/editor');
   assert.equal(registered.tabs[0].keepMounted, true);
   // 契约是「各座位独立注册、任一失败不影响其他」。
   // 座位数量会随功能增长（tab body / 浮层舞台 / 左栏入口 / main 页 / 设置页），
@@ -278,12 +278,12 @@ test('apply 防御性：tab 类型 + tab body 各自注册，服务缺失不抛'
   const byName = (n) => registered.slots.find((s) => s.definition.name === n);
   const tabSlot = byName('sidebar.right.pane.tab');
   assert.ok(tabSlot, 'tab body 必须注册');
-  assert.equal(tabSlot.definition.key, 'dsh-markdown-typora/editor');
+  assert.equal(tabSlot.definition.key, 'dsh-markdown-editor-typora/editor');
   assert.equal(typeof tabSlot.component, 'function');
 
   const stageSlot = byName('shell.overlay');
   assert.ok(stageSlot, '浮层舞台必须注册');
-  assert.equal(stageSlot.definition.id, 'dsh-markdown-typora-stage');
+  assert.equal(stageSlot.definition.id, 'dsh-markdown-editor-typora-stage');
   assert.equal(typeof stageSlot.component, 'function');
 
   const railSlot = byName('sidebar.panellist');
@@ -293,11 +293,11 @@ test('apply 防御性：tab 类型 + tab body 各自注册，服务缺失不抛'
 
   const mainSlot = byName('main');
   assert.ok(mainSlot, 'main 页面必须注册');
-  assert.equal(mainSlot.definition.key, 'dsh-markdown-typora-docs');
+  assert.equal(mainSlot.definition.key, 'dsh-markdown-editor-typora-docs');
 
   const settingsSlot = byName('settings.section');
   assert.ok(settingsSlot, '设置页 section 必须注册');
-  assert.equal(settingsSlot.definition.id, 'dsh-markdown-typora');
+  assert.equal(settingsSlot.definition.id, 'dsh-markdown-editor-typora');
   assert.equal(typeof settingsSlot.component, 'function');
 
   // 极简 ctx（没有 sidebarRightTabs / inject）也不能抛

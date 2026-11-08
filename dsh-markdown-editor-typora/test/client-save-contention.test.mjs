@@ -1,4 +1,4 @@
-// dsh-markdown-typora/test/client-save-contention.test.mjs
+// dsh-markdown-editor-typora/test/client-save-contention.test.mjs
 // public, portable regression for the MP_LIVE_STALE save-path decision (no host, no browser).
 //
 // Loads the REAL adjacent package `lib/client.js` the same way the web shell does

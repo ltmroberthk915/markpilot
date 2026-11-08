@@ -1,3 +1,5 @@
+> **Renamed in 1.4.0:** the package is now **`dsh-markdown-editor-typora`** (was `dsh-markdown-typora`). Install/upgrade with `dsh plugin --profile desktop add dsh-markdown-editor-typora@1.4.0`; the old package stays at 1.3.x and is no longer updated. Older entries below keep their historical package names.
+
 # MarkPilot
 
 ## MarkPilot for DSH 1.1 · An IDE-style Markdown workspace beside your AI
@@ -34,6 +36,9 @@
 **1.3.1:** `file://` Markdown links (previously inert) and absolute `.md` path chips open in the middle workspace instead of bringing up the sidebar change preview; the 1.3.0 fail-closed host authentication fix is included. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.3.1`
 
 **1.3.2:** external edits reach the editor within 1–2 s (an unsaved draft shows an actionable banner); the chosen editor theme survives host light/dark switches and conversation switches; dragged sidebar/right-bar handle widths are restored after switching conversations, and re-applying the transparency setting restores transparency. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.3.2`
+
+**1.4.0 (renamed):** the package is now `dsh-markdown-editor-typora`. It carries the 1.3.2 fixes (external edits refresh, theme persistence, sidebar handle restore, transparency re-apply) plus hardening of the live refresh path (no auto-adopt while editing, visible failures, bounded retry). Install: `dsh plugin --profile desktop add dsh-markdown-editor-typora@1.4.0`
+
 
 
 
@@ -987,3 +992,9 @@ A Markdown link in a conversation opens the note in the middle workspace and clo
 External edits to an open note now show up within 1–2 s; an unsaved draft surfaces an actionable banner (“重载磁盘版本” / “复制我的内容”) instead of silently keeping stale text.
 
 [Get DSH plugin 1.3.2](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.3.2), or install `dsh-markdown-typora@1.3.2`.
+
+### MarkPilot for DSH 1.4.0 · renamed to dsh-markdown-editor-typora
+
+The package is now `dsh-markdown-editor-typora` (the old `dsh-markdown-typora` stays at 1.3.x). This release carries external-edit refresh, theme persistence, sidebar handle restore, transparency re-apply, and hardening of the live refresh path.
+
+[Get DSH plugin 1.4.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-editor-typora-v1.4.0), or install `dsh-markdown-editor-typora@1.4.0`.

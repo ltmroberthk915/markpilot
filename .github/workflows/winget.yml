@@ -60,7 +60,7 @@ jobs:
           }
           if (-not $tag) { $tag = "v$version" }
           if ($version -notmatch '^\d+(\.\d+){2,3}$') {
-            # DSH plugin releases use tags like dsh-markdown-typora-v1.2.2 and have
+            # DSH plugin releases use tags like dsh-markdown-editor-typora-v1.2.2 and have
             # no MarkPilot Setup exe: skip them instead of failing the run. A manual
             # dispatch still fails loudly, because there the version is an input.
             if ($env:EVENT_NAME -eq 'release') {

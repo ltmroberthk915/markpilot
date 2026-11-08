@@ -1,4 +1,4 @@
-// dsh-markdown-typora 桥：手动保存宿主面的最小契约测试。
+// dsh-markdown-editor-typora 桥：手动保存宿主面的最小契约测试。
 // 运行：node --test test/manual-save.test.mjs
 //
 // 背景：引擎把 Ctrl+S 绑定到 actions.save，而该动作只认 window.mpHost.__save。
@@ -42,11 +42,11 @@ function loadBridge(options = {}) {
     querySelectorAll() { return []; },
     createElement() { return { setAttribute() {}, style: {} }; },
     head: { firstChild: null, insertBefore() {} },
-    baseURI: 'http://127.0.0.1/dsh-markdown-typora/renderer-cm6/index.html',
+    baseURI: 'http://127.0.0.1/dsh-markdown-editor-typora/renderer-cm6/index.html',
   };
   const location = {
-    pathname: '/dsh-markdown-typora/renderer-cm6/index.html',
-    href: 'http://127.0.0.1/dsh-markdown-typora/renderer-cm6/index.html',
+    pathname: '/dsh-markdown-editor-typora/renderer-cm6/index.html',
+    href: 'http://127.0.0.1/dsh-markdown-editor-typora/renderer-cm6/index.html',
   };
   const sandbox = {
     window,

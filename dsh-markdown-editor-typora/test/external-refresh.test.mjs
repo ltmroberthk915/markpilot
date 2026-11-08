@@ -94,7 +94,7 @@ async function startHost(fsAdapter) {
 }
 
 async function openSse(port, absPath, timeoutMs = 6000) {
-  const url = `http://127.0.0.1:${port}/dsh-markdown-typora/api/watch?path=${encodeURIComponent(absPath)}`;
+  const url = `http://127.0.0.1:${port}/dsh-markdown-editor-typora/api/watch?path=${encodeURIComponent(absPath)}`;
   const res = await fetch(url);
   assert.equal(res.status, 200, 'SSE watch must be accepted');
   const reader = res.body.getReader();
@@ -232,7 +232,7 @@ function applyUpdates(base, updates) {
 
 /** POST JSON to the plugin API. */
 async function postApi(port, path, payload) {
-  const res = await fetch(`http://127.0.0.1:${port}/dsh-markdown-typora/api/${path}`, {
+  const res = await fetch(`http://127.0.0.1:${port}/dsh-markdown-editor-typora/api/${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(payload),

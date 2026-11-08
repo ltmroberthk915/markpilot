@@ -21,7 +21,7 @@ function makeFrame() {
     insertBefore() {},
   };
   const frame = {
-    location: { pathname: '/dsh-markdown-typora/renderer-cm6/index.html', href: 'http://127.0.0.1/dsh-markdown-typora/renderer-cm6/index.html' },
+    location: { pathname: '/dsh-markdown-editor-typora/renderer-cm6/index.html', href: 'http://127.0.0.1/dsh-markdown-editor-typora/renderer-cm6/index.html' },
     setTimeout, clearTimeout, setInterval, clearInterval, queueMicrotask,
     console: { ...console, error() {} },
     document: {

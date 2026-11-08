@@ -68,17 +68,17 @@ test('default close releases grid/pane/native-handle overrides without overwriti
   assert.equal(panel.style.getPropertyValue('--dsh-sidebar-width'), '576px');
   assert.equal(panel.style.getPropertyValue('transform'), 'translateX(2px)');
   assert.equal(f.listeners().doc, 0);
-  assert.equal(f.ids.has('dsh-markdown-typora-grid-style'), false);
+  assert.equal(f.ids.has('dsh-markdown-editor-typora-grid-style'), false);
 });
 
 test('keep opt-in survives close, then opt-out releases ownership immediately', () => {
   const { f, a, frame, col, panel } = pinnedShell();
   a.layout.writeSettings(f.storage, { keepResizeHandlesAfterClose: true });
-  f.emit('dsh-markdown-typora:settings-changed'); a.closeDocsWorkbench();
+  f.emit('dsh-markdown-editor-typora:settings-changed'); a.closeDocsWorkbench();
   assert(frame.hasAttribute('data-mp-grid')); assert(col.hasAttribute('data-mp-rightbar-fit'));
   assert.equal(f.listeners().doc, 4);
   a.layout.writeSettings(f.storage, { keepResizeHandlesAfterClose: false });
-  f.emit('dsh-markdown-typora:settings-changed');
+  f.emit('dsh-markdown-editor-typora:settings-changed');
   assert.equal(frame.hasAttribute('data-mp-grid'), false);
   assert.equal(col.hasAttribute('data-mp-rightbar-fit'), false);
   assert.equal(f.listeners().doc, 0);
