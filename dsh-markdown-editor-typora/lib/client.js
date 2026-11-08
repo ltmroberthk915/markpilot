@@ -3692,12 +3692,39 @@ const __test = {
       background: "color-mix(in srgb, currentColor 14%, transparent)",
       border: "1px solid color-mix(in srgb, currentColor 22%, transparent)",
       backdropFilter: "blur(6px)", pointerEvents: "none", maxWidth: "90%",
-      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-    };
+      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"    };
     const btnStyle = {
       fontSize: 12, padding: "1px 8px", border: "1px solid rgba(127,127,127,0.4)",
       borderRadius: 4, background: "transparent", cursor: "pointer",
     };
+    // B1: rail is a fixed 28px flex sibling above the iframe. Container query
+    // (not @media) because the panel can be 160px inside a wide window.
+    const RAIL_CSS = `
+.mp-rail-btn{height:22px;min-width:22px;padding:0 6px;border:0;border-radius:5px;background:transparent;color:inherit;font:inherit;font-size:11.5px;cursor:pointer;white-space:nowrap;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:3px}
+.mp-rail-btn:hover{background:color-mix(in srgb,currentColor 10%,transparent)}
+.mp-rail-btn:focus-visible{outline:2px solid currentColor;outline-offset:1px}
+.mp-rail-status{flex:0 0 auto;max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;opacity:.72}
+.mp-rail-text{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;cursor:default}
+.mp-rail-text:focus-visible{outline:2px solid currentColor;outline-offset:1px;border-radius:4px}
+.mp-rail-actions{display:flex;align-items:center;gap:4px;flex:0 0 auto;min-width:0}
+@container (max-width:360px){
+  .mp-rail-status{display:inline-block;width:8px;height:8px;min-width:8px;max-width:8px;padding:0;border-radius:50%;font-size:0;color:transparent;background:#d9a441;overflow:hidden;flex:0 0 8px}
+  .mp-rail-status[data-mp-save-status="saved"]{background:transparent;border:1.5px solid #4caf50;box-sizing:border-box}
+  .mp-rail-btn{width:24px;min-width:24px;padding:0;font-size:0}
+  .mp-rail-btn::before{content:attr(data-icon);font-size:13px;line-height:1}
+  .mp-rail-actions{gap:2px}
+}
+@container (max-width:200px){
+  .mp-rail{gap:4px !important}
+  .mp-rail-btn{width:20px;min-width:20px;height:20px}
+  .mp-rail-actions{gap:1px}
+  .mp-rail-status{width:6px;min-width:6px;max-width:6px;height:6px;flex-basis:6px}
+  .mp-rail-popover{left:8px !important;right:8px !important}
+  .mp-rail-recovered{display:none}
+  .mp-rail-status[data-mp-save-status="saved"]{background:transparent;border:1.5px solid #4caf50;box-sizing:border-box}
+}
+@media (prefers-reduced-motion:reduce){.mp-rail-btn{transition:none}}
+`;
     const emptyStyle = { padding: 12, fontSize: 12, opacity: 0.7 };
 
     /* ───────────────────────── tab body ───────────────────────── */
@@ -4603,6 +4630,8 @@ const __test = {
             ? h(EditorTabBodyInner, {
                 useTabInfo: function () { return { tab: { contentId: active.address, id: "dsh-markdown-editor-typora-docs", draft:active.draft, workspace:active.workspace } }; },
                 sessionId: active.sessionId || context.sessionId, workbenchCollapsed: collapsed,
+                railInsetLeft: collapsed ? 52 : 0,
+                railInsetRight: 20,
               })
             : h("div", { style: { margin: "auto", textAlign: "center", fontSize: 12.5, ...sub, opacity: 0.8 } },
                 folder ? "从左侧选一份文档，或新建一份。" : "先在「设置 → Markdown 编辑器」里填写目标文档文件夹。")),
@@ -5076,6 +5105,7 @@ const __test = {
         useTabInfo: function () { return { tab: d.tab }; },
         sessionId: d.sessionId,
         inputActions: d.inputActions,
+        railInsetRight: 26,
       }));
     }
 
@@ -5149,12 +5179,12 @@ const __test = {
       const setUiIfChanged = React.useCallback((next) => {
         setUi((prev) => {
           if (prev.phase === next.phase && prev.detail === next.detail && prev.notice === next.notice) return prev;
-          return { ...prev, ...next };
+          return { ...prev, ...next, ...(prev.phase !== next.phase ? { railOpen: false } : {}) };
         });
       }, []);
       // recovered 横幅独立于 phase（dirty/ready 切换不清除；按票一次，用户「知道了」才收起）。
       const setUiIfChangedWithRecovered = React.useCallback((items) => {
-        setUi((prev) => (prev.recovered === items ? prev : { ...prev, recovered: items }));
+        setUi((prev) => (prev.recovered === items ? prev : { ...prev, recovered: items, ...(items ? {} : { railOpen: false }) }));
       }, []);
 
       /* ── 文档生命周期（每个 depKey 一代；异步回执都验票） ── */
@@ -5211,7 +5241,7 @@ const __test = {
           copyMine: null,
         };
         st.doc = doc;
-        setUiIfChanged({ phase: "loading", detail: "", notice: "", recovery: null });
+        setUi((prev) => ({ ...prev, phase: "loading", detail: "", notice: "", recovery: null, railOpen: false }));
         setUi((prev) => (prev.recovered || prev.saveStatus ? { ...prev, recovered: null, saveStatus: "" } : prev));   // 新文档代际不继承恢复提示或保存回执
 
         const ticket = ticketOf(doc.sessionId, doc.absPath, doc.gen);
@@ -6437,7 +6467,7 @@ const __test = {
           },
           dismissRecovered: () => {
             doc.liveRecoveredItems = null;
-            setUi((prev) => (prev.recovered ? { ...prev, recovered: null } : prev));
+            setUi((prev) => (prev.recovered ? { ...prev, recovered: null, railOpen: false } : prev));
           },
           retry: () => {
             if (doc.staleDraftPending) {
@@ -6556,51 +6586,92 @@ const __test = {
         return h("div", { style: emptyStyle }, "dsh-markdown-editor-typora: 无法解析文件地址 " + String(address == null ? "" : address));
       }
 
-      let banner = null;
+      const railInsetLeft = Number(props.railInsetLeft) || 0;
+      const railInsetRight = Number(props.railInsetRight) || 0;
+      const restoreHint = ui.saveStatus === "unsaved" && typeof ui.detail === "string" && ui.detail.includes("未写盘");
+      const saveText = ui.saveStatus === "unsaved" ? (restoreHint ? "未保存 · 按 Ctrl+S 保存" : "未保存") : ui.saveStatus === "saved" ? "已保存" : "";
+      const recoveredItems = Array.isArray(ui.recovered) ? ui.recovered : [];
+      const toggleRail = () => setUi((prev) => ({ ...prev, railOpen: !prev.railOpen }));
+      const actions = [];
+      let primaryText = "", primaryTone = "info";
       if (ui.phase === "conflict") {
-        banner = h("div", { style: bannerStyle(true) },
-          h("span", null, "⚠ " + ui.detail),
-          h("button", { style: btnStyle, onClick: () => { try { st.actions.reloadDisk && st.actions.reloadDisk(); } catch (e) { /* 忽略 */ } } }, "重载磁盘版本"),
-          h("button", { style: btnStyle, onClick: () => { try { st.actions.copyMine && st.actions.copyMine(); } catch (e) { /* 忽略 */ } } }, "复制我的内容"));
+        primaryText = "⚠ " + ui.detail;
+        primaryTone = "warn";
+        actions.push({ label: "重载磁盘版本", icon: "↻", run: () => st.actions.reloadDisk && st.actions.reloadDisk() });
+        actions.push({ label: "复制我的内容", icon: "⧉", run: () => st.actions.copyMine && st.actions.copyMine() });
       } else if (ui.phase === "recovery" && ui.recovery) {
-        banner = h("div", { style: bannerStyle(true) },
-          h("span", null, "检测到上次关闭时未保存的内容（" + new Date(ui.recovery.ts || Date.now()).toLocaleString() + "）"),
-          h("button", { style: btnStyle, onClick: () => { try { st.actions.restoreRecovery && st.actions.restoreRecovery(); } catch (e) { /* 忽略 */ } } }, "恢复"),
-          h("button", { style: btnStyle, onClick: () => { try { st.actions.discardRecovery && st.actions.discardRecovery(); } catch (e) { /* 忽略 */ } } }, "丢弃"));
+        primaryText = "↺ 检测到上次关闭时未保存的内容（" + new Date(ui.recovery.ts || Date.now()).toLocaleString() + "）";
+        primaryTone = "warn";
+        actions.push({ label: "恢复", icon: "↺", run: () => st.actions.restoreRecovery && st.actions.restoreRecovery() });
+        actions.push({ label: "丢弃", icon: "🗑", run: () => st.actions.discardRecovery && st.actions.discardRecovery() });
       } else if (ui.phase === "error") {
-        banner = h("div", { style: bannerStyle(true) },
-          h("span", null, "✗ " + ui.detail),
-          h("button", { style: btnStyle, onClick: () => { try { st.actions.retry && st.actions.retry(); } catch (e) { /* 忽略 */ } } }, "重试"),
-          st.doc && st.doc.recovery && st.doc.recoveryBackupFailed ? h("button", { style: btnStyle, onClick: () => { try { st.actions.discardRecovery && st.actions.discardRecovery(); } catch (e) { /* 忽略 */ } } }, "丢弃恢复内容") : null);
+        primaryText = "✗ " + ui.detail;
+        primaryTone = "warn";
+        actions.push({ label: "重试", icon: "⟳", run: () => st.actions.retry && st.actions.retry() });
+        if (st.doc && st.doc.recovery && st.doc.recoveryBackupFailed) {
+          actions.push({ label: "丢弃恢复内容", icon: "🗑", run: () => st.actions.discardRecovery && st.actions.discardRecovery() });
+        }
       } else if (ui.phase === "loading") {
-        banner = h("div", { style: bannerStyle(false) }, "正在加载文档…");
-      } else {
-        // Only save state appears at the top. Actionable banners above keep
-        // priority; their actions and the independent recovered banner survive.
-        const restoreHint = ui.saveStatus === "unsaved" && typeof ui.detail === "string" && ui.detail.includes("未写盘");
-        const saveText = ui.saveStatus === "unsaved" ? (restoreHint ? "未保存 · 按 Ctrl+S 保存" : "未保存") : ui.saveStatus === "saved" ? "已保存" : "";
-        banner = saveText ? h("div", { style: toastStyle, title: ui.detail || "", "data-mp-save-status": ui.saveStatus, role: "status" }, saveText) : null;
+        primaryText = "正在加载文档…";
       }
-
-      /* recovered：join 票带回的草稿副本提示（独立于 phase；按票一次；只展示+复制路径，
-       * 不读取/不打开这些文件；不经 SSE、不影响其它文档 tab）。 */
-      let recoveredBanner = null;
-      if (ui.recovered && ui.recovered.length) {
-        recoveredBanner = h("div", { style: bannerStyle(true), flexDirection: "column", alignItems: "stretch" },
-          h("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } },
-            h("span", null, "♻ 该文件存在共享会话恢复的草稿副本（原件未被覆盖）："),
-            h("button", { style: btnStyle, onClick: () => { try { st.actions.dismissRecovered && st.actions.dismissRecovered(); } catch (e) { /* 忽略 */ } } }, "知道了")),
-          ...ui.recovered.map((item, index) => h("div", { key: item.recoveryPath + ":" + index, style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } },
-            h("code", { style: { userSelect: "all", wordBreak: "break-all", fontSize: 11 } }, item.recoveryPath),
-            item.at ? h("span", { style: { opacity: 0.65, fontSize: 11 } }, new Date(item.at).toLocaleString()) : null,
-            h("button", { style: btnStyle, onClick: () => { try { st.actions.copyRecoveredPath && st.actions.copyRecoveredPath(index); } catch (e) { /* 忽略 */ } } }, "复制路径"))));
+      if (!primaryText && recoveredItems.length) {
+        primaryText = "♻ 该文件存在 " + recoveredItems.length + " 份共享会话恢复的草稿副本（原件未被覆盖）";
+        actions.push({ label: "查看", icon: "♻", run: toggleRail, aria: { "aria-expanded": !!ui.railOpen } });
+        actions.push({ label: "知道了", icon: "✓", run: () => st.actions.dismissRecovered && st.actions.dismissRecovered() });
+      } else if (recoveredItems.length) {
+        actions.push({ label: "♻ " + recoveredItems.length, icon: "♻", className: "mp-rail-recovered", title: "查看共享会话恢复的草稿副本", run: toggleRail, aria: { "aria-expanded": !!ui.railOpen } });
       }
-
       const frameName = "dsh-markdown-editor-typora-" + String((tab && (tab.id || tab.occurrenceId)) || "tab");
-      // position:relative —— 让轻提示(toastStyle)能绝对定位悬浮，不占布局高度。
-      return h("div", { ref: rootRef, style: { position: "relative", width: "100%", height: "100%", display: "flex", flexDirection: "column", minHeight: 0 } },
-        banner,
-        recoveredBanner,
+      const actionButton = (item, index) => h("button", {
+        key: "rail-action-" + index,
+        type: "button",
+        className: "mp-rail-btn" + (item.className ? " " + item.className : ""),
+        "data-icon": item.icon,
+        title: item.title || item.label,
+        onClick: () => { try { item.run && item.run(); } catch (e) { /* 忽略 */ } },
+        ...(item.aria || {}),
+      }, item.label);
+      // B1: fixed 28px rail above the iframe. The rail is always present, so
+      // banners and save status never change the editor geometry.
+      return h("div", {
+        ref: rootRef,
+        style: { position: "relative", width: "100%", height: "100%", display: "flex", flexDirection: "column", minHeight: 0, containerType: "inline-size" },
+      },
+        h("style", { key: "rail-css" }, RAIL_CSS),
+        h("div", {
+          className: "mp-rail",
+          role: "toolbar",
+          "aria-label": "文档状态与提示",
+          style: {
+            flex: "0 0 28px", height: 28, minHeight: 28, maxHeight: 28, minWidth: 0,
+            boxSizing: "border-box",
+            display: "flex", alignItems: "center", gap: 8, overflow: "hidden",
+            paddingLeft: 8 + railInsetLeft, paddingRight: 8 + railInsetRight,
+            borderBottom: "1px solid color-mix(in srgb, currentColor 14%, transparent)",
+            background: "color-mix(in srgb, currentColor 4%, transparent)",
+            position: "relative", zIndex: 1,
+          },
+        },
+          saveText ? h("span", {
+            className: "mp-rail-status",
+            title: ui.detail || saveText,
+            "aria-label": saveText,
+            "data-mp-save-status": ui.saveStatus,
+            role: "status",
+          }, saveText) : null,
+          primaryText ? h("span", {
+            className: "mp-rail-text",
+            title: primaryText + (recoveredItems.length ? "；点击查看共享会话恢复的草稿副本" : ""),
+            role: primaryTone === "warn" ? "alert" : "status",
+            tabIndex: recoveredItems.length ? 0 : undefined,
+            "aria-expanded": recoveredItems.length ? !!ui.railOpen : undefined,
+            style: recoveredItems.length ? { cursor: "pointer" } : undefined,
+            onClick: recoveredItems.length ? toggleRail : undefined,
+            onKeyDown: recoveredItems.length ? (event) => {
+              if (event.key === "Enter" || event.key === " ") { try { event.preventDefault(); } catch (e) { /* 忽略 */ } toggleRail(); }
+            } : undefined,
+          }, primaryText + (recoveredItems.length ? " ♻" : "")) : (saveText ? null : h("span", { className: "mp-rail-text", style: { opacity: 0.6 } }, "就绪")),
+          h("div", { className: "mp-rail-actions" }, ...actions.map(actionButton))),
         h("iframe", {
           key: depKey,
           ref: frameRef,
@@ -6621,8 +6692,40 @@ const __test = {
               } catch (e) { /* 尚未就绪 */ }
             }
           },
-          style: { width: "100%", height: "100%", border: 0, flex: 1, background: "transparent" },
-        }));
+          style: { width: "100%", border: 0, background: "transparent", flex: "1 1 auto", minHeight: 0, height: "auto" },
+        }),
+        recoveredItems.length ? h("div", {
+          key: "rail-popover",
+          className: "mp-rail-popover",
+          role: "dialog",
+          "aria-label": "共享会话恢复的草稿副本",
+          style: {
+            position: "absolute", top: 34, left: 8 + railInsetLeft, right: 8 + railInsetRight,
+            maxHeight: "calc(100% - 42px)", overflow: "auto", overflowX: "hidden", zIndex: 40,
+            boxSizing: "border-box",
+            display: ui.railOpen ? "block" : "none",
+            padding: 10, borderRadius: 8,
+            border: "1px solid color-mix(in srgb, currentColor 22%, transparent)",
+            background: "color-mix(in srgb, currentColor 8%, transparent)",
+            backdropFilter: "blur(12px)",
+            boxShadow: "0 8px 24px color-mix(in srgb, black 30%, transparent)",
+            color: "inherit",
+            fontSize: 12,
+          },
+        },
+          h("div", { style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 8 } },
+            h("strong", { style: { flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, "♻ 共享会话恢复的草稿副本（原件未被覆盖）"),
+            h("button", {
+              type: "button", className: "mp-rail-btn", "data-icon": "✓", title: "知道了",
+              onClick: () => { try { st.actions.dismissRecovered && st.actions.dismissRecovered(); } catch (e) { /* 忽略 */ } },
+            }, "知道了")),
+          ...recoveredItems.map((item, index) => h("div", { key: item.recoveryPath + ":" + index, style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", padding: "4px 0", borderTop: "1px solid color-mix(in srgb, currentColor 10%, transparent)" } },
+            h("code", { style: { userSelect: "all", wordBreak: "break-all", fontSize: 11, flex: "1 1 0", minWidth: 0 } }, item.recoveryPath),
+            item.at ? h("span", { className: "mp-rail-date", style: { opacity: 0.65, fontSize: 11, whiteSpace: "nowrap", flex: "0 0 auto" } }, new Date(item.at).toLocaleString()) : null,
+            h("button", {
+              type: "button", className: "mp-rail-btn", "data-icon": "⧉", title: "复制路径",
+              onClick: () => { try { st.actions.copyRecoveredPath && st.actions.copyRecoveredPath(index); } catch (e) { /* 忽略 */ } },
+            }, "复制路径")))) : null);
     }
 
     /* ───────────────────────── @mp 引用源（可失败，不阻塞主功能） ───────────────────────── */
