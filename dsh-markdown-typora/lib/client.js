@@ -4090,6 +4090,71 @@ const __test = {
         }
       }
     }
+    /* ── 文档链接接管：file:// 链接与路径芯片 ─────────────────────────────
+     * 宿主对 file:// 的点击没有实际打开动作（点了没反应）；路径芯片则走宿主预览，
+     * 文件有改动时会顺带弹出右栏的改动对比。这里统一在捕获阶段接管：解析出本地
+     * 路径，直接进文档工作台，并阻止宿主后续处理。
+     */
+    function decodeFileUrlPath(raw) {
+      try {
+        var s0 = String(raw || "").trim();
+        if (!/^file:/i.test(s0)) return "";
+        s0 = s0.replace(/^file:\/\/\//i, "/").replace(/^file:\/\//i, "//").replace(/^file:/i, "");
+        try { s0 = decodeURIComponent(s0); } catch (e) { /* 保留原串 */ }
+        if (/^\/[A-Za-z]:/.test(s0)) s0 = s0.slice(1);
+        return s0.replace(/\//g, "\\");
+      } catch (e) { return ""; }
+    }
+    function docPathFromChipText(text) {
+      var t = String(text || "").replace(/\s+/g, " ").trim();
+      t = t.replace(/^(?:绝对路径|完整路径|路径|Path|File)\s*[:：]\s*/i, "");
+      var m = t.match(/^(?:[A-Za-z]:[\\/]|\\\\)[^<>|?*\r\n]+\.(?:md|markdown)$/i);
+      return m ? m[0] : "";
+    }
+    function openLocalDoc(path) {
+      try {
+        if (!path || !layoutEnabled()) return false;
+        if (readSettings(window.localStorage).enabled !== true) return false;
+        var wctx = workspaceContext();
+        void chooseWorkbenchDoc({ path: path, address: absoluteFileAddress(path), workspace: wctx.cwd || "", sessionId: wctx.sessionId || "" });
+        return true;
+      } catch (e) { return false; }
+    }
+    function installFileLinkInterceptor() {
+      if (typeof document === "undefined" || typeof document.addEventListener !== "function") return function () {};
+      var findAnchor = function (node) {
+        try { return node && node.closest ? node.closest("a[href]") : null; } catch (e) { return null; }
+      };
+      var onClick = function (ev) {
+        if (!ev || ev.defaultPrevented) return;
+        if (typeof ev.button === "number" && ev.button !== 0) return;
+        if (ev.metaKey || ev.ctrlKey || ev.altKey || ev.shiftKey) return;
+        var target = ev.target;
+        if (!target) return;
+        var path = "";
+        var anchorEl = findAnchor(target);
+        if (anchorEl) {
+          path = decodeFileUrlPath(anchorEl.getAttribute && anchorEl.getAttribute("href"));
+          if (!path || !/\.(md|markdown)$/i.test(path)) return;
+        } else {
+          var el = target, depth = 0;
+          while (el && depth < 4) {
+            var hit = docPathFromChipText(el.textContent);
+            if (!hit && el.getAttribute) {
+              hit = docPathFromChipText(el.getAttribute("title")) || docPathFromChipText(el.getAttribute("aria-label"));
+            }
+            if (hit) { path = hit; break; }
+            el = el.parentElement; depth += 1;
+          }
+          if (!path) return;
+        }
+        if (!openLocalDoc(path)) return;
+        try { ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); } catch (e) { /* 忽略 */ }
+      };
+      document.addEventListener("click", onClick, true);
+      return function () { try { document.removeEventListener("click", onClick, true); } catch (e) { /* 忽略 */ } };
+    }
+
     function installWorkspaceNavigation(ctx) {
       var stops=[], disposed=false, queued=false, previous=null;
       function observe() {
@@ -6559,6 +6624,7 @@ const __test = {
       // ③ sessions 旁路（cwd 解析用；服务晚到也没关系，每次 open 现取）。
       try { SessionsBridge.getSessions = () => get("sessions"); } catch (e) { /* 忽略 */ }
       ctx.effect(() => installWorkspaceNavigation(ctx), "dsh-markdown-typora: workspace navigation");
+      ctx.effect(() => installFileLinkInterceptor(), "dsh-markdown-typora: document links");
 
       // Rightbar preferences apply only to the editor-owned grid.
 
