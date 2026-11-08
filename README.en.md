@@ -33,6 +33,9 @@
 
 **1.3.1:** `file://` Markdown links (previously inert) and absolute `.md` path chips open in the middle workspace instead of bringing up the sidebar change preview; the 1.3.0 fail-closed host authentication fix is included. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.3.1`
 
+**1.3.2:** external edits reach the editor within 1–2 s; an unsaved draft now shows a banner instead of silently keeping stale text. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.3.2`
+
+
 
 
 
@@ -978,3 +981,9 @@ A Markdown link in a conversation opens the note in the middle workspace and clo
 `file://` Markdown links in a message used to do nothing when clicked; they now resolve to a local path and open in the middle workspace. Absolute `.md` path chips take the same route instead of bringing up the sidebar change preview. Includes the 1.3.0 fail-closed host authentication fix.
 
 [Get DSH plugin 1.3.1](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.3.1), or install `dsh-markdown-typora@1.3.1`.
+
+### MarkPilot for DSH 1.3.2 · External edits reach the editor
+
+External edits to an open note now show up within 1–2 s; an unsaved draft surfaces an actionable banner (“重载磁盘版本” / “复制我的内容”) instead of silently keeping stale text.
+
+[Get DSH plugin 1.3.2](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.3.2), or install `dsh-markdown-typora@1.3.2`.

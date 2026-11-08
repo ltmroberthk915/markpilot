@@ -279,14 +279,15 @@ function compact(db, room) {
   db.prepare('UPDATE rooms SET floor=?,checkpoint=? WHERE epoch=?').run(floor, Buffer.from(text,'utf16le'), room.epoch);
   db.prepare('DELETE FROM changes WHERE epoch=? AND version<=?').run(room.epoch, floor);
 }
-function adoptDisk(db, room, disk) {
+function adoptDisk(db, room, disk, force = false) {
   if (room.disk === disk.hash) return;
   const current = materialize(db, room);
   if (current !== disk.text) {
     // A draft that diverges from the new disk text is a genuine both-changed
     // conflict — unless the external writer landed this very draft, which the
-    // equality check above already turned into a save.
-    if (room.version !== room.saved) throw conflict('原文件和未保存的协同草稿均已改变，请另存草稿或重新载入');
+    // equality check above already turned into a save. `force` is only used by
+    // the user-confirmed "重新加载磁盘版本" (discard) path.
+    if (room.version !== room.saved && !force) throw conflict('原文件和未保存的协同草稿均已改变，请另存草稿或重新载入');
     let from = 0, end = current.length, nextEnd = disk.text.length;
     while (from < end && from < nextEnd && current.charCodeAt(from) === disk.text.charCodeAt(from)) from++;
     while (end > from && nextEnd > from && current.charCodeAt(end-1) === disk.text.charCodeAt(nextEnd-1)) { end--; nextEnd--; }
@@ -420,7 +421,7 @@ class LiveDocuments {
   // save/external, so a cooperating window's commit can never fall between
   // the disk read and the room update — an interleaved save would otherwise
   // be adopted as a stale disk state and overwrite the newer room contents.
-  async refresh(client, epoch) {
+  async refresh(client, epoch, options = {}) {
     const {key,file} = this.member(client,epoch);
     return withFileCommit(file, async () => {
       this.member(client,epoch);
@@ -429,8 +430,9 @@ class LiveDocuments {
         const room = roomFor(this.db,key);
         if (!room || room.epoch !== epoch) throw fault('MP_LIVE_SESSION','文档协同会话已结束，草稿已保留');
         if (room.disk === disk.hash) return {...head(room),changed:false};
-        if (room.version !== room.saved) return {...head(room),changed:true,unsavedDraft:true};
-        try { adoptDisk(this.db, room, disk); }
+        // 有未保存草稿时默认只报告冲突；用户显式「重载磁盘版本」(discard) 才让磁盘内容覆盖草稿。
+        if (room.version !== room.saved && !options.discard) return {...head(room),changed:true,unsavedDraft:true};
+        try { adoptDisk(this.db, room, disk, options.discard === true); }
         catch (error) {
           if (error.code !== 'MP_FILE_CONFLICT') throw error;
           return {...head(roomFor(this.db,key) || room),changed:true,unsavedDraft:true};

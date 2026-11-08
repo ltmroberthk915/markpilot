@@ -5670,7 +5670,7 @@ const __test = {
                 try {
                   const stat = await api("stat", { path: doc.absPath });
                   if (alive() && stat.ok === true && stat.value && stat.value.version !== doc.lastVersion) {
-                    if (doc.live) post("live-refresh", { protocol: 2, docToken: doc.token });
+                    if (doc.live) void refreshLiveRoom();
                     else if (doc.dirty || doc.conflict) { doc.externalStale = true; }
                     else await loadFromDisk({ silent: true, reason: "save-reconcile" });
                   }
@@ -5832,6 +5832,33 @@ const __test = {
           scheduleSave(SAVE_DEBOUNCE_MS);
         }
 
+        /** 外部磁盘变更：live 房间先从磁盘采纳（干净时自动进正文；有草稿时报告冲突）。 */
+        async function refreshLiveRoom(options) {
+          const opts = options || {};
+          if (!doc.live) return null;
+          try {
+            const result = await api("live", { client: doc.live.client, action: "refresh", request: { epoch: doc.live.epoch, discard: opts.discard === true } });
+            if (!alive() || !doc.live) return null;
+            if (result.ok !== true) return null;
+            const value = result.value || {};
+            if (value.changed) post("live-refresh", { protocol: 2, docToken: doc.token });
+            if (value.unsavedDraft && !opts.discard) {
+              doc.externalStale = true;
+              showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
+              return value;
+            }
+            doc.externalStale = false;
+            doc.staleNotified = false;
+            if (value.changed) {
+              try {
+                const stat = await api("stat", { path: doc.absPath });
+                if (alive() && stat.ok === true && stat.value) doc.lastVersion = stat.value.version;
+              } catch (e) { /* 版本对账失败不影响正文 */ }
+            }
+            return value;
+          } catch (e) { return null; }
+        }
+
         function onExternalEvent(event) {
           let data = {};
           try { data = JSON.parse(event.data) || {}; } catch (e) { data = {}; }
@@ -5839,7 +5866,7 @@ const __test = {
           if (!doc.opened) return; // 握手/首次 open 之前的事件没有落点（boot 自己会读磁盘）
           // live 会话：磁盘事件的采纳权在共享房间（external 写入会被 adopt 成房间更新），
           // 这里只催一次 refresh，绝不 loadFromDisk 覆盖共享草稿。
-          if (doc.live) { post("live-refresh", { protocol: 2, docToken: doc.token }); return; }
+          if (doc.live) { void refreshLiveRoom(); return; }
           const version = data.version == null ? "" : String(data.version);
           const accepted = shouldAcceptExternal({
             dirty: doc.dirty,
@@ -5851,10 +5878,10 @@ const __test = {
           if (!accepted) {
             if (!doc.externalStale) {
               doc.externalStale = true;
-              if (doc.dirty && !doc.staleNotified) {
-                doc.staleNotified = true;
-                showPhase("dirty", "编辑中…（磁盘已更新，保存时会冲突）");
-              }
+              if (doc.dirty && !doc.staleNotified) doc.staleNotified = true;
+            }
+            if (doc.dirty || doc.conflict) {
+              showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
             }
             return;
           }
@@ -6216,7 +6243,7 @@ const __test = {
           if (doc.dead) return;
           if (isDocumentHidden()) { clearPoll(); return; }
           // API.md §1.5：窗口重新获焦 → 立即增量交换（不是全文轮询）。
-          if (doc.live) post("live-refresh", { protocol: 2, docToken: doc.token });
+          if (doc.live) void refreshLiveRoom();
           schedulePoll(0);
           if (doc.opened && doc.externalStale && !doc.dirty && !doc.conflict && !doc.saving && doc.tabVisible !== false) {
             doc.externalStale = false;

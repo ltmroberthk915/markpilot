@@ -33,6 +33,9 @@
 
 **1.3.1：** 消息里的 `file://` Markdown 链接（此前点了没反应）与绝对路径 `.md` 芯片现在都进中间工作台，不再弹出右栏的改动对比；1.3.0 的认证 fail-closed 宿主修复一并包含。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.3.1`
 
+**1.3.2：** 修外部修改不刷新：外部进程改写 md 后编辑器会在 1–2 秒内自动采纳；有未保存草稿时显示「文件已在磁盘上更新」横幅（重载磁盘版本 / 复制我的内容），不再静默。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.3.2`
+
+
 
 
 
@@ -971,3 +974,9 @@ DSH 重启时会把上次打开的 Markdown 标签恢复成自带预览，停在
 消息里的 `file://` Markdown 链接此前点击没有任何反应；1.3.1 起会解析成本地路径并在中间工作台打开。绝对路径的 `.md` 芯片也统一走工作台，不再连带弹出右栏的改动对比。本版同时包含 1.3.0 的认证 fail-closed 宿主修复。
 
 [下载 DSH 插件 1.3.1](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.3.1)，或安装 `dsh-markdown-typora@1.3.1`。
+
+### MarkPilot for DSH 1.3.2 · 外部修改会刷新了
+
+外部进程改写正在打开的 md 后，编辑器会在 1–2 秒内自动采纳磁盘内容；有未保存草稿时显示可操作的「文件已在磁盘上更新」横幅（重载磁盘版本 / 复制我的内容）。
+
+[下载 DSH 插件 1.3.2](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.3.2)，或安装 `dsh-markdown-typora@1.3.2`。

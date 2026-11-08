@@ -757,6 +757,11 @@ export function createHost(options = {}) {
       releaseLive(payload.client);
       return {ok:true,value:null};
     }
+    if (payload.action === 'refresh') {
+      const request = payload.request || {};
+      return Promise.resolve(live.refresh(payload.client, request.epoch, { discard: request.discard === true }))
+        .then(value=>({ok:true,value}));
+    }
     if (payload.action !== 'exchange') return badRequest('unknown live action');
     return Promise.resolve(live.exchange(payload.client,payload.request)).then(value=>({ok:true,value}));
   }

@@ -31,6 +31,9 @@
 
 **1.3.1：** 消息里的 `file://` Markdown 链接（此前点了没反应）与绝对路径 `.md` 芯片现在都在捕获阶段被接管，解析成本地路径后直接进中间工作台，不再弹出右栏的改动对比；1.3.0 的认证 fail-closed 宿主修复一并包含。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.3.1`
 
+**1.3.2：** 修外部修改不刷新：外部进程改写 md 后，编辑器（含协同编辑房间）会在 1–2 秒内自动采纳磁盘新内容；有未保存草稿时不再静默，而是显示「文件已在磁盘上更新」横幅，可点「重载磁盘版本」覆盖或「复制我的内容」保留。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.3.2`
+
+
 
 
 
@@ -65,6 +68,9 @@
 **1.2.2:** a Markdown link opens in the middle workspace and the duplicate right-sidebar tab closes itself. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.2.2`
 
 **1.3.1:** `file://` Markdown links in a message (previously inert) and absolute `.md` path chips are taken over in the capture phase and opened in the middle workspace instead of bringing up the sidebar change preview. This build includes the 1.3.0 fail-closed host authentication fix. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.3.1`
+
+**1.3.2:** external edits now reach the editor: a collaboration room adopts the new disk text on the next change event (1–2 s), and an unsaved draft no longer hides the update — the editor shows a banner offering “重载磁盘版本” or “复制我的内容”. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.3.2`
+
 
 
 
@@ -270,3 +276,14 @@ Install `dsh-markdown-typora@1.3.0` or the matching GitHub release archive, then
 `file://` Markdown links and absolute `.md` path chips now open in the middle workspace instead of being ignored or opening the sidebar change preview. Includes the 1.3.0 fail-closed host authentication fix.
 
 Install `dsh-markdown-typora@1.3.1` or the matching GitHub release archive, then restart DSH.
+
+
+## MarkPilot for DSH 1.3.2 · 外部修改会刷新了
+
+外部进程（另一个会话、git、编辑器）改写正在打开的 md 后，插件会自动从磁盘采纳新内容：协同编辑房间在收到变更事件后先向磁盘对齐，再把差异下发给编辑区；干净文档 1–2 秒内更新。
+
+有未保存草稿时不再静默：「文件已在磁盘上更新」横幅提供「重载磁盘版本」（用磁盘内容覆盖草稿）与「复制我的内容」（保留草稿）。
+
+External edits now reach the editor: a live room adopts the disk text before pushing deltas, and an unsaved draft surfaces an actionable banner instead of stale content.
+
+Install `dsh-markdown-typora@1.3.2` or the matching GitHub release archive, then restart DSH.

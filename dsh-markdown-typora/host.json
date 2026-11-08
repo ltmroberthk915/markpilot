@@ -8,8 +8,8 @@
     },
     {
       "path": "live-documents.js",
-      "bytes": 30336,
-      "sha256": "2f843e6a5e143a72c5f08092f8a09570a48b01c35d204d334fd88026917deaf3"
+      "bytes": 30650,
+      "sha256": "bd0c03509b9ff24a032fea7597fcdae89706af8db13251e35df0844cbe2fdd26"
     },
     {
       "path": "text-codec.js",
