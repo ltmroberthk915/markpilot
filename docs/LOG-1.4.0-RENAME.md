@@ -35,3 +35,20 @@
 - 全量测试：342 项，341 通过、1 项 POSIX 跳过、0 失败（更名后按新路由/tab/恢复槽断言）。
 - `node scripts/sync-core.mjs --check`、`node scripts/sync-host.mjs` 均通过。
 - 打包：`dsh-markdown-editor-typora-1.4.0.tgz`（见发布记录哈希）。
+
+## 1.4.0 发布与验证（2026-11-08 13:35–13:45）
+
+- Git main `6b56420`，标签 `dsh-markdown-editor-typora-v1.4.0`（轻量标签）。
+- GitHub Release：https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-editor-typora-v1.4.0 ，资产 `dsh-markdown-editor-typora-1.4.0.tgz`，2,761,504 字节。
+- TGZ SHA-256：`7bed7827a9e269ad93ac4f3d656f5347fd2d3c5c5ece90b6d0316dafbc431bdd`；GitHub asset digest、npm 下载包、本地打包三方一致（worktree 与 D:\BuyKey\markpilot-public 两个 checkout 各自 npm pack 同哈希）。
+- npm：`dsh-markdown-editor-typora@1.4.0` 已发布，latest=1.4.0。首次发布新包名时 npm 先建了一个 `0.0.0-stage` 占位（staged publishing），随后 1.4.0 正常可见；两者同属本账号。
+- 旧包 `dsh-markdown-typora@1.3.1` 已 `npm deprecate`，提示安装新包；旧包不删除。
+- 本机 desktop profile：依赖键、bundles 条目、pnpm-lock 与 node_modules junction 全部从旧名换到 `dsh-markdown-editor-typora`（备份 `D:\BuyKey\dsh-backup-desktop-rename-20261108-133335`）；旧 junction 只指向旧目录，已按目标校验后移除。
+- headless profile 仍是旧的 `dsh-markdown-typora@1.3.1`，待桌面验证通过后升级/替换。
+- 市场文案与 PR 由另一会话负责（用户明确不让我改），本记录不涉及。
+
+## 打包复核
+
+- `package.json` name=`dsh-markdown-editor-typora` version=`1.4.0`，repository.directory/homepage 已指向新目录。
+- 解包复核：`cordis.patch.yml` id/name 均为新名；shipped js 中无旧路由 `/dsh-markdown-typora`、旧 tab `dsh-markdown-typora/editor`、旧恢复槽前缀。
+- `node scripts/sync-core.mjs --check` 通过；`node scripts/sync-host.mjs` → `HOST_SYNC_OK 9 files`。
