@@ -3719,7 +3719,9 @@ const __test = {
   .mp-rail-btn{width:20px;min-width:20px;height:20px}
   .mp-rail-actions{gap:1px}
   .mp-rail-status{width:6px;min-width:6px;max-width:6px;height:6px;flex-basis:6px}
-  .mp-rail-popover{left:calc(8px + var(--mp-rail-inset-left,0px)) !important;right:calc(8px + var(--mp-rail-inset-right,0px)) !important}
+  .mp-rail-popover{top:92px !important;left:8px !important;right:calc(8px + var(--mp-rail-inset-right,0px)) !important;max-height:calc(100% - 100px) !important}
+  .mp-rail-head{flex-wrap:wrap}
+  .mp-rail-head strong{flex:1 1 100% !important}
   .mp-rail-date{flex:1 1 100% !important;white-space:normal !important}
   .mp-rail-recovered,.mp-rail-notices{display:none}
   .mp-rail-status[data-mp-save-status="saved"]{background:transparent;border:1.5px solid #4caf50;box-sizing:border-box}
@@ -6800,7 +6802,7 @@ const __test = {
             fontSize: 12,
           },
         },
-          recoveredItems.length ? h("div", { style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 8 } },
+          recoveredItems.length ? h("div", { className: "mp-rail-head", style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 8 } },
             h("strong", { style: { flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, "♻ 共享会话恢复的草稿副本（原件未被覆盖）"),
             h("button", {
               type: "button", className: "mp-rail-btn", "data-icon": "✓", title: "知道了",
@@ -6814,7 +6816,7 @@ const __test = {
               onClick: () => { try { st.actions.copyRecoveredPath && st.actions.copyRecoveredPath(index); } catch (e) { /* 忽略 */ } },
             }, "复制路径"))),
           noticeItems.length ? h("div", { style: { borderTop: "1px solid color-mix(in srgb, currentColor 14%, transparent)", marginTop: 6, paddingTop: 6 } },
-            h("div", { style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 4 } },
+            h("div", { className: "mp-rail-head", style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 4 } },
               h("strong", { style: { flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, "通知（" + noticeItems.length + "）"),
               h("button", {
                 type: "button", className: "mp-rail-btn", "data-icon": "⌫", title: "清除通知",
