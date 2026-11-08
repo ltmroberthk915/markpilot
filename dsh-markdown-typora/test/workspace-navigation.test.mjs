@@ -255,3 +255,22 @@ test('the legacy props.actions fallback also closes the duplicate tab',async()=>
   await new Promise((resolve)=>setTimeout(resolve,380));
   assert.deepEqual(closed,['tab']);f.dispose();
  });
+
+test('file:// links to Markdown documents resolve to Windows paths',()=>{
+  const p=make().W;
+  assert.equal(p.decodeFileUrlPath('file:///C:/Users/Ming/.dsh/AGENTS.md'),'C:\\Users\\Ming\\.dsh\\AGENTS.md');
+  assert.equal(p.decodeFileUrlPath('file:///C:/a%20b/%E4%B8%AD.md'),'C:\\a b\\中.md');
+  assert.equal(p.decodeFileUrlPath('https://example.com/a.md'),'');
+ });
+test('an absolute Markdown path chip is recognised, other text is not',()=>{
+  const p=make().W;
+  assert.equal(p.docPathFromChipText('绝对路径: C:\\Users\\Ming\\.dsh\\AGENTS.md'),'C:\\Users\\Ming\\.dsh\\AGENTS.md');
+  assert.equal(p.docPathFromChipText('README.md'),'');
+  assert.equal(p.docPathFromChipText('点这里'),'');
+ });
+test('a link-opened local document lands in the workbench',async()=>{
+  const f=make();f.storage.set('dsh.markpilot.layout.v1',JSON.stringify({enabled:true}));
+  const ok=f.W.openLocalDoc('D:/A/AGENTS.md');await drain();
+  assert.equal(ok,true);assert.equal(f.W.state().docsModeOn,true);
+  assert.equal(f.W.state().workbenchDoc.path,'D:/A/AGENTS.md');f.dispose();
+ });

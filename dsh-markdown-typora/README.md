@@ -29,6 +29,9 @@
 
 **1.2.2：** 链接打开的 md 进中间后，右栏的重复标签会自动关闭，右栏不再为此弹出。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.2.2`
 
+**1.3.1：** 消息里的 `file://` Markdown 链接（此前点了没反应）与绝对路径 `.md` 芯片现在都在捕获阶段被接管，解析成本地路径后直接进中间工作台，不再弹出右栏的改动对比；1.3.0 的认证 fail-closed 宿主修复一并包含。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.3.1`
+
+
 
 
 
@@ -60,6 +63,9 @@
 **1.2.1:** Markdown tabs restored at startup are adopted into the document workspace instead of staying in the right-side preview. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.2.1`
 
 **1.2.2:** a Markdown link opens in the middle workspace and the duplicate right-sidebar tab closes itself. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.2.2`
+
+**1.3.1:** `file://` Markdown links in a message (previously inert) and absolute `.md` path chips are taken over in the capture phase and opened in the middle workspace instead of bringing up the sidebar change preview. This build includes the 1.3.0 fail-closed host authentication fix. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.3.1`
+
 
 
 
@@ -255,3 +261,12 @@ Install `dsh-markdown-typora@1.2.2` or the matching GitHub release archive, then
 The file API's trust fence now trusts only the host's `connection.requestRejection`. A host that lacks the capability — or has no `connection` service — receives `503 host-auth-unavailable` on every plugin route, and a single startup warning explains why. The loopback Host/Origin fallback is gone: when authentication is unavailable it silently skipped the check, so 1.3.0 drops compatibility with such hosts instead of failing open. This is the fail-closed behavior requested in [polang233/dsh-plugin-index#213](https://github.com/polang233/dsh-plugin-index/issues/213).
 
 Install `dsh-markdown-typora@1.3.0` or the matching GitHub release archive, then restart DSH.
+
+
+## MarkPilot for DSH 1.3.1 · 文档链接一律进工作台
+
+消息里的 `file://` Markdown 链接此前点击没有任何反应；1.3.1 起在捕获阶段解析成本地路径并在中间工作台打开。绝对路径的 `.md` 芯片同样走工作台，不再连带弹出右栏的改动对比。本版同时包含 1.3.0 的认证 fail-closed 宿主修复。
+
+`file://` Markdown links and absolute `.md` path chips now open in the middle workspace instead of being ignored or opening the sidebar change preview. Includes the 1.3.0 fail-closed host authentication fix.
+
+Install `dsh-markdown-typora@1.3.1` or the matching GitHub release archive, then restart DSH.

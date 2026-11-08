@@ -31,6 +31,9 @@
 
 **1.2.2:** clicking a Markdown link opens the note in the middle workspace and closes the duplicate tab it leaves in the right sidebar, so the sidebar no longer pops open for the file. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.2.2`
 
+**1.3.1:** `file://` Markdown links (previously inert) and absolute `.md` path chips open in the middle workspace instead of bringing up the sidebar change preview; the 1.3.0 fail-closed host authentication fix is included. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.3.1`
+
+
 
 
 
@@ -969,3 +972,9 @@ When DSH starts it restores the Markdown tabs from the last session into its own
 A Markdown link in a conversation opens the note in the middle workspace and closes the duplicate tab it leaves in the right sidebar; a sidebar holding nothing else collapses with it. The × memory and the passive-open setting are unchanged.
 
 [Get DSH plugin 1.2.2](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.2.2), or install `dsh-markdown-typora@1.2.2`.
+
+### MarkPilot for DSH 1.3.1 · Document links land in the workspace
+
+`file://` Markdown links in a message used to do nothing when clicked; they now resolve to a local path and open in the middle workspace. Absolute `.md` path chips take the same route instead of bringing up the sidebar change preview. Includes the 1.3.0 fail-closed host authentication fix.
+
+[Get DSH plugin 1.3.1](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-typora-v1.3.1), or install `dsh-markdown-typora@1.3.1`.
