@@ -17,6 +17,17 @@
 - `forceReload`（冲突横幅“重载磁盘版本”）：先拒绝 `dead/pendingApply/applyUnknown/saving`；先归档 `doc.recovery.text`（`pre-reload-recovery`），再归档 dirty 的 room 文本（`pre-reload`，优先 `pullText` 的 room 正文），任一失败不重载；归档期间有新编辑则取消。
 - 错误：`MP_DOC_DIRTY`，message 带 `[MP_DOC_DIRTY]`、绝对路径和“在编辑器中保存或丢弃后重试”。
 
+## 真机验收（2026-11-09 00:4x，重启后 1.4.2）
+
+用真实 `live-v1` SQLite 为测试文件模拟“打开”房间，再通过本会话真实的 DSH `write` 工具验收：
+
+- **dirty 房间**：`guard-e2e.md` room `version=1, saved=0`；`write` 工具返回
+  `[MP_DOC_DIRTY] 文件正在 MarkPilot 中打开且有未保存修改：D:\...\guard-e2e.md...`；
+  文件字节未变（68 B，mtime 未变）。
+- **清理房间后**：同一 `write` 工具成功；未打开文件 `guard-e2e-2.md` 也成功。
+- **clean 房间**：`version=0, saved=0` 时 `write` 工具成功（CAS 放行）。
+- 三次测试后 `rooms.sqlite` 的 rooms=0，无残留。
+
 ## 已知边界（不承诺覆盖）
 
 - 只保护本 MarkPilot 插件已 join 的 live 房间：关 tab/HMR 时 `live.leave` 会删房间（即使脏），此后守卫不可见；此路径靠 1.4.1 的恢复槽/归档兜底。
