@@ -6373,13 +6373,48 @@ const __test = {
         }
 
         function forceReload() {
-          stopLive(true);   // 冲突后重载 = 放弃旧房间，重新 join
-          setUiIfChanged({ phase: "loading", detail: "", notice: "" });
-          void loadFromDisk({ silent: false, discard: true }).then(loaded => {
+          if (doc.dead || doc.pendingApply || doc.applyUnknown || doc.saving) {
+            showNotice('编辑器同步或保存进行中，暂时不能重载磁盘版本；请稍后再试');
+            return;
+          }
+          const seq = doc.editSeq;
+          void (async () => {
+            // Discarding a conflict must not be the only copy of the user's text.
+            if (doc.recovery) {
+              const recoverySlot = {
+                text: typeof doc.recovery.text === 'string' ? doc.recovery.text : '',
+                baseVersion: typeof doc.recovery.baseVersion === 'string' ? doc.recovery.baseVersion : doc.lastVersion,
+                docToken: typeof doc.recovery.docToken === 'string' ? doc.recovery.docToken : undefined,
+              };
+              const archivedRecovery = await archiveDraftSlot(recoverySlot, 'pre-reload-recovery');
+              if (!archivedRecovery) {
+                if (alive()) showPhase('conflict', '未重载：恢复草稿归档失败，当前编辑内容已保留；可重试');
+                return;
+              }
+            }
+            if (doc.dirty) {
+              let text = typeof doc.text === "string" ? doc.text : "";
+              try {
+                const pulled = await pullText();
+                if (pulled && typeof pulled.text === "string" && !pulled.stale) text = pulled.text;
+              } catch (error) { /* 保底用父镜像 */ }
+              const archived = await archiveDraftSlot({ text, baseVersion: doc.lastVersion, docToken: doc.token }, 'pre-reload');
+              if (!archived) {
+                if (alive()) showPhase('conflict', '未重载：冲突内容归档失败，当前编辑内容已保留；可重试');
+                return; // keep the conflict banner and the draft
+              }
+            }
+            if (!alive() || doc.editSeq !== seq) {
+              showNotice('重载已取消：归档期间出现新的编辑，请重试');
+              return;
+            }
+            stopLive(true);   // 冲突后重载 = 放弃旧房间，重新 join
+            setUiIfChanged({ phase: "loading", detail: "", notice: "" });
+            const loaded = await loadFromDisk({ silent: false, discard: true });
             if (!loaded && alive() && (doc.dirty || doc.conflict)) {
               showPhase("conflict", "未重载，当前编辑内容已保留；可再次重载磁盘版本");
             }
-          });
+          })();
         }
 
         // 横幅按钮回调（渲染侧通过 st.actions 取当前代）。

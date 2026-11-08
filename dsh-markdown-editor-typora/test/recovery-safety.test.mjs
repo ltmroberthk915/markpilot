@@ -360,3 +360,73 @@ test('retry after an unrelated save failure does not hijack a sleeping recovery 
   assert.notEqual(h.engine.text, 'RESTORE-ME');
   h.cleanup();
 });
+
+test('reloading the disk version archives the editor text first', async () => {
+  const h = make();
+  await h.boot();
+  h.edit('LOCAL');
+  h.st.doc.conflict = true;
+  h.st.doc.recovery = { text: 'RECOVERY-TEXT', baseVersion: 'v1' };
+  const opens = () => h.requests.filter((r) => r.endpoint === 'open').length;
+  const before = opens();
+  h.setFetch((req) => (req.endpoint === 'archive'
+    ? { ok: false, error: { code: 'EACCES', message: 'denied' } }
+    : { ok: true, value: { text: 'disk-v1', version: 'v1', displayPath: 'D:/probe/a.md', size: 7 } }));
+  h.st.actions.reloadDisk();
+  await drain();
+  await drain();
+  assert.equal(opens(), before, 'a failed archive must abort the reload');
+  assert.equal(h.st.doc.conflict, true);
+  h.setFetch((req) => (req.endpoint === 'archive'
+    ? { ok: true, value: { archivePath: 'D:/probe/.archive/pre-reload.md' } }
+    : { ok: true, value: { text: 'disk-v1', version: 'v1', displayPath: 'D:/probe/a.md', size: 7 } }));
+  h.st.actions.reloadDisk();
+  await drain();
+  await drain();
+  assert.equal(opens(), before + 1);
+  assert.ok(h.requests.some((r) => r.endpoint === 'archive' && r.payload.tag === 'pre-reload-recovery'));
+  assert.ok(h.requests.some((r) => r.endpoint === 'archive' && r.payload.tag === 'pre-reload'));
+  h.cleanup();
+});
+
+test('reload is refused while the editor is applying or saving', async () => {
+  const h = make();
+  await h.boot();
+  h.edit('LOCAL');
+  h.st.doc.conflict = true;
+  h.st.doc.saving = true;
+  const opens = () => h.requests.filter((r) => r.endpoint === 'open').length;
+  const before = opens();
+  h.setFetch((req) => (req.endpoint === 'archive'
+    ? { ok: true, value: { archivePath: 'D:/probe/.archive/pre-reload.md' } }
+    : { ok: true, value: { text: 'disk-v1', version: 'v1', displayPath: 'D:/probe/a.md', size: 7 } }));
+  h.st.actions.reloadDisk();
+  await drain();
+  assert.equal(opens(), before);
+  assert.equal(h.requests.filter((r) => r.endpoint === 'archive').length, 0);
+  h.st.doc.saving = false;
+  h.cleanup();
+});
+
+test('a recovery archive success followed by a dirty archive failure aborts the reload', async () => {
+  const h = make();
+  await h.boot();
+  h.edit('LOCAL');
+  h.st.doc.conflict = true;
+  h.st.doc.recovery = { text: 'RECOVERY-TEXT', baseVersion: 'v1' };
+  const opens = () => h.requests.filter((r) => r.endpoint === 'open').length;
+  const before = opens();
+  h.setFetch((req) => {
+    if (req.endpoint !== 'archive') return { ok: true, value: { text: 'disk-v1', version: 'v1', displayPath: 'D:/probe/a.md', size: 7 } };
+    if (req.payload.tag === 'pre-reload-recovery') return { ok: true, value: { archivePath: 'D:/probe/.archive/recovery.md' } };
+    return { ok: false, error: { code: 'EACCES', message: 'denied' } };
+  });
+  h.st.actions.reloadDisk();
+  await drain();
+  await drain();
+  assert.equal(opens(), before, 'the dirty archive failure must abort the reload');
+  assert(h.st.doc.dirty);
+  assert(h.st.doc.recovery, 'the recovery slot is kept when the dirty archive fails');
+  assert.equal(h.ui().phase, 'conflict');
+  h.cleanup();
+});

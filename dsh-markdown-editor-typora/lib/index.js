@@ -751,6 +751,35 @@ export function createHost(options = {}) {
     if (!leases.delete(client)) return;
     live.leave(client);
   }
+
+  /** Open rooms are the cross-process truth; read them through a short-lived read-only handle. */
+  let roomsSqlite = null;
+  async function lookupDocument(target) {
+    if (closed) return null;
+    const dbFile = join(live.directory, 'rooms.sqlite');
+    if (!existsSync(dbFile)) return null;
+    const canonical = await canonicalTarget(target);
+    if (closed) return null;
+    const key = pathKey(canonical);
+    try {
+      if (!roomsSqlite) roomsSqlite = await import('node:sqlite');
+      const db = new roomsSqlite.DatabaseSync(dbFile, { readOnly: true });
+      try {
+        try { db.exec('PRAGMA busy_timeout=2000'); } catch { /* 尽力而为 */ }
+        const room = db.prepare('SELECT file,epoch,version,saved,disk FROM rooms WHERE file=?').get(key);
+        if (!room) return null;
+        return {
+          path: canonical,
+          file: room.file,
+          epoch: room.epoch,
+          version: room.version,
+          savedVersion: room.saved,
+          dirty: room.version !== room.saved,
+          diskHash: room.disk,
+        };
+      } finally { try { db.close(); } catch { /* 已关闭 */ } }
+    } catch (error) { throw error; }
+  }
   function liveEndpoint(payload) {
     leaseOf(payload.client);
     if (payload.action === 'leave') {
@@ -1658,7 +1687,93 @@ export function createHost(options = {}) {
 
   const hostToken = {};
   registerHost(hostToken);
-  return { route, dispatch, close, broadcastChange, _internals: { watchers, liveStreams } };
+  return { route, dispatch, close, broadcastChange, _internals: { watchers, liveStreams, lookupDocument } };
+}
+
+const WRITE_GUARD_DIRTY = 'MP_DOC_DIRTY';
+
+function writeGuardError(code, path, detail) {
+  const where = path ? `：${path}` : '';
+  const message = `[${code}] 文件正在 MarkPilot 中打开且有未保存修改${where}。请先在编辑器中保存或丢弃，然后重试。`;
+  return Object.assign(new Error(detail || message), { code, path: String(path || '') });
+}
+
+/**
+ * B2: refuse file-tool writes to documents with an unsaved MarkPilot draft,
+ * and apply expected-version guards to clean open documents. Rooms are the
+ * shared truth (cross-process); leases are intentionally not consulted.
+ */
+export function createWriteGuard({ fs, lookup, log, pluginName = 'markpilot-write-guard' } = {}) {
+  const installed = new WeakSet();
+  const warned = new Set();
+  function warn(operation, error) {
+    const key = operation + '\0' + String(error?.message ?? error);
+    if (warned.has(key)) return;
+    warned.add(key);
+    try { log?.warn?.('%s: %s guard fail-open: %s', pluginName, operation, String(error?.message ?? error)); } catch { /* 日志失败不影响 */ }
+  }
+  async function stateOf(target) {
+    if (!target || typeof target !== 'object') return null;
+    if (typeof target.targetKey !== 'string' && typeof target.displayPath !== 'string') return null;
+    try { return await lookup(target); }
+    catch (error) { warn('lookup', error); return undefined; }
+  }
+  async function checked(target) {
+    const state = await stateOf(target);
+    if (!state) return { state: null, base: undefined };
+    if (state.dirty) throw writeGuardError(WRITE_GUARD_DIRTY, state.path || target.displayPath || '');
+    return { state, base: undefined };
+  }
+  async function currentVersion(state, target) {
+    const info = await fs.stat(target);
+    if (!info) return null; // clean room on a deleted file: let the tool decide (create may succeed)
+    return String(info.version);
+  }
+  function install(ctx) {
+    if (!ctx || typeof ctx.on !== 'function' || installed.has(ctx)) return () => {};
+    installed.add(ctx);
+    const disposers = [];
+    const add = (event, handler) => {
+      try {
+        const dispose = ctx.on(event, handler, { prepend: true });
+        if (typeof dispose === 'function') disposers.push(dispose);
+      } catch (error) {
+        try { log?.warn?.('%s: %s registration failed: %s', pluginName, event, String(error?.message ?? error)); } catch { /* 忽略 */ }
+      }
+    };
+    add('fs/write-intent', async (target, _actor, next) => {
+      const base = typeof next === 'function' ? await next() : undefined;
+      const checkedState = await checked(target);
+      if (!checkedState.state) return base;
+      if (base !== undefined) return base; // never weaken another policy's intent
+      const version = await currentVersion(checkedState.state, target);
+      if (!version) return base;
+      return { kind: 'replaceIfVersion', version };
+    });
+    add('fs/edit-intent', async (target, _actor, next) => {
+      const base = typeof next === 'function' ? await next() : undefined;
+      const checkedState = await checked(target);
+      if (!checkedState.state) return base;
+      if (base !== undefined) return base;
+      const version = await currentVersion(checkedState.state, target);
+      if (!version) return base;
+      return { version };
+    });
+    add('fs/delete-intent', async (target, _actor, next) => {
+      const base = typeof next === 'function' ? await next() : undefined;
+      const checkedState = await checked(target);
+      if (!checkedState.state) return base;
+      if (base !== undefined) return base;
+      const version = await currentVersion(checkedState.state, target);
+      if (!version) return base;
+      return { version };
+    });
+    return () => {
+      for (const dispose of disposers.splice(0)) { try { dispose(); } catch { /* 已清理 */ } }
+      installed.delete(ctx);
+    };
+  }
+  return { install };
 }
 
 function safeGet(ctx, serviceName) {
@@ -1707,6 +1822,16 @@ export function apply(ctx) {
   } catch (error) {
     log.warn?.('%s: host init failed: %s', name, String(error?.message ?? error));
     return;
+  }
+
+  // B2 write guard: shared rooms are only read (never created) from this path;
+  // listeners are fiber-scoped and must no-op on hosts whose test ctx has no ctx.on.
+  try {
+    const guard = createWriteGuard({ fs: fsService, lookup: host._internals.lookupDocument, log, pluginName: name });
+    if (typeof ctx.effect === 'function') ctx.effect(() => guard.install(ctx), 'dsh-markdown-editor-typora: write guard');
+    else guard.install(ctx);
+  } catch (error) {
+    log.warn?.('%s: write guard install failed: %s', name, String(error?.message ?? error));
   }
 
   try {

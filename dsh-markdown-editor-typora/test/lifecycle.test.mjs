@@ -7,7 +7,7 @@ test('client lifecycle preserves owned state with v2 apply receipts',async t=>{
   const h=make();await h.boot();h.edit('UNSAVED');const d=h.st.doc;d.conflict=true;d.externalStale=true;d.recovery={text:'RECOVERY',baseVersion:'v1'};
   h.setFetch(()=>Promise.reject(Error('OFFLINE')));h.st.actions.reloadDisk();await drain();
   assert(d.dirty&&d.conflict&&d.externalStale&&d.recovery?.text==='RECOVERY');assert.equal(h.ui().phase,'conflict');
-  h.setFetch(()=>({ok:true,value:{text:'disk-after-retry',version:'v2',size:16}}));h.st.actions.reloadDisk();await drain();
+  h.setFetch(req=>req.endpoint==='archive'?{ok:true,value:{archivePath:'D:/probe/.archive/pre-reload.md'}}:{ok:true,value:{text:'disk-after-retry',version:'v2',size:16}});h.st.actions.reloadDisk();await drain();
   assert(!d.dirty);assert.equal(d.text,'disk-after-retry');assert.equal(h.engine.text,d.text);assert.equal(d.lastVersion,'v2');
  });
  await t.test('apply rejection never advances version or clears dirty state',async()=>{
