@@ -20,7 +20,7 @@ test('save-reload-serialization',async()=>{const h=make();await h.boot();h.edit(
 test('lost-ack-immediate-close',async()=>{const h=make();h.transport.dropAck=true;h.transport.dropText=true;await h.boot();assert(h.st.doc.pendingApply&&!h.st.doc.opened,'open ACK really missing');h.edit('LAST-INPUT');h.cleanup();await h.advance(500);
   assert([...h.storage.values()].map(JSON.parse).some(v=>v.text==='LAST-INPUT'),'lost ACK discarded the last input on close');assert(!h.requests.some(r=>r.endpoint==='save'));});
 
-test('restore-checkpoint-durability',async()=>{const h=make();await h.boot();const d=h.st.doc,old={path:d.absPath,text:'RECOVERED-OLD',docToken:'old',session:{epoch:9,sourceRevision:8}};
+test('restore-checkpoint-durability',async()=>{const h=make();await h.boot();const d=h.st.doc,old={path:d.absPath,text:'RECOVERED-OLD',baseVersion:d.lastVersion,docToken:'old',session:{epoch:9,sourceRevision:8}};
   h.slots.set(old.docToken,old);d.recovery=old;let done;h.draftStore.checkpoint=()=>new Promise(resolve=>done=resolve);
   const apply=h.st.actions.restoreRecovery();await drain();await apply;assert.equal(h.engine.text,old.text);assert(done&&h.slots.has('old'),'replacement checkpoint pending');
   done({ok:false,durable:false,code:'QuotaExceededError'});await drain();assert(h.slots.has('old'),'failed replacement checkpoint deleted the recoverable old slot');});

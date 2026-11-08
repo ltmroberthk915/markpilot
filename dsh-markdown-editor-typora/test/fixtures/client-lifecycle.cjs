@@ -9,7 +9,7 @@ const drain=async()=>{for(let i=0;i<40;i++)await Promise.resolve();};
 function make(options={}){
  const effects=[],refs=[],listeners=new Map(),timers=new Map(),storage=new Map(),slots=new Map(),posts=[],requests=[],held=[];
  const transport={dropAck:false,holdAck:false,dropText:false,rejectApply:false};
- let timerId=0,now=0,definition,ui,cwd=options.cwd||'D:/probe',fetchHandler=()=>Promise.resolve({ok:true,value:{text:'disk-v1',version:'v1',displayPath:'D:/probe/a.md',size:7}});
+ let timerId=0,now=0,definition,ui,cwd=options.cwd||'D:/probe',fetchHandler=req=>Promise.resolve(req.endpoint==='archive'?{ok:true,value:{archivePath:'D:/probe/.archive/'+String(req.payload?.tag||'draft')+'.md',sha256:'0'.repeat(64),bytes:String(req.payload?.text||'').length}}:{ok:true,value:{text:'disk-v1',version:'v1',displayPath:'D:/probe/a.md',size:7}});
  const engine={text:'',session:null,token:null,lastApply:null,composing:false};
  const same=(a,b)=>!!a&&!!b&&a.epoch===b.epoch&&a.sourceRevision===b.sourceRevision;
  const add=(n,f)=>{if(!listeners.has(n))listeners.set(n,new Set());listeners.get(n).add(f);};

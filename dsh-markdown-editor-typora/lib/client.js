@@ -249,6 +249,10 @@ function createDraftStore(options = {}) {
     }),state);
   }
   function clear(path,docToken,expectedSession) {
+    // A missing token must never reach IndexedDB: getAllKeys(undefined) is
+    // equivalent to selecting every key and would wipe unrelated documents'
+    // recovery records (legacy slots carry no docToken).
+    if (typeof docToken !== 'string' || docToken.length === 0) return Promise.resolve({ok:false,code:'RECOVERY_OWNER'});
     const state=states.get(docToken);
     if(state&&(state.pathKey!==pathKey(path)||expectedSession&&!same(state.session,expectedSession)))return Promise.resolve({ok:false,code:'RECOVERY_NEWER'});
     // Another page may already own a newer synchronous tail on this baseline.
@@ -459,6 +463,17 @@ function applyMirrorDelta(mirror,event){
       const nb = normalizePathKey(b);
       if (/^[A-Za-z]:/.test(na) || /^[A-Za-z]:/.test(nb)) return na.toLowerCase() === nb.toLowerCase();
       return na === nb;
+    }
+
+    /**
+     * A recovery slot is only safe to apply on the disk version it was based on.
+     * Untitled drafts have no disk version on either side (null/undefined == null);
+     * every other pair must be two non-empty strings that match exactly.
+     */
+    function sameRecoveryBase(slot, currentVersion) {
+      const a = slot && slot.baseVersion;
+      if (a == null && currentVersion == null) return true;
+      return typeof a === 'string' && a.length > 0 && typeof currentVersion === 'string' && currentVersion.length > 0 && a === currentVersion;
     }
 
     /** 恢复槽键（要求口径）：dsh-markdown-editor-typora:recovery:<path>。 */
@@ -5175,6 +5190,8 @@ const __test = {
           text: "",
           textFresh: false,
           recovery: null,
+          staleDraftPending: null,
+          recoveryBackupFailed: false,
           saveTimer: null,
           flushed: false,
           live: null, liveUnsupported: false, liveFlushSeq: 0, liveFlushWaiters: new Map(), liveStatus: null,
@@ -5409,17 +5426,40 @@ const __test = {
               clearRecoverySlot(null,pathAtApply);
               if(consumed?.docToken && consumed.docToken!==tokenAtApply){try{Promise.resolve(draftStore()?.clear?.(pathAtApply,consumed.docToken,consumed.session)).then(inspectStoreResult).catch(error=>showNotice('恢复记录清理失败：'+String(error)));}catch(e){}}
             });
-            doc.recovery=null;
+            doc.recovery=null;doc.recoveryBackupFailed=false;
           }else if(pending.opts.discard){clearRecoverySlot(null,doc.absPath);doc.recovery=null;}
           if(doc.dead){persistCurrentRecovery();return;}
-          showPhase(doc.dirty?'dirty':'ready',restore?'已恢复未保存内容':pending.firstOpen?'':'已同步磁盘更新');
-          if(doc.dirty && !doc.composing)scheduleSave(restore?0:SAVE_DEBOUNCE_MS);
+          showPhase(doc.dirty?'dirty':'ready',restore?'已恢复未保存内容（未写盘，按 Ctrl+S 保存）':pending.firstOpen?'':'已同步磁盘更新');
+          if(doc.dirty && !doc.composing && !restore)scheduleSave(SAVE_DEBOUNCE_MS);
           if(pending.firstOpen){
             const atEdit=doc.editSeq;
-            Promise.resolve(draftStore()?.readLatest?.(doc.absPath)).then(saved=>{
+            Promise.resolve(draftStore()?.readLatest?.(doc.absPath)).then(async saved=>{
               const slot=saved??readRecoverySlot(null,doc.absPath);
-              if(!alive() || doc.editSeq!==atEdit || doc.dirty || !slot || typeof slot.text!=='string' || slot.text===doc.text)return;
-              doc.recovery=slot;setUiIfChanged({phase:'recovery',detail:'检测到上次关闭时未保存的内容',notice:'',recovery:slot});
+              if(!alive() || doc.editSeq!==atEdit || doc.dirty || !slot || typeof slot.text!=='string')return;
+              if(slot.text===doc.text){
+                // The draft carries no pending work: it already matches the disk text.
+                try {
+                  if(typeof slot.docToken==='string' && slot.docToken) inspectStoreResult(await draftStore()?.clear?.(doc.absPath,slot.docToken,slot.session));
+                  await settleLegacySlot(slot.text);
+                } catch(error) { /* best effort */ }
+                return;
+              }
+              // A recovery slot is only safe on the disk version it was based on.
+              // If the file was saved afterwards (this is the 2026-11-08 loss), applying
+              // the slot would overwrite newer content: archive it instead.
+              if(!sameRecoveryBase(slot,doc.lastVersion)){
+                const archived=await archiveDraftSlot(slot,'stale-draft');
+                if(archived){
+                  doc.staleDraftPending=null;
+                  if(alive() && doc.phase==='recovery')showPhase(doc.dirty?'dirty':'ready','');
+                  return;
+                }
+                if(!alive())return;
+                doc.staleDraftPending=slot;
+                showError('旧草稿归档失败；草稿仍保留，未改动当前文件。可重试归档。');
+                return;
+              }
+              doc.recovery=slot;doc.phase='recovery';setUiIfChanged({phase:'recovery',detail:'检测到上次关闭时未保存的内容',notice:'',recovery:slot});
             }).catch(error=>showNotice('读取恢复记录失败：'+String(error)));
           }
         }
@@ -5442,6 +5482,7 @@ const __test = {
           const applied=applyMirrorDelta(doc.mirror,delta);
           if(!applied.ok){doc.mirror.continuous=false;doc.dirty=true;saveStatus.update(true);if(!doc.gapDeltas.some(x=>sameSession(x.after,delta.after)))doc.gapDeltas.push(delta);if(!doc.pulls.size)void requestSnapshot('gap');return false;}
           doc.mirror=applied.mirror;doc.textFresh=false;doc.dirty=true;doc.editSeq++;doc.composing=!!delta.composing;
+          doc.recoveryBackupFailed=false;
           try{const result=inspectStoreResult(draftStore()?.append?.({...delta,path:doc.absPath,baseVersion:doc.lastVersion}));result?.durable?.then?.(inspectStoreResult).catch?.(error=>showNotice('恢复记录尚未持久化：'+String(error)));}catch(error){showNotice('恢复记录尚未持久化：'+String(error));}
           if(doc.dead){persistCurrentRecovery();return true;}
           showPhase('dirty',doc.composing?'输入中…':'编辑中…');
@@ -5587,6 +5628,7 @@ const __test = {
             if(clean) {
               try {inspectStoreResult(await draftStore()?.markSaved?.({path:doc.absPath,docToken:doc.token,session:pulled.session,baseVersion:doc.lastVersion}));}
               catch(e) {if(alive())showNotice("恢复记录更新失败："+String(e));}
+              await settleLegacySlot(pulled.text);
             }
             if(!alive())return;
             saveStatus.update(doc.dirty,!doc.dirty);showPhase(doc.dirty?"dirty":"ready","");startSse();
@@ -5678,10 +5720,20 @@ const __test = {
               const result = await api("save", request.body);
               if (!alive()) return;
               if (result.ok === true) {
-                const editedDuringSave = doc.editSeq !== saveSeq;
                 doc.lastVersion = result.value.version;
                 if (doc.live) doc.live = applyLiveReceipt(doc.live, result.value);
-                try { Promise.resolve(draftStore()?.markSaved?.({path:doc.absPath,docToken:doc.token,session:pulled.session,baseVersion:doc.lastVersion})).then(inspectStoreResult).catch(e=>showNotice("恢复记录更新失败：" + String(e))); } catch (e) { showNotice("恢复记录更新失败：" + String(e)); }
+                let recoveryClean = false;
+                try {
+                  const receipt = await draftStore()?.markSaved?.({path:doc.absPath,docToken:doc.token,session:pulled.session,baseVersion:doc.lastVersion});
+                  inspectStoreResult(receipt);
+                  recoveryClean = receipt?.ok === true;
+                } catch (e) { showNotice("恢复记录更新失败：" + String(e)); }
+                if (!recoveryClean) showNotice("文件已保存，但恢复记录未能更新；下次打开可能提示旧草稿副本");
+                await settleLegacySlot(pulled.text);
+                // Recompute after the durability awaits: edits that arrive while
+                // markSaved/settleLegacy are pending must not be cleared using the
+                // pre-await snapshot (adversarial review P0).
+                const editedDuringSave = doc.editSeq !== saveSeq;
                 if (!editedDuringSave) {
                   doc.text = pulled.text;
                   doc.textFresh = true;
@@ -5694,6 +5746,7 @@ const __test = {
                 doc.conflict = false;
                 doc.externalStale = false;
                 doc.staleNotified = false;
+                doc.recoveryBackupFailed = false;
                 doc.liveStaleRounds = 0;      // 保存成功 = 预算清零（下一轮竞争重新计数）
                 doc.liveStaleBlocked = false;
                 saveStatus.update(doc.dirty, !doc.dirty);
@@ -5776,6 +5829,7 @@ const __test = {
         function manualSave(content) {
           if (doc.dead) return;
           if(doc.untitled){void runSave({manual:true});return;}
+          if (doc.recovery && doc.phase === 'recovery') { post("toast", "存在未保存的恢复内容，请先点「恢复」或「丢弃」"); return; }
           doc.liveStaleBlocked = false;   // 显式保存 = 重置 STALE 退避预算（只此显式入口重置）
           doc.liveStaleRounds = 0;
           const gate = manualSaveGate({
@@ -5852,6 +5906,7 @@ const __test = {
 
         function onDirty(content) {
           doc.dirty = true;
+          doc.recoveryBackupFailed = false;
           saveStatus.update(true);
           doc.editSeq += 1;
           doc.textFresh = false;
@@ -6200,16 +6255,104 @@ const __test = {
           // scroll / img / media-command 等：MVP 静默（协议 v1 无对应能力）。
         }
 
+        async function settleLegacySlot(savedText) {
+          const legacy = readRecoverySlot(null, doc.absPath);
+          if (!legacy) return;
+          if (typeof legacy.text === 'string' && legacy.text === savedText) {
+            clearRecoverySlot(null, doc.absPath);
+            return;
+          }
+          // A differing legacy slot is historical content: archive it (with a durable
+          // copy) before clearing. A failed archive keeps the slot in localStorage.
+          await archiveDraftSlot(legacy, 'legacy-draft');
+        }
+
+        async function archiveDraftSlot(slot, tag) {
+          const text = typeof slot?.text === 'string' ? slot.text : '';
+          let archivePath = '';
+          try {
+            const result = await api("docs/archive", {
+              path: doc.absPath, text, tag,
+              baseVersion: typeof slot?.baseVersion === 'string' ? slot.baseVersion : null,
+              docToken: typeof slot?.docToken === 'string' ? slot.docToken : null,
+            });
+            if (!result || result.ok !== true || typeof result.value?.archivePath !== 'string' || result.value.archivePath.length === 0)
+              throw new Error(result?.error?.message || result?.error?.code || 'archive endpoint returned no path');
+            archivePath = result.value.archivePath;
+          } catch (error) {
+            showNotice('旧草稿归档失败，未改动当前文件：' + String(error && error.message ? error.message : error));
+            return null;
+          }
+          if (typeof slot?.docToken === 'string' && slot.docToken) {
+            try { inspectStoreResult(await draftStore()?.clear?.(doc.absPath, slot.docToken, slot?.session)); }
+            catch (error) { showNotice('旧草稿已归档，但恢复记录清理失败：' + String(error && error.message ? error.message : error)); }
+          }
+          // Only retire the legacy slot when it is absent or carries this same text;
+          // a differing legacy slot is another draft and is left for its own archive.
+          const legacy = readRecoverySlot(null, doc.absPath);
+          if (!legacy || (typeof legacy.text === 'string' && legacy.text === text)) clearRecoverySlot(null, doc.absPath);
+          showNotice(archivePath ? ('已归档旧草稿副本：' + archivePath) : '已归档旧草稿副本');
+          return archivePath;
+        }
+
         async function restoreRecovery() {
           const slot=doc.recovery;
           if (!slot || typeof slot.text!=="string" || doc.pendingApply || doc.applyUnknown) return false;
+          // A recovery slot is only safe on top of the disk version it was based on.
+          // If the file was saved afterwards, the slot is a historical draft: archive
+          // it instead of overwriting newer content (the 2026-11-08 loss).
+          if (!sameRecoveryBase(slot, doc.lastVersion)) {
+            const archived = await archiveDraftSlot(slot, 'stale-draft');
+            doc.recovery = null;
+            if (archived) {
+              showPhase(doc.dirty ? 'dirty' : 'ready', '');
+              return false;
+            }
+            if (!alive()) return false;
+            doc.staleDraftPending = slot;
+            showError('旧草稿归档失败；草稿仍保留，未改动当前文件。可重试归档。');
+            return false;
+          }
+          // Keep a durable copy of the currently displayed disk text before applying
+          // a recovery. A recovery must never be the only surviving copy of either side.
+          const current = typeof doc.text === 'string' ? doc.text : '';
+          const expectedEditSeq = doc.editSeq;
+          try {
+            const backup = await api('docs/archive', { path: doc.absPath, text: current, tag: 'pre-restore', baseVersion: doc.lastVersion || null, docToken: doc.token });
+            if (!backup || backup.ok !== true || typeof backup.value?.archivePath !== 'string' || backup.value.archivePath.length === 0)
+              throw new Error(backup?.error?.message || 'archive endpoint returned no path');
+          } catch (error) {
+            doc.recoveryBackupFailed = true;
+            showError('恢复前备份失败，已取消恢复：' + String(error && error.message ? error.message : error));
+            return false;
+          }
+          // Re-check after the async backup: new input or a disk version change
+          // during the backup must abort (and be re-routed to the stale path),
+          // otherwise the recovery would overwrite content that appeared meanwhile.
+          if (!alive()) return false;
+          if (doc.editSeq !== expectedEditSeq || doc.dirty || !sameRecoveryBase(slot, doc.lastVersion)) {
+            if (!sameRecoveryBase(slot, doc.lastVersion)) {
+              const archived = await archiveDraftSlot(slot, 'stale-draft');
+              doc.recovery = null;
+              if (archived) {
+                showPhase(doc.dirty ? 'dirty' : 'ready', '');
+                return false;
+              }
+              doc.staleDraftPending = slot;
+              showError('旧草稿归档失败；草稿仍保留，未改动当前文件。可重试归档。');
+              return false;
+            }
+            showNotice('恢复已取消：备份期间出现新的改动，请重试恢复');
+            return false;
+          }
           return applyToFrame({kind:'restore',value:{text:slot.text,version:doc.lastVersion,displayPath:doc.displayPath,size:slot.text.length},firstOpen:false,opts:{},path:doc.absPath,baseVersion:doc.lastVersion,loadSeq:doc.loadSeq,editSeq:doc.editSeq,recoverySlot:slot});
         }
 
         function discardRecovery() {
-          const slot=doc.recovery;doc.recovery=null;
+          const slot=doc.recovery;doc.recovery=null;doc.phase='ready';doc.recoveryBackupFailed=false;
           clearRecoverySlot(null,doc.absPath);
-          try{Promise.resolve(draftStore()?.clear?.(doc.absPath,slot?.docToken||doc.token,slot?.session)).catch(error=>showNotice('清除恢复记录失败：'+String(error)));}catch(error){showNotice('清除恢复记录失败：'+String(error));}
+          const token=typeof slot?.docToken==='string'&&slot.docToken?slot.docToken:null;
+          if(token){try{Promise.resolve(draftStore()?.clear?.(doc.absPath,token,slot?.session)).catch(error=>showNotice('清除恢复记录失败：'+String(error)));}catch(error){showNotice('清除恢复记录失败：'+String(error));}}
           setUiIfChanged({phase:'ready',detail:'已丢弃恢复内容',notice:'',recovery:null});
           return Promise.resolve();
         }
@@ -6261,7 +6404,20 @@ const __test = {
             doc.liveRecoveredItems = null;
             setUi((prev) => (prev.recovered ? { ...prev, recovered: null } : prev));
           },
-          retry: () => { if(doc.pendingApply || doc.applyUnknown){void requestSnapshot("apply");return;} if (doc.live) stopLive(true); showPhase("loading", ""); void loadFromDisk({ silent: false }); },
+          retry: () => {
+            if (doc.staleDraftPending) {
+              const slot = doc.staleDraftPending;
+              void (async () => {
+                const archived = await archiveDraftSlot(slot, 'stale-draft');
+                if (!archived) return;
+                doc.staleDraftPending = null;
+                if (alive()) showPhase(doc.dirty ? 'dirty' : 'ready', '');
+              })();
+              return;
+            }
+            if (doc.recovery && doc.phase === 'error' && doc.recoveryBackupFailed) { void restoreRecovery(); return; }
+            if(doc.pendingApply || doc.applyUnknown){void requestSnapshot("apply");return;} if (doc.live) stopLive(true); showPhase("loading", ""); void loadFromDisk({ silent: false });
+          },
         };
         doc.reload = (opts) => loadFromDisk(opts || {});
         doc.reloadDisk = forceReload;
@@ -6379,14 +6535,16 @@ const __test = {
       } else if (ui.phase === "error") {
         banner = h("div", { style: bannerStyle(true) },
           h("span", null, "✗ " + ui.detail),
-          h("button", { style: btnStyle, onClick: () => { try { st.actions.retry && st.actions.retry(); } catch (e) { /* 忽略 */ } } }, "重试"));
+          h("button", { style: btnStyle, onClick: () => { try { st.actions.retry && st.actions.retry(); } catch (e) { /* 忽略 */ } } }, "重试"),
+          st.doc && st.doc.recovery && st.doc.recoveryBackupFailed ? h("button", { style: btnStyle, onClick: () => { try { st.actions.discardRecovery && st.actions.discardRecovery(); } catch (e) { /* 忽略 */ } } }, "丢弃恢复内容") : null);
       } else if (ui.phase === "loading") {
         banner = h("div", { style: bannerStyle(false) }, "正在加载文档…");
       } else {
         // Only save state appears at the top. Actionable banners above keep
         // priority; their actions and the independent recovered banner survive.
-        const saveText = ui.saveStatus === "unsaved" ? "未保存" : ui.saveStatus === "saved" ? "已保存" : "";
-        banner = saveText ? h("div", { style: toastStyle, "data-mp-save-status": ui.saveStatus, role: "status" }, saveText) : null;
+        const restoreHint = ui.saveStatus === "unsaved" && typeof ui.detail === "string" && ui.detail.includes("未写盘");
+        const saveText = ui.saveStatus === "unsaved" ? (restoreHint ? "未保存 · 按 Ctrl+S 保存" : "未保存") : ui.saveStatus === "saved" ? "已保存" : "";
+        banner = saveText ? h("div", { style: toastStyle, title: ui.detail || "", "data-mp-save-status": ui.saveStatus, role: "status" }, saveText) : null;
       }
 
       /* recovered：join 票带回的草稿副本提示（独立于 phase；按票一次；只展示+复制路径，

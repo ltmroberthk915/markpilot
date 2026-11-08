@@ -21,7 +21,7 @@
 import { readFile, stat as fsStat, realpath, writeFile, mkdir, open as fsOpen, link as fsLink, unlink as fsUnlink, rename as fsRename } from 'node:fs/promises';
 import { createReadStream, readFileSync, writeFileSync, appendFileSync, renameSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import { createRequire } from 'node:module';
 // 下面三个静态导入**只保留 HMR 依赖边**（host/*.js 变更 ⇒ dsh-hmr 把插件条目一并重启），
 // 实例不直接消费：DSH HMR 的替换计划只驱逐「变更模块 + 其 importer」（planReplacement
@@ -34,7 +34,7 @@ import rawDiskStore from '../host/document-store.js';
 import rawLiveStore from '../host/live-documents.js';
 import rawTextCodec from '../host/text-codec.js';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, normalize, sep, extname, resolve as pathResolve, isAbsolute, relative as pathRelative }  from 'node:path';
+import { dirname, join, normalize, sep, extname, basename, resolve as pathResolve, isAbsolute, relative as pathRelative }  from 'node:path';
 
 const requirePlugin = createRequire(import.meta.url);
 const nodeFs = requirePlugin('node:fs');
@@ -318,7 +318,7 @@ const API_PREFIX = ROUTE_PREFIX + '/api/';
 const MODEL_TOOL = Symbol('markdown model tool');
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'diag']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'diag']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
 
@@ -1182,6 +1182,59 @@ export function createHost(options = {}) {
     });
   }
 
+  const ARCHIVE_MAX_BYTES = 64 * 1024 * 1024;
+  function archiveDirectory() {
+    const base = process.env.LOCALAPPDATA || process.env.XDG_DATA_HOME || homedir();
+    return join(base, '.markpilot', 'draft-archive');
+  }
+  /**
+   * Archive a draft/backup copy under the app data directory. Never writes near
+   * the source document; the source path only drives naming and metadata. Used
+   * to retire superseded recovery slots with a durable copy instead of silently
+   * destroying the only surviving draft, and to snapshot the current text before
+   * a recovery apply.
+   */
+  async function apiDocsArchive(payload) {
+    const rawPath = typeof payload?.path === 'string' ? payload.path : '';
+    const text = payload?.text;
+    const tag = typeof payload?.tag === 'string' && /^[a-z0-9][a-z0-9-]{0,31}$/i.test(payload.tag) ? payload.tag.toLowerCase() : 'draft';
+    if (!rawPath || !isAbsolute(rawPath)) return badRequest('archive path must be absolute');
+    if (typeof text !== 'string') return badRequest('archive text is required');
+    const bytes = Buffer.from(text, 'utf8');
+    if (bytes.length > ARCHIVE_MAX_BYTES) throw codedError('FS_ARCHIVE_TOO_LARGE', 'archive text exceeds limit');
+    const sha = createHash('sha256').update(bytes).digest('hex');
+    const dir = pathResolve(archiveDirectory());
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    const stem = (basename(rawPath) || 'document').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').replace(/[. ]+$/, '').slice(0, 96) || 'document';
+    // Deterministic archive name: the same source/tag/bytes always resolves to the
+    // same file, so retrying after a lost reply can never duplicate the archive.
+    const sourceKey = createHash('sha256').update(rawPath + '\0' + tag + '\0' + sha).digest('hex').slice(0, 16);
+    const name = `${stem}.${tag}.${sourceKey}.md`;
+    const target = join(dir, name);
+    const existing = await readFile(target).then(buf => buf, error => { if (error.code === 'ENOENT') return null; throw error; });
+    if (existing && createHash('sha256').update(existing).digest('hex') === sha) {
+      return { ok: true, value: { archivePath: target, metaPath: target + '.json', sha256: sha, bytes: bytes.length, idempotent: true } };
+    }
+    const temp = join(dir, `.mp-archive-${process.pid}-${randomUUID()}`);
+    try {
+      await writeFile(temp, bytes, { flag: 'wx', mode: 0o600 });
+      try { await fsRename(temp, target); }
+      catch (error) {
+        // Two tabs can archive the same bytes concurrently; the loser's rename may
+        // fail with EPERM/EEXIST on Windows while the winner wrote identical bytes.
+        const current = await readFile(target).then(buf => buf, readError => { if (readError.code === 'ENOENT') return null; throw readError; });
+        if (!current || createHash('sha256').update(current).digest('hex') !== sha) throw error;
+      }
+    } finally {
+      await fsUnlink(temp).catch(error => { if (error.code !== 'ENOENT') throw error; });
+    }
+    const meta = { schema: 1, sourcePath: rawPath, tag, archivedAt: new Date().toISOString(), sha256: sha, bytes: bytes.length,
+      baseVersion: typeof payload?.baseVersion === 'string' ? payload.baseVersion : null,
+      docToken: typeof payload?.docToken === 'string' ? payload.docToken : null };
+    await writeFile(target + '.json', JSON.stringify(meta, null, 2), { encoding: 'utf8', flag: 'wx' }).catch(() => { /* metadata is best effort */ });
+    return { ok: true, value: { archivePath: target, metaPath: target + '.json', sha256: sha, bytes: bytes.length } };
+  }
+
   async function apiDocsCreate(payload) {
     if (payload && (Object.hasOwn(payload,'exactText') || Object.hasOwn(payload,'draftId'))) return createExactDraft(payload);
     const dir = typeof payload?.dir === 'string' ? payload.dir.trim() : '';
@@ -1423,6 +1476,7 @@ export function createHost(options = {}) {
         case 'edit': return await apiEdit(payload, invocation);
         case 'docs/create': return await apiDocsCreate(payload);
         case 'docs/recent': return await apiDocsRecent(payload);
+        case 'docs/archive': return await apiDocsArchive(payload);
         case 'diag': {
           lastDiag = { receivedAt: Date.now(), payload };
           // 诊断同时落盘一份，验收时用 PowerShell 直接读，不必开 DevTools、也不受接口鉴权影响。
