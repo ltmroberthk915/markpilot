@@ -33,7 +33,7 @@
 
 **1.3.1：** 消息里的 `file://` Markdown 链接（此前点了没反应）与绝对路径 `.md` 芯片现在都进中间工作台，不再弹出右栏的改动对比；1.3.0 的认证 fail-closed 宿主修复一并包含。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.3.1`
 
-**1.3.2：** 修外部修改不刷新：外部进程改写 md 后编辑器会在 1–2 秒内自动采纳；有未保存草稿时显示「文件已在磁盘上更新」横幅（重载磁盘版本 / 复制我的内容），不再静默。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.3.2`
+**1.3.2：** 修外部修改不刷新（外部进程改写 md 后 1–2 秒内自动采纳；有草稿时显示可操作的「文件已在磁盘上更新」横幅）；修主题不保持（工具岛切换明暗后，编辑器主题及其明暗同族不再被重置）；修左右侧栏手柄位置不保持（切会话回来按上次拖动恢复）——透明模式下重新应用设置会恢复透明。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.3.2`
 
 
 

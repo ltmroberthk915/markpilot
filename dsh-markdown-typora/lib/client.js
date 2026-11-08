@@ -848,6 +848,30 @@ function applyMirrorDelta(mirror,event){
     var nativeHandleLeft = new Map();
     var handleLifecycleStop = null;
     var handleState = { dragging: false, side: null, startX: 0, startW: 0, sb: 0, rb: 0, frame: null, mo: null, hostGrid: "", lastWritten: "", sbMax: 0, rbMax: 0, sbUser: false, rbUser: false, parentMo: null, parentMoTarget: null };
+    /** 上次拖动保存的左右侧栏位置（宿主每次重排都会写回自己的列宽，重开会话后要补回去）。 */
+    function readSavedHandles() {
+      try {
+        var raw = window.localStorage.getItem("dsh.markpilot.handles.v1");
+        if (!raw) return null;
+        var parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object") return null;
+        var sb = Number(parsed.sb), rb = Number(parsed.rb);
+        var out = { sb: 0, rb: 0 };
+        if (isFinite(sb) && sb >= HANDLE_FLOOR_SIDEBAR && sb <= HANDLE_CEIL_SIDEBAR) out.sb = Math.round(sb);
+        if (isFinite(rb) && rb >= HANDLE_FLOOR_RIGHTBAR && rb <= Math.round(window.innerWidth * 0.7)) out.rb = Math.round(rb);
+        return (out.sb > 0 || out.rb > 0) ? out : null;
+      } catch (e) { return null; }
+    }
+
+    /** 会话切换/重排后把用户拖过的宽度重新钉回去。 */
+    function reapplySavedHandles() {
+      if (!handleFloorInstalled) return;
+      var saved = readSavedHandles();
+      if (!saved) return;
+      if (saved.sb > 0 && handleState.sbUser !== true) { handleState.sb = saved.sb; handleState.sbUser = true; }
+      if (saved.rb > 0 && handleState.rbUser !== true) { handleState.rb = saved.rb; handleState.rbUser = true; }
+      try { paintHandles(); } catch (e) { /* 忽略 */ }
+    }
 
     /**
      * 取 frame 上那两根真正的手柄。
@@ -1812,6 +1836,7 @@ function applyMirrorDelta(mirror,event){
       handleFloorInstalled = true;
       handleGeneration += 1;
       try { window.__mpHandleFloorInstalled = true; } catch (e) { /* 忽略 */ }
+      try { window.__mpReapplyHandles = reapplySavedHandles; } catch (eH) { /* 忽略 */ }
       var release = null;
       var disposed = false;
       function disposeHandles() {
@@ -1856,6 +1881,13 @@ function applyMirrorDelta(mirror,event){
       document.addEventListener("pointerdown", onHandleDown, true);
       document.addEventListener("pointermove", onHandleMove, true);
       document.addEventListener("pointerup", onHandleUp, true);
+      // 冷启动/切会话回来：宿主列宽是它自己的值，按上次拖动补回（多次重试等宿主 frame 就绪）。
+      try {
+        var restoreTimers = [0, 400, 1400];
+        for (var rt = 0; rt < restoreTimers.length; rt += 1) {
+          setTimeout(function () { try { reapplySavedHandles(); } catch (eR) { /* 忽略 */ } }, restoreTimers[rt]);
+        }
+      } catch (eS) { /* 忽略 */ }
       document.addEventListener("pointercancel", onHandleUp, true);
       // 侧栏折叠/展开、右栏开关：宿主会自己重排，我们放手（否则会和它的动画打架）。
       // 注意：不能只在安装这一刻解析 frame —— 插件可能比宿主布局先跑，
@@ -4171,6 +4203,7 @@ const __test = {
           // 自动恢复没打开文档时（例如该目录被 × 记忆压住、或没有历史文档），
           // 把宿主右栏已经打开的 md 标签接进中间，别让会话看起来「点了没反应」。
           setTimeout(function(){ if(!disposed) adoptOpenNativeDocs(); }, 260);
+          setTimeout(function(){ try { if (typeof window.__mpReapplyHandles === "function") window.__mpReapplyHandles(); } catch (e) { /* 忽略 */ } }, 420);
         });
       }
       const bind=(c)=>{

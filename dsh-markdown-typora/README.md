@@ -31,7 +31,7 @@
 
 **1.3.1：** 消息里的 `file://` Markdown 链接（此前点了没反应）与绝对路径 `.md` 芯片现在都在捕获阶段被接管，解析成本地路径后直接进中间工作台，不再弹出右栏的改动对比；1.3.0 的认证 fail-closed 宿主修复一并包含。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.3.1`
 
-**1.3.2：** 修外部修改不刷新：外部进程改写 md 后，编辑器（含协同编辑房间）会在 1–2 秒内自动采纳磁盘新内容；有未保存草稿时不再静默，而是显示「文件已在磁盘上更新」横幅，可点「重载磁盘版本」覆盖或「复制我的内容」保留。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.3.2`
+**1.3.2：** 修外部修改不刷新（1–2 秒内自动采纳；有草稿时显示可操作的冲突横幅）；修主题不保持（保留所选主题，宿主明暗切换只切同族）；修左右侧栏手柄位置不保持（切会话回来按上次拖动恢复）；透明模式下重新应用设置会恢复透明。安装：`dsh plugin --profile desktop add dsh-markdown-typora@1.3.2`
 
 
 
@@ -69,7 +69,7 @@
 
 **1.3.1:** `file://` Markdown links in a message (previously inert) and absolute `.md` path chips are taken over in the capture phase and opened in the middle workspace instead of bringing up the sidebar change preview. This build includes the 1.3.0 fail-closed host authentication fix. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.3.1`
 
-**1.3.2:** external edits now reach the editor: a collaboration room adopts the new disk text on the next change event (1–2 s), and an unsaved draft no longer hides the update — the editor shows a banner offering “重载磁盘版本” or “复制我的内容”. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.3.2`
+**1.3.2:** external edits reach the editor (1–2 s; unsaved drafts show an actionable banner); the chosen editor theme survives host light/dark switches and conversation switches; dragged sidebar/right-bar widths are restored after a conversation switch; re-applying the transparency setting restores transparency. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.3.2`
 
 
 

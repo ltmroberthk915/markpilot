@@ -87,13 +87,67 @@
       lastSkinDark = dark;
       emitSkin('theme', { dark: dark });
     }
+    reassertTransparency();
   }
+  // 用户显式选择的编辑主题（engine 的 ce() 写入 editor-theme）；宿主主题切换只切同族明暗。
+  var appearance = { transparent: true, known: false };
+  function storedEngineTheme() {
+    try { return localStorage.getItem('editor-theme') || ''; } catch (error) { return ''; }
+  }
+  function engineThemeForHostMode(dark) {
+    var api = window.mpTheme;
+    var current = storedEngineTheme();
+    if (api && typeof api.has === 'function' && current && api.has(current)) {
+      var meta = typeof api.byId === 'function' ? api.byId(current) : null;
+      if (!meta || !!meta.dark === !!dark) return current;
+      if (typeof api.sibling === 'function') {
+        var sibling = api.sibling(current);
+        if (sibling && (!api.has || api.has(sibling))) return sibling;
+      }
+      return current;   // 没有同族主题时保留用户选择，不改配色族
+    }
+    return dark ? 'telari-dark' : 'telari-light';
+  }
+  function applyEngineTheme(dark) {
+    var id = engineThemeForHostMode(dark);
+    var api = window.mpTheme;
+    try {
+      if (api && typeof api.apply === 'function' && (!api.has || api.has(id))) { api.apply(id); return true; }
+      var engine = window.mpEngine;
+      if (engine && typeof engine.setTheme === 'function') { engine.setTheme(id); return true; }
+    } catch (error) { /* 主题未注册时忽略 */ }
+    return false;
+  }
+  // 主题切换可能改写背景；透明模式下把内联背景清掉，让 [data-mp-transparent="on"] 的 !important 生效。
+  function reassertTransparency() {
+    var root = document.documentElement;
+    if (!root || !appearance.known) return;   // 父窗口还没下发 appearance：不动属性（保持 boot 前状态）
+    var on = appearance.transparent !== false;
+    var want = on ? 'on' : 'off';
+    if (root.getAttribute('data-mp-transparent') !== want) root.setAttribute('data-mp-transparent', want);
+    if (!on) return;
+    var nodes = [root, document.body];
+    try {
+      var list = document.querySelectorAll('.cm-editor, .cm-scroller, .cm-content, .cm-gutters, .mp-zoom-wrap');
+      for (var i = 0; i < list.length; i += 1) nodes.push(list[i]);
+    } catch (error) { /* 无 DOM */ }
+    for (var j = 0; j < nodes.length; j += 1) {
+      var el = nodes[j];
+      if (!el || !el.style) continue;
+      try {
+        if (el.style.background) el.style.background = '';
+        if (el.style.backgroundColor) el.style.backgroundColor = '';
+      } catch (error) { /* 忽略 */ }
+    }
+  }
+
   function applyAppearance(content) {
     if (!content || typeof content.transparent !== 'boolean') return;
+    appearance.transparent = content.transparent !== false;
+    appearance.known = true;
     var root = document.documentElement;
     if (!root) return;
-    var value = content.transparent ? 'on' : 'off';
-    if (root.getAttribute('data-mp-transparent') !== value) root.setAttribute('data-mp-transparent', value);
+    reassertTransparency();
     if (typeof content.workbenchCollapsed === 'boolean') {
       var controls = content.workbenchCollapsed ? '1' : '0';
       if (root.getAttribute('data-mp-workbench-collapsed') !== controls) root.setAttribute('data-mp-workbench-collapsed', controls);
@@ -122,17 +176,11 @@
       root.style.setProperty('--mp-bg', palette.bg);
       root.style.setProperty('--mp-fg', palette.fg);
     } catch (error) { /* 忽略 */ }
-    try {
-      localStorage.setItem('dshmd-theme', dark ? 'dark' : 'light');
-      localStorage.setItem('editor-theme', dark ? 'telari-dark' : 'telari-light');
-    } catch (error) { /* 无存储 */ }
-    var engine = window.mpEngine;
-    if (engine && typeof engine.setTheme === 'function') {
-      try { engine.setTheme(dark ? 'telari-dark' : 'telari-light'); } catch (error) { /* 主题未注册时忽略 */ }
-      pendingThemeApply = false;
-    } else {
-      pendingThemeApply = true;   // open/boot 之后补一次（引擎 boot 结束才会创建 window.mpEngine）
-    }
+    try { localStorage.setItem('dshmd-theme', dark ? 'dark' : 'light'); } catch (error) { /* 无存储 */ }
+    // 只切用户主题的同族明暗；不再用 telari 默认覆盖用户选择。
+    if (applyEngineTheme(dark)) pendingThemeApply = false;
+    else pendingThemeApply = true;   // 引擎 boot 之后补一次
+    reassertTransparency();
     syncSkinTheme();
   }
 
@@ -151,10 +199,9 @@
   function maybeApplyPendingTheme() {
     applyEmbedDefaults();
     if (!pendingThemeApply || themeDark === null) return;
-    var engine = window.mpEngine;
-    if (!engine || typeof engine.setTheme !== 'function') return;
-    try { engine.setTheme(themeDark ? 'telari-dark' : 'telari-light'); } catch (error) { /* 忽略 */ }
+    if (!applyEngineTheme(themeDark)) return;
     pendingThemeApply = false;
+    reassertTransparency();
   }
 
   function showToast(content) {

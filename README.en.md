@@ -33,7 +33,7 @@
 
 **1.3.1:** `file://` Markdown links (previously inert) and absolute `.md` path chips open in the middle workspace instead of bringing up the sidebar change preview; the 1.3.0 fail-closed host authentication fix is included. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.3.1`
 
-**1.3.2:** external edits reach the editor within 1–2 s; an unsaved draft now shows a banner instead of silently keeping stale text. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.3.2`
+**1.3.2:** external edits reach the editor within 1–2 s (an unsaved draft shows an actionable banner); the chosen editor theme survives host light/dark switches and conversation switches; dragged sidebar/right-bar handle widths are restored after switching conversations, and re-applying the transparency setting restores transparency. Install: `dsh plugin --profile desktop add dsh-markdown-typora@1.3.2`
 
 
 
