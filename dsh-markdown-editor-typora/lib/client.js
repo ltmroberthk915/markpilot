@@ -5012,7 +5012,7 @@ const __test = {
 
     function WorkspaceNotice() {
       if(!workspaceNotice)return null;
-      return React.createElement("div", {role:"alert",style:{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",zIndex:1000,maxWidth:"min(560px,80vw)",display:"flex",gap:16,alignItems:"center",padding:"12px 16px",borderRadius:10,border:"1px solid var(--dsw-alias-border-l2,#555)",background:"var(--dsw-alias-bg-elevated,#25282e)",color:"var(--dsw-alias-label-primary,#eee)",boxShadow:"0 6px 24px #0003",font:"13px/1.5 system-ui",pointerEvents:"auto"}},workspaceNotice,
+      return React.createElement("div", {role:"alert",style:{position:"fixed",top:114,bottom:"auto",left:"50%",transform:"translateX(-50%)",zIndex:1000,maxWidth:"min(560px,80vw)",maxHeight:"40vh",overflow:"auto",boxSizing:"border-box",display:"flex",gap:16,alignItems:"center",padding:"12px 16px",borderRadius:10,border:"1px solid var(--dsw-alias-border-l2,#555)",background:"var(--dsw-alias-bg-elevated,#25282e)",color:"var(--dsw-alias-label-primary,#eee)",boxShadow:"0 6px 24px #0003",font:"13px/1.5 system-ui",pointerEvents:"auto"}},workspaceNotice,
         React.createElement("button",{type:"button","aria-label":"关闭提示",onClick:()=>{workspaceNotice="";bumpOverlay();},style:{border:0,background:"transparent",color:"inherit",cursor:"pointer",fontSize:18,padding:4}},"×"));
     }
     function EditorOverlayStage(props) {
@@ -5317,7 +5317,16 @@ const __test = {
           const id = ++noticeSeq;
           const item = { id, text, kind: opts.kind || (archive ? "archive" : "info"), ts: Date.now(), actions };
           const ttl = Number.isFinite(opts.ttlMs) ? Math.max(1500, opts.ttlMs) : (archive ? 10000 : 6000);
-          if (noticeTexts.has(text)) return;
+          const existingId = noticeTexts.get(text);
+          if (existingId) {
+            if (opts.update && actions.length) {
+              setUi((prev) => ({
+                ...prev,
+                notices: (Array.isArray(prev.notices) ? prev.notices : []).map((entry) => entry.id === existingId ? { ...entry, actions } : entry),
+              }));
+            }
+            return;
+          }
           if (noticeTexts.size >= 5) {
             const oldest = noticeTexts.entries().next().value;
             if (oldest) {
@@ -5356,6 +5365,77 @@ const __test = {
           noticeTexts.clear();
           setUi((prev) => ({ ...prev, notices: [], railOpen: false }));
         }
+
+        const IFRAME_TOAST_SELECTOR = ".mp-toast,#dsh-md-toast,.mp-tools__toast";
+        const IFRAME_TOAST_DUPLICATES = new Set(["已提交请求", "已交给对话框"]);
+        function installIframeToastBridge(win) {
+          if (!win || !win.document) return;
+          const iframeDoc = win.document;
+          if (!iframeDoc.body) return;
+          try { doc.toastObserver?.disconnect(); } catch (e) { /* 忽略 */ }
+          try { doc.toastStyle?.remove(); } catch (e) { /* 忽略 */ }
+          const Observer = win.MutationObserver || (typeof MutationObserver !== "undefined" ? MutationObserver : null);
+          if (!Observer) return;
+          const watchSet = new WeakSet();
+          const read = (el) => {
+            if (!el || el.nodeType !== 1 || !iframeDoc.contains(el)) return;
+            const text = String(el.textContent || "").trim();
+            if (!text) return;
+            // Inline fallback in case the injected stylesheet is blocked.
+            try { el.style.display = "none"; } catch (e) { /* 忽略 */ }
+            const link = el.querySelector ? el.querySelector(".mp-toast-link") : null;
+            if (!link && IFRAME_TOAST_DUPLICATES.has(text)) return;
+            const actions = link ? [{
+              label: link.textContent || "打开", icon: "↗", title: link.textContent || "打开",
+              run: () => { try { link.click(); } catch (e) { /* 忽略 */ } },
+            }] : [];
+            notify(text, { actions, ttlMs: link ? 6000 : 4000, update: !!link });
+          };
+          const watch = (el) => {
+            if (!el || el.nodeType !== 1 || !el.matches || !el.matches(IFRAME_TOAST_SELECTOR) || watchSet.has(el)) return;
+            watchSet.add(el);
+            read(el);
+            try {
+              observer.observe(el, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["style", "data-on", "class"] });
+            } catch (e) { /* 忽略 */ }
+          };
+          let observer;
+          observer = new Observer((mutations) => {
+            for (const mutation of mutations) {
+              const target = mutation.target.nodeType === 1 ? mutation.target : mutation.target.parentElement;
+              const ownToast = target && target.closest ? target.closest(IFRAME_TOAST_SELECTOR) : null;
+              if (mutation.type === "childList") {
+                for (const node of mutation.addedNodes) {
+                  if (!node || node.nodeType !== 1) continue;
+                  if (node.matches && node.matches(IFRAME_TOAST_SELECTOR)) watch(node);
+                  try { for (const child of node.querySelectorAll ? node.querySelectorAll(IFRAME_TOAST_SELECTOR) : []) watch(child); } catch (e) { /* 忽略 */ }
+                }
+              }
+              if (ownToast) read(ownToast);
+            }
+          });
+          // Whole-body observer is direct childList only; once a toast appears it
+          // gets its own fine-grained watcher, so CM6 typing does not traverse.
+          observer.observe(iframeDoc.body, { childList: true });
+          for (const el of iframeDoc.querySelectorAll(IFRAME_TOAST_SELECTOR)) watch(el);
+          let style = null;
+          try {
+            style = iframeDoc.createElement("style");
+            style.setAttribute("data-mp-rail-toast-bridge", "1");
+            style.textContent = IFRAME_TOAST_SELECTOR.split(",").map((sel) => sel + "{display:none!important}").join("");
+            (iframeDoc.head || iframeDoc.documentElement).appendChild(style);
+          } catch (error) { style = null; }
+          doc.toastObserver = observer;
+          doc.toastStyle = style;
+        }
+        st.installToastBridge = installIframeToastBridge;
+        cleanups.push(() => {
+          try { doc.toastObserver?.disconnect(); } catch (e) { /* 忽略 */ }
+          doc.toastObserver = null;
+          try { doc.toastStyle?.remove(); } catch (e) { /* 忽略 */ }
+          doc.toastStyle = null;
+          st.installToastBridge = null;
+        });
 
         function post(type, content) {
           // B1b: parent-side toasts live in the rail now; never fall back to the
@@ -6244,6 +6324,13 @@ const __test = {
           const liveWin = doc.win || currentFrameWin();
           if (!liveWin || event.source !== liveWin) return; // 只认当前代 iframe，旧 iframe 的晚到消息丢弃
           const type = data.type;
+          if (type === "toast") {
+            const toastContent = data.content;
+            const toastText = typeof toastContent === "string" ? toastContent
+              : (toastContent && typeof toastContent.text === "string" ? toastContent.text : "");
+            if (toastText) notify(toastText);
+            return;
+          }
           // 已死代际只放行"关 tab flush 的 text 回执"（旧回执一律丢弃）。
           if (!alive() && !(doc.closeUntil >= Date.now() && ["text","document-delta","composition","apply-result","live-exchange","live-leave","live-flush-result"].includes(type))) return;
           // 编辑器 iframe 的右沿热区：拖动量上行到这里改对话宽度
@@ -6779,6 +6866,19 @@ const __test = {
                 win.postMessage({ __dshmd: true, dir: "down", type: "theme", content: { dark: isDarkTheme() } }, "*");
                 win.postMessage({ __dshmd: true, dir: "down", type: "appearance", content: editorAppearance() }, "*");
               } catch (e) { /* 尚未就绪 */ }
+              if (current && current.key === depKey && !current.dead) {
+                let attempts = 0;
+                const install = () => {
+                  if (!current || current.key !== depKey || current.dead) return;
+                  const fn = st.installToastBridge;
+                  if (typeof fn === "function") {
+                    try { fn(win); } catch (e) { /* 非 DSH 预览：保留原生 toast */ }
+                    return;
+                  }
+                  if (++attempts <= 3) setTimeout(install, 50);
+                };
+                install();
+              }
             }
           },
           style: { width: "100%", border: 0, background: "transparent", flex: "1 1 auto", minHeight: 0, height: "auto" },

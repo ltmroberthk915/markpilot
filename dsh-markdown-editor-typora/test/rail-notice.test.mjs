@@ -7,6 +7,65 @@ const nodes = (n) => (!n || typeof n !== 'object' ? [] : [n, ...(n.children || [
 const text = (n) => (typeof n === 'string' ? n : !n || typeof n !== 'object' ? '' : (n.children || []).map(text).join(''));
 const button = (tree, label) => nodes(tree).find((n) => n.type === 'button' && text(n) === label);
 
+test('iframe toast messages land in the rail instead of the bottom', async () => {
+  const h = make();
+  await h.boot();
+  h.message('toast', { text: 'IFRAME-BRIDGE-TOAST' });
+  assert.ok(text(h.render()).includes('IFRAME-BRIDGE-TOAST'));
+  assert.equal(h.posts.filter((p) => p.type === 'toast').length, 0);
+  h.cleanup();
+});
+
+test('the injected iframe bridge hides and forwards engine toasts', async () => {
+  const h = make();
+  await h.boot();
+  assert.equal(typeof h.st.installToastBridge, 'function');
+  const observers = [];
+  class FakeObserver {
+    constructor(callback) { this.callback = callback; observers.push(this); }
+    observe() {}
+    disconnect() {}
+  }
+  const style = { setAttribute() {}, textContent: '' };
+  const body = { nodeType: 1 };
+  const iframeDoc = {
+    body,
+    head: { appendChild(node) { this.style = node; } },
+    documentElement: { appendChild() {} },
+    createElement() { return style; },
+    contains() { return true; },
+    querySelectorAll() { return []; },
+  };
+  const win = { document: iframeDoc, MutationObserver: FakeObserver };
+  h.st.installToastBridge(win);
+  const toast = {
+    nodeType: 1,
+    textContent: 'ENGINE-TOAST',
+    matches(selector) { return selector.includes('mp-toast'); },
+    querySelector() { return null; },
+    closest() { return this; },
+    querySelectorAll() { return []; },
+  };
+  observers[0].callback([{ type: 'childList', target: body, addedNodes: [toast] }]);
+  assert.ok(text(h.render()).includes('ENGINE-TOAST'));
+  assert.ok(style.textContent.includes('.mp-toast'));
+  let clicked = false;
+  const link = { textContent: '打开文件夹', click() { clicked = true; } };
+  toast.querySelector = () => link;
+  observers[0].callback([{ type: 'attributes', target: toast }]);
+  assert.ok(button(h.render(), '打开文件夹'), 'late action link becomes a rail action');
+  button(h.render(), '打开文件夹').props.onClick();
+  assert.equal(clicked, true);
+  const duplicate = {
+    nodeType: 1, textContent: '已交给对话框',
+    matches(selector) { return selector.includes('mp-toast'); },
+    querySelector() { return null; }, closest() { return this; }, querySelectorAll() { return []; },
+  };
+  observers[0].callback([{ type: 'childList', target: body, addedNodes: [duplicate] }]);
+  assert.ok(!text(h.render()).includes('已交给对话框'), 'AI duplicate engine toast is suppressed');
+  h.cleanup();
+});
+
 test('a rail notice is deduped and expires on its TTL', async () => {
   const h = make();
   await h.boot();
