@@ -304,3 +304,14 @@ Install `dsh-markdown-typora@1.3.2` or the matching GitHub release archive, then
 The package is renamed to `dsh-markdown-editor-typora`; internal route prefix, tab type and recovery-slot keys follow the new name, while `dsh.markpilot.*` settings storage is unchanged.
 
 Install `dsh-markdown-editor-typora@1.4.0` or the matching GitHub release archive, then restart DSH.
+
+
+## MarkPilot for DSH 1.7.0 · AI 改的就是你眼前这一份 / AI edits the document you see
+
+MarkPilot 打开着某篇文档时，AI 的 `markdown` 工具会读取编辑器里的当前内容——包括你还没保存的修改——并直接在这份内容上做替换。改动会立刻出现在编辑区，随后按编辑器既有的自动保存节奏落盘；每次 AI 修改前都会保留一份可恢复的旧稿副本。
+
+如果 AI 读取之后你又改了同一段，AI 会收到“版本已过期”，必须重新读取后再改，不会静默覆盖你刚输入的内容。未打开的文档仍按原方式直接读写文件。
+
+While a document is open in MarkPilot, the AI `markdown` tool reads the editor's current text — including unsaved changes — and edits that text. The change appears in the editor immediately and follows the editor's normal auto-save cadence; a recoverable copy of the pre-edit text is kept. If you change the same region after the AI read, the edit is refused as stale and the AI must read again instead of overwriting your input. Files that are not open keep the normal disk behavior.
+
+Install `dsh-markdown-editor-typora@1.7.0` or the matching GitHub release archive, then restart DSH.

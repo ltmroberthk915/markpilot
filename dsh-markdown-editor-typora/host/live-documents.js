@@ -70,6 +70,23 @@ function hostStamp() {
   try { account = os.userInfo().username; } catch {}
   return machine.toLowerCase() + '\n' + account;
 }
+// True only for an existing store created by this host. Used by B3 before a
+// write-side open: database() deliberately clears a foreign store on first
+// use, and an agent's append must never be the reason that happens.
+function localStoreUsable(filename) {
+  if (!fs.existsSync(filename)) return false;
+  let db;
+  try {
+    const {DatabaseSync} = require('node:sqlite');
+    db = new DatabaseSync(filename, {readOnly:true});
+    try { db.exec('PRAGMA busy_timeout=2000'); } catch { /* best effort */ }
+    const stored = db.prepare("SELECT value FROM meta WHERE key='host'").get()?.value;
+    if (stored !== hostStamp()) return false;
+    db.prepare('SELECT 1 FROM rooms LIMIT 1').get();
+    return true;
+  } catch { return false; }
+  finally { try { db?.close(); } catch { /* already closed */ } }
+}
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 
 // Abnormal exits (crash, kill, power loss) leave client rows behind and, with
@@ -82,6 +99,9 @@ const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 // never removed by housekeeping: an unacknowledged user draft must not be
 // silently destroyed; only the recovery index is capped.
 const sweptLocations = new Set(), RECOVERY_BATCH = 4, RECOVERY_ROWS = 500;
+// Agent appends do not write disk; a 10s ceiling keeps an AI tool call from
+// waiting the full 30s save lease while a slow external save is in flight.
+const APPEND_BUSY_TIMEOUT_MS = 10000;
 function recoveryFile(directory, room) {
   const name = path.basename(room.file).replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 64) || 'document';
   return path.join(path.resolve(directory), 'recovery',
@@ -156,6 +176,14 @@ function atomic(db, action) {
   db.exec('BEGIN IMMEDIATE');
   try { const result = action(); db.exec('COMMIT'); return result; }
   catch (error) { db.exec('ROLLBACK'); throw error; }
+}
+// Read-only consistency wrapper: checkpoint and changes must be read in one
+// transaction so a cross-process writer cannot land between the two queries.
+// BEGIN (deferred) never takes the write lock.
+function readTx(db, action) {
+  db.exec('BEGIN');
+  try { const result = action(); db.exec('COMMIT'); return result; }
+  catch (error) { try { db.exec('ROLLBACK'); } catch { /* already closed */ } throw error; }
 }
 function alive(pid) {
   if (pid === process.pid) return true;
@@ -498,13 +526,101 @@ class LiveDocuments {
       return sealedHead ? {...result, ...sealedHead, liveVersion:sealedHead.version} : result;
     }, this.directory, this.leaseOptions());
   }
+  // B3: authoritative read of the shared buffer. Never creates the rooms store,
+  // never joins, never sweeps, never writes. A missing/foreign database means
+  // "no room": the caller must fall back to the disk authority.
+  async readRoom(filePath) {
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    const filename = path.join(path.resolve(this.directory), 'rooms.sqlite');
+    if (!fs.existsSync(filename)) return null;
+    const {DatabaseSync} = require('node:sqlite');
+    let db;
+    try { db = new DatabaseSync(filename, {readOnly:true}); }
+    catch (error) { return null; }
+    try {
+      try { db.exec('PRAGMA busy_timeout=2000'); } catch { /* best effort */ }
+      try {
+        const stored = db.prepare("SELECT value FROM meta WHERE key='host'").get()?.value;
+        if (stored !== hostStamp()) return null;    // foreign/copied store: never seat it as authority
+      } catch { return null; }                       // no meta/old schema: not this host's room
+      return readTx(db, () => {
+        const room = roomFor(db, key);
+        if (!room) return null;
+        const text = materialize(db, room);
+        const savedTextAvailable = room.saved >= room.floor;
+        const savedText = room.version === room.saved ? text
+          : (savedTextAvailable ? materialize(db, room, room.saved) : null);
+        const pids = db.prepare('SELECT pid FROM clients WHERE epoch=?').all(room.epoch);
+        const members = pids.filter(({pid}) => alive(pid)).length;
+        const localMembers = pids.filter(({pid}) => pid === process.pid).length;
+        return {...head(room), length:room.length, text, savedText, savedTextAvailable,
+          textSha256:digest(Buffer.from(text,'utf8')), members, localMembers};
+      });
+    } catch (error) {
+      // A read-only WAL edge, a locked store or a transient SQLite failure must
+      // not block a read. Fall back to the disk authority; write paths still go
+      // through live.external/CAS and cannot silently overwrite a dirty room.
+      return null;
+    } finally { try { db.close(); } catch { /* already closed */ } }
+  }
+  // B3: append one authoritative remote edit to the shared buffer. Never
+  // touches disk or `saved`; the change is delivered to every member through
+  // the normal exchange() update stream. The transaction re-checks epoch,
+  // version and the materialized base text, so a concurrent editor save or
+  // peer edit can never be appended on top of a stale base.
+  async append(filePath, {epoch, baseVersion, baseText, changes, actor='agent'} = {}) {
+    if (typeof baseText !== 'string') throw fault('MP_LIVE_APPEND', '缺少权威正文');
+    if (typeof epoch !== 'string' || !epoch) throw fault('MP_LIVE_APPEND', '缺少协同会话');
+    if (!Number.isSafeInteger(baseVersion) || baseVersion < 0) throw fault('MP_LIVE_APPEND', '无效的协同版本');
+    if (!/^[a-z0-9-]{1,32}$/.test(String(actor))) throw fault('MP_LIVE_APPEND', '无效的追加者');
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    const filename = path.join(path.resolve(this.directory), 'rooms.sqlite');
+    if (!localStoreUsable(filename)) throw fault('MP_LIVE_NO_ROOM', '文档没有共享会话，请重新读取后再试');
+    return withFileCommit(file, async () => {
+      const db = this.db;
+      return atomic(db, () => {
+        const room = roomFor(db, key);
+        if (!room) throw fault('MP_LIVE_NO_ROOM', '文档没有共享会话，请重新读取后再试');
+        if (room.epoch !== epoch) throw fault('MP_LIVE_SESSION', '文档协同会话已改变');
+        const members = db.prepare('SELECT pid FROM clients WHERE epoch=?').all(room.epoch)
+          .filter(({pid}) => alive(pid)).length;
+        if (!members) throw fault('MP_LIVE_NO_MEMBER', '没有在线的编辑器会话，请重新读取后再试');
+        if (room.version !== baseVersion || materialize(db, room) !== baseText)
+          throw fault('MP_LIVE_STALE', '文档刚有新编辑，请重新读取后再应用');
+        const length = checkedLength(changes, room.length);
+        const version = room.version + 1;
+        db.prepare('INSERT INTO changes VALUES(?,?,?,?,?)')
+          .run(room.epoch, version, actor, 0, JSON.stringify(changes));
+        db.prepare('UPDATE rooms SET version=?,length=? WHERE epoch=?').run(version, length, room.epoch);
+        room.version = version; room.length = length;
+        compact(db, room);
+        const text = materialize(db, room);
+        return {...head(room), text, textSha256:digest(Buffer.from(text,'utf8'))};
+      });
+    }, this.directory, { ...this.leaseOptions(), busyTimeoutMs: Math.min(this.leaseOptions().busyTimeoutMs ?? APPEND_BUSY_TIMEOUT_MS, APPEND_BUSY_TIMEOUT_MS) });
+  }
   leave(client) {
     const member = this.clients.get(client);
     if (!member) return;
     const db = this.db;
     atomic(db, () => {
+      // An agent edit that no editor has acknowledged yet may exist only in the
+      // room log. Deleting the room here would silently drop it (the editor
+      // never applied it, so its WAL has no record and the pre-edit archive is
+      // not the edit). Keep that room; the next join parks it as a recovery
+      // draft. A delivered agent edit (ack >= version) is safe to retire — the
+      // editor's normal save/recovery path owns it by then.
+      const room = db.prepare('SELECT version,saved FROM rooms WHERE epoch=?').get(member.epoch);
+      const maxAck = db.prepare('SELECT MAX(ack) AS v FROM clients WHERE epoch=?').get(member.epoch)?.v;
+      const unackedAgent = room
+        ? db.prepare("SELECT MAX(version) AS v FROM changes WHERE epoch=? AND client='agent' AND version>?")
+            .get(member.epoch, room.saved)?.v
+        : null;
       db.prepare('DELETE FROM clients WHERE id=? AND epoch=?').run(client,member.epoch);
-      db.prepare('DELETE FROM rooms WHERE epoch=? AND NOT EXISTS(SELECT 1 FROM clients WHERE epoch=?)').run(member.epoch,member.epoch);
+      const remaining = db.prepare('SELECT COUNT(*) AS c FROM clients WHERE epoch=?').get(member.epoch).c;
+      if (remaining > 0) return;
+      const keep = unackedAgent != null && (maxAck == null || unackedAgent > maxAck);
+      if (!keep) db.prepare('DELETE FROM rooms WHERE epoch=?').run(member.epoch);
     });
     this.clients.delete(client);
     if (!this.clients.size) hosts.delete(this);

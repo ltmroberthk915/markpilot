@@ -73,8 +73,7 @@ async function loadReal(pluginRoot) {
 function stageCopy() {
   const dst = fs.mkdtempSync(path.join(os.tmpdir(), 'mp-host-bind-'));
   fs.cpSync(path.join(ROOT, 'host'), path.join(dst, 'host'), { recursive: true });
-  fs.mkdirSync(path.join(dst, 'lib'), { recursive: true });
-  fs.copyFileSync(path.join(ROOT, 'lib', 'index.js'), path.join(dst, 'lib', 'index.js'));
+  fs.cpSync(path.join(ROOT, 'lib'), path.join(dst, 'lib'), { recursive: true });
   fs.copyFileSync(path.join(ROOT, 'host.json'), path.join(dst, 'host.json'));
   if (fs.existsSync(path.join(ROOT, 'package.json'))) fs.copyFileSync(path.join(ROOT, 'package.json'), path.join(dst, 'package.json'));
   return dst;
@@ -162,7 +161,11 @@ test('two generations coexist: old pending with its own binding, retirement rest
     assert.ok(graph1 && graph1.abi === ABI);
     // A host token keeps generation 1 alive (injected liveDocuments stub: no real kernel/worker).
     const fsStub = { resolve: async (p) => ({ displayPath: p, targetKey: p }), writeText: async () => ({}) };
-    const hostA = g1.createHost({ fs: fsStub, liveDocuments: {}, rootDir: staged, log: { info() {}, warn() {}, error() {} } });
+    const liveStub = {
+    readRoom: async () => null,
+    append: async () => { throw Object.assign(new Error('no room'), { code: 'MP_LIVE_NO_ROOM' }); },
+  };
+  const hostA = g1.createHost({ fs: fsStub, liveDocuments: liveStub, rootDir: staged, log: { info() {}, warn() {}, error() {} } });
     bumpMember(staged);
     const g2 = await import(libUrl(2));
     const graph2 = currentGraph(hostDir);

@@ -80,10 +80,10 @@ test('session policy, working directory and cancellation come from the tool invo
   const noPolicy = createHost({fs:provider,log:{warn(){}}});
   try {
     assert.equal((await createMarkdownToolDefinition(host.dispatch).execute(request,execution)).error?.code,'FS_SANDBOX_DENIED');
-    assert.equal(edits,1);
+    assert.equal(edits,0);   // the documents service denies before delegating to the provider
     assert.equal((await createMarkdownToolDefinition(noPolicy.dispatch).execute(request,execution)).error?.code,'FS_SANDBOX_DENIED');
     controller.abort();
     assert.equal((await createMarkdownToolDefinition(host.dispatch).execute(request,execution)).ok,false);
-    assert.equal(edits,1);
+    assert.equal(edits,0);
   } finally {host.close();noPolicy.close();}
 });

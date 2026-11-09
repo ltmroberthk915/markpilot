@@ -746,11 +746,19 @@ test('body 上限：超过配置即 413，不静默截断', async () => {
 });
 
 test('markdown 工具定义：0.2.1 defineTool 形态（output.schema/render）+ 与保存同一守卫', async () => {
+  const sha = 'a'.repeat(64);
+  const rev = 'rev1:disk:v1:' + sha;
   const calls = [];
   const dispatch = async (endpoint, payload) => {
     calls.push({ endpoint, payload });
-    if (endpoint === 'open') return { ok: true, value: { text: '# hi', version: 'v1', displayPath: 'D:/a.md' } };
-    return { ok: true, value: { version: 'v2', displayPath: 'D:/a.md', changed: true } };
+    if (endpoint === 'documents.read') return {
+      ok: true,
+      value: { text: '# hi', version: rev, revisionId: rev, displayPath: 'D:/a.md', source: 'disk', dirty: false },
+    };
+    return {
+      ok: true,
+      value: { version: 'rev1:disk:v2:' + sha, revisionId: 'rev1:disk:v2:' + sha, displayPath: 'D:/a.md', changed: true, source: 'buffer', dirty: true, saved: false },
+    };
   };
   const spec = createMarkdownToolDefinition(dispatch);
   assert.equal(spec.name, 'markdown');
@@ -759,25 +767,27 @@ test('markdown 工具定义：0.2.1 defineTool 形态（output.schema/render）+
   assert.ok(spec.output && spec.output.schema && typeof spec.output.render === 'function');
 
   const read = await spec.execute({ action: 'read', path: 'D:/a.md' });
-  assert.deepEqual(plain(read), { ok: true, action: 'read', text: '# hi', version: 'v1', displayPath: 'D:/a.md' });
-  assert.equal(calls[0].endpoint, 'open');
+  assert.deepEqual(plain(read), { ok: true, action: 'read', text: '# hi', version: rev, revisionId: rev, displayPath: 'D:/a.md', source: 'disk', dirty: false });
+  assert.equal(calls[0].endpoint, 'documents.read');
 
-  const edited = await spec.execute({ action: 'edit', path: 'D:/a.md', oldString: 'a', newString: 'b', baseVersion: 'v1' });
+  const edited = await spec.execute({ action: 'edit', path: 'D:/a.md', oldString: 'a', newString: 'b', baseVersion: rev });
   assert.equal(edited.ok, true);
-  assert.equal(calls[1].endpoint, 'edit');
+  assert.equal(edited.saved, false);
+  assert.equal(edited.dirty, true);
+  assert.equal(calls[1].endpoint, 'documents.applyEdits');
   assert.equal(calls[1].payload.oldString, 'a');
   assert.equal(calls[1].payload.newString, 'b');
-  assert.equal(calls[1].payload.baseVersion, 'v1');
+  assert.equal(calls[1].payload.baseVersion, rev);
 
   // 错误码原样透传（不吞成 message）
   const failSpec = createMarkdownToolDefinition(async () => ({ ok: false, error: { code: 'FS_STALE_VERSION', message: 'file changed' } }));
-  const failed = await failSpec.execute({ action: 'edit', path: 'D:/a.md', oldString: 'a', newString: 'b', baseVersion: 'v1' });
+  const failed = await failSpec.execute({ action: 'edit', path: 'D:/a.md', oldString: 'a', newString: 'b', baseVersion: rev });
   assert.equal(failed.ok, false);
   assert.equal(failed.error.code, 'FS_STALE_VERSION');
 
   const blocks = spec.output.render({ action: 'read' }, read);
   assert.equal(blocks[0].type, 'text');
-  assert.match(blocks[0].text, /版本 v1/);
+  assert.match(blocks[0].text, /版本/);
   const errorBlocks = spec.output.render({ action: 'edit' }, failed);
   assert.match(errorBlocks[0].text, /FS_STALE_VERSION/);
 

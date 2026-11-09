@@ -33,6 +33,7 @@ import { createRequire } from 'node:module';
 import rawDiskStore from '../host/document-store.js';
 import rawLiveStore from '../host/live-documents.js';
 import rawTextCodec from '../host/text-codec.js';
+import { createDocumentsService } from './documents-service.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize, sep, extname, basename, resolve as pathResolve, isAbsolute, relative as pathRelative }  from 'node:path';
 
@@ -316,9 +317,10 @@ const API_PREFIX = ROUTE_PREFIX + '/api/';
 // Only the editor's explicit local-file actions use its native file capability.
 // The model tool must use the host filesystem's read projection and write policy.
 const MODEL_TOOL = Symbol('markdown model tool');
+export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'diag']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'diag']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
 
@@ -794,6 +796,23 @@ export function createHost(options = {}) {
     if (payload.action !== 'exchange') return badRequest('unknown live action');
     return Promise.resolve(live.exchange(payload.client,payload.request)).then(value=>({ok:true,value}));
   }
+  // B3: the model tool's authority over the current document (buffer or disk).
+  // It never creates a room and never writes disk on the buffer branch; the
+  // editor's own save path remains the only writer of unsaved buffer text.
+  const documents = createDocumentsService({
+    live,
+    openModel: (payload, invocation) => apiOpen(payload, MODEL_TOOL, undefined, invocation),
+    edit: (payload, invocation) => apiEdit(payload, invocation),
+    save: (payload) => apiSave(payload),
+    archive: (payload) => apiDocsArchive(payload),
+    resolve: (payload, invocation) => fs.resolve(payload?.path ?? '', resolveOptions(payload, invocation)),
+    stat: (target) => fs.stat(target),
+    canonical: (target) => canonicalTarget(target),
+    localPath: (target) => nativeTargetPath(target),
+    enqueue: (key, action) => queueSave(pathKey(key), action),
+    sandboxMode: fs.sandboxMode,
+    log,
+  });
   /** Persisted-file notifications are scoped to the watched target. Unsaved edits use independent document leases. */
   const liveStreams = new Set();
 
@@ -1490,7 +1509,7 @@ export function createHost(options = {}) {
       if (authority === MODEL_TOOL) {
         const session = execution?.agent?.session;
         let policy;
-        if (endpoint === 'edit' && fs.sandboxMode !== undefined) {
+        if ((endpoint === 'edit' || endpoint === 'documents.applyEdits') && fs.sandboxMode !== undefined) {
           policy = await options.sandboxPolicy?.()?.resolve(session ? {session} : {});
           if (!policy?.mode) throw codedError('FS_SANDBOX_DENIED', 'Cannot resolve filesystem policy for this tool call');
         }
@@ -1503,6 +1522,12 @@ export function createHost(options = {}) {
         case 'stat': return await apiStat(payload);
         case 'live': return authority === MODEL_TOOL ? badRequest('editor lease required') : await liveEndpoint(payload);
         case 'edit': return await apiEdit(payload, invocation);
+        case 'documents.read':
+          if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
+          return await documents.read(payload, invocation);
+        case 'documents.applyEdits':
+          if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
+          return await documents.applyEdits(payload, invocation, invocation?.policy);
         case 'docs/create': return await apiDocsCreate(payload);
         case 'docs/recent': return await apiDocsRecent(payload);
         case 'docs/archive': return await apiDocsArchive(payload);
@@ -1687,7 +1712,7 @@ export function createHost(options = {}) {
 
   const hostToken = {};
   registerHost(hostToken);
-  return { route, dispatch, close, broadcastChange, _internals: { watchers, liveStreams, lookupDocument } };
+  return { route, dispatch, close, broadcastChange, _internals: { watchers, liveStreams, lookupDocument, documents } };
 }
 
 const WRITE_GUARD_DIRTY = 'MP_DOC_DIRTY';
@@ -1865,19 +1890,23 @@ export function createMarkdownToolDefinition(dispatch) {
   return {
     name: 'markdown',
     description: [
-      '读写 Markdown（及任意文本）文件，与 MarkPilot 编辑面板走同一版本守卫通道。',
-      'read 返回全文与版本；edit 按字面 oldString→newString 原子替换（同 edit 工具语义）。',
-      '冲突纪律：save/edit 报 FS_STALE_VERSION 说明文件在读取后被改过（可能用户正在编辑面板里打字）——',
-      '此时必须重新 read 拿新版本再重试，绝不盲目覆盖；用户编辑永远优先。',
+      '读写 Markdown（及任意文本）文件。read 返回“当前正文”——包含用户在 MarkPilot 编辑器里尚未保存的修改；',
+      'edit 在“当前正文”上做字面 oldString→newString 原子替换。',
+      '如果 edit 返回 saved:false，说明修改只进入编辑器缓冲区、还没有写到磁盘；不要声称文件已保存，用户会看到并决定何时保存。',
+      '冲突纪律：MP_DOC_STALE 表示读取后正文又被改过——必须重新 read 拿新的 version（revision token）再重试，绝不沿用旧值；',
+      'MP_DOC_EXTERNAL_CONFLICT / MP_DOC_ORPHAN_DRAFT 必须让用户先在编辑器里处理冲突或恢复草稿。',
+      'MP_DOC_UNSAVED_ELSEWHERE 表示另一窗口有未保存修改，AI 不能改；请让用户先在那里保存。',
+      '共享会话失效（MP_LIVE_*）或归档失败（MP_ARCHIVE_FAILED）时不要改用其它写工具，重新 read 或让用户重试。',
     ].join(' '),
     parameters: {
-      action: { type: 'string', required: true, description: 'read = 读文件（text+version）；edit = 字面替换后守卫写回。', enum: ['read', 'edit'] },
+      action: { type: 'string', required: true, description: 'read = 读当前正文（text+version）；edit = 在当前正文上字面替换。', enum: ['read', 'edit'] },
       path: { type: 'string', required: true, description: '文件的绝对路径。' },
       cwd: { type: 'string', description: '可选：相对路径的解析基准目录。' },
-      oldString: { type: 'string', description: 'action=edit 必填：要替换的原文字面量（须在文件中唯一，除非 replaceAll）。' },
+      oldString: { type: 'string', description: 'action=edit 必填：要替换的原文字面量（须唯一，除非 replaceAll）。' },
       newString: { type: 'string', description: 'action=edit 必填：替换后的文字面量。' },
-      replaceAll: { type: 'boolean', description: 'action=edit 可选：替换所有出现（默认 false）。' },
-      baseVersion: { type: 'string', description: '可选：上次 read 拿到的版本；提供后文件已变则拒绝（FS_STALE_VERSION），不盲写。' },
+      replaceAll: { type: 'boolean', description: 'action=edit 可选：替换所有出现（默认 false，最多 1000 处）。' },
+      baseVersion: { type: 'string', description: '上次 read 返回的 version（revision token）；edit 应回传，过期则 MP_DOC_STALE。' },
+      baseRevisionId: { type: 'string', description: '可选：与 baseVersion 等价的显式 revision token。' },
     },
     output: {
       schema: {
@@ -1888,14 +1917,27 @@ export function createMarkdownToolDefinition(dispatch) {
           action: { type: 'string', required: true },
           text: { type: 'string' },
           version: { type: 'string' },
+          revisionId: { type: 'string' },
           displayPath: { type: 'string' },
           changed: { type: 'boolean' },
+          source: { type: 'string' },
+          dirty: { type: 'boolean' },
+          saved: { type: 'boolean' },
+          diskChanged: { type: 'boolean' },
+          bufferOwnedElsewhere: { type: 'boolean' },
+          unsavedElsewhere: { type: 'boolean' },
+          checkpointPath: { type: 'string' },
           error: {
             type: 'object',
             additionalProperties: false,
             properties: {
               code: { type: 'string', required: true },
               message: { type: 'string', required: true },
+              currentRevisionId: { type: 'string' },
+              source: { type: 'string' },
+              dirty: { type: 'boolean' },
+              diskChanged: { type: 'boolean' },
+              checkpointPath: { type: 'string' },
             },
           },
         },
@@ -1907,40 +1949,58 @@ export function createMarkdownToolDefinition(dispatch) {
         if (value.action === 'read') {
           const text = String(value.text ?? '');
           const head = text.length > 8000 ? `${text.slice(0, 8000)}\n…（共 ${text.length} 字符，已截断）` : text;
-          return textBlock(`${value.displayPath ?? ''}（版本 ${String(value.version ?? '').slice(0, 12)}…）:\n${head}`);
+          const where = value.source === 'buffer' ? '编辑器缓冲区' : '磁盘';
+          const dirty = value.dirty === true ? '，含未保存修改' : '';
+          return textBlock(`${value.displayPath ?? ''}（${where}${dirty}；版本 ${String(value.version ?? '').slice(0, 16)}…）:\n${head}`);
         }
-        return textBlock(`已应用编辑：${value.displayPath ?? ''}${value.changed === false ? '（oldString 与 newString 相同，内容未变）' : ''}，新版本 ${String(value.version ?? '').slice(0, 12)}…`);
+        const target = value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘；请让用户确认后自行保存';
+        const copy = value.checkpointPath ? `；改前副本：${value.checkpointPath}` : '';
+        return textBlock(`已应用编辑：${value.displayPath ?? ''}${value.changed === false ? '（内容未变）' : ''}；${target}${copy}；新版本 ${String(value.version ?? '').slice(0, 16)}…`);
       },
     },
     async execute(args, execution) {
       const action = args?.action === 'edit' ? 'edit' : 'read';
       try {
         if (action === 'read') {
-          const result = await dispatch('open', { path: args?.path, cwd: args?.cwd }, MODEL_TOOL, execution);
+          const result = await dispatch('documents.read', { path: args?.path, cwd: args?.cwd }, MODEL_TOOL, execution);
           if (result.ok !== true) return { ok: false, action, error: result.error };
+          const value = result.value;
           return {
             ok: true,
             action,
-            text: result.value.text,
-            version: result.value.version,
-            displayPath: result.value.displayPath,
+            text: value.text,
+            version: value.version,
+            revisionId: value.revisionId,
+            displayPath: value.displayPath,
+            source: value.source,
+            dirty: value.dirty === true,
+            ...(typeof value.diskChanged === 'boolean' ? { diskChanged: value.diskChanged } : {}),
+            ...(value.bufferOwnedElsewhere === true ? { bufferOwnedElsewhere: true } : {}),
+            ...(value.unsavedElsewhere === true ? { unsavedElsewhere: true } : {}),
           };
         }
-        const result = await dispatch('edit', {
+        const result = await dispatch('documents.applyEdits', {
           path: args?.path,
           cwd: args?.cwd,
           oldString: args?.oldString,
           newString: args?.newString,
           replaceAll: args?.replaceAll === true,
           baseVersion: args?.baseVersion,
+          baseRevisionId: args?.baseRevisionId,
         }, MODEL_TOOL, execution);
         if (result.ok !== true) return { ok: false, action, error: result.error };
+        const value = result.value;
         return {
           ok: true,
           action,
-          version: result.value.version,
-          displayPath: result.value.displayPath,
-          changed: result.value.changed,
+          version: value.version,
+          revisionId: value.revisionId,
+          displayPath: value.displayPath,
+          changed: value.changed,
+          source: value.source,
+          dirty: value.dirty === true,
+          saved: value.saved === true,
+          ...(value.checkpoint?.archivePath ? { checkpointPath: value.checkpoint.archivePath } : {}),
         };
       } catch (error) {
         return { ok: false, action, error: { code: errorCode(error), message: String(error?.message ?? error) } };
