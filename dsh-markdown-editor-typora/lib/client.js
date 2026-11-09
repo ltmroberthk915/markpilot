@@ -5429,6 +5429,10 @@ const __test = {
           doc.toastStyle = style;
         }
         st.installToastBridge = installIframeToastBridge;
+        try {
+          const loadedWin = frameRef.current && frameRef.current.contentWindow;
+          if (loadedWin) installIframeToastBridge(loadedWin);
+        } catch (e) { /* frame 尚未就绪 */ }
         cleanups.push(() => {
           try { doc.toastObserver?.disconnect(); } catch (e) { /* 忽略 */ }
           doc.toastObserver = null;
@@ -6866,19 +6870,22 @@ const __test = {
                 win.postMessage({ __dshmd: true, dir: "down", type: "theme", content: { dark: isDarkTheme() } }, "*");
                 win.postMessage({ __dshmd: true, dir: "down", type: "appearance", content: editorAppearance() }, "*");
               } catch (e) { /* 尚未就绪 */ }
-              if (current && current.key === depKey && !current.dead) {
-                let attempts = 0;
-                const install = () => {
-                  if (!current || current.key !== depKey || current.dead) return;
-                  const fn = st.installToastBridge;
-                  if (typeof fn === "function") {
-                    try { fn(win); } catch (e) { /* 非 DSH 预览：保留原生 toast */ }
-                    return;
-                  }
+              let attempts = 0;
+              const install = () => {
+                const cur = st.doc;
+                if (!cur) {
                   if (++attempts <= 3) setTimeout(install, 50);
-                };
-                install();
-              }
+                  return;
+                }
+                if (cur.key !== depKey || cur.dead) return;
+                const fn = st.installToastBridge;
+                if (typeof fn === "function") {
+                  try { fn(win); } catch (e) { /* 非 DSH 预览：保留原生 toast */ }
+                  return;
+                }
+                if (++attempts <= 3) setTimeout(install, 50);
+              };
+              install();
             }
           },
           style: { width: "100%", border: 0, background: "transparent", flex: "1 1 auto", minHeight: 0, height: "auto" },
