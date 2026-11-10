@@ -1,23 +1,23 @@
 # ROADMAP · B3 收尾到 B5 的后续规划
 
-- 当前基线：`main` @ `4caca6d`；B3.1 `documents.read/applyEdits`、B3.2 恢复副本/归档保留/`documents.state` 已实装并真机通过。
-- 验证基线：`npm test` 424 tests / 423 pass / 1 skip；host/core 门禁绿。
+- 当前基线：`main` @ `80e18dd`；B3.1/B3.2/B3.3a/B4.1 已实装并真机通过。
+- 验证基线：`npm test` 437 tests / 436 pass / 1 skip；host/core 门禁绿。
 - 原则：数据安全优先于功能；默认 fail-closed；不做自动覆盖/自动合并；每批先设计对抗、再落码、再突变+真机。
 
 ## 1. 优先级总表
 
 | 顺序 | 批次 | 目标 | 是否改 renderer | 依赖 |
 | --- | --- | --- | --- | --- |
-| 1 | B3.3a | 恢复副本的一键恢复/丢弃 UI + `documents.recover` | 否（client 小改） | B3.2 |
+| 1 | B3.3a | 恢复副本的一键恢复/丢弃 UI + `documents.recover`（已完成） | 否（client 小改） | B3.2 |
 | 2 | B3.3b | `liveUnsupported` 文件的宿主草稿索引 | 可能小改 client | B3.3a |
-| 3 | B4.1 | 文档块解析、块 ID、`readToken`/`groupId` 审计 | 否（host-only） | B3.2 |
+| 3 | B4.1 | 文档块解析、块 ID、`readToken`/`groupId` 审计（已完成） | 否（host-only） | B3.2 |
 | 4 | B4.2 | AI 编辑审查/撤销组、审阅前不自动落盘 | **是**（renderer/core） | B4.1 |
 | 5 | B4.3 | diff3/冲突合并、批量编辑协议 | 是 | B4.2 |
 | 6 | B5 | 内核权威 buffer/CRDT、通用 fs patch/move 守卫 | 是（内核） | B4 稳定后 |
 
 **建议**：先做 1，再做 3；2 与 4 可并行评估，但不要先动 B5。
 
-## 2. B3.3a · 恢复副本的闭环（下一步）
+## 2. B3.3a · 恢复副本的闭环（已完成）
 
 ### 要做
 
@@ -57,7 +57,7 @@
 
 编辑器 facade 被禁用时，AI read 仍能看到未保存正文；写回不写盘、不抢编辑器；重启后草稿可定位。该批范围较大，先做设计对抗再决定是否拆成 B3.3b1/b2。
 
-## 4. B4.1 · 块/readToken/groupId（host-only）
+## 4. B4.1 · 块/readToken/groupId（host-only，已完成）
 
 ### 目标
 
