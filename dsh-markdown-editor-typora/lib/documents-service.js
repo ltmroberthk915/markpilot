@@ -177,6 +177,76 @@ export function findDocumentBlock(text, blockId) {
   return parseDocumentBlocks(text).find((block) => block.id === blockId) || null;
 }
 
+function diffLines(base, other) {
+  const n = base.length, m = other.length;
+  if (n * m > 9_000_000) throw Object.assign(new Error('merge input is too large'), { code: 'MP_MERGE_LIMIT' });
+  const width = m + 1;
+  const dp = new Uint32Array((n + 1) * width);
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i * width + j] = base[i] === other[j]
+        ? dp[(i + 1) * width + j + 1] + 1
+        : Math.max(dp[(i + 1) * width + j], dp[i * width + j + 1]);
+    }
+  }
+  const out = [];
+  let i = 0, j = 0, start = -1, lines = [];
+  const flush = () => { if (start >= 0) { out.push({ start, end: i, lines }); start = -1; lines = []; } };
+  while (i < n && j < m) {
+    if (base[i] === other[j]) { flush(); i++; j++; continue; }
+    if (start < 0) start = i;
+    if (dp[(i + 1) * width + j] >= dp[i * width + j + 1]) i++;
+    else { lines.push(other[j]); j++; }
+  }
+  if (i < n || j < m) {
+    if (start < 0) start = i;
+    while (i < n) i++;
+    while (j < m) { lines.push(other[j]); j++; }
+  }
+  flush();
+  return out;
+}
+
+export function merge3Text(baseText, oursText, otherText) {
+  const base = String(baseText).split('\n');
+  const ours = String(oursText).split('\n');
+  const other = String(otherText).split('\n');
+  const a = diffLines(base, ours);
+  const b = diffLines(base, other);
+  const conflicts = [];
+  const overlaps = (x, y) => {
+    const xi = x.start === x.end, yi = y.start === y.end;
+    if (xi && yi) return x.start === y.start && x.lines.join('\n') !== y.lines.join('\n');
+    if (xi) return y.start < x.start && x.start < y.end;
+    if (yi) return x.start < y.start && y.start < x.end;
+    return x.start < y.end && y.start < x.end;
+  };
+  for (const x of a) for (const y of b) if (overlaps(x, y)) {
+    conflicts.push({
+      baseFrom: Math.min(x.start, y.start), baseTo: Math.max(x.end, y.end),
+      base: base.slice(Math.min(x.start, y.start), Math.max(x.end, y.end)).join('\n'),
+      ours: x.lines.join('\n'), other: y.lines.join('\n'),
+    });
+  }
+  if (conflicts.length) return { clean: false, conflicts, text: null };
+  const seen = new Set();
+  const all = [...a, ...b].filter((change) => {
+    const key = `${change.start}:${change.end}:${change.lines.join('\n')}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).sort((x, y) => x.start - y.start || x.end - y.end);
+  const out = [];
+  let pos = 0;
+  for (const change of all) {
+    if (change.start < pos) return { clean: false, conflicts: [{ baseFrom: change.start, baseTo: change.end, base: '', ours: change.lines.join('\n'), other: '' }], text: null };
+    out.push(...base.slice(pos, change.start), ...change.lines);
+    pos = change.end;
+  }
+  out.push(...base.slice(pos));
+  return { clean: true, conflicts: [], text: out.join('\n') };
+}
+
 // Locate a literal oldString in `text` and return the minimal splice list.
 // `insert` is already normalized by the caller for the buffer branch.
 export function replaceExact(text, oldString, newString, replaceAll) {
@@ -729,6 +799,26 @@ export function createDocumentsService(deps) {
     } catch (error) { return fail(error, a); }
   }
 
+  async function merge3(payload, invocation, policy) {
+    let a;
+    try { a = await authority(payload, invocation); }
+    catch (error) { return fail(error, null); }
+    if (a.error) return a.error;
+    if (typeof payload?.baseText !== 'string' || typeof payload?.otherText !== 'string')
+      return fail(coded('bad-request', 'baseText and otherText are required'), a);
+    const rawBase = typeof payload?.baseRevisionId === 'string' ? payload.baseRevisionId
+      : (typeof payload?.baseVersion === 'string' ? payload.baseVersion : '');
+    if (rawBase !== a.revisionId) return fail(stale(a), a);
+    let merged;
+    try { merged = merge3Text(payload.baseText, a.text, payload.otherText); }
+    catch (error) { return fail(error, a); }
+    if (!merged.clean) return { ok: true, value: { clean: false, conflicts: merged.conflicts, source: a.source, version: a.revisionId } };
+    if (merged.text === a.text) return { ok: true, value: { clean: true, merged: false, changed: false, source: a.source, version: a.revisionId, dirty: a.dirty } };
+    const result = await applyEdits({ path: payload.path, cwd: payload.cwd, edits: [{ from: 0, to: a.text.length, insert: merged.text }], baseRevisionId: a.revisionId }, invocation, policy);
+    if (!result || result.ok !== true) return result || fail(coded('FS_IO_ERROR', 'merge write failed'), a);
+    return { ok: true, value: { ...result.value, clean: true, merged: true } };
+  }
+
   async function undoGroup(payload, invocation, policy) {
     let a;
     try { a = await authority(payload, invocation); }
@@ -763,6 +853,6 @@ export function createDocumentsService(deps) {
     return { ok: true, value: { ...result.value, undoOf: groupId } };
   }
 
-  return { read, applyEdits, state, recover, discardRecovery, undoGroup };
+  return { read, applyEdits, state, recover, discardRecovery, undoGroup, merge3 };
 }
 

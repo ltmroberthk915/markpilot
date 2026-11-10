@@ -301,6 +301,33 @@ test('B4.1-API1 markdown blocks/edit blockId goes through the live room and retu
   } finally { w.restore(); }
 });
 
+test('B4.3b-API1 markdown merge3 writes a clean merge and refuses conflicts', async () => {
+  const text = 'A\nb\nc\n';
+  const w = await makeWorld('merge3', text);
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    await liveDocs.join(w.file, text);
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const tool = createMarkdownToolDefinition(host.dispatch);
+    const read = await tool.execute({ action: 'read', path: w.file }, execution(w.root));
+    const merged = await tool.execute({
+      action: 'merge3', path: w.file, baseText: 'a\nb\nc\n', otherText: 'a\nb\nC\n', baseVersion: read.readToken,
+    }, execution(w.root));
+    assert.equal(merged.ok, true, JSON.stringify(merged));
+    assert.equal(merged.clean, true);
+    const after = await tool.execute({ action: 'read', path: w.file }, execution(w.root));
+    assert.equal(after.text, 'A\nb\nC\n');
+    const conflict = await tool.execute({
+      action: 'merge3', path: w.file, baseText: 'a\nb\nc\n', otherText: 'a\nb\nX\n', baseVersion: after.readToken,
+    }, execution(w.root));
+    assert.equal(conflict.ok, true, JSON.stringify(conflict));
+    assert.equal(conflict.clean, false);
+    assert.equal(conflict.conflicts.length > 0, true);
+    assert.equal((await tool.execute({ action: 'read', path: w.file }, execution(w.root))).text, 'A\nb\nC\n');
+    host.close();
+  } finally { w.restore(); }
+});
+
 test('B4.3-API1 markdown batch applies multiple edits with one group and one append', async () => {
   const text = '# A\nalpha\n\n# B\nbeta\n';
   const w = await makeWorld('batch', text);

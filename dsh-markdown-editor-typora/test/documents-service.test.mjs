@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {
   createDocumentsService, parseRevisionId, makeLiveRevisionId, makeDiskRevisionId,
   sha256Text, normalizeCompare, isCanonicalUnder, replaceExact,
-  parseDocumentBlocks, findDocumentBlock,
+  parseDocumentBlocks, findDocumentBlock, merge3Text,
 } from '../lib/documents-service.js';
 
 function makeWorld(options = {}) {
@@ -473,4 +473,33 @@ test('B4.1-S6 blockId and oldString together are rejected before any write', asy
   assert.equal(result.ok, false);
   assert.equal(result.error.code, 'bad-request');
   assert.equal(w.calls.append.length, 0);
+});
+
+test('B4.3b-S1 diff3 merges independent line changes and reports overlap', () => {
+  const base = 'a\nb\nc\n';
+  assert.deepEqual(merge3Text(base, 'A\nb\nc\n', 'a\nb\nC\n'), { clean: true, conflicts: [], text: 'A\nb\nC\n' });
+  const conflict = merge3Text(base, 'a\nOURS\nc\n', 'a\nOTHER\nc\n');
+  assert.equal(conflict.clean, false);
+  assert.equal(conflict.conflicts.length > 0, true);
+  assert.equal(conflict.text, null);
+  assert.equal(merge3Text(base, 'a\nb\nc\nextra\n', 'a\nb\nc\n').text, 'a\nb\nc\nextra\n');
+});
+
+test('B4.3b-S2 merge3 service writes only a clean merge and never writes conflicts', async () => {
+  const text = 'A\nb\nc\n';
+  const room = { epoch: 'e-1', version: 2, savedVersion: 2, diskHash: 'd1', text, savedText: text, savedTextAvailable: true, members: 1, textSha256: sha256Text(text) };
+  const w = makeWorld({ room, text });
+  const token = makeLiveRevisionId(room.epoch, room.version, sha256Text(room.text));
+  const clean = await w.service.merge3({ path: w.file, baseText: 'a\nb\nc\n', otherText: 'a\nb\nC\n', baseRevisionId: token }, {}, undefined);
+  assert.equal(clean.ok, true, JSON.stringify(clean));
+  assert.equal(clean.value.clean, true);
+  assert.equal(w.calls.append.length, 1);
+  assert.equal(w.calls.append[0].changes[0].insert, 'A\nb\nC\n');
+
+  const conflictWorld = makeWorld({ room: { ...room, version: 3, savedVersion: 3, text: 'A\nOURS\nc\n', savedText: 'A\nOURS\nc\n', textSha256: sha256Text('A\nOURS\nc\n') }, text: 'A\nOURS\nc\n' });
+  const conflictToken = makeLiveRevisionId('e-1', 3, sha256Text('A\nOURS\nc\n'));
+  const conflict = await conflictWorld.service.merge3({ path: conflictWorld.file, baseText: 'a\nb\nc\n', otherText: 'a\nOTHER\nc\n', baseRevisionId: conflictToken }, {}, undefined);
+  assert.equal(conflict.ok, true, JSON.stringify(conflict));
+  assert.equal(conflict.value.clean, false);
+  assert.equal(conflictWorld.calls.append.length, 0);
 });

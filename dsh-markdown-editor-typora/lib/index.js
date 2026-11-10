@@ -320,7 +320,7 @@ const MODEL_TOOL = Symbol('markdown model tool');
 export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'diag']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'diag']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
 
@@ -1565,7 +1565,7 @@ export function createHost(options = {}) {
       if (authority === MODEL_TOOL) {
         const session = execution?.agent?.session;
         let policy;
-        if ((endpoint === 'edit' || endpoint === 'documents.applyEdits' || endpoint === 'documents.undoGroup') && fs.sandboxMode !== undefined) {
+        if ((endpoint === 'edit' || endpoint === 'documents.applyEdits' || endpoint === 'documents.undoGroup' || endpoint === 'documents.merge3') && fs.sandboxMode !== undefined) {
           policy = await options.sandboxPolicy?.()?.resolve(session ? {session} : {});
           if (!policy?.mode) throw codedError('FS_SANDBOX_DENIED', 'Cannot resolve filesystem policy for this tool call');
         }
@@ -1595,6 +1595,9 @@ export function createHost(options = {}) {
         case 'documents.undoGroup':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           return await documents.undoGroup(payload, invocation, invocation?.policy);
+        case 'documents.merge3':
+          if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
+          return await documents.merge3(payload, invocation, invocation?.policy);
         case 'docs/create': return await apiDocsCreate(payload);
         case 'docs/recent': return await apiDocsRecent(payload);
         case 'docs/archive':
@@ -1969,11 +1972,13 @@ export function createMarkdownToolDefinition(dispatch) {
       '共享会话失效（MP_LIVE_*）或归档失败（MP_ARCHIVE_FAILED）时不要改用其它写工具，重新 read 或让用户重试。',
     ].join(' '),
     parameters: {
-      action: { type: 'string', required: true, description: 'read = 读当前正文；edit = 字面/整块替换；blocks = 列块 ID；batch = 原子应用多处非重叠 edits；undo = 撤销最近一组 AI 编辑。', enum: ['read', 'edit', 'blocks', 'batch', 'undo'] },
+      action: { type: 'string', required: true, description: 'read = 读当前正文；edit = 字面/整块替换；blocks = 列块 ID；batch = 原子多处编辑；merge3 = 三方合并；undo = 撤销最近一组 AI 编辑。', enum: ['read', 'edit', 'blocks', 'batch', 'merge3', 'undo'] },
       path: { type: 'string', required: true, description: '文件的绝对路径。' },
       cwd: { type: 'string', description: '可选：相对路径的解析基准目录。' },
       blockId: { type: 'string', description: 'action=edit 可选：从 blocks 结果拿到的 section ID；与 oldString 二选一。' },
       groupId: { type: 'string', description: 'action=undo 必填：edit 返回的 groupId。' },
+      baseText: { type: 'string', description: 'action=merge3 必填：共同祖先正文。' },
+      otherText: { type: 'string', description: 'action=merge3 必填：另一侧正文。' },
       edits: {
         type: 'array',
         description: 'action=batch 必填：按 from 升序、互不重叠的 {from,to,insert}。',
@@ -2005,6 +2010,21 @@ export function createMarkdownToolDefinition(dispatch) {
           undoOf: { type: 'string' },
           totalBlocks: { type: 'number' },
           truncated: { type: 'boolean' },
+          clean: { type: 'boolean' },
+          merged: { type: 'boolean' },
+          conflicts: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                baseFrom: { type: 'number' },
+                baseTo: { type: 'number' },
+                base: { type: 'string' },
+                ours: { type: 'string' },
+                other: { type: 'string' },
+              },
+            },
+          },
           blocks: {
             type: 'array',
             items: {
@@ -2078,6 +2098,13 @@ export function createMarkdownToolDefinition(dispatch) {
           const lines = blocks.map((b) => `- ${b.id}  ${b.kind === 'heading' ? '#'.repeat(b.level) + ' ' : ''}${b.title}  (${b.textLength} 字符) ${b.preview ? '— ' + String(b.preview).slice(0, 80) : ''}`);
           return textBlock(`块列表：${value.displayPath ?? ''}（${blocks.length}/${total} 个）\nreadToken: ${String(value.readToken ?? value.version ?? '')}\n${lines.join('\n')}${value.truncated ? '\n…（仅显示前 200 个）' : ''}`);
         }
+        if (value.action === 'merge3') {
+          if (value.clean === false) {
+            const conflicts = Array.isArray(value.conflicts) ? value.conflicts : [];
+            return textBlock(`未写入：三方合并发现 ${conflicts.length} 处冲突，需用户/调用方决定。\n` + conflicts.map((c) => `- base ${c.baseFrom}..${c.baseTo}: ours=${JSON.stringify(String(c.ours).slice(0, 80))} other=${JSON.stringify(String(c.other).slice(0, 80))}`).join('\n'));
+          }
+          return textBlock(`三方合并完成：${value.displayPath ?? ''}${value.changed === false ? '（无变化）' : ''}；${value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘'}；新版本：${String(value.version ?? '')}${value.groupId ? '；groupId：' + value.groupId : ''}`);
+        }
         if (value.action === 'batch') {
           const count = Array.isArray(value.applied) ? value.applied.length : 0;
           return textBlock(`已批量应用 ${count} 处编辑：${value.displayPath ?? ''}${value.changed === false ? '（内容未变）' : ''}；${value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘'}；新版本：${String(value.version ?? '')}${value.groupId ? '；groupId：' + value.groupId : ''}`);
@@ -2094,7 +2121,8 @@ export function createMarkdownToolDefinition(dispatch) {
     },
     async execute(args, execution) {
       const action = args?.action === 'edit' ? 'edit' : args?.action === 'blocks' ? 'blocks'
-        : args?.action === 'batch' ? 'batch' : args?.action === 'undo' ? 'undo' : 'read';
+        : args?.action === 'batch' ? 'batch' : args?.action === 'merge3' ? 'merge3'
+          : args?.action === 'undo' ? 'undo' : 'read';
       try {
         if (action === 'read' || action === 'blocks') {
           const result = await dispatch('documents.read', { path: args?.path, cwd: args?.cwd }, MODEL_TOOL, execution);
@@ -2122,6 +2150,22 @@ export function createMarkdownToolDefinition(dispatch) {
             ...(typeof value.diskChanged === 'boolean' ? { diskChanged: value.diskChanged } : {}),
             ...(value.bufferOwnedElsewhere === true ? { bufferOwnedElsewhere: true } : {}),
             ...(value.unsavedElsewhere === true ? { unsavedElsewhere: true } : {}),
+          };
+        }
+        if (action === 'merge3') {
+          const result = await dispatch('documents.merge3', {
+            path: args?.path, cwd: args?.cwd, baseText: args?.baseText, otherText: args?.otherText,
+            baseRevisionId: args?.baseRevisionId ?? args?.baseVersion,
+          }, MODEL_TOOL, execution);
+          if (result.ok !== true) return { ok: false, action, error: result.error };
+          const value = result.value;
+          return {
+            ok: true, action, clean: value.clean !== false, merged: value.merged === true,
+            version: value.version, revisionId: value.revisionId, readToken: value.version,
+            displayPath: value.displayPath, changed: value.changed === true, source: value.source,
+            dirty: value.dirty === true, saved: value.saved === true,
+            ...(Array.isArray(value.conflicts) ? { conflicts: value.conflicts } : {}),
+            ...(value.groupId ? { groupId: value.groupId } : {}),
           };
         }
         if (action === 'batch') {
