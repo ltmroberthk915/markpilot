@@ -1951,11 +1951,11 @@ export function createMarkdownToolDefinition(dispatch) {
           const head = text.length > 8000 ? `${text.slice(0, 8000)}\n…（共 ${text.length} 字符，已截断）` : text;
           const where = value.source === 'buffer' ? '编辑器缓冲区' : '磁盘';
           const dirty = value.dirty === true ? '，含未保存修改' : '';
-          return textBlock(`${value.displayPath ?? ''}（${where}${dirty}；版本 ${String(value.version ?? '').slice(0, 16)}…）:\n${head}`);
+          return textBlock(`${value.displayPath ?? ''}（${where}${dirty}）\nversion: ${String(value.version ?? '')}\n\n${head}`);
         }
         const target = value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘；请让用户确认后自行保存';
         const copy = value.checkpointPath ? `；改前副本：${value.checkpointPath}` : '';
-        return textBlock(`已应用编辑：${value.displayPath ?? ''}${value.changed === false ? '（内容未变）' : ''}；${target}${copy}；新版本 ${String(value.version ?? '').slice(0, 16)}…`);
+        return textBlock(`已应用编辑：${value.displayPath ?? ''}${value.changed === false ? '（内容未变）' : ''}；${target}${copy}；新版本：${String(value.version ?? '')}`);
       },
     },
     async execute(args, execution) {

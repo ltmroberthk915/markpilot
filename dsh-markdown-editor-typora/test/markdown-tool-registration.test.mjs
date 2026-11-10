@@ -23,6 +23,11 @@ test('registry fallback converts author required:true into JSON-Schema required 
   assert.deepEqual(def.output.schema.properties.error.required, ['code', 'message']);
   assert.equal(typeof def.output.render, 'function');
   assert.equal(typeof def.execute, 'function');
+  const rendered = def.output.render({ action: 'read' }, {
+    ok: true, action: 'read', displayPath: 'D:/a.md', source: 'buffer', dirty: true,
+    version: 'rev1:live:e-1:7:' + 'a'.repeat(64), text: 'hi',
+  });
+  assert.match(rendered[0].text, /rev1:live:e-1:7:/);
 });
 
 test('registerMarkdownTool falls back to tools.register when defineTool is unavailable in this tree', async () => {

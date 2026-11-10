@@ -787,7 +787,7 @@ test('markdown 工具定义：0.2.1 defineTool 形态（output.schema/render）+
 
   const blocks = spec.output.render({ action: 'read' }, read);
   assert.equal(blocks[0].type, 'text');
-  assert.match(blocks[0].text, /版本/);
+  assert.match(blocks[0].text, /version: rev1:disk:v1:/);
   const errorBlocks = spec.output.render({ action: 'edit' }, failed);
   assert.match(errorBlocks[0].text, /FS_STALE_VERSION/);
 
