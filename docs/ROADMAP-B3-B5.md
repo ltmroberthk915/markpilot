@@ -11,7 +11,7 @@
 | 1 | B3.3a | 恢复副本的一键恢复/丢弃 UI + `documents.recover`（已完成） | 否（client 小改） | B3.2 |
 | 2 | B3.3b | `liveUnsupported` 文件的宿主草稿索引 | 可能小改 client | B3.3a |
 | 3 | B4.1 | 文档块解析、块 ID、`readToken`/`groupId` 审计（已完成） | 否（host-only） | B3.2 |
-| 4 | B4.2 | AI 编辑审查/撤销组、审阅前不自动落盘 | **是**（renderer/core） | B4.1 |
+| 4 | B4.2 | AI 编辑审查/撤销组、审阅前不自动落盘（4.2a host 撤销已完成；4.2b renderer 待批准） | **是**（renderer/core） | B4.1 |
 | 5 | B4.3 | diff3/冲突合并、批量编辑协议 | 是 | B4.2 |
 | 6 | B5 | 内核权威 buffer/CRDT、通用 fs patch/move 守卫 | 是（内核） | B4 稳定后 |
 
@@ -77,7 +77,7 @@
 
 块 ID 在正文变化后失效；重复标题用前缀/序号区分；编辑整块不误删后续 section；跨 CRLF/BOM 一致；工具 render 显示块标题和新 token。
 
-## 5. B4.2 · 审查/撤销组（renderer）
+## 5. B4.2 · 审查/撤销组（4.2a host 已完成；4.2b renderer 待批准）
 
 ### 目标
 
