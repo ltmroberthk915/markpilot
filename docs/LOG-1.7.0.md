@@ -110,6 +110,15 @@ npm pack --dry-run                  → lib/documents-service.js 20.6 KB 在载�
 git diff --numstat README.md        → 11 0（只增不删）
 ```
 
+### 4.4 实装与热载验证
+
+- 主树 `main` 已 fast-forward 到 `08c339c`；profile 的 `node_modules/dsh-markdown-editor-typora` 是指向主树插件目录的 junction，安装版 `package.json` 读取为 **1.7.0**。
+- `plugin_manager` 对 `include:dsh-markdown-editor-typora` 执行 disable → enable，两次均返回 `application:"applied"`，强制宿主重载插件（无需重启整个 DSH）。
+- 通过宿主 Node inspector（`127.0.0.1:9230`，pid 27096）只读检查 host graph：
+  - `generation: 2`、`digest: 4b4c484d8f11`、`hosts: 1`、`retired: active`；
+  - `hasAppend: true`、`hasReadRoom: true` —— 运行中的 `LiveDocuments` 已包含 1.7.0 新增方法，不是旧代。
+- 本编码会话的 Agent preset 不含 `markdown` 工具，无法从本会话直接发起 AI 工具调用；AI 读/改未保存正文需在 MarkPilot 侧（带该工具的会话）做一次真机操作。建议验收：打开 md → 改一段不保存 → 让 AI `markdown read` 应返回 `source:"buffer"`、`dirty:true`、`rev1:live:...`；再让 AI 改另一段，应返回 `saved:false`、编辑区立即出现、磁盘此刻不变，并给出 `agent-before` 归档路径。
+
 ## 5. 对抗审阅
 
 两轮设计对抗 + 两轮实现对抗（报告在 `.mp-verify/b3-inventory/ADVERSARIAL-*.md`）：
