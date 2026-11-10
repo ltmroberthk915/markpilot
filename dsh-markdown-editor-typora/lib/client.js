@@ -5462,6 +5462,14 @@ const __test = {
         /* ── live 会话（引擎 facade mpEngine.liveDocument 承担 OT；父窗口只做中继）── */
         function startLive(ticket, text) {
           if (!alive() || doc.live || doc.liveUnsupported) return;
+          // A new join may carry a fresh recovery batch left by a previous
+          // room. The old "shown once per tab" flag must not suppress it after
+          // reopen/reload.
+          doc.liveRecoveredShownFor = null;
+          if (doc.liveRecoveredItems) {
+            doc.liveRecoveredItems = null;
+            setUiIfChangedWithRecovered(null);
+          }
           // 房间票：client/epoch(UUID 字符串)/version(整数)；text 允许空串（空文件）。
           if (!ticket || typeof ticket.client !== "string" || !ticket.client
             || typeof ticket.epoch !== "string" || !ticket.epoch
