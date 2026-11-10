@@ -2010,6 +2010,48 @@ export function createMarkdownToolDefinition(dispatch) {
 }
 
 /**
+ * The plugin is installed as an external package (junction/npm), so the bundled
+ * `@deepseek-ai/dsh-tools` is not on its ESM resolution path. Convert the
+ * author-facing DSL used by `createMarkdownToolDefinition` into the plain JSON
+ * Schema a `tools.register()` definition accepts, and use it as a fallback when
+ * `defineTool` cannot be imported.
+ */
+export function authorSchemaToRegistrySchema(node) {
+  if (Array.isArray(node)) return node.map(authorSchemaToRegistrySchema);
+  if (!node || typeof node !== 'object') return node;
+  const out = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (key === 'required' && typeof value === 'boolean') continue; // collected by the parent property map
+    if (key === 'properties' && value && typeof value === 'object') {
+      const properties = {}, required = [];
+      for (const [name, property] of Object.entries(value)) {
+        properties[name] = authorSchemaToRegistrySchema(property);
+        if (property?.required === true) required.push(name);
+      }
+      out.properties = properties;
+      if (required.length) out.required = required;
+      continue;
+    }
+    out[key] = authorSchemaToRegistrySchema(value);
+  }
+  return out;
+}
+
+export function createRegistryMarkdownToolDefinition(spec) {
+  const parameters = authorSchemaToRegistrySchema({
+    type: 'object', properties: spec.parameters, additionalProperties: false,
+  });
+  const outputSchema = authorSchemaToRegistrySchema(spec.output.schema);
+  return {
+    name: spec.name,
+    description: spec.description,
+    parameters,
+    output: { schema: outputSchema, render: spec.output.render },
+    async execute(args, execution) { return spec.execute(args, execution); },
+  };
+}
+
+/**
  * markpilot 模型工具（read/edit）：与编辑面 tab 同一守卫。加载失败只告警，不影响插件其它能力。
  */
 export function registerMarkdownTool(ctx, { dispatch, log } = {}) {
@@ -2038,7 +2080,14 @@ export function registerMarkdownTool(ctx, { dispatch, log } = {}) {
               dispose = tools.register(tool);
             })
             .catch((error) => {
-              if (!stopped) onWarn(error);
+              if (stopped) return;
+              try {
+                const fallback = createRegistryMarkdownToolDefinition(createMarkdownToolDefinition(dispatch));
+                dispose = tools.register(fallback);
+                try { log?.info?.('dsh-markdown-editor-typora: markdown tool registered via schema fallback (%s)', String(error?.message ?? error)); } catch { /* 日志失败不影响 */ }
+              } catch (fallbackError) {
+                onWarn(new Error(String(fallbackError?.message ?? fallbackError) + ' / defineTool: ' + String(error?.message ?? error)));
+              }
             });
           return () => {
             stopped = true;
