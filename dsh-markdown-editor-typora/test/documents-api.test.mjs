@@ -265,6 +265,36 @@ test('B3-API7 a room owned only by another process is disk authority; dirty else
   } finally { dirtyWorld.restore(); }
 });
 
+test('B3-API8 UI recovery restores an append copy through disk CAS and discard removes it', async () => {
+  const w = await makeWorld('recover', 'hello\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const joined = await liveDocs.join(w.file, 'hello\n');
+    const appended = await liveDocs.append(w.file, {
+      epoch: joined.epoch, baseVersion: 0, baseText: 'hello\n', actor: 'agent',
+      changes: [{ from: 5, to: 5, insert: ' world' }],
+    });
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(path.join(w.live, 'rooms.sqlite'));
+    try { db.exec('DELETE FROM clients; DELETE FROM rooms;'); } finally { db.close(); }
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const read = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(read.value.source, 'disk');
+    const restored = await host.dispatch('documents.recover', {
+      path: w.file, recoveryPath: appended.recoveryPath, baseVersion: read.value.version,
+    });
+    assert.equal(restored.ok, true, JSON.stringify(restored));
+    assert.equal(restored.value.recovered, true);
+    assert.equal(restored.value.saved, true);
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'hello world\n');
+    const discarded = await host.dispatch('documents.discardRecovery', { path: w.file, recoveryPath: appended.recoveryPath });
+    assert.equal(discarded.ok, true);
+    assert.equal(discarded.value.removed, true);
+    assert.equal((await liveDocs.listAppendRecovery(w.file)).length, 0);
+    host.close();
+  } finally { w.restore(); }
+});
+
 test('B3-API5 a sandboxed session cannot apply a buffer edit outside its workspace', async () => {
   const w = await makeWorld('policy', 'hello\n');
   try {

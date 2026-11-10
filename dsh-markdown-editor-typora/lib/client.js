@@ -6611,6 +6611,15 @@ const __test = {
           })();
         }
 
+        function removeLiveRecovered(index, message) {
+          const items = Array.isArray(doc.liveRecoveredItems) ? doc.liveRecoveredItems.slice() : [];
+          if (index < 0 || index >= items.length) return;
+          items.splice(index, 1);
+          doc.liveRecoveredItems = items.length ? items : null;
+          setUi((prev) => ({ ...prev, recovered: items.length ? items : null, ...(items.length ? {} : { railOpen: false }) }));
+          if (message) showNotice(message);
+        }
+
         // 横幅按钮回调（渲染侧通过 st.actions 取当前代）。
         st.actions = {
           reloadDisk: forceReload,
@@ -6629,6 +6638,45 @@ const __test = {
               () => showNotice("已复制草稿副本路径：" + item.recoveryPath),
               (error) => showNotice("复制失败：" + String(error && error.message || error)),
             );
+          },
+          restoreLiveRecovered: (index) => {
+            const items = doc.liveRecoveredItems || [];
+            const item = items[index];
+            if (!item || !doc.absPath) return;
+            if (doc.pendingApply || doc.applyUnknown || doc.saving || doc.phase === 'loading') {
+              showNotice('编辑器同步或保存进行中，暂时不能恢复；请稍后再试');
+              return;
+            }
+            const baseVersion = typeof doc.lastVersion === 'string' ? doc.lastVersion : '';
+            void api('documents.recover', {
+              path: doc.absPath,
+              recoveryPath: item.recoveryPath,
+              baseVersion,
+            }).then((result) => {
+              if (!result || result.ok !== true) {
+                showNotice('恢复失败：' + String(result?.error?.message || result?.error?.code || 'unknown'));
+                return;
+              }
+              removeLiveRecovered(index, result.value?.saved === false ? '已恢复到编辑器缓冲区，请审阅后保存' : '已恢复到文件');
+              if (result.value?.saved === true) {
+                if (doc.live) stopLive(true);
+                showPhase('loading', '');
+                void loadFromDisk({ silent: false });
+              }
+            }).catch((error) => showNotice('恢复失败：' + String(error && error.message ? error.message : error)));
+          },
+          discardLiveRecovered: (index) => {
+            const items = doc.liveRecoveredItems || [];
+            const item = items[index];
+            if (!item || !doc.absPath) return;
+            if (typeof window.confirm === 'function' && !window.confirm('丢弃这份恢复副本？文件不会再被恢复。')) return;
+            void api('documents.discardRecovery', { path: doc.absPath, recoveryPath: item.recoveryPath }).then((result) => {
+              if (!result || result.ok !== true) {
+                showNotice('丢弃失败：' + String(result?.error?.message || result?.error?.code || 'unknown'));
+                return;
+              }
+              removeLiveRecovered(index, '已丢弃恢复副本');
+            }).catch((error) => showNotice('丢弃失败：' + String(error && error.message ? error.message : error)));
           },
           dismissRecovered: () => {
             doc.liveRecoveredItems = null;
@@ -6918,6 +6966,14 @@ const __test = {
           ...recoveredItems.map((item, index) => h("div", { key: item.recoveryPath + ":" + index, style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", padding: "4px 0", borderTop: "1px solid color-mix(in srgb, currentColor 10%, transparent)" } },
             h("code", { style: { userSelect: "all", wordBreak: "break-all", fontSize: 11, flex: "1 1 0", minWidth: 0 } }, item.recoveryPath),
             item.at ? h("span", { className: "mp-rail-date", style: { opacity: 0.65, fontSize: 11, whiteSpace: "nowrap", flex: "0 0 auto" } }, new Date(item.at).toLocaleString()) : null,
+            h("button", {
+              type: "button", className: "mp-rail-btn", "data-icon": "↺", title: "恢复此副本到编辑器",
+              onClick: () => { try { st.actions.restoreLiveRecovered && st.actions.restoreLiveRecovered(index); } catch (e) { /* 忽略 */ } },
+            }, "恢复"),
+            h("button", {
+              type: "button", className: "mp-rail-btn", "data-icon": "🗑", title: "丢弃此恢复副本",
+              onClick: () => { try { st.actions.discardLiveRecovered && st.actions.discardLiveRecovered(index); } catch (e) { /* 忽略 */ } },
+            }, "丢弃"),
             h("button", {
               type: "button", className: "mp-rail-btn", "data-icon": "⧉", title: "复制路径",
               onClick: () => { try { st.actions.copyRecoveredPath && st.actions.copyRecoveredPath(index); } catch (e) { /* 忽略 */ } },

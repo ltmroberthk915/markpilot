@@ -731,6 +731,56 @@ class LiveDocuments {
     } catch { return []; }
     finally { try { db.close(); } catch { /* already closed */ } }
   }
+  // User-initiated recovery: read one committed post-append copy and verify its
+  // bytes/path against the append_recovery row. Never trusts a client path.
+  async readAppendRecovery(filePath, recoveryPath) {
+    if (typeof recoveryPath !== 'string' || !recoveryPath) throw fault('MP_RECOVERY_NOT_FOUND', '恢复副本路径无效');
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    const dir = appendRecoveryDirectory(this.directory);
+    const resolved = path.resolve(recoveryPath);
+    if (resolved !== path.resolve(dir, path.basename(resolved)) || !resolved.startsWith(path.resolve(dir) + path.sep))
+      throw fault('MP_RECOVERY_INVALID', '恢复副本不在受控目录');
+    const filename = path.join(path.resolve(this.directory), 'rooms.sqlite');
+    if (!fs.existsSync(filename)) throw fault('MP_RECOVERY_NOT_FOUND', '没有可用的恢复索引');
+    const {DatabaseSync} = require('node:sqlite');
+    let db;
+    try { db = new DatabaseSync(filename, {readOnly:true}); } catch { throw fault('MP_RECOVERY_NOT_FOUND', '恢复索引不可读'); }
+    try {
+      try { db.exec('PRAGMA busy_timeout=2000'); } catch { /* best effort */ }
+      if (db.prepare("SELECT value FROM meta WHERE key='host'").get()?.value !== hostStamp())
+        throw fault('MP_RECOVERY_INVALID', '恢复索引不属于本宿主');
+      const row = db.prepare('SELECT recoveryPath,sha256,bytes,epoch,version,at FROM append_recovery WHERE source=? AND recoveryPath=?').get(key, resolved);
+      if (!row) throw fault('MP_RECOVERY_NOT_FOUND', '恢复副本已不存在');
+      const bytes = fs.readFileSync(resolved);
+      if (bytes.length !== row.bytes || digest(bytes) !== row.sha256)
+        throw fault('MP_RECOVERY_CORRUPT', '恢复副本内容校验失败');
+      return {recoveryPath: resolved, text: bytes.toString('utf8'), sha256: row.sha256, bytes: bytes.length,
+        epoch: String(row.epoch || ''), version: Number(row.version) || 0, at: Number(row.at) || 0};
+    } finally { try { db.close(); } catch { /* already closed */ } }
+  }
+  async discardAppendRecovery(filePath, recoveryPath) {
+    if (typeof recoveryPath !== 'string' || !recoveryPath) throw fault('MP_RECOVERY_NOT_FOUND', '恢复副本路径无效');
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    const dir = appendRecoveryDirectory(this.directory);
+    const resolved = path.resolve(recoveryPath);
+    if (resolved !== path.resolve(dir, path.basename(resolved)) || !resolved.startsWith(path.resolve(dir) + path.sep))
+      throw fault('MP_RECOVERY_INVALID', '恢复副本不在受控目录');
+    const filename = path.join(path.resolve(this.directory), 'rooms.sqlite');
+    if (!fs.existsSync(filename)) throw fault('MP_RECOVERY_NOT_FOUND', '没有可用的恢复索引');
+    const {DatabaseSync} = require('node:sqlite');
+    const db = new DatabaseSync(filename);
+    try {
+      try { db.exec('PRAGMA busy_timeout=2000'); } catch { /* best effort */ }
+      if (db.prepare("SELECT value FROM meta WHERE key='host'").get()?.value !== hostStamp())
+        throw fault('MP_RECOVERY_INVALID', '恢复索引不属于本宿主');
+      const row = db.prepare('SELECT recoveryPath FROM append_recovery WHERE source=? AND recoveryPath=?').get(key, resolved);
+      if (!row) throw fault('MP_RECOVERY_NOT_FOUND', '恢复副本已不存在');
+      db.prepare('DELETE FROM append_recovery WHERE source=? AND recoveryPath=?').run(key, resolved);
+    } finally { db.close(); }
+    try { fs.rmSync(resolved, {force: true}); } catch { /* locked: row is already gone, file is inert */ }
+    try { fs.rmSync(resolved + '.json', {force: true}); } catch { /* best effort */ }
+    return {removed: true, recoveryPath: resolved};
+  }
   // B3: append one authoritative remote edit to the shared buffer. Never
   // touches disk or `saved`; the change is delivered to every member through
   // the normal exchange() update stream. The transaction re-checks epoch,

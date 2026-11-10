@@ -535,5 +535,85 @@ export function createDocumentsService(deps) {
     return { ok: false, error: value };
   }
 
-  return { read, applyEdits, state };
+  async function discardRecovery(payload) {
+    if (typeof live.discardAppendRecovery !== 'function')
+      return fail(coded('MP_RECOVERY_NOT_FOUND', 'recovery discard is unavailable'), null);
+    try {
+      const result = await live.discardAppendRecovery(payload?.path, payload?.recoveryPath);
+      return { ok: true, value: { removed: result?.removed === true, recoveryPath: result?.recoveryPath || payload?.recoveryPath } };
+    } catch (error) { return fail(error, null); }
+  }
+
+  async function recover(payload, invocation, policy) {
+    let a;
+    try { a = await authority(payload, invocation); }
+    catch (error) { return fail(error, null); }
+    if (a.error) return a.error;
+    if (a.conflict) return fail(coded('MP_DOC_EXTERNAL_CONFLICT', 'the buffer and disk both changed; resolve the conflict before restoring a copy', { source: a.source }), a);
+    if (a.orphanDraft) return fail(coded('MP_DOC_ORPHAN_DRAFT', 'open the document and resolve its draft before restoring a recovery copy', { source: a.source }), a);
+    if (a.unsavedElsewhere || a.bufferOwnedElsewhere)
+      return fail(coded('MP_DOC_UNSAVED_ELSEWHERE', 'another window owns unsaved edits; resolve them there first', { source: a.source }), a);
+    if (a.source === 'buffer' && a.dirty)
+      return fail(coded('MP_DOC_DIRTY', 'the editor has unsaved changes; save or discard them before restoring a copy', { source: a.source, dirty: true }), a);
+    if (typeof live.readAppendRecovery !== 'function' || typeof archive !== 'function')
+      return fail(coded('MP_RECOVERY_NOT_FOUND', 'recovery restore is unavailable'), a);
+    const rawBase = typeof payload?.baseRevisionId === 'string' ? payload.baseRevisionId
+      : (typeof payload?.baseVersion === 'string' ? payload.baseVersion : '');
+    // The editor tab still tracks the provider/disk version in `lastVersion`
+    // for clean documents. Accept it only when the room is clean; a dirty room
+    // still requires the exact rev1:live token (or it is refused above).
+    const legacyCleanBase = a.dirty === false && rawBase === a.providerVersion;
+    if (rawBase !== a.revisionId && !legacyCleanBase) return fail(stale(a), a);
+    let copy;
+    try { copy = await live.readAppendRecovery(a.canonical || payload?.path, payload?.recoveryPath); }
+    catch (error) { return fail(error, a); }
+    if (!copy) return fail(coded('MP_RECOVERY_NOT_FOUND', 'recovery copy no longer exists'), a);
+    if (copy.text === a.text)
+      return { ok: true, value: { changed: false, source: a.source, revisionId: a.revisionId, version: a.revisionId, saved: a.source === 'disk', dirty: a.dirty === true, recoveryPath: copy.recoveryPath } };
+    try { await checkWritePolicy(a, policy); }
+    catch (error) { return fail(error, a); }
+    let checkpointValue = null;
+    try {
+      const archived = await archive({ path: a.canonical || a.opened.value.displayPath, text: a.text, tag: 'pre-recovery', baseVersion: a.providerVersion });
+      if (!archived || archived.ok !== true) throw coded('MP_ARCHIVE_FAILED', 'pre-recovery archive failed');
+      checkpointValue = archived.value || null;
+    } catch (error) { return fail(coded('MP_ARCHIVE_FAILED', 'pre-recovery archive failed: ' + String(error?.message || error)), a); }
+
+    if (a.source === 'buffer') {
+      try {
+        const result = await (enqueue || ((_key, action) => action()))(a.canonical, () => live.append(a.canonical, {
+          epoch: a.room.epoch, baseVersion: a.room.version, baseText: a.text, actor: 'agent',
+          changes: [{ from: 0, to: a.text.length, insert: copy.text }],
+        }));
+        const revisionId = makeLiveRevisionId(result.epoch, result.version, result.textSha256);
+        return {
+          ok: true,
+          value: {
+            changed: true, recovered: true, source: 'buffer', revisionId, version: revisionId,
+            displayPath: a.opened.value.displayPath, dirty: true, saved: false,
+            textSha256: result.textSha256, textLength: copy.text.length,
+            checkpoint: checkpointValue, recoveryPath: copy.recoveryPath, applied: [{ from: 0, to: a.text.length, insertedLength: copy.text.length }],
+          },
+        };
+      } catch (error) { return fail(error, a); }
+    }
+    try {
+      const result = await save({ path: payload.path, cwd: payload.cwd ?? invocation?.cwd, text: copy.text, baseVersion: a.providerVersion });
+      if (!result || result.ok !== true) return result || fail(coded('FS_IO_ERROR', 'recovery save failed'), a);
+      const version = String(result.value.version);
+      const actual = await rereadDiskText(payload, invocation, version, copy.text);
+      const revisionId = makeDiskRevisionId(version, sha256Text(actual));
+      return {
+        ok: true,
+        value: {
+          changed: true, recovered: true, source: 'disk', revisionId, version,
+          displayPath: a.opened.value.displayPath, dirty: false, saved: true,
+          textSha256: sha256Text(actual), textLength: actual.length,
+          checkpoint: checkpointValue, recoveryPath: copy.recoveryPath,
+        },
+      };
+    } catch (error) { return fail(error, a); }
+  }
+
+  return { read, applyEdits, state, recover, discardRecovery };
 }

@@ -18,6 +18,16 @@ function makeWorld(options = {}) {
   const live = {
     async readRoom(p) { assert.equal(p, file); return room; },
     async listAppendRecovery(p) { assert.equal(p, file); return options.recovery ?? []; },
+    async readAppendRecovery(p, recoveryPath) {
+      assert.equal(p, file);
+      calls.recoverRead = (calls.recoverRead || 0) + 1;
+      return options.recoveryCopy ? { ...options.recoveryCopy, recoveryPath } : null;
+    },
+    async discardAppendRecovery(p, recoveryPath) {
+      assert.equal(p, file);
+      calls.discard = (calls.discard || 0) + 1;
+      return { removed: true, recoveryPath };
+    },
     async append(p, req) {
       assert.equal(p, file);
       calls.append.push(req);
@@ -334,4 +344,46 @@ test('B3-S12 buffer apply returns the independent recovery path', async () => {
   assert.equal(apply.ok, true);
   assert.equal(apply.value.recoveryPath, 'C:/live/recovery/agent-append/a.md');
   assert.equal(apply.value.saved, false);
+});
+
+test('B3.3-S1 recover replaces a clean buffer from a validated recovery copy and archives first', async () => {
+  const text = 'hello\n';
+  const room = { epoch: 'e-1', version: 2, savedVersion: 2, diskHash: 'd1', text, savedText: text, savedTextAvailable: true, members: 1, textSha256: sha256Text(text) };
+  const recoveryCopy = { text: 'restored\n', sha256: sha256Text('restored\n'), bytes: 9, version: 3, epoch: 'e-1', at: 1 };
+  const w = makeWorld({ room, recoveryCopy });
+  const token = makeLiveRevisionId(room.epoch, room.version, sha256Text(room.text));
+  const result = await w.service.recover({ path: w.file, baseVersion: token, recoveryPath: 'C:/recovery/copy.md' }, {}, undefined);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.value.source, 'buffer');
+  assert.equal(result.value.saved, false);
+  assert.equal(result.value.recovered, true);
+  assert.equal(w.calls.archive.length, 1);
+  assert.equal(w.calls.archive[0].tag, 'pre-recovery');
+  assert.equal(w.calls.append.length, 1);
+  assert.deepEqual(w.calls.append[0].changes, [{ from: 0, to: 6, insert: 'restored\n' }]);
+});
+
+test('B3.3-S2 recover refuses dirty buffers, stale tokens, and invalid recovery paths', async () => {
+  const room = { epoch: 'e-1', version: 3, savedVersion: 2, diskHash: 'd1', text: 'buffer\n', savedText: 'hello\n', savedTextAvailable: true, members: 1, textSha256: sha256Text('buffer\n') };
+  const recoveryCopy = { text: 'restored\n', sha256: sha256Text('restored\n'), bytes: 9, version: 4, epoch: 'e-1', at: 1 };
+  const dirty = makeWorld({ room, recoveryCopy });
+  const dirtyResult = await dirty.service.recover({ path: dirty.file, baseVersion: makeLiveRevisionId(room.epoch, room.version, sha256Text(room.text)), recoveryPath: 'C:/recovery/copy.md' }, {}, undefined);
+  assert.equal(dirtyResult.ok, false);
+  assert.equal(dirtyResult.error.code, 'MP_DOC_DIRTY');
+  assert.equal(dirty.calls.append.length, 0);
+
+  const cleanRoom = { epoch: 'e-1', version: 2, savedVersion: 2, diskHash: 'd1', text: 'hello\n', savedText: 'hello\n', savedTextAvailable: true, members: 1, textSha256: sha256Text('hello\n') };
+  const stale = makeWorld({ room: cleanRoom, recoveryCopy });
+  const staleResult = await stale.service.recover({ path: stale.file, baseVersion: 'rev1:live:e-1:1:' + '0'.repeat(64), recoveryPath: 'C:/recovery/copy.md' }, {}, undefined);
+  assert.equal(staleResult.ok, false);
+  assert.equal(staleResult.error.code, 'MP_DOC_STALE');
+  assert.equal(stale.calls.archive.length, 0);
+});
+
+test('B3.3-S3 discard removes exactly the requested recovery row through the live store', async () => {
+  const w = makeWorld();
+  const result = await w.service.discardRecovery({ path: w.file, recoveryPath: 'C:/recovery/copy.md' }, {});
+  assert.equal(result.ok, true);
+  assert.equal(result.value.removed, true);
+  assert.equal(w.calls.discard, 1);
 });

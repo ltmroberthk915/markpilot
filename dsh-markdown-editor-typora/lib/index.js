@@ -320,7 +320,7 @@ const MODEL_TOOL = Symbol('markdown model tool');
 export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'diag']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'diag']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
 
@@ -1588,6 +1588,10 @@ export function createHost(options = {}) {
         case 'documents.reconcile':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           return await documents.state(payload, invocation);
+        case 'documents.recover':
+          return await documents.recover(payload, invocation, invocation?.policy);
+        case 'documents.discardRecovery':
+          return await documents.discardRecovery(payload, invocation);
         case 'docs/create': return await apiDocsCreate(payload);
         case 'docs/recent': return await apiDocsRecent(payload);
         case 'docs/archive':

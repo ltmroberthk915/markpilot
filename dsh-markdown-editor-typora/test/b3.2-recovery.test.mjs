@@ -198,8 +198,7 @@ test('B3.2-R7 BOM/CRLF disk content matches the recovery copy by normalized text
   assert.equal((ticket.recovered || []).some((item) => item.recoveryPath === appended.recoveryPath), false);
 });
 
-test('B3.2-R8 parked drafts keep their UI slots ahead of newer append copies', async () => {
-  const w = await world();
+test('B3.2-R8 parked drafts keep their UI slots ahead of newer append copies', async () => {  const w = await world();
   const live = new LiveDocuments({ directory: w.dir });
   const joined = await live.join(w.file, 'hello\n');
   const parkedText = 'parked draft\n';
@@ -220,4 +219,27 @@ test('B3.2-R8 parked drafts keep their UI slots ahead of newer append copies', a
   // this arm still verifies the parked row is not dropped by the merge.
   const ticket = await live.join(w.file, 'hello\n');
   assert.ok((ticket.recovered || []).some((item) => item.recoveryPath === parkedPath));
+});
+
+test('B3.3-R1 UI recovery rejects paths outside the controlled directory', async () => {
+  const w = await world();
+  const live = new LiveDocuments({ directory: w.dir });
+  const joined = await live.join(w.file, 'hello\n');
+  const appended = await live.append(w.file, {
+    epoch: joined.epoch, baseVersion: 0, baseText: 'hello\n', actor: 'agent',
+    changes: [{ from: 5, to: 5, insert: ' world' }],
+  });
+  await assert.rejects(
+    () => live.readAppendRecovery(w.file, 'C:\\Windows\\System32\\not-a-recovery.md'),
+    (error) => error.code === 'MP_RECOVERY_INVALID',
+  );
+  await assert.rejects(
+    () => live.discardAppendRecovery(w.file, 'C:\\Windows\\System32\\not-a-recovery.md'),
+    (error) => error.code === 'MP_RECOVERY_INVALID',
+  );
+  const copy = await live.readAppendRecovery(w.file, appended.recoveryPath);
+  assert.equal(copy.text, 'hello world\n');
+  const discarded = await live.discardAppendRecovery(w.file, appended.recoveryPath);
+  assert.equal(discarded.removed, true);
+  await assert.rejects(() => live.readAppendRecovery(w.file, appended.recoveryPath), (error) => error.code === 'MP_RECOVERY_NOT_FOUND');
 });
