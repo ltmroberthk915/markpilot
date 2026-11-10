@@ -5701,6 +5701,8 @@ const __test = {
           showPhase('dirty',doc.composing?'输入中…':'编辑中…');
           if (remoteGroupId && remoteGroupId !== doc.ignoreRemoteGroupId) {
             doc.review = { groupId: remoteGroupId, count: Array.isArray(delta.changes) ? delta.changes.length : 1 };
+            doc.reviewDiff = null;
+            setUi((prev) => ({ ...prev, reviewDiff: null }));
             showPhase('review', 'AI 修改了 ' + doc.review.count + ' 处，保存前请确认');
           } else if (remoteGroupId && remoteGroupId === doc.ignoreRemoteGroupId) {
             doc.ignoreRemoteGroupId = null;
@@ -6734,6 +6736,8 @@ const __test = {
               }
               doc.ignoreRemoteGroupId = result.value?.groupId || null;
               doc.review = null;
+              doc.reviewDiff = null;
+              setUi((prev) => ({ ...prev, reviewDiff: null, railOpen: false }));
               showPhase(doc.dirty ? 'dirty' : 'ready', '已撤销本次 AI 修改；磁盘未改变');
               showNotice('已撤销本次 AI 修改，磁盘未改变');
             }).catch((error) => showNotice('撤销失败：' + String(error && error.message ? error.message : error)));
@@ -6741,7 +6745,9 @@ const __test = {
           reviewKeep: () => {
             if (!doc.review) return;
             doc.review = null;
+            doc.reviewDiff = null;
             doc.ignoreRemoteGroupId = null;
+            setUi((prev) => ({ ...prev, reviewDiff: null, railOpen: false }));
             showPhase('dirty', '已保留 AI 修改，正在保存');
             scheduleSave(0);
           },
@@ -6752,13 +6758,13 @@ const __test = {
               if (!result || result.ok !== true) { showNotice('读取差异失败：' + String(result?.error?.message || result?.error?.code || 'unknown')); return; }
               const changes = Array.isArray(result.value?.changes) ? result.value.changes : [];
               if (!changes.length) { showNotice('该组没有可显示的差异'); return; }
-              const lines = changes.slice(0, 5).map((change, index) => {
-                const oldText = String(change.removed || '').slice(0, 160);
-                const newText = String(change.insert || '').slice(0, 160);
-                return (index + 1) + '. - ' + oldText + '\n   + ' + newText;
-              });
-              showNotice('AI 修改差异（' + changes.length + ' 处）：\n' + lines.join('\n') + (changes.length > 5 ? '\n…' : ''));
+              doc.reviewDiff = changes;
+              setUi((prev) => ({ ...prev, reviewDiff: changes, railOpen: true }));
             }).catch((error) => showNotice('读取差异失败：' + String(error && error.message ? error.message : error)));
+          },
+          closeReviewDiff: () => {
+            doc.reviewDiff = null;
+            setUi((prev) => ({ ...prev, reviewDiff: null, railOpen: false }));
           },
           retry: () => {
             if (doc.staleDraftPending) {
@@ -6882,9 +6888,10 @@ const __test = {
       const restoreHint = ui.saveStatus === "unsaved" && typeof ui.detail === "string" && ui.detail.includes("未写盘");
       const saveText = ui.saveStatus === "unsaved" ? (restoreHint ? "未保存 · 按 Ctrl+S 保存" : "未保存") : ui.saveStatus === "saved" ? "已保存" : "";
       const recoveredItems = Array.isArray(ui.recovered) ? ui.recovered : [];
+      const reviewDiffItems = Array.isArray(ui.reviewDiff) ? ui.reviewDiff : [];
       const noticeItems = Array.isArray(ui.notices) ? ui.notices : [];
       const latestNotice = noticeItems[noticeItems.length - 1];
-      const hasPopover = recoveredItems.length > 0 || noticeItems.length > 0;
+      const hasPopover = recoveredItems.length > 0 || reviewDiffItems.length > 0 || noticeItems.length > 0;
       const toggleRail = () => setUi((prev) => ({ ...prev, railOpen: !prev.railOpen }));
       const actions = [];
       let primaryText = "", primaryTone = "info";
@@ -7041,6 +7048,17 @@ const __test = {
             fontSize: 12,
           },
         },
+          reviewDiffItems.length ? h("div", { style: { marginBottom: 6 } },
+            h("div", { className: "mp-rail-head", style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 6 } },
+              h("strong", { style: { flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, "≠ AI 修改差异（" + reviewDiffItems.length + " 处）"),
+              h("button", {
+                type: "button", className: "mp-rail-btn", "data-icon": "⌫", title: "收起差异",
+                onClick: () => { try { st.actions.closeReviewDiff && st.actions.closeReviewDiff(); } catch (e) { /* 忽略 */ } },
+              }, "收起")),
+            ...reviewDiffItems.slice(0, 12).map((change, index) => h("div", { key: "review-diff-" + index, style: { padding: "5px 0", borderTop: "1px solid color-mix(in srgb, currentColor 10%, transparent)" } },
+              h("div", { style: { opacity: 0.65, marginBottom: 3 } }, "修改 " + (index + 1) + (change.to > change.from ? "（替换 " + (change.to - change.from) + " 字符）" : "（插入）")),
+              String(change.removed || "").length ? h("pre", { style: { margin: "2px 0", padding: "4px 6px", whiteSpace: "pre-wrap", wordBreak: "break-word", background: "color-mix(in srgb, #d33 14%, transparent)", borderRadius: 4, fontSize: 11.5 } }, "- " + String(change.removed).slice(0, 1500)) : null,
+              h("pre", { style: { margin: "2px 0", padding: "4px 6px", whiteSpace: "pre-wrap", wordBreak: "break-word", background: "color-mix(in srgb, #2a7 14%, transparent)", borderRadius: 4, fontSize: 11.5 } }, "+ " + String(change.insert || "").slice(0, 1500))))) : null,
           recoveredItems.length ? h("div", { className: "mp-rail-head", style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 8 } },
             h("strong", { style: { flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, "♻ 共享会话恢复的草稿副本（原件未被覆盖）"),
             h("button", {
