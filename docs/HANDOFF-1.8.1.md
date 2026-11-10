@@ -15,6 +15,7 @@
 5. **性能预热方案已失败并回退**：1.7.6 的 iframe 保活/预热破坏 Markdown 显示，不能再直接重试。启动慢的根因是 iframe/CM6 启动本身约 718–775 ms，不是左栏按钮。
 6. **不要为了收尾而压缩验收**：本项目的数据安全问题是真实事故驱动的，review/undo/conflict 都必须保留“先归档、fail-closed、不自动覆盖”的不变量。
 7. **前期调研结论**：CodeMirror 6 / VS Code / ProseMirror / Lexical 都把“不可变文档状态 + 单一 transaction 入口 + 显式 undo 边界”作为核心；VS Code 的 3-way merge editor 是 B4.3 的直接范式；CRDT（Zed/Yjs）成本高，当前没有必须引入的需求。详见 §2.7。
+8. **引用区两项新缺陷已复现、未修复**：Shift+Enter 在引用区插入裸换行，破坏连续引用；跨行/含 `>` 前缀的 Ctrl+B/I 会把标记写到前缀外。详见 §2.8，下一批需要修改 `dsh-markpilot/src-cm6` 并同步核心。
 
 ---
 
@@ -427,6 +428,239 @@ B4.3 应直接采用这套交互语义，而不是自创：
 - 冲突用 B4.3 的 3-way session；
 - CRDT 仅作为未来可选，不进入 B5 第一阶段；
 - 任何“统一四个真相”的改动都必须保留现有 CAS、归档、fail-closed 不变量。
+
+---
+
+## 2.8 已复现的用户报障：引用区 Shift+Enter 与 Ctrl+B
+
+> 状态：**已复现，未修复**。这两项属于引擎 `dsh-markpilot/src-cm6` 的行为，插件与独立 EXE 共用同一套 CM6 内核；当前 1.8.1 插件实测已复现。修复需要走 renderer/core 构建链，不能只改 `lib/client.js`。
+
+### 2.8.1 复现环境
+
+| 项 | 值 |
+|---|---|
+| 插件 | `dsh-markdown-editor-typora@1.8.1` |
+| 内核 | CM6 `3.6.17`（`coreHash=4499e...`） |
+| 系统 | Windows 10/11，中文输入法，DSH Web GUI 内嵌 MarkPilot |
+| 测试文件 | `D:\BuyKey\Typora-Editor-App\zz-quote-bug-20261110.md`（测试后删除） |
+| 初始 Markdown | 见下 |
+
+初始内容：
+
+```markdown
+# Quote Test
+
+> alpha
+> beta
+> gamma
+
+outside
+```
+
+“连续引用区”指连续的 `> ` 行在渲染上是一个整体 blockquote；中间任何一行丢掉 `>` 都会被 CommonMark 当成引用区结束。
+
+### 2.8.2 问题 A：Shift+Enter 在引用区内换行会隔断引用区
+
+**实测 1：光标在 `beta` 中间（`bet|a`），按 Shift+Enter**
+
+结果缓冲区：
+
+```markdown
+# Quote Test
+
+> alpha
+> bet
+a
+> gamma
+
+outside
+```
+
+- 新行 `a` **没有 `>` 前缀**；
+- 渲染上 `a` 落到引用区外，连续引用被切成两个 block；
+- 原 `beta` 的剩余内容没有带回引用前缀。
+
+**实测 2：光标在 `alpha` 行尾（`alpha|`），按 Shift+Enter**
+
+结果缓冲区：
+
+```markdown
+# Quote Test
+
+> alpha
+
+> beta
+> gamma
+
+outside
+```
+
+- 插入的是**裸空行**，不是 `>` 空行；
+- 渲染上 `alpha` 与 `beta/gamma` 成为两个独立引用块；
+- 用户在视觉上看到“引用区中间被隔开”，与描述一致。
+
+**代码层原因（已定位到入口）**
+
+- 引擎没有为普通 blockquote 的 `Shift-Enter` 注册自定义命令；`Shift-Enter` 走 CM6 默认换行路径（`insertNewline`/默认 keymap），只插入 `\n`，不会复制当前 blockquote 的 `quoteLead`。
+- `markdown-context.js` 已有 `quoteLead(text)`（`/^ {0,3}>[ \t]?/` 可解析嵌套 `> >`），但 Shift+Enter 路径没有使用它。
+- `src-cm6/main.js` 中唯一显式的 `Shift-Enter` 特判在**表格单元格**（`tables.js` 的 `<br>` 语义），普通引用区没有对应分支。
+- 因此这不是“CSS 显示问题”，是**写进缓冲区的 Markdown 字节少了 `>` 前缀**；保存后磁盘文件也会缺。
+
+**期望行为（按用户要求固定）**
+
+在连续引用区任意光标处按 Shift+Enter，必须保证：
+
+1. 换行后仍在同一个连续引用区；
+2. 新行带当前引用前缀；嵌套引用保留全部层（`> > `）；
+3. 原有后续行不丢前缀；
+4. 行尾按 Shift+Enter 产生**引用区内的空行**（建议写成 `>` 或 `> ` 的行）；
+5. 单元格内 Shift+Enter 仍保持表格的 `<br>` 语义，不被本修复影响；
+6. 普通段落、列表、代码块行为不变。
+
+建议的目标形态：
+
+```markdown
+> alpha
+> beta
+>
+> gamma
+```
+
+中间换行：
+
+```markdown
+> bet
+> a
+```
+
+（即插入 `\n` + 当前完整 `quoteLead`，而不是裸 `\n`。）
+
+**修复方案（待设计对抗，不在本文件落码）**
+
+1. 在 `main.js` 增加 `Prec.high` 的 `Shift-Enter` 命令，作用域仅普通编辑面，排除表格单元格/覆盖层：
+   - 取当前行 `line.text`，用 `quoteLead` 得到 `{off, depth, q}`；
+   - `depth===0` 时回退默认 `insertNewline`（不改普通段落）；
+   - 有选区时先删除选区；在光标处插入 `\n` + `q`；
+   - 光标落到新行 `q` 之后；
+   - 若光标位于行首前缀之前/之中，按“保持当前引用层”规则钳制。
+2. 若光标在行尾且下一行也是引用行：插入 `\n` + `q`，得到 `> alpha\n> \n> beta` 这类连续引用；需要验证 CommonMark 是否把 `>` 空行仍算同一 blockquote（用项目内 markdown parser/真机双重验证）。
+3. 若当前行是 nested quote，`q` 必须是完整 `> > `；不能只加一层。
+4. 若当前行在 quote 内的列表中，Shift+Enter 的语义需要单独定义（引用层优先还是列表层优先），先做设计对抗，不直接改。
+5. 新增探针/单测：
+   - `quoteLead` 解析：`> `、`>>`、`> > `、带 0–3 空格缩进；
+   - 中间/行尾/行首/嵌套引用四种插入；
+   - 表格 Shift+Enter 回归；
+   - 普通段落 Shift+Enter 回归；
+   - 存盘后 Byte 级断言（不是只看渲染）。
+
+### 2.8.3 问题 B：引用区选中后 Ctrl+B 无效 / 跨行时写坏标记
+
+**实测 1：在引用区内双击选中单个词 `alpha`，按 Ctrl+B**
+
+缓冲区结果：
+
+```markdown
+> **alpha**
+> beta
+> gamma
+```
+
+- 这个形态下 **B 是生效的**，与用户“完全无效”的描述不一致；
+- 说明 `Mod-b → wrapInline('**')` 的 keymap 和 `wrap` 主路径本身可用。
+
+**实测 2：从引用区一行拖选到另一行（选区包含 `> ` 前缀/换行），按 Ctrl+B**
+
+选区大致为 `alpha\n> beta`，结果：
+
+```markdown
+> alpha
+****> beta
+> gamma
+```
+
+- `**` 被加在 `> beta` 前面，形成 `****> beta`；
+- 这不是合法的“把选中文段加粗”，渲染上也不显示为用户期望的粗体；
+- `> gamma` 行仍在缓冲区，但前一行标记结构已坏，整段引用显示异常。
+
+**实测 3：同样的跨行选区按 Ctrl+I**
+
+结果：
+
+```markdown
+> *alpha
+> beta*
+> gamma
+```
+
+- 斜体标记跨行落在 `alpha` 开头和 `beta` 结尾，同样不是合法的逐行斜体；
+- 所以“I/U 正常”只在**单行内容选区**成立；跨行/含引用前缀时 I/U 也会写坏。
+
+**代码层原因（已定位）**
+
+- `extras.js` 的默认键表（`DEFAULT_KEYS`）把 `bold` 映射到 `Mod-b`，`ACTIONS.bold` 调 `deps.wrapInline(v,'**')`；与工具栏按钮共用 `toolbar.js` 的 `wrap`。
+- `toolbar.js` 的 `wrapSingle` 把选区文本 `sel` 原样包在 `**...**` 里：
+  - 选区不含换行、不含 `> ` 前缀时，结果正确；
+  - 选区跨行或包含 blockquote 前缀时，`**` 会包住 `> ` 或换行，产生非法 Markdown；
+  - `enclosingSpan` 只按 `doc.lineAt(from)` 判断，不能处理跨行结构。
+- 因此**跨行/含前缀的 B 与 I/U 是同一类 bug**，不是 B 独有。
+- 用户报告的“B 完全无效、I/U 正常”还有第二种可能：**按键根本没到达 `wrap`**。需要区分：
+  1. `mp-keys` / 快捷键设置里 `bold` 被保存为空或别的组合；
+  2. DSH 父窗口在捕获阶段截了 Ctrl+B（`defaultPrevented=true`）；
+  3. 选区起点/终点落在引用前缀或隐藏标记上，`wrap` 视作“已包裹/不可包裹”而返回；
+  4. 输入法/键盘布局吞键。
+
+**必须先做的 B-only 诊断（不要直接改 wrap）**
+
+- 引擎已有 `window.__keyLog`（`main.js:8203` 附近）记录 `key + shift + defaultPrevented`；对比按 Ctrl+B/I/U 时 iframe 是否收到事件、是否 `prevented`。
+- 读取 `localStorage['mp-keys']`（快捷键设置），确认 `bold` 的值；不要假设默认表生效。
+- 在 `ACTIONS.bold`/`wrap` 入口加**一次性自证计数**（`window.__mpBoldCalls++`），复验“事件到没到、wrap 进没进、进了返回什么”。
+- 用同一个选区分别按 B/I/U，记录 `sel` 的原文/起止位置；先证明三者的选区完全相同。
+- 如果事件没到编辑器 ⇒ 快捷键/父级拦截问题；如果到了但 wrap 未改文档 ⇒ wrap/选区判定问题。两条修法完全不同。
+
+**修复方案（待设计对抗）**
+
+1. **选区规范化**：在 `wrap` 前把每个 selection 的文本按行拆开，剥离 `quoteLead`/列表/标题前缀后再格式化；保留原前缀。
+2. **单行内容选区**：只把内容段包 `**`/`*`/`<u>`，不得把 `> ` 包进去。
+3. **跨行选区**：
+   - 逐行格式化每行的内容段（Typora 语义），或
+   - 明确拒绝并 toast “引用/列表内跨行格式暂不支持”，但绝不能写出非法 Markdown。
+   先做产品决策，不能默默写坏。
+4. **嵌套引用/列表**：用 `quoteLead` 的完整 `q`；不要只剥第一层。
+5. **空选区**：保持现有 `**|**` 占位行为，但同样要排除前缀区。
+6. **快捷键层**：如果诊断证明是 `mp-keys` 覆盖，修复设置迁移/显示；如果是父级拦截，不能靠改 wrap 解决，必须在 keymap/宿主层处理。
+7. 新增单测/探针：
+   - 单行内容选区 B/I/U；
+   - 选区含 `> ` 前缀；
+   - 跨两行引用、嵌套 `> >`；
+   - 选区含列表/引用混合；
+   - 工具栏按钮与快捷键结果逐字节一致；
+   - Ctrl+B 事件到达自证。
+
+### 2.8.4 两项的优先级与验收
+
+- **P1（格式正确性/用户可见）**：两项都应在本轮引擎修复中处理；不要只修 B 或只修 A。
+- 两项都不能只改 `lib/client.js`；必须改 `dsh-markpilot/src-cm6`，走 `build-from-source.cjs` / 引擎同步链，更新 `coreHash`。
+- **独立 EXE 与插件共用引擎**：修复后必须同时验证插件和独立 EXE；本轮只复现了插件，未在本次单独启动 EXE 复验。
+- 验收必须包含：
+  - 中间/行尾/行首/嵌套引用的 Shift+Enter；
+  - 单行/跨行/含前缀的 B/I/U；
+  - 表格 Shift+Enter `<br>` 回归；
+  - 存盘字节断言；
+  - 视觉截图（引用区没有被切成两块、粗体真的渲染）；
+  - 五通道真实键鼠（键盘、鼠标、组合键、键鼠配合、拖拽选区）。
+
+### 2.8.5 复现记录表（供后续追加）
+
+| 编号 | 操作 | 期望 | 实测 | 状态 |
+|---|---|---|---|---|
+| Q-A1 | `bet|a` Shift+Enter | `> bet\n> a` | `> bet\na`，`a` 出引用 | **失败** |
+| Q-A2 | `alpha|` Shift+Enter | `> alpha\n>\n> beta` | `> alpha\n\n> beta`，裸空行断引用 | **失败** |
+| Q-B1 | 双击 `alpha` + Ctrl+B | `> **alpha**` | `> **alpha**` | 通过 |
+| Q-B2 | 跨行选区 + Ctrl+B | 合法逐行粗体或明确拒绝 | `****> beta` / 结构错乱 | **失败** |
+| Q-B3 | 跨行选区 + Ctrl+I | 合法逐行斜体或明确拒绝 | `*alpha\n> beta*` | **失败** |
+| Q-B4 | 用户报告的“B 完全无效” | 需定位键事件/配置 | 本轮未复现；单行 B 生效 | **待定位** |
+
+> 注：Q-B4 不能因为 Q-B1 通过就关闭；必须按 §2.8.3 的诊断区分“键没到”和“wrap 写坏”。用户实际选区/快捷键配置需要下一轮采集。
 
 ---
 
