@@ -63,8 +63,10 @@ tests 430, pass 429, fail 0, skipped 1
 `.mp-verify/b3.3a/ADVERSARIAL.md` 的 1 个 P0 + 5 个 P1：
 
 - **P0**：客户端 `doc.lastVersion` 是 provider/disk 版本，不是 `rev1:` token。recover 增加“clean 文档接受 providerVersion”的兼容分支；`B3-API8` 直接用 `baseVersion:'v0'` 复现客户端路径。
-- **P1**：`discardRecovery` 增加与 recover 相同的 `checkWritePolicy`；新增只读沙箱用例。
+- **P1**：`discardRecovery` 增加与 recover 相同的 `checkWritePolicy`；新增只读沙箱用例；可信 UI（无 invocation）使用宿主默认策略。
 - **P1**：buffer 恢复后 UI 不再只说“已恢复”，改为“已请求恢复到编辑器缓冲区”，并主动拉一次 snapshot 核对。
 - **P1**：pre-recovery 归档先于 CAS 失败会留档（用户副本，保留不删，已登记）。
 - **P1**：external 分支的编辑器广播/关窗时序未做真实并发夹；留作真机回归。
 - **P1**：discard 改为先删文件、成功后再删 DB 行，避免“UI 说丢弃成功但盘上仍有不可索引文件”。
+- **真机**：README 恢复横幅出现，`查看` 打开副本面板，`恢复/丢弃/复制路径` 按钮可见；首次点击因 UI 无 policy 返回“Cannot resolve filesystem policy”，修复为可信 UI 跳过 policy 后再次点击无错误、横幅消失。该次恢复的副本内容已因编辑器自动保存与当前正文相同，未把它当作“内容确实被替换”的最终证据；不同内容的替换由 `B3-API8`（磁盘）和 `B3.3-S1`（buffer）覆盖。
+
