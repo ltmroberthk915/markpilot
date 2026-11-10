@@ -382,7 +382,7 @@ test('B3.3-S2 recover refuses dirty buffers, stale tokens, and invalid recovery 
 
 test('B3.3-S3 discard removes exactly the requested recovery row through the live store', async () => {
   const w = makeWorld();
-  const result = await w.service.discardRecovery({ path: w.file, recoveryPath: 'C:/recovery/copy.md' }, {}, undefined);
+  const result = await w.service.discardRecovery({ path: w.file, recoveryPath: 'C:/recovery/copy.md' }, undefined, undefined);
   assert.equal(result.ok, true);
   assert.equal(result.value.removed, true);
   assert.equal(w.calls.discard, 1);

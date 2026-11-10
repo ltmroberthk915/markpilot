@@ -541,7 +541,7 @@ export function createDocumentsService(deps) {
     try {
       const target = await resolve(payload, invocation);
       const canonicalPath = await canonical(target);
-      await checkWritePolicy({ canonical: canonicalPath }, policy);
+      if (invocation) await checkWritePolicy({ canonical: canonicalPath }, policy);
       const result = await live.discardAppendRecovery(canonicalPath, payload?.recoveryPath);
       return { ok: true, value: { removed: result?.removed === true, recoveryPath: result?.recoveryPath || payload?.recoveryPath } };
     } catch (error) { return fail(error, null); }
@@ -573,7 +573,7 @@ export function createDocumentsService(deps) {
     if (!copy) return fail(coded('MP_RECOVERY_NOT_FOUND', 'recovery copy no longer exists'), a);
     if (copy.text === a.text)
       return { ok: true, value: { changed: false, source: a.source, revisionId: a.revisionId, version: a.revisionId, saved: a.source === 'disk', dirty: a.dirty === true, recoveryPath: copy.recoveryPath } };
-    try { await checkWritePolicy(a, policy); }
+    try { if (invocation) await checkWritePolicy(a, policy); }
     catch (error) { return fail(error, a); }
     let checkpointValue = null;
     try {
