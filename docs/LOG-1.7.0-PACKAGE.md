@@ -41,7 +41,7 @@ files: 149
 - 点击 README 编辑区，`Ctrl+End`，键盘输入 `PACKAGE-KEY-PROBE`；
 - `Ctrl+S` 后磁盘文件包含该标记，大小 7844 B；
 - 再输入 `X`、`Ctrl+S`，界面显示“已保存”，磁盘更新；
-- 复测未再出现此前一次外部冲突横幅（首次运行时曾短暂出现，第二次干净通过，未复现）。\n- 包内 `markdown blocks` 真机返回 9 个 section；AI 审阅、差异、撤销在安装目录上通过。
+- 复测未再出现此前一次外部冲突横幅（首次运行时曾短暂出现，第二次干净通过，未复现）。\n- 包内 `markdown blocks` 真机返回 9 个 section；AI 审阅、差异、撤销在安装目录上通过。\n- 包内 `markdown batch` 真机把 `a/b/c` 写成 `A/b/C`；`merge3` 再与 `a/B/c` 合并为 `A/B/C`；均返回 groupId。
 
 ### AI 审阅
 
