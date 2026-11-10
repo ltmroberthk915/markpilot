@@ -346,3 +346,13 @@ test('审阅状态：多组累积、只撤最近一组、审阅中禁止保存',
   assert.equal(T.reviewSuppressesSave({ review: null }), false);
   assert.equal(T.reviewSuppressesSave({}), false);
 });
+
+test('保存后 stat 版本变化：正文相同才采纳，正文不同仍冲突', async () => {
+  const { test: T } = await loadClientFactory();
+  const opened = { ok: true, value: { version: 'v2', text: '\uFEFFa\r\nb\r\n' } };
+  assert.equal(T.shouldAdoptSavedVersion(opened, 'v2', 'a\nb\n'), true);
+  assert.equal(T.shouldAdoptSavedVersion(opened, 'v3', 'a\nb\n'), false);
+  assert.equal(T.shouldAdoptSavedVersion({ ok: true, value: { version: 'v2', text: 'different' } }, 'v2', 'a\nb\n'), false);
+  assert.equal(T.shouldAdoptSavedVersion({ ok: false }, 'v2', 'a\nb\n'), false);
+  assert.equal(T.normalizeSavedText('\uFEFFx\r\ny'), 'x\ny');
+});

@@ -2,7 +2,7 @@
 
 - 源码基线：`main` @ `e7ad844`（B4.2b/4.3 完成）。
 - 打包：`dsh-markdown-editor-typora-1.7.0.tgz`。
-- 实装：`C:\Users\Ming\.dsh\profiles\desktop\node_modules\dsh-markdown-editor-typora` 已从 dev junction 换成真实安装目录（1.7.0）。
+- 实装：`C:\Users\Ming\.dsh\profiles\desktop\node_modules\dsh-markdown-editor-typora` 已从 dev junction 换成真实安装目录（1.7.0）。\n- 后续修复保存后版本对账误报，已升级到 1.7.1，见 `LOG-1.7.1-SAVE-RECONCILE.md`。
 
 ## 1. 打包
 

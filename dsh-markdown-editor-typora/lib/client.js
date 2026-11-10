@@ -648,6 +648,18 @@ function applyMirrorDelta(mirror,event){
       return items;
     }
 
+    function normalizeSavedText(text) {
+      return String(text == null ? "" : text).replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
+    }
+    // A post-save stat version can differ merely because the provider's version
+    // string includes ctime/mtime nanoseconds. Only keep the conflict when the
+    // disk text really differs from the text we just saved.
+    function shouldAdoptSavedVersion(opened, statVersion, savedText) {
+      return !!(opened && opened.ok === true && opened.value
+        && String(opened.value.version) === String(statVersion)
+        && normalizeSavedText(opened.value.text) === normalizeSavedText(savedText));
+    }
+
     // Pure review-state helpers: shared by the editor and the portable client tests.
     function mergeReviewGroup(review, groupId, changeCount) {
       const groups = review && Array.isArray(review.groups) ? review.groups.slice() : [];
@@ -3581,6 +3593,7 @@ function normDocs(d) {
 const __test = {
       createDraftStore,
       mergeReviewGroup, reviewUndoGroup, reviewIsMulti, reviewSuppressesSave,
+      normalizeSavedText, shouldAdoptSavedVersion,
       constants: {
         TAB_TYPE_ID: TAB_TYPE_ID,
         FILE_ADDRESS_PREFIX: FILE_ADDRESS_PREFIX,
@@ -6004,8 +6017,22 @@ const __test = {
                   const stat = await api("stat", { path: doc.absPath });
                   if (alive() && stat.ok === true && stat.value && stat.value.version !== doc.lastVersion) {
                     if (doc.live) void refreshLiveRoom();
-                    else if (doc.dirty || doc.conflict) { doc.externalStale = true; }
-                    else await loadFromDisk({ silent: true, reason: "save-reconcile" });
+                    else {
+                      let adopted = false;
+                      try {
+                        const opened = await api("open", { path: doc.absPath, live: false });
+                        if (alive() && shouldAdoptSavedVersion(opened, stat.value.version, pulled.text)) {
+                          doc.lastVersion = String(opened.value.version);
+                          doc.externalStale = false;
+                          doc.conflict = false;
+                          adopted = true;
+                        }
+                      } catch (e) { /* 读取失败时仍走保守冲突路径 */ }
+                      if (alive() && !adopted) {
+                        if (doc.dirty || doc.conflict) { doc.externalStale = true; }
+                        else await loadFromDisk({ silent: true, reason: "save-reconcile" });
+                      }
+                    }
                   }
                 } catch (e) { /* 对账失败不阻塞保存结果 */ }
                 return;
