@@ -207,6 +207,30 @@ function diffLines(base, other) {
   return out;
 }
 
+// A live revision token embeds the client epoch in addition to version/sha.
+// After closing/reopening an editor the epoch changes while the buffered
+// content (and therefore version/sha) is the same. Undo validation must
+// compare content identity, not the process-local epoch.
+export function revisionContentKey(revision) {
+  const s = String(revision == null ? "" : revision);
+  const m = /^rev1:(?:live|disk):(.+)$/i.exec(s);
+  if (!m) return null;
+  const body = m[1];
+  const at = body.lastIndexOf(':');
+  if (at <= 0) return null;
+  const sha = body.slice(at + 1);
+  const before = body.slice(0, at);
+  const versionAt = before.lastIndexOf(':');
+  const version = versionAt < 0 ? before : before.slice(versionAt + 1);
+  if (!version || !/^[0-9a-f]{64}$/i.test(sha)) return null;
+  return version + ':' + sha.toLowerCase();
+}
+export function sameRevisionContent(a, b) {
+  if (String(a) === String(b)) return true;
+  const ka = revisionContentKey(a), kb = revisionContentKey(b);
+  return !!(ka && kb && ka === kb);
+}
+
 export function merge3Text(baseText, oursText, otherText) {
   const base = String(baseText).split('\n');
   const ours = String(oursText).split('\n');
@@ -872,7 +896,7 @@ export function createDocumentsService(deps) {
       if (groups[i].baseRevision !== groups[i - 1].resultRevision)
         return fail(coded('MP_GROUP_STALE', 'agent groups are not a contiguous edit sequence'), a);
     }
-    if (groups[groups.length - 1].resultRevision !== a.revisionId) return fail(stale(a), a);
+    if (!sameRevisionContent(groups[groups.length - 1].resultRevision, a.revisionId)) return fail(stale(a), a);
     let text = a.text;
     for (let i = groups.length - 1; i >= 0; i -= 1) {
       const group = groups[i];
@@ -912,7 +936,7 @@ export function createDocumentsService(deps) {
     try { group = await live.getAgentGroup(a.canonical, groupId); }
     catch (error) { return fail(error, a); }
     if (!group || group.undoneAt) return fail(coded('MP_GROUP_NOT_FOUND', 'agent group is already undone or missing'), a);
-    if (group.resultRevision !== a.revisionId) return fail(stale(a), a);
+    if (!sameRevisionContent(group.resultRevision, a.revisionId)) return fail(stale(a), a);
     const recent = await live.listAgentGroups(a.canonical, 20);
     const latest = recent.find((entry) => !entry.undoneAt);
     if (!latest || latest.groupId !== groupId) return fail(coded('MP_GROUP_NOT_LATEST', 'only the latest agent edit group can be undone'), a);
