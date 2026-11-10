@@ -46,6 +46,8 @@
 
 - `dsh-markdown-editor-typora-1.9.0-rc.2.tgz`
 - 149 files / 2.8 MB
+- SHA256 `E9E995C04EDEF4CB074733F548DA0E890F1F6E3E4F0848200FC7FC07803FDE55`
+- 源码冻结提交 `0c85f40`（B4.3 + B3.3b，24 files / +4196/−78）
 
 **注意**：rc.1 与更早的 1.9.0 包在 B3.3b 之前构建，不包含 `draft_index`/mirror 代码；rc.2 为 B4.3+B3.3b 的新候选，不能与 rc.1 混用。
 
