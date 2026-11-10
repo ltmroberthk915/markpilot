@@ -61,6 +61,6 @@ tests 446, pass 445, fail 0, skipped 1
 
 - 真机：AI 修改后按 Ctrl+S，等待 3 秒磁盘仍为原 hash/7825 B，review 横幅仍在。
 - 真机：review 未决时直接关闭编辑面，磁盘仍为原 hash；重开后出现“检测到上次关闭时未保存的内容”，可选择恢复/丢弃。
-- 多组入口按 `review.groups` 累积；`documents.undoGroups` 按组链模拟逆变换，最后一次性写回；`B4.2B-API2` 覆盖两组连续撤销。
+- 多组入口按 `review.groups` 累积；`documents.undoGroups` 按组链模拟逆变换，最后一次性写回；`B4.2B-API2` 覆盖两组连续撤销。\n- 真机：README 连续两组 AI 修改，横幅显示“AI 修改了 2 处（共 2 组）”；点“撤销本次”toast“已撤销本次 AI 修改（2 组）；磁盘未改变”，两组 `undoneAt` 均置，正文恢复、磁盘 hash 不变。
 - 差异面板：显示红/绿行、修改序号/替换长度；最多 12 处、每处 1500 字符。
 - 多组 review 状态（累积、最近组、multi 判定、保存抑制）已加入 `test/client.test.mjs`；关闭/重开、Ctrl+S 拦截仍为真机用例。
