@@ -243,3 +243,18 @@ test('B3.3-R1 UI recovery rejects paths outside the controlled directory', async
   assert.equal(discarded.removed, true);
   await assert.rejects(() => live.readAppendRecovery(w.file, appended.recoveryPath), (error) => error.code === 'MP_RECOVERY_NOT_FOUND');
 });
+
+test('B4.2B-R1 append carries group_id into exchange updates for the UI review', async () => {
+  const w = await world();
+  const live = new LiveDocuments({ directory: w.dir });
+  const joined = await live.join(w.file, 'hello\n');
+  const groupId = '11111111-1111-4111-8111-111111111111';
+  await live.append(w.file, {
+    epoch: joined.epoch, baseVersion: 0, baseText: 'hello\n', actor: 'agent', groupId,
+    changes: [{ from: 5, to: 5, insert: '!' }],
+  });
+  const exchanged = await live.exchange(joined.client, { epoch: joined.epoch, version: 0 });
+  assert.equal(exchanged.updates.length, 1);
+  assert.equal(exchanged.updates[0].groupId, groupId);
+  assert.equal(exchanged.updates[0].changes[0].insert, '!');
+});

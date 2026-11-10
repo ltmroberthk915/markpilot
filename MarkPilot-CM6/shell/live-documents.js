@@ -41,7 +41,7 @@ function database(directory) {
       CREATE INDEX IF NOT EXISTS room_clients ON clients(epoch);
       CREATE TABLE IF NOT EXISTS changes (
         epoch TEXT NOT NULL REFERENCES rooms(epoch) ON DELETE CASCADE, version INTEGER NOT NULL,
-        client TEXT NOT NULL, seq INTEGER NOT NULL, delta TEXT NOT NULL, PRIMARY KEY(epoch,version));
+        client TEXT NOT NULL, seq INTEGER NOT NULL, delta TEXT NOT NULL, group_id TEXT, PRIMARY KEY(epoch,version));
       CREATE TABLE IF NOT EXISTS recovery (
         source TEXT NOT NULL, recoveryPath TEXT PRIMARY KEY, epoch TEXT NOT NULL,
         version INTEGER NOT NULL, saved INTEGER NOT NULL, at INTEGER NOT NULL,
@@ -62,6 +62,8 @@ function database(directory) {
     const groupColumns = db.prepare('PRAGMA table_info(agent_group)').all().map((column) => column.name);
     if (!groupColumns.includes('changes')) db.exec('ALTER TABLE agent_group ADD COLUMN changes TEXT');
     if (!groupColumns.includes('undone_at')) db.exec('ALTER TABLE agent_group ADD COLUMN undone_at INTEGER');
+    if (!db.prepare('PRAGMA table_info(changes)').all().some((column) => column.name === 'group_id'))
+      db.exec('ALTER TABLE changes ADD COLUMN group_id TEXT');
     // The rooms store is per machine and account. A database carried here from
     // another device or profile (synced or copied LOCALAPPDATA) must not seat
     // stale authority over files it has never seen on this host.
@@ -424,7 +426,7 @@ function roomFor(db, file) { return db.prepare('SELECT '+roomColumns+' FROM room
 function head(room) { return {epoch:room.epoch,version:room.version,savedVersion:room.saved,diskHash:room.disk}; }
 function updateRoom(db, room, client, seq, changes) {
   const length = checkedLength(changes, room.length), version = room.version + 1;
-  db.prepare('INSERT INTO changes VALUES(?,?,?,?,?)').run(room.epoch, version, client, seq, JSON.stringify(changes));
+  db.prepare('INSERT INTO changes(epoch,version,client,seq,delta,group_id) VALUES(?,?,?,?,?,NULL)').run(room.epoch, version, client, seq, JSON.stringify(changes));
   db.prepare('UPDATE rooms SET version=?,length=? WHERE epoch=?').run(version, length, room.epoch);
   room.version = version; room.length = length;
 }
@@ -570,7 +572,7 @@ class LiveDocuments {
         }
       }
       if (version > lease.ack) db.prepare('UPDATE clients SET ack=? WHERE id=?').run(version,client);
-      const updates = db.prepare('SELECT version,client,seq,delta FROM changes WHERE epoch=? AND version>? ORDER BY version').all(epoch,version)
+      const updates = db.prepare('SELECT version,client,seq,delta,group_id AS groupId FROM changes WHERE epoch=? AND version>? ORDER BY version').all(epoch,version)
         .map(({delta,...row}) => ({...row,changes:JSON.parse(delta)}));
       if (changes !== undefined) compact(db,room);
       return {...head(room),updates};
@@ -848,11 +850,12 @@ class LiveDocuments {
   // the normal exchange() update stream. The transaction re-checks epoch,
   // version and the materialized base text, so a concurrent editor save or
   // peer edit can never be appended on top of a stale base.
-  async append(filePath, {epoch, baseVersion, baseText, changes, actor='agent'} = {}) {
+  async append(filePath, {epoch, baseVersion, baseText, changes, actor='agent', groupId=null} = {}) {
     if (typeof baseText !== 'string') throw fault('MP_LIVE_APPEND', '缺少权威正文');
     if (typeof epoch !== 'string' || !epoch) throw fault('MP_LIVE_APPEND', '缺少协同会话');
     if (!Number.isSafeInteger(baseVersion) || baseVersion < 0) throw fault('MP_LIVE_APPEND', '无效的协同版本');
     if (!/^[a-z0-9-]{1,32}$/.test(String(actor))) throw fault('MP_LIVE_APPEND', '无效的追加者');
+    if (groupId != null && !/^[0-9a-f-]{36}$/i.test(String(groupId))) throw fault('MP_LIVE_APPEND', '无效的编辑组');
     const file = await canonicalFile(filePath), key = fileKey(file);
     const filename = path.join(path.resolve(this.directory), 'rooms.sqlite');
     if (!localStoreUsable(filename)) throw fault('MP_LIVE_NO_ROOM', '文档没有共享会话，请重新读取后再试');
@@ -884,8 +887,8 @@ class LiveDocuments {
           // discovery record; the file is the payload.
           db.prepare('INSERT OR REPLACE INTO append_recovery VALUES(?,?,?,?,?,?,?)')
             .run(key, written.path, room.epoch, version, written.at || Date.now(), written.bytes, written.sha256);
-          db.prepare('INSERT INTO changes VALUES(?,?,?,?,?)')
-            .run(room.epoch, version, actor, 0, JSON.stringify(changes));
+          db.prepare('INSERT INTO changes(epoch,version,client,seq,delta,group_id) VALUES(?,?,?,?,?,?)')
+            .run(room.epoch, version, actor, 0, JSON.stringify(changes), groupId ? String(groupId) : null);
           db.prepare('UPDATE rooms SET version=?,length=? WHERE epoch=?').run(version, length, room.epoch);
           room.version = version; room.length = length;
           compact(db, room);

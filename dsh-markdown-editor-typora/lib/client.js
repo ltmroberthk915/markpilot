@@ -5230,6 +5230,7 @@ const __test = {
           live: null, liveUnsupported: false, liveFlushSeq: 0, liveFlushWaiters: new Map(), liveStatus: null,
           liveStaleRounds: 0, liveStaleBlocked: false,
           liveRecoveredShownFor: null, liveRecoveredItems: null,
+          review: null, remoteGroups: null, ignoreRemoteGroupId: null,
           es: null,
           esHealthy: false,
           pollTimer: null,
@@ -5520,7 +5521,14 @@ const __test = {
           };
           if (!alive() && !(doc.closeUntil >= Date.now())) { reply({ ok: false, error: "编辑面已关闭", code: "MP_LIVE_GONE" }); return; }
           try {
-            reply(await api("live", { client: client, action: "exchange", request: content.request }));
+            const response = await api("live", { client: client, action: "exchange", request: content.request });
+            const updates = response && response.value && Array.isArray(response.value.updates) ? response.value.updates : [];
+            for (const update of updates) {
+              if (!update || typeof update.groupId !== "string" || !update.groupId) continue;
+              if (!Array.isArray(doc.remoteGroups)) doc.remoteGroups = [];
+              doc.remoteGroups.push({ version: Number(update.version), groupId: update.groupId });
+            }
+            reply(response);
           } catch (error) {
             reply({ ok: false, error: String(error && error.message || error), code: "MP_LIVE_TRANSPORT" });
           }
@@ -5671,9 +5679,19 @@ const __test = {
             pending.resolve?.(false);
           }
         }
+        function takeRemoteGroup(delta) {
+          if (!Array.isArray(doc.remoteGroups) || doc.remoteGroups.length === 0) return null;
+          const revision = delta && delta.after ? delta.after.sourceRevision : null;
+          let index = Number.isSafeInteger(revision) ? doc.remoteGroups.findIndex((item) => item.version === revision) : -1;
+          if (index < 0) index = 0;
+          const entry = doc.remoteGroups.splice(index, 1)[0];
+          if (doc.remoteGroups.length === 0) doc.remoteGroups = null;
+          return entry && entry.groupId ? entry.groupId : null;
+        }
         function acceptDelta(delta) {
           if(delta?.protocol!==2 || delta.docToken!==doc.token || !doc.mirror)return false;
           if(delta.after?.epoch===doc.mirror.session.epoch && delta.after.sourceRevision<=doc.mirror.session.sourceRevision)return true;
+          const remoteGroupId = takeRemoteGroup(delta);
           const applied=applyMirrorDelta(doc.mirror,delta);
           if(!applied.ok){doc.mirror.continuous=false;doc.dirty=true;saveStatus.update(true);if(!doc.gapDeltas.some(x=>sameSession(x.after,delta.after)))doc.gapDeltas.push(delta);if(!doc.pulls.size)void requestSnapshot('gap');return false;}
           doc.mirror=applied.mirror;doc.textFresh=false;doc.dirty=true;doc.editSeq++;doc.composing=!!delta.composing;
@@ -5681,8 +5699,16 @@ const __test = {
           try{const result=inspectStoreResult(draftStore()?.append?.({...delta,path:doc.absPath,baseVersion:doc.lastVersion}));result?.durable?.then?.(inspectStoreResult).catch?.(error=>showNotice('恢复记录尚未持久化：'+String(error)));}catch(error){showNotice('恢复记录尚未持久化：'+String(error));}
           if(doc.dead){persistCurrentRecovery();return true;}
           showPhase('dirty',doc.composing?'输入中…':'编辑中…');
+          if (remoteGroupId && remoteGroupId !== doc.ignoreRemoteGroupId) {
+            doc.review = { groupId: remoteGroupId, count: Array.isArray(delta.changes) ? delta.changes.length : 1 };
+            showPhase('review', 'AI 修改了 ' + doc.review.count + ' 处，保存前请确认');
+          } else if (remoteGroupId && remoteGroupId === doc.ignoreRemoteGroupId) {
+            doc.ignoreRemoteGroupId = null;
+          } else if (doc.review) {
+            showPhase('review', 'AI 修改了 ' + doc.review.count + ' 处，保存前请确认');
+          }
           if(doc.saveTimer){clearTimeout(doc.saveTimer);doc.saveTimer=null;}
-          if(!doc.composing)scheduleSave(SAVE_DEBOUNCE_MS);
+          if(!doc.composing && !doc.review)scheduleSave(SAVE_DEBOUNCE_MS);
           return true;
         }
         function onDelta(delta) {
@@ -5783,6 +5809,7 @@ const __test = {
 
         function scheduleSave(delay) {
           if (doc.dead) return;
+          if (doc.review) return;   // AI review must reach a decision before the timer can write.
           if (doc.saveTimer) { clearTimeout(doc.saveTimer); doc.saveTimer = null; }
           doc.saveTimer = setTimeout(() => {
             doc.saveTimer = null;
@@ -5839,6 +5866,7 @@ const __test = {
         async function runSave(options) {
           const manual = !!(options && options.manual);
           if (doc.dead) return;
+          if (doc.review) return;
           // 有界预算耗尽后不再自动发保存请求（防持续竞争下无界后台唤醒）；
           // 显式保存（Ctrl+S）重置预算，输入改动只保留草稿等显式动作。
           if (doc.untitled) { if(manual) await saveUntitled(); return; }
@@ -6023,6 +6051,7 @@ const __test = {
          */
         function manualSave(content) {
           if (doc.dead) return;
+          if (doc.review) { post("toast", "存在 AI 修改待确认，请先点「保留并保存」或「撤销本次」"); return; }
           if(doc.untitled){void runSave({manual:true});return;}
           if (doc.recovery && doc.phase === 'recovery') { post("toast", "存在未保存的恢复内容，请先点「恢复」或「丢弃」"); return; }
           doc.liveStaleBlocked = false;   // 显式保存 = 重置 STALE 退避预算（只此显式入口重置）
@@ -6694,6 +6723,43 @@ const __test = {
             doc.liveRecoveredItems = null;
             setUi((prev) => (prev.recovered ? { ...prev, recovered: null, railOpen: false } : prev));
           },
+          reviewUndo: () => {
+            const review = doc.review;
+            if (!review || !doc.absPath) return;
+            if (doc.pendingApply || doc.applyUnknown || doc.saving) { showNotice('编辑器同步或保存进行中，暂时不能撤销；请稍后再试'); return; }
+            void api('documents.undoGroup', { path: doc.absPath, groupId: review.groupId }).then((result) => {
+              if (!result || result.ok !== true) {
+                showNotice('撤销失败：' + String(result?.error?.message || result?.error?.code || 'unknown'));
+                return;
+              }
+              doc.ignoreRemoteGroupId = result.value?.groupId || null;
+              doc.review = null;
+              showPhase(doc.dirty ? 'dirty' : 'ready', '已撤销本次 AI 修改；磁盘未改变');
+              showNotice('已撤销本次 AI 修改，磁盘未改变');
+            }).catch((error) => showNotice('撤销失败：' + String(error && error.message ? error.message : error)));
+          },
+          reviewKeep: () => {
+            if (!doc.review) return;
+            doc.review = null;
+            doc.ignoreRemoteGroupId = null;
+            showPhase('dirty', '已保留 AI 修改，正在保存');
+            scheduleSave(0);
+          },
+          reviewDiff: () => {
+            const review = doc.review;
+            if (!review || !doc.absPath) return;
+            void api('documents.reviewGroup', { path: doc.absPath, groupId: review.groupId }).then((result) => {
+              if (!result || result.ok !== true) { showNotice('读取差异失败：' + String(result?.error?.message || result?.error?.code || 'unknown')); return; }
+              const changes = Array.isArray(result.value?.changes) ? result.value.changes : [];
+              if (!changes.length) { showNotice('该组没有可显示的差异'); return; }
+              const lines = changes.slice(0, 5).map((change, index) => {
+                const oldText = String(change.removed || '').slice(0, 160);
+                const newText = String(change.insert || '').slice(0, 160);
+                return (index + 1) + '. - ' + oldText + '\n   + ' + newText;
+              });
+              showNotice('AI 修改差异（' + changes.length + ' 处）：\n' + lines.join('\n') + (changes.length > 5 ? '\n…' : ''));
+            }).catch((error) => showNotice('读取差异失败：' + String(error && error.message ? error.message : error)));
+          },
           retry: () => {
             if (doc.staleDraftPending) {
               const slot = doc.staleDraftPending;
@@ -6827,6 +6893,12 @@ const __test = {
         primaryTone = "warn";
         actions.push({ label: "重载磁盘版本", icon: "↻", run: () => st.actions.reloadDisk && st.actions.reloadDisk() });
         actions.push({ label: "复制我的内容", icon: "⧉", run: () => st.actions.copyMine && st.actions.copyMine() });
+      } else if (ui.phase === "review") {
+        primaryText = "AI 修改待确认：" + ui.detail;
+        primaryTone = "warn";
+        actions.push({ label: "撤销本次", icon: "↶", run: () => st.actions.reviewUndo && st.actions.reviewUndo() });
+        actions.push({ label: "保留并保存", icon: "✓", run: () => st.actions.reviewKeep && st.actions.reviewKeep() });
+        actions.push({ label: "查看差异", icon: "≠", run: () => st.actions.reviewDiff && st.actions.reviewDiff() });
       } else if (ui.phase === "recovery" && ui.recovery) {
         primaryText = "↺ 检测到上次关闭时未保存的内容（" + new Date(ui.recovery.ts || Date.now()).toLocaleString() + "）";
         primaryTone = "warn";

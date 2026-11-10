@@ -583,14 +583,14 @@ export function createDocumentsService(deps) {
       if (newText === a.text) return { ok: true, value: resultValue(a, changes, null, false) };
 
       if (a.source === 'buffer') {
-        await checkWritePolicy(a, policy);
+        if (invocation) await checkWritePolicy(a, policy);
         let archived = null;
         try { archived = await checkpoint(a); }
         catch (error) { return fail(error, a); }
         let result;
         try {
           result = await (enqueue || ((_key, action) => action()))(a.canonical, () => live.append(a.canonical, {
-            epoch: a.room.epoch, baseVersion: a.room.version, baseText: a.text, changes, actor: 'agent',
+            epoch: a.room.epoch, baseVersion: a.room.version, baseText: a.text, changes, actor: 'agent', groupId,
           }));
         } catch (error) {
           if (error?.code === 'MP_LIVE_STALE') {
@@ -633,7 +633,7 @@ export function createDocumentsService(deps) {
       // enqueue: apiEdit/apiSave already enter the same per-path queue.
       // apiEdit carries the policy itself; apiSave does not for the local native
       // branch, so enforce the same policy once here for both shapes.
-      await checkWritePolicy(a, policy);
+      if (invocation) await checkWritePolicy(a, policy);
       if (isOldString) {
         const result = await edit({
           path: payload.path, cwd: payload.cwd, oldString: payload.oldString,
@@ -819,6 +819,20 @@ export function createDocumentsService(deps) {
     return { ok: true, value: { ...result.value, clean: true, merged: true } };
   }
 
+  async function reviewGroup(payload) {
+    let target;
+    try { target = await resolve(payload, {}); } catch (error) { return fail(error, null); }
+    const canonicalPath = await canonical(target);
+    if (typeof live.getAgentGroup !== 'function') return fail(coded('MP_GROUP_NOT_FOUND', 'agent group audit is unavailable'), null);
+    const group = await live.getAgentGroup(canonicalPath, payload?.groupId);
+    if (!group) return fail(coded('MP_GROUP_NOT_FOUND', 'agent group is missing'), null);
+    return { ok: true, value: {
+      groupId: group.groupId, actor: group.actor, kind: group.kind, at: group.at,
+      baseRevision: group.baseRevision, resultRevision: group.resultRevision,
+      undoneAt: group.undoneAt, changes: group.changes || [],
+    } };
+  }
+
   async function undoGroup(payload, invocation, policy) {
     let a;
     try { a = await authority(payload, invocation); }
@@ -853,6 +867,6 @@ export function createDocumentsService(deps) {
     return { ok: true, value: { ...result.value, undoOf: groupId } };
   }
 
-  return { read, applyEdits, state, recover, discardRecovery, undoGroup, merge3 };
+  return { read, applyEdits, state, recover, discardRecovery, undoGroup, merge3, reviewGroup };
 }
 
