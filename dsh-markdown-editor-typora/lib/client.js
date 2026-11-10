@@ -5703,17 +5703,23 @@ const __test = {
               if(consumed?.docToken && consumed.docToken!==tokenAtApply){try{Promise.resolve(draftStore()?.clear?.(pathAtApply,consumed.docToken,consumed.session)).then(inspectStoreResult).catch(error=>showNotice('恢复记录清理失败：'+String(error)));}catch(e){}}
             });
             doc.recovery=null;doc.recoveryBackupFailed=false;
-          }else if(pending.opts.discard){clearRecoverySlot(null,doc.absPath);doc.recovery=null;}
+          }else if(pending.opts.discard){clearRecoverySlot(null,doc.absPath);doc.recovery=null;clearPersistedReview();}
           if(doc.dead){persistCurrentRecovery();return;}
-          showPhase(doc.dirty?'dirty':'ready',restore?'已恢复未保存内容（未写盘，按 Ctrl+S 保存）':pending.firstOpen?'':'已同步磁盘更新');
+          if (doc.review) {
+            const multi = reviewIsMulti(doc.review);
+            showPhase("review", "AI 修改了 " + doc.review.count + " 处" + (multi ? "（共 " + doc.review.groups.length + " 组）" : "") + "，保存前请确认");
+          } else {
+            showPhase(doc.dirty?'dirty':'ready',restore?'已恢复未保存内容（未写盘，按 Ctrl+S 保存）':pending.firstOpen?'':'已同步磁盘更新');
+          }
           if(doc.dirty && !doc.composing && !restore)scheduleSave(SAVE_DEBOUNCE_MS);
           if(pending.firstOpen){
             const atEdit=doc.editSeq;
             Promise.resolve(draftStore()?.readLatest?.(doc.absPath)).then(async saved=>{
               const slot=saved??readRecoverySlot(null,doc.absPath);
-              if(!alive() || doc.editSeq!==atEdit || doc.dirty || !slot || typeof slot.text!=='string')return;
+              if(!alive() || doc.editSeq!==atEdit || doc.dirty || !slot || typeof slot.text!=='string'){ if(!slot) clearPersistedReview(); return; }
               if(slot.text===doc.text){
                 // The draft carries no pending work: it already matches the disk text.
+                clearPersistedReview();
                 try {
                   if(typeof slot.docToken==='string' && slot.docToken) inspectStoreResult(await draftStore()?.clear?.(doc.absPath,slot.docToken,slot.session));
                   await settleLegacySlot(slot.text);
@@ -5726,6 +5732,7 @@ const __test = {
               if(!sameRecoveryBase(slot,doc.lastVersion)){
                 const archived=await archiveDraftSlot(slot,'stale-draft');
                 if(archived){
+                  clearPersistedReview();
                   doc.staleDraftPending=null;
                   if(alive() && doc.phase==='recovery')showPhase(doc.dirty?'dirty':'ready','');
                   return;
@@ -5884,13 +5891,17 @@ const __test = {
         }
         function restorePersistedReview() {
           const storage = reviewStorage();
-          if (!storage || !doc.absPath || !doc.dirty) return false;
+          if (!storage || !doc.absPath) return false;
           let record = null;
           try { record = normalizeReviewRecord(storage.getItem(reviewStoreKey(doc.absPath)), doc.absPath, doc.lastVersion); } catch (e) { record = null; }
           if (!record) {
             clearPersistedReview();
             return false;
           }
+          // A clean open may still be followed by the async recovery-slot probe.
+          // Keep the record until that probe proves there is no unsaved content;
+          // otherwise the recovery banner and the review would lose each other.
+          if (!doc.dirty) return false;
           // Provisional review is installed synchronously, before any autosave
           // timer can write the AI changes; host validation follows async.
           doc.review = mergeReviewGroup(null, record.groups[0], record.count - (record.groups.length - 1));
