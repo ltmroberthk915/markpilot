@@ -6779,11 +6779,17 @@ const __test = {
           reviewDiff: () => {
             const review = doc.review;
             if (!review || !doc.absPath) return;
-            const groupId = reviewUndoGroup(review);
-            if (!groupId) return;
-            void api('documents.reviewGroup', { path: doc.absPath, groupId }).then((result) => {
+            const groupIds = Array.isArray(review.groups) ? review.groups.slice() : [];
+            if (!groupIds.length) return;
+            void api('documents.reviewGroups', { path: doc.absPath, groupIds }).then((result) => {
               if (!result || result.ok !== true) { showNotice('读取差异失败：' + String(result?.error?.message || result?.error?.code || 'unknown')); return; }
-              const changes = Array.isArray(result.value?.changes) ? result.value.changes : [];
+              const groups = Array.isArray(result.value?.groups) ? result.value.groups : [];
+              const changes = [];
+              for (const group of groups) {
+                for (const change of Array.isArray(group.changes) ? group.changes : []) {
+                  changes.push({ ...change, group: group.index });
+                }
+              }
               if (!changes.length) { showNotice('该组没有可显示的差异'); return; }
               doc.reviewDiff = changes;
               setUi((prev) => ({ ...prev, reviewDiff: changes, railOpen: true }));
@@ -7083,7 +7089,7 @@ const __test = {
                 onClick: () => { try { st.actions.closeReviewDiff && st.actions.closeReviewDiff(); } catch (e) { /* 忽略 */ } },
               }, "收起")),
             ...reviewDiffItems.slice(0, 12).map((change, index) => h("div", { key: "review-diff-" + index, style: { padding: "5px 0", borderTop: "1px solid color-mix(in srgb, currentColor 10%, transparent)" } },
-              h("div", { style: { opacity: 0.65, marginBottom: 3 } }, "修改 " + (index + 1) + (change.to > change.from ? "（替换 " + (change.to - change.from) + " 字符）" : "（插入）")),
+              h("div", { style: { opacity: 0.65, marginBottom: 3 } }, (change.group ? "第 " + change.group + " 组 · " : "") + "修改 " + (index + 1) + (change.to > change.from ? "（替换 " + (change.to - change.from) + " 字符）" : "（插入）")),
               String(change.removed || "").length ? h("pre", { style: { margin: "2px 0", padding: "4px 6px", whiteSpace: "pre-wrap", wordBreak: "break-word", background: "color-mix(in srgb, #d33 14%, transparent)", borderRadius: 4, fontSize: 11.5 } }, "- " + String(change.removed).slice(0, 1500)) : null,
               h("pre", { style: { margin: "2px 0", padding: "4px 6px", whiteSpace: "pre-wrap", wordBreak: "break-word", background: "color-mix(in srgb, #2a7 14%, transparent)", borderRadius: 4, fontSize: 11.5 } }, "+ " + String(change.insert || "").slice(0, 1500))))) : null,
           recoveredItems.length ? h("div", { className: "mp-rail-head", style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 8 } },

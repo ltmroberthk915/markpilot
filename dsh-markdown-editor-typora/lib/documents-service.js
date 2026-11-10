@@ -833,6 +833,23 @@ export function createDocumentsService(deps) {
     } };
   }
 
+  async function reviewGroups(payload) {
+    let target;
+    try { target = await resolve(payload, {}); } catch (error) { return fail(error, null); }
+    const canonicalPath = await canonical(target);
+    if (typeof live.getAgentGroup !== 'function') return fail(coded('MP_GROUP_NOT_FOUND', 'agent group audit is unavailable'), null);
+    const ids = Array.isArray(payload?.groupIds) ? payload.groupIds.slice(0, 20) : [];
+    if (ids.length === 0 || ids.some((id) => !/^[0-9a-f-]{36}$/i.test(String(id))))
+      return fail(coded('MP_GROUP_NOT_FOUND', 'groupIds is invalid'), null);
+    const groups = [];
+    for (let index = 0; index < ids.length; index += 1) {
+      const group = await live.getAgentGroup(canonicalPath, String(ids[index]));
+      if (!group) return fail(coded('MP_GROUP_NOT_FOUND', 'agent group is missing'), null);
+      groups.push({ index: index + 1, groupId: group.groupId, at: group.at, kind: group.kind, changes: group.changes || [] });
+    }
+    return { ok: true, value: { groups } };
+  }
+
   async function undoGroups(payload, invocation, policy) {
     let a;
     try { a = await authority(payload, invocation); }
@@ -916,6 +933,6 @@ export function createDocumentsService(deps) {
     return { ok: true, value: { ...result.value, undoOf: groupId } };
   }
 
-  return { read, applyEdits, state, recover, discardRecovery, undoGroup, undoGroups, merge3, reviewGroup };
+  return { read, applyEdits, state, recover, discardRecovery, undoGroup, undoGroups, merge3, reviewGroup, reviewGroups };
 }
 

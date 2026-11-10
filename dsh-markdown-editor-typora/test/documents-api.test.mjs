@@ -419,6 +419,11 @@ test('B4.2B-API2 multi-group review undo restores the whole sequence', async () 
       path: w.file, baseRevisionId: secondRead.value.version, oldString: 'two', newString: 'TWO',
     }, MODEL_TOOL, execution(w.root));
     assert.equal(second.ok, true, JSON.stringify(second));
+    const reviewed = await host.dispatch('documents.reviewGroups', { path: w.file, groupIds: [first.value.groupId, second.value.groupId] });
+    assert.equal(reviewed.ok, true, JSON.stringify(reviewed));
+    assert.equal(reviewed.value.groups.length, 2);
+    assert.equal(reviewed.value.groups[0].changes[0].insert, 'ONE');
+    assert.equal(reviewed.value.groups[1].changes[0].insert, 'TWO');
     const undone = await host.dispatch('documents.undoGroups', { path: w.file, groupIds: [first.value.groupId, second.value.groupId] });
     assert.equal(undone.ok, true, JSON.stringify(undone));
     const after = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
