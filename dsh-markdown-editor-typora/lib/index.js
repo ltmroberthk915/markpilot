@@ -1565,7 +1565,7 @@ export function createHost(options = {}) {
       if (authority === MODEL_TOOL) {
         const session = execution?.agent?.session;
         let policy;
-        if ((endpoint === 'edit' || endpoint === 'documents.applyEdits') && fs.sandboxMode !== undefined) {
+        if ((endpoint === 'edit' || endpoint === 'documents.applyEdits' || endpoint === 'documents.undoGroup') && fs.sandboxMode !== undefined) {
           policy = await options.sandboxPolicy?.()?.resolve(session ? {session} : {});
           if (!policy?.mode) throw codedError('FS_SANDBOX_DENIED', 'Cannot resolve filesystem policy for this tool call');
         }

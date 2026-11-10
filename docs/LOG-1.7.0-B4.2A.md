@@ -28,6 +28,7 @@
 - `action` 增加 `undo`，参数 `groupId`。
 - 输出 `undoOf`、新 `groupId`、新版本、`saved/dirty`。
 - render 显示“已撤销 AI 编辑组”。
+- 真机：临时文件块编辑 → `undo` 首次因 `documents.undoGroup` 未进入沙箱 policy 解析而 `FS_SANDBOX_DENIED`；把该端点加入 policy 解析后同一 `groupId` 撤销成功，正文恢复 `# B\nbeta`，临时文件已删除。
 
 ## 4. 测试
 
