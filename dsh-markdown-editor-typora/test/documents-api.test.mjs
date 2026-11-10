@@ -301,6 +301,32 @@ test('B4.1-API1 markdown blocks/edit blockId goes through the live room and retu
   } finally { w.restore(); }
 });
 
+test('B4.2A-API2 undo resolves the same sandbox policy as edit', async () => {
+  const w = await makeWorld('undo-policy', '# A\nalpha\n\n# B\nbeta\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    await liveDocs.join(w.file, '# A\nalpha\n\n# B\nbeta\n');
+    const sandboxed = provider(w.file);
+    sandboxed.sandboxMode = 'workspace-write';
+    const host = createHost({
+      fs: sandboxed, liveDocuments: liveDocs, log: { warn() {} },
+      sandboxPolicy: () => ({ resolve: () => ({ mode: 'workspace-write', workspaceRoot: w.root }) }),
+    });
+    const tool = createMarkdownToolDefinition(host.dispatch);
+    const blocks = await tool.execute({ action: 'blocks', path: w.file }, execution(w.root));
+    const edit = await tool.execute({
+      action: 'edit', path: w.file, blockId: blocks.blocks[1].id,
+      newString: '# B\nBETA\n', baseVersion: blocks.readToken,
+    }, execution(w.root));
+    assert.equal(edit.ok, true, JSON.stringify(edit));
+    const undo = await tool.execute({ action: 'undo', path: w.file, groupId: edit.groupId }, execution(w.root));
+    assert.equal(undo.ok, true, JSON.stringify(undo));
+    const after = await tool.execute({ action: 'read', path: w.file }, execution(w.root));
+    assert.equal(after.text, '# A\nalpha\n\n# B\nbeta\n');
+    host.close();
+  } finally { w.restore(); }
+});
+
 test('B3-API8 UI recovery restores an append copy through disk CAS and discard removes it', async () => {  const w = await makeWorld('recover', 'hello\n');
   try {
     const liveDocs = new LiveDocuments({ directory: w.live });

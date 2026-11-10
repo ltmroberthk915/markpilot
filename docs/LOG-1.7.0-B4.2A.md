@@ -34,10 +34,10 @@
 
 ```text
 npm test
-tests 437, pass 436, fail 0, skipped 1
+tests 438, pass 437, fail 0, skipped 1
 ```
 
-- `B4.1-API1`：块编辑 → `agent_group` 有记录 → `undo` → 正文恢复 → 旧组 `undoneAt` 已置。
+- `B4.1-API1`：块编辑 → `agent_group` 有记录 → `undo` → 正文恢复 → 旧组 `undoneAt` 已置。`B4.2A-API2` 覆盖沙箱 policy 下的 edit→undo。
 - 既有 B3/B4.1 测试全绿；撤销复用原有写路径，因此 buffer/disk 两态都被既有测试覆盖。
 
 ## 5. 未做/边界
