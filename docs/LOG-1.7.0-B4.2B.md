@@ -36,7 +36,7 @@ AI 修改 buffer 后：
 
 ```text
 npm test
-tests 444, pass 443, fail 0, skipped 1
+tests 445, pass 444, fail 0, skipped 1
 ```
 
 - `B4.2B-R1`：append 的 `groupId` 进入 exchange updates。
@@ -63,4 +63,4 @@ tests 444, pass 443, fail 0, skipped 1
 - 真机：review 未决时直接关闭编辑面，磁盘仍为原 hash；重开后出现“检测到上次关闭时未保存的内容”，可选择恢复/丢弃。
 - 真机：多组入口按 `review.groups` 累积；按钮显示“撤销最近一组”，撤销后提示更早组仍保留。
 - 差异面板：显示红/绿行、修改序号/替换长度；最多 12 处、每处 1500 字符。
-- 未做自动化：多组、关闭/重开、Ctrl+S 拦截仍是真机用例，客户端状态机测试仍缺。
+- 多组 review 状态（累积、最近组、multi 判定、保存抑制）已加入 `test/client.test.mjs`；关闭/重开、Ctrl+S 拦截仍为真机用例。
