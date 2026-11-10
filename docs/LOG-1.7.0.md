@@ -113,16 +113,22 @@ git diff --numstat README.md        → 11 0（只增不删）
 
 ### 4.4 实装与热载验证
 
-- 主树 `main` 已 fast-forward 到 `c2483f0`；profile 的 `node_modules/dsh-markdown-editor-typora` 是指向主树插件目录的 junction，安装版 `package.json` 读取为 **1.7.0**。
+- 主树 `main` 已 fast-forward 到 `c2483f0`，随后叠加真机修复 `229a3f9`、`d7fca4e`、`f11f5cc`；profile 的 `node_modules/dsh-markdown-editor-typora` 是指向主树插件目录的 junction，安装版 `package.json` 读取为 **1.7.0**。
 - `plugin_manager` 对 `include:dsh-markdown-editor-typora` 执行 disable → enable，两次均返回 `application:"applied"`，强制宿主重载插件（无需重启整个 DSH）。
-- 通过宿主 Node inspector（`127.0.0.1:9230`）只读检查 host graph：`generation: 2`、`digest: 4b4c484d8f11`、`hosts: 1`、`retired: active`，`hasAppend/readRoom=true` —— 运行中的 `LiveDocuments` 已包含 1.7.0 新增方法。
+- 重启前热载时通过宿主 Node inspector（`127.0.0.1:9230`）只读检查 host graph：`generation: 2`、`digest: 4b4c484d8f11`、`hosts: 1`、`retired: active`，`hasAppend/readRoom=true` —— 热载的 `LiveDocuments` 已包含 1.7.0 新增方法。
+- 干净重启后，`markdown` 工具直接出现在本会话工具表；MarkPilot 打开文档后 `rooms.sqlite` 有 1 个房间（client pid 40744），证明 1.7.0 在启动路径正常加载。
 - **真机首测发现两个阻断**（本会话 Agent preset 未暴露 markdown 工具，是因为工具没注册成功，不是 preset 问题）：
   1. `@deepseek-ai/dsh-tools` 在 junction/npm 安装形态下不在插件 ESM 解析路径；`registerMarkdownTool` 的 `import()` 失败后只告警，`markdown` 工具**从未注册**。宿主 tools 服务实测 global data 44 条，无 `markdown`。修复：`registerMarkdownTool` 捕获导入失败后，用 `authorSchemaToRegistrySchema` 将 author DSL 转成 `tools.register` 接受的 JSON Schema 回退注册（`229a3f9`）。真机 schema 探针注册→`has:true`→dispose 通过；重载后工具进入 tools 表，本会话可直接调用。
   2. `read` 渲染把 revision token 截到 16 字符，模型拿不到完整 `baseVersion`，无法安全回写 buffer。修复：渲染完整 `version: ...`（`d7fca4e`）；新增断言 `rev1:live:...` 完整出现。
 - 真机通过工具调用：
-  - `markdown.read` → `source:"disk"`、完整 `rev1:disk:<providerVersion>:<sha256>`；
+  - `markdown.read` 对未打开的临时文件 → `source:"disk"`、完整 `rev1:disk:<providerVersion>:<sha256>`；
   - `markdown.edit` 对磁盘文件写入 → `saved:true`，改后 token 与写后复读一致。
-- **缓冲区路径本机未完成**：MarkPilot 编辑器打开文档时 `%LOCALAPPDATA%\.markpilot\live-v1\rooms.sqlite` 的 `rooms` 表为 0，工具读仍返回 disk；判定为热重载后旧 iframe 的 live 会话未重建，需要**干净重启 DSH** 后重新打开文档复测，不是 host service 的结论。复测判据不变：先改一段不保存 → read 应 `source:"buffer"`、`dirty:true`、`rev1:live:`；再 AI 改另一段 → `saved:false`、编辑区立即出现、磁盘此刻不变，并给 `agent-before` 路径。
+- **缓冲区完整链路（干净重启后）**：MarkPilot 打开 `_diag\xhs\北交所博士后笔试-优化版.md`，`rooms.sqlite` 出现 1 个房间（client pid 40744、version 0、saved 0）。
+  1. clean read → `source:"buffer"`、`rev1:live:<epoch>:0:<sha256(原文)>`；
+  2. 在编辑器末尾键入 `MP-B3-PROBE`（状态栏“未保存”），read → `source:"buffer"`、`dirty:true`、版本 `:2:`、文本 78067；
+  3. AI edit `MP-B3-PROBE → MP-B3-AFTER`，base 用上一步 token → `saved:false`、新版本 `:3:`、`改前副本 C:\Users\Ming\AppData\Local\.markpilot\draft-archive\北交所博士后笔试-优化版.md.agent-before.96b36f80c8cf17cc.md`；编辑器立即显示 `MP-B3-AFTER`，随后既有自动保存落盘；
+  4. 反向两次 edit（`→MP-B3-PROBE`、`→''`）恢复到版本 `:5:`，sha 与原文逐字节相同；最终磁盘 SHA-256 `69d0c9ad…`、173036 字节，及备份 `69d0c9ad…` 一致；checkpoint 内容含 `MP-B3-PROBE`、78067 字符。
+  5. 持续空格/退格制造未保存状态时 read → `含未保存修改`、版本 `:31:`；停止后自动保存，房间 `version=saved=185`、`floor=128`，磁盘恢复原 SHA-256。全程未改用户正文，sentinel 仅出现在测试期间及 `agent-before` 副本。
 
 ## 5. 对抗审阅
 
