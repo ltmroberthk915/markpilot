@@ -12,7 +12,7 @@
 | 2 | B3.3b | `liveUnsupported` 文件的宿主草稿索引 | 可能小改 client | B3.3a |
 | 3 | B4.1 | 文档块解析、块 ID、`readToken`/`groupId` 审计（已完成） | 否（host-only） | B3.2 |
 | 4 | B4.2 | AI 编辑审查/撤销组、审阅前不自动落盘（4.2a host 撤销已完成；4.2b renderer 待批准） | **是**（renderer/core） | B4.1 |
-| 5 | B4.3 | diff3/冲突合并、批量编辑协议 | 是 | B4.2 |
+| 5 | B4.3 | diff3/冲突合并、批量编辑协议（批量 4.3a 已完成；diff3 待做） | 部分 | B4.2 |
 | 6 | B5 | 内核权威 buffer/CRDT、通用 fs patch/move 守卫 | 是（内核） | B4 稳定后 |
 
 **建议**：先做 1，再做 3；2 与 4 可并行评估，但不要先动 B5。
@@ -92,7 +92,7 @@ AI 改完后用户能先看再决定，而不是 1.5s 自动保存。
 
 改 core/renderer 需完整构建、五通道交互测试、真机截图；会触及 B3.1 不变的 renderer 字节契约，必须在设计对抗中明确版本与 coreHash。
 
-## 6. B4.3 · diff3/批量协议
+## 6. B4.3 · diff3/批量协议（批量 4.3a 已完成）
 
 - 用户与 AI 同段冲突：共同 base + diff3；不能自动合并时给出三栏/逐块选择。
 - 连续 AI append 批量提交，避免每笔触发 auto-save/STALE 退避。
