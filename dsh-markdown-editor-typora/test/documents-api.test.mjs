@@ -282,11 +282,13 @@ test('B4.1-API1 markdown blocks/edit blockId goes through the live room and retu
       newString: '## B\nBETA\n', baseVersion: blocks.readToken,
     }, execution(w.root));
     assert.equal(edit.ok, true, JSON.stringify(edit));
-    assert.equal(edit.blockId, target.id);
+    assert.notEqual(edit.blockId, target.id);
     assert.match(edit.groupId, /^[0-9a-f-]{36}$/);
     assert.equal(edit.saved, false);
     const after = await tool.execute({ action: 'read', path: w.file }, execution(w.root));
     assert.equal(after.text, '# A\nalpha\n\n## B\nBETA\n');
+    const afterBlocks = await tool.execute({ action: 'blocks', path: w.file }, execution(w.root));
+    assert.equal(afterBlocks.blocks.some((b) => b.id === edit.blockId), true);
     host.close();
   } finally { w.restore(); }
 });

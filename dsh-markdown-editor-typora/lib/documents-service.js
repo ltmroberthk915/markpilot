@@ -131,11 +131,12 @@ export function parseDocumentBlocks(text) {
   for (const line of lineAt) {
     const trimmed = line.text.replace(/^\s{0,3}/, '');
     if (fence) {
-      if (trimmed.startsWith(fence)) fence = null;
+      const close = new RegExp('^\\s{0,3}' + (fence.char === '`' ? '`' : '~') + '{' + fence.length + ',}\\s*$');
+      if (close.test(line.text)) fence = null;
       continue;
     }
     const f = /^(`{3,}|~{3,})/.exec(trimmed);
-    if (f) { fence = f[1][0]; continue; }
+    if (f) { fence = { char: f[1][0], length: f[1].length }; continue; }
     const m = /^(#{1,6})\s+(.+?)\s*$/.exec(line.text);
     if (m) starts.push({ from: line.from, level: m[1].length, title: m[2] });
   }
@@ -151,16 +152,22 @@ export function parseDocumentBlocks(text) {
       preview: body.split('\n').map((line) => line.trim()).find((line) => line.length > 0) || '',
     });
   }
-  if (starts.length === 0 || starts[0].from > 0) {
-    const end = starts.length ? starts[0].from : src.length;
-    const body = src.slice(0, end);
+  if (starts.length === 0) {
+    const body = src;
     if (body.length > 0) {
-      ranges.unshift({
-        id: `b0-${sha256Text(body).slice(0, 8)}`, ordinal: 0, kind: 'preamble', level: 0,
-        title: '(preamble)', from: 0, to: end, textLength: body.length,
+      ranges.push({
+        id: `b0-${sha256Text(body).slice(0, 8)}`, ordinal: 0, kind: 'document', level: 0,
+        title: '(document)', from: 0, to: src.length, textLength: body.length,
         preview: body.split('\n').map((line) => line.trim()).find((line) => line.length > 0) || '',
       });
     }
+  } else if (starts[0].from > 0) {
+    const body = src.slice(0, starts[0].from);
+    ranges.unshift({
+      id: `b0-${sha256Text(body).slice(0, 8)}`, ordinal: 0, kind: 'preamble', level: 0,
+      title: '(preamble)', from: 0, to: starts[0].from, textLength: body.length,
+      preview: body.split('\n').map((line) => line.trim()).find((line) => line.length > 0) || '',
+    });
   }
   return ranges;
 }
@@ -450,17 +457,22 @@ export function createDocumentsService(deps) {
     const isEdits = Array.isArray(payload?.edits);
 
     try {
-      let changes, newText, diskBase = null;
+      let changes, newText, diskBase = null, block = null;
+      if (isBlock && isOldString) return fail(coded('bad-request', 'blockId and oldString are mutually exclusive'), a);
       if (isBlock) {
         if (typeof payload.newString !== 'string') return fail(coded('bad-request', 'newString is required'), a);
-        const block = findDocumentBlock(a.text, payload.blockId);
+        block = findDocumentBlock(a.text, payload.blockId);
         if (!block) return fail(coded('MP_BLOCK_NOT_FOUND', 'block id no longer matches this document; read blocks again'), a);
         if (a.source === 'buffer') requireBufferBase(a, rawBase);
         else {
           if (!rawBase) return fail(coded('MP_DOC_STALE', 'baseRevisionId is required for block edits'), a);
           diskBase = requireDiskBase(a, rawBase, { required: true });
         }
-        changes = [{ from: block.from, to: block.to, insert: normalizeEol(payload.newString) }];
+        let replacement = normalizeEol(payload.newString);
+        // A non-last section must end on a new line or the next heading would
+        // be glued to the replacement text ("BETA## C").
+        if (block.to < a.text.length && !replacement.endsWith('\n')) replacement += '\n';
+        changes = [{ from: block.from, to: block.to, insert: replacement }];
         newText = applyChanges(a.text, changes);
       } else if (isOldString) {
         if (typeof payload.newString !== 'string') return fail(coded('bad-request', 'newString is required'), a);
@@ -522,6 +534,7 @@ export function createDocumentsService(deps) {
           throw error;
         }
         const revisionId = makeLiveRevisionId(result.epoch, result.version, result.textSha256);
+        const newBlockId = block ? parseDocumentBlocks(newText).find((b) => b.ordinal === block.ordinal)?.id : null;
         return {
           ok: true,
           value: {
@@ -530,7 +543,7 @@ export function createDocumentsService(deps) {
             version: revisionId,
             textSha256: result.textSha256, dirty: true, saved: false,
             applied: appliedOf(changes), checkpoint: archived, textLength: result.text.length,
-            ...(isBlock ? { blockId: payload.blockId, groupId } : {}),
+            ...(isBlock ? { blockId: newBlockId, previousBlockId: block.id, groupId } : {}),
             ...(typeof result.recoveryPath === 'string' && result.recoveryPath ? { recoveryPath: result.recoveryPath } : {}),
           },
         };
@@ -551,7 +564,11 @@ export function createDocumentsService(deps) {
         const version = String(result.value.version);
         const actual = await rereadDiskText(payload, invocation, version, newText);
         const value = diskResult(a, version, sha256Text(actual), changes, actual);
-        if (isBlock) { value.blockId = payload.blockId; value.groupId = groupId; }
+        if (isBlock) {
+          value.blockId = parseDocumentBlocks(actual).find((b) => b.ordinal === block.ordinal)?.id || null;
+          value.previousBlockId = block.id;
+          value.groupId = groupId;
+        }
         return { ok: true, value };
       }
       const result = await save({ path: payload.path, cwd: payload.cwd ?? invocation?.cwd, text: newText, baseVersion: diskBase });
@@ -559,7 +576,11 @@ export function createDocumentsService(deps) {
       const version = String(result.value.version);
       const actual = await rereadDiskText(payload, invocation, version, newText);
       const value = diskResult(a, version, sha256Text(actual), changes, actual);
-      if (isBlock) { value.blockId = payload.blockId; value.groupId = groupId; }
+      if (isBlock) {
+        value.blockId = parseDocumentBlocks(actual).find((b) => b.ordinal === block.ordinal)?.id || null;
+        value.previousBlockId = block.id;
+        value.groupId = groupId;
+      }
       return { ok: true, value };
     } catch (error) {
       return fail(error, a);

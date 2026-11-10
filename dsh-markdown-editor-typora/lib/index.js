@@ -1962,6 +1962,7 @@ export function createMarkdownToolDefinition(dispatch) {
       '冲突纪律：MP_DOC_STALE 表示读取后正文又被改过——必须重新 read 拿新的 version（revision token）再重试，绝不沿用旧值；',
       'MP_DOC_EXTERNAL_CONFLICT / MP_DOC_ORPHAN_DRAFT 必须让用户先在编辑器里处理冲突或恢复草稿。',
       'MP_DOC_UNSAVED_ELSEWHERE 表示另一窗口有未保存修改，AI 不能改；请让用户先在那里保存。',
+      'MP_BLOCK_NOT_FOUND 表示块 ID 已因正文变化失效——重新调用 blocks，绝不猜 ID。',
       '共享会话失效（MP_LIVE_*）或归档失败（MP_ARCHIVE_FAILED）时不要改用其它写工具，重新 read 或让用户重试。',
     ].join(' '),
     parameters: {
@@ -1985,6 +1986,8 @@ export function createMarkdownToolDefinition(dispatch) {
           readToken: { type: 'string' },
           blockId: { type: 'string' },
           groupId: { type: 'string' },
+          totalBlocks: { type: 'number' },
+          truncated: { type: 'boolean' },
           blocks: {
             type: 'array',
             items: {
@@ -2043,8 +2046,9 @@ export function createMarkdownToolDefinition(dispatch) {
         }
         if (value.action === 'blocks') {
           const blocks = Array.isArray(value.blocks) ? value.blocks : [];
-          const lines = blocks.slice(0, 200).map((b) => `- ${b.id}  ${b.kind === 'heading' ? '#'.repeat(b.level) + ' ' : ''}${b.title}  (${b.textLength} 字符) ${b.preview ? '— ' + String(b.preview).slice(0, 80) : ''}`);
-          return textBlock(`块列表：${value.displayPath ?? ''}（${blocks.length} 个）\nreadToken: ${String(value.readToken ?? value.version ?? '')}\n${lines.join('\n')}${blocks.length > 200 ? '\n…（仅显示前 200 个）' : ''}`);
+          const total = Number.isFinite(Number(value.totalBlocks)) ? Number(value.totalBlocks) : blocks.length;
+          const lines = blocks.map((b) => `- ${b.id}  ${b.kind === 'heading' ? '#'.repeat(b.level) + ' ' : ''}${b.title}  (${b.textLength} 字符) ${b.preview ? '— ' + String(b.preview).slice(0, 80) : ''}`);
+          return textBlock(`块列表：${value.displayPath ?? ''}（${blocks.length}/${total} 个）\nreadToken: ${String(value.readToken ?? value.version ?? '')}\n${lines.join('\n')}${value.truncated ? '\n…（仅显示前 200 个）' : ''}`);
         }
         const target = value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘；请让用户确认后自行保存';
         const copy = value.checkpointPath ? `；改前副本：${value.checkpointPath}` : '';
@@ -2061,10 +2065,12 @@ export function createMarkdownToolDefinition(dispatch) {
           if (result.ok !== true) return { ok: false, action, error: result.error };
           const value = result.value;
           if (action === 'blocks') {
+            const all = parseDocumentBlocks(String(value.text ?? ''));
+            const blocks = all.slice(0, 200);
             return {
               ok: true, action, version: value.version, revisionId: value.revisionId, readToken: value.readToken || value.version,
               displayPath: value.displayPath, source: value.source, dirty: value.dirty === true,
-              blocks: parseDocumentBlocks(String(value.text ?? '')),
+              blocks, totalBlocks: all.length, truncated: all.length > blocks.length,
             };
           }
           return {

@@ -405,7 +405,9 @@ test('B4.1-S1 block parser finds heading sections, ignores fences, and IDs are c
   assert.equal(blocks[1].level, 2);
   assert.equal(findDocumentBlock(text, blocks[1].id).title, 'B');
   assert.equal(findDocumentBlock(text, 'b1-deadbeef'), null);
-  assert.equal(parseDocumentBlocks('```\n# fenced\n```\n')[0].kind, 'preamble');
+  assert.equal(parseDocumentBlocks('```\n# fenced\n```\n')[0].kind, 'document');
+  const fenced = parseDocumentBlocks('# A\na\n```js\ncode\n``` trailing\n# fake\n```\n## B\nb\n');
+  assert.deepEqual(fenced.map((b) => b.title), ['A', 'B']);
   const changed = text.replace('beta', 'BETA');
   assert.notEqual(parseDocumentBlocks(changed)[1].id, blocks[1].id);
 });
@@ -418,7 +420,9 @@ test('B4.1-S2 block edit replaces exactly the selected section through buffer ap
   const token = makeLiveRevisionId(room.epoch, room.version, sha256Text(room.text));
   const result = await w.service.applyEdits({ path: w.file, blockId: block.id, newString: '## B\nBETA\n', baseRevisionId: token }, {}, undefined);
   assert.equal(result.ok, true, JSON.stringify(result));
-  assert.equal(result.value.blockId, block.id);
+  assert.notEqual(result.value.blockId, block.id);
+  assert.equal(result.value.previousBlockId, block.id);
+  assert.equal(parseDocumentBlocks('# A\nalpha\n\n## B\nBETA\n').find((b) => b.ordinal === 2).id, result.value.blockId);
   assert.match(result.value.groupId, /^[0-9a-f-]{36}$/);
   assert.equal(w.calls.append.length, 1);
   assert.deepEqual(w.calls.append[0].changes, [{ from: block.from, to: block.to, insert: '## B\nBETA\n' }]);
@@ -447,4 +451,26 @@ test('B4.1-S4 block edit on an unopened file writes through the disk CAS', async
   assert.equal(w.calls.save.length, 1);
   assert.equal(w.calls.save[0].text, '# A\nalpha\n\n# B\nBETA\n');
   assert.equal(w.calls.save[0].baseVersion, 'v1');
+});
+
+test('B4.1-S5 a non-last block replacement without a trailing newline cannot swallow the next heading', async () => {
+  const text = '# A\na\n\n# B\nb\n';
+  const w = makeWorld({ text });
+  const read = await w.service.read({ path: w.file }, {});
+  const block = parseDocumentBlocks(text)[0];
+  const result = await w.service.applyEdits({ path: w.file, blockId: block.id, newString: '# A\nA2', baseRevisionId: read.value.version }, {}, undefined);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(w.calls.save[0].text, '# A\nA2\n# B\nb\n');
+  assert.deepEqual(parseDocumentBlocks(w.calls.save[0].text).map((b) => b.title), ['A', 'B']);
+});
+
+test('B4.1-S6 blockId and oldString together are rejected before any write', async () => {
+  const text = '# A\na\n';
+  const room = { epoch: 'e-1', version: 2, savedVersion: 2, diskHash: 'd1', text, savedText: text, savedTextAvailable: true, members: 1, textSha256: sha256Text(text) };
+  const w = makeWorld({ room, text });
+  const block = parseDocumentBlocks(text)[0];
+  const result = await w.service.applyEdits({ path: w.file, blockId: block.id, oldString: 'a', newString: 'b', baseRevisionId: makeLiveRevisionId(room.epoch, room.version, sha256Text(text)) }, {}, undefined);
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, 'bad-request');
+  assert.equal(w.calls.append.length, 0);
 });

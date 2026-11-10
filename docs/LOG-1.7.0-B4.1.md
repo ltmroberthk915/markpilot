@@ -39,7 +39,7 @@
 
 ```text
 npm test
-tests 435, pass 434, fail 0, skipped 1
+tests 437, pass 436, fail 0, skipped 1
 ```
 
 - `B4.1-S1`：heading/fence/preamble、ID 内容绑定、旧 ID 拒绝。
@@ -52,5 +52,18 @@ tests 435, pass 434, fail 0, skipped 1
 
 - 不解析 setext/列表/表格/行内格式；不提供选区锚点。
 - `groupId` 目前只返回，未持久化到审计表；B4.2 审查组再落库。
-- `blocks` 一次返回全部 section（限 200 行 render）；超大文档的解析/输出后续可加 `maxBlocks`。
-- 对抗审阅待归档；如有 P0 再补。
+- `blocks` 一次最多返回 200 个（`totalBlocks/truncated` 标明截断）；超大文档的解析/输出后续可加按需分页。
+- 无 ATX 标题的文档标记为单个 `kind:'document'` 块，避免把纯段落误当普通 section。
+
+## 7. 对抗修正
+
+`.mp-verify/b4.1/ADVERSARIAL.md` 未发现 P0，6 条 P1/P2 已处理：
+
+- **围栏闭合**：改为按开围栏长度校验，关闭行不允许尾随 info string；` ``` trailing ` 不再提前闭合。
+- **返回的 blockId**：编辑后返回**新块 ID**（`previousBlockId` 为旧 ID），不再给模型一个立刻失效的 ID。
+- **非末块尾随换行**：newString 无尾随 `\n` 时由服务端补一个，避免吞掉下一标题；`B4.1-S5` 固化。
+- **无标题文档**：单块标 `kind:'document'`，不冒充普通 section。
+- **blockId + oldString 同时给出**：`bad-request`，不做二选一猜测。
+- **blocks 上限**：工具层截 200 并返回 `totalBlocks/truncated`；错误码写进工具说明。
+- 未处理（已登记）：CRLF 磁盘夹具混合换行取证、`groupId` 尚无消费者、setext 标题不解析。
+
