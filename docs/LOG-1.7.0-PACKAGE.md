@@ -30,7 +30,7 @@ files: 149
 - 新安装目录：`C:\Users\Ming\.dsh\profiles\desktop\node_modules\dsh-markdown-editor-typora`
 - 安装目录版本：`1.7.0`
 - 安装目录 `lib/client.js` sha16：`1a273fb627e3ae96`
-- 插件热加载后 `markdown blocks` 正常返回 9 个 section，证明运行的是安装包。
+- 插件热加载后 `markdown blocks` 正常返回 9 个 section，证明运行的是安装包。\n- 安装目录是真实目录，不是 junction；`package.json` 版本 1.7.0、`lib/client.js` sha16=1a273fb627e3ae96。
 
 注意：profile 的 `package.json` 依赖声明仍是 `link:D:/BuyKey/markpilot-public/dsh-markdown-editor-typora`；如果以后执行 `pnpm install`/`dsh plugin`，可能会重建 junction 覆盖当前安装目录。需要长期保持安装态时应把依赖改成 tarball/file 或重新打包。
 
@@ -41,7 +41,7 @@ files: 149
 - 点击 README 编辑区，`Ctrl+End`，键盘输入 `PACKAGE-KEY-PROBE`；
 - `Ctrl+S` 后磁盘文件包含该标记，大小 7844 B；
 - 再输入 `X`、`Ctrl+S`，界面显示“已保存”，磁盘更新；
-- 复测未再出现此前一次外部冲突横幅（首次运行时曾短暂出现，第二次干净通过，未复现）。
+- 复测未再出现此前一次外部冲突横幅（首次运行时曾短暂出现，第二次干净通过，未复现）。\n- 包内 `markdown blocks` 真机返回 9 个 section；AI 审阅、差异、撤销在安装目录上通过。
 
 ### AI 审阅
 
