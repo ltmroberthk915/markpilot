@@ -29,7 +29,7 @@ AI 修改 buffer 后：
 - 只 review **live buffer** 的 AI 编辑；磁盘权威编辑不进入（已落盘，没有“审阅前不保存”语义）。
 - review 期间不自动保存；用户继续编辑仍保留 review，Ctrl+S 被拦截。
 - 撤销只允许最新未撤销组；当前 revision/文本不匹配时拒绝。
-- `查看差异` 当前是 host `reviewGroup` + toast 文本摘要，不是 renderer 装饰 diff。
+- `查看差异` 使用 rail 面板显示红/绿 `- 旧 / + 新`，最多 12 处、每处 1500 字符；真机已确认显示“修改 1（替换 48 字符）”及新旧文本。
 - 未改 core/renderer；无需 coreHash 变更。
 
 ## 4. 测试
@@ -48,7 +48,7 @@ tests 444, pass 443, fail 0, skipped 1
   - 点“撤销本次”：toast“已撤销本次 AI 修改，磁盘未改变”，正文恢复、磁盘未变，旧组 `undoneAt` 已置；
   - 再追加 `B4.2B-KEEP-PROBE`，等 3 秒磁盘仍未变；点“保留并保存”后磁盘变为 7841 B 且包含该标记；
   - README 已恢复原 hash/7825 B；live room、agent_group、append_recovery 测试行已清理。
-- `查看差异` 已点击但截图未捕获 toast；host `reviewGroup` 由 API 测试覆盖，客户端显示路径未做像素级确认。
+- `查看差异` 真机打开 rail 面板，显示“AI 修改差异（1 处）/ 修改 1（替换 48 字符）/ 红色旧文本 / 绿色新文本”；host `reviewGroup` 由 API 测试覆盖。
 
 ## 5. 未做
 
