@@ -675,10 +675,51 @@ function applyMirrorDelta(mirror,event){
     // Pure review-state helpers: shared by the editor and the portable client tests.
     function mergeReviewGroup(review, groupId, changeCount) {
       const groups = review && Array.isArray(review.groups) ? review.groups.slice() : [];
-      if (groupId && !groups.includes(groupId)) groups.push(groupId);
+      const exists = !!(groupId && groups.includes(groupId));
+      if (groupId && !exists) groups.push(groupId);
       const previous = review && Number.isFinite(Number(review.count)) ? Number(review.count) : 0;
       const added = Number.isFinite(Number(changeCount)) && Number(changeCount) > 0 ? Number(changeCount) : 1;
-      return { groups, count: previous + added };
+      // Optimistic conflict-resolve review and the later live remote group are
+      // the same group; merging it twice must not double the change count.
+      return { groups, count: exists ? Math.max(previous, groups.length) : previous + added };
+    }
+    // Pure conflict-panel helpers: no DOM, no side effects. The host keeps the
+    // full base/ours/theirs texts; the client only receives hunks.
+    function conflictDefaultChoices(session) {
+      const hunks = session && Array.isArray(session.hunks) ? session.hunks : [];
+      return hunks.map((hunk, index) => ({ index, choice: 'ours', text: '' }));
+    }
+    function conflictResolutionsFromChoices(choices) {
+      return (Array.isArray(choices) ? choices : []).map((choice) => ({
+        choice: choice.choice,
+        ...(choice.choice === 'manual' ? { text: String(choice.text == null ? '' : choice.text) } : {}),
+      }));
+    }
+    function conflictApplyEnabled(session, choices, busy) {
+      if (busy || !session || !Array.isArray(session.hunks)) return false;
+      if (!Array.isArray(choices) || choices.length !== session.hunks.length) return false;
+      return choices.every((choice, index) => choice && choice.index === index
+        && ['ours', 'theirs', 'both', 'manual'].includes(choice.choice)
+        && (choice.choice !== 'manual' || String(choice.text == null ? '' : choice.text).length > 0));
+    }
+    function conflictChoiceLabel(choice) {
+      if (choice === 'ours') return '用我的';
+      if (choice === 'theirs') return '用磁盘';
+      if (choice === 'both') return '两边保留';
+      if (choice === 'manual') return '手动编辑';
+      return String(choice == null ? '' : choice);
+    }
+    function conflictTruncatedNotice(session) {
+      return session && session.truncated ? '文档较大，仅显示冲突块摘要；应用仍按完整正文计算。' : '';
+    }
+    // A live join whose seed equals the room text can still be dirty when the
+    // room has unsaved versions (e.g. conflict-resolve appends). Use the room
+    // savedVersion/version pair, not only the initial text comparison.
+    function liveTicketDirty(ticket) {
+      if (!ticket || typeof ticket !== 'object') return false;
+      if (ticket.dirty === true) return true;
+      return Number.isSafeInteger(ticket.version) && Number.isSafeInteger(ticket.savedVersion)
+        && ticket.version !== ticket.savedVersion;
     }
     function reviewUndoGroup(review) {
       return review && Array.isArray(review.groups) && review.groups.length
@@ -701,7 +742,7 @@ function applyMirrorDelta(mirror,event){
     function normalizeReviewRecord(raw, path, baseVersion) {
       let value = raw;
       if (typeof raw === "string") { try { value = JSON.parse(raw); } catch { return null; } }
-      if (!value || typeof value !== "object" || value.v !== 1) return null;
+      if (!value || typeof value !== "object" || value.v !== 2) return null;
       if (String(value.pathKey || "") !== reviewPathKey(path)) return null;
       if (typeof baseVersion !== "string" || !baseVersion || String(value.baseVersion || "") !== baseVersion) return null;
       if (!Array.isArray(value.groups) || value.groups.length === 0 || value.groups.length > 20) return null;
@@ -713,7 +754,7 @@ function applyMirrorDelta(mirror,event){
       const count = Number(value.count);
       if (!Number.isSafeInteger(count) || count < groups.length || count > 100000) return null;
       const at = Number(value.at);
-      return { v: 1, pathKey: reviewPathKey(path), baseVersion, groups, count, at: Number.isFinite(at) ? at : 0 };
+      return { v: 2, pathKey: reviewPathKey(path), baseVersion, groups, count, at: Number.isFinite(at) ? at : 0 };
     }
 
     /** 轮询档位：SSE 健康/页面隐藏/后台 tab 时返回 null（不调度）；断开首档 2s，三次后 6s。 */
@@ -3630,6 +3671,8 @@ function normDocs(d) {
 const __test = {
       createDraftStore,
       mergeReviewGroup, reviewUndoGroup, reviewIsMulti, reviewSuppressesSave,
+      conflictDefaultChoices, conflictResolutionsFromChoices, conflictApplyEnabled,
+      conflictChoiceLabel, conflictTruncatedNotice, liveTicketDirty,
       reviewPathKey, reviewStoreKey, normalizeReviewRecord,
       normalizeSavedText, shouldAdoptSavedVersion, shouldVerifyExternalEvent, externalDiskVerdict,
       constants: {
@@ -5300,8 +5343,11 @@ const __test = {
           flushed: false,
           live: null, liveUnsupported: false, liveFlushSeq: 0, liveFlushWaiters: new Map(), liveStatus: null,
           liveStaleRounds: 0, liveStaleBlocked: false,
+          baseSha256: "", draftMirror: null, draftMirrorTimer: null, draftMirrorSeq: 0,
           liveRecoveredShownFor: null, liveRecoveredItems: null,
           review: null, remoteGroups: null, ignoreRemoteGroupId: null, savedAt: 0, lastSavedText: "", externalVerifyTimer: null,
+          conflictSession: null, conflictChoices: [], conflictBusy: false, resolvedDisk: null,
+          needLiveJoin: false,
           es: null,
           esHealthy: false,
           pollTimer: null,
@@ -5316,6 +5362,17 @@ const __test = {
           copyMine: null,
         };
         st.doc = doc;
+        if (typeof window !== "undefined" && /(?:^|[#&])mpdebug(?:$|[&/])/.test(String(window.location?.hash || ""))) {
+          window.__mpDocDebug = () => ({
+            token: doc.token,
+            liveUnsupported: doc.liveUnsupported === true, live: !!doc.live, dirty: doc.dirty === true,
+            baseSha256: doc.baseSha256 || "", lastVersion: doc.lastVersion || null, phase: doc.phase,
+            draftMirror: doc.draftMirror || null, draftMirrorTimer: !!doc.draftMirrorTimer,
+            opened: doc.opened === true, untitled: doc.untitled === true, absPath: doc.absPath || "",
+            conflict: doc.conflict === true, review: doc.review || null,
+          });
+          window.__mpTestUnsupported = () => { doc.liveUnsupported = true; doc.live = null; return true; };
+        }
         setUi((prev) => ({ ...prev, phase: "loading", detail: "", notice: "", recovery: null, railOpen: false, notices: [] }));
         setUi((prev) => (prev.recovered || prev.saveStatus ? { ...prev, recovered: null, saveStatus: "" } : prev));   // 新文档代际不继承恢复提示或保存回执
 
@@ -5548,6 +5605,7 @@ const __test = {
             || !Number.isSafeInteger(ticket.version) || typeof text !== "string") return;
           doc.live = { client: ticket.client, epoch: ticket.epoch, version: ticket.version,
             diskHash: ticket.diskHash, savedVersion: Number.isSafeInteger(ticket.savedVersion) ? ticket.savedVersion : ticket.version };
+          if (typeof ticket.resolvedDisk === "string" && ticket.resolvedDisk) doc.resolvedDisk = ticket.resolvedDisk;
           post("live-bind", { protocol: 2, docToken: doc.token, text: text, live: ticket });
           // recovered：join 票带回的草稿副本（内核恢复记录）。只在本 tab 内展示一次：
           // 路径可复制、原件未被覆盖；不读文件、不进 SSE、不影响其它文档。
@@ -5558,8 +5616,19 @@ const __test = {
             setUiIfChangedWithRecovered(recovered);
           }
         }
-        function stopLive(backstopLeave) {
-          const session = doc.live;
+        // Bind a newly saved document to its live room. A one-time clean reload
+        // is intentional here: the engine may still hold local edit deltas from
+        // the pre-join untitled session; a bare live-bind would leave those
+        // deltas in front of the room's first append (Position N out of range).
+        // The caller only reaches this after saving, with no new edits.
+        async function joinLiveIfNeeded() {
+          if (!alive() || doc.live || doc.liveUnsupported || doc.untitled || !doc.absPath) return false;
+          if (doc.dirty || doc.conflict || doc.saving || doc.pendingApply || doc.applyUnknown) return false;
+          doc.needLiveJoin = false;
+          return loadFromDisk({ silent: true, reason: "untitled-live-join" });
+        }
+
+        function stopLive(backstopLeave) {          const session = doc.live;
           doc.live = null;
           doc.liveStaleBlocked = false;   // 会话离场：STALE 预算随会话作废
           doc.liveStaleRounds = 0;
@@ -5616,9 +5685,14 @@ const __test = {
             // 单窗口回落：重新以非 live 口径读盘（干净时），避免把共享房间的未存草稿
             // 留在编辑面里被当成磁盘基线；用户已输入（脏）时由 loadFromDisk 自身守卫保留。
             if (doc.opened && !doc.dirty && !doc.conflict) void loadFromDisk({ silent: true, reason: "live-unsupported" });
+            if (doc.dirty) scheduleDraftMirror(true);
             return;
           }
           if (action === "conflict") {
+            // Unbind before dropping the parent ticket: otherwise the bridge's
+            // per-docToken idempotence would keep the old engine member and a
+            // later join would bind a different client than the parent holds.
+            if (doc.live) stopLive(true);
             doc.live = null;
             doc.conflict = true;
             showPhase("conflict", (code === "MP_LIVE_STALE" ? "共享文档版本已变化，未覆盖；" : "共享编辑会话已结束，") + "当前内容已保留：" + friendly);
@@ -5668,20 +5742,24 @@ const __test = {
         function commitApplied(pending,reply,snapshot) {
           const value=pending.value,restore=pending.kind==='restore';
           doc.opened=true;doc.text=value.text;doc.textFresh=true;doc.lastVersion=value.version;
+          if (typeof value.diskRevisionSha === "string" && /^[0-9a-f]{64}$/i.test(value.diskRevisionSha))
+            doc.baseSha256 = value.diskRevisionSha.toLowerCase();
+          void probeDraftMirror();
           doc.lastSavedText=value.text;
           doc.displayPath=value.displayPath||doc.absPath;doc.size=value.size;
           doc.mirror=mirrorOf(value.text,reply.session,doc.token);doc.composing=false;
           // 共享房间的未存草稿不是磁盘状态：open 带回的正文若与磁盘种子不同（value.live.dirty），
           // 必须如实标记脏 —— baseVersion/lastVersion 仍指向磁盘版本，绝不能把共享正文
           // 当成"已在盘上"的基线；后续落盘只能走 live 票（房间校验）路径。
-          doc.dirty=restore||doc.untitled||(pending.firstOpen&&value.live&&value.live.dirty===true);
+          doc.dirty=restore||doc.untitled||(pending.firstOpen&&value.live&&liveTicketDirty(value.live));
           if (pending.firstOpen || restore) restorePersistedReview();
           if(pending.firstOpen && !doc.untitled) recordRecentDoc({path:doc.absPath,scope:"absolute"},doc.sessionId,doc.workspace);
           doc.conflict=false;doc.externalStale=false;doc.staleNotified=false;
           if(restore)doc.editSeq++;
-          // live 会话：open(live:true) 回执带票且引擎 facade 可用时，把传输桥交给 iframe。
-          // join 票对应的正文就是本次应用的 value.text，facade bind 的 initial 与之一致。
-          if(value.live && pending.firstOpen && !doc.live && !doc.liveUnsupported) startLive(value.live, value.text);
+          // live 会话：open 回执带票且引擎 facade 可用时绑定。不能只在 firstOpen
+          // 绑定：重载/冲突解决后第一次保存都需要重新接上同一房间。
+          doc.resolvedDisk = typeof value.live?.resolvedDisk === 'string' && value.live.resolvedDisk ? value.live.resolvedDisk : null;
+          if(value.live && !doc.live && !doc.liveUnsupported) startLive(value.live, value.text);
           const recoveryReceipt=checkpointRecovery(value.text,reply.session,restore);
           if(snapshot && snapshot.session.epoch===reply.session.epoch && snapshot.session.sourceRevision>=reply.session.sourceRevision){
             const changed=snapshot.session.sourceRevision>reply.session.sourceRevision;
@@ -5776,6 +5854,7 @@ const __test = {
           if(!applied.ok){doc.mirror.continuous=false;doc.dirty=true;saveStatus.update(true);if(!doc.gapDeltas.some(x=>sameSession(x.after,delta.after)))doc.gapDeltas.push(delta);if(!doc.pulls.size)void requestSnapshot('gap');return false;}
           doc.mirror=applied.mirror;doc.textFresh=false;doc.dirty=true;doc.editSeq++;doc.composing=!!delta.composing;
           doc.recoveryBackupFailed=false;
+          if (doc.liveUnsupported) scheduleDraftMirror(true);
           try{const result=inspectStoreResult(draftStore()?.append?.({...delta,path:doc.absPath,baseVersion:doc.lastVersion}));result?.durable?.then?.(inspectStoreResult).catch?.(error=>showNotice('恢复记录尚未持久化：'+String(error)));}catch(error){showNotice('恢复记录尚未持久化：'+String(error));}
           if(doc.dead){persistCurrentRecovery();return true;}
           showPhase('dirty',doc.composing?'输入中…':'编辑中…');
@@ -5818,6 +5897,7 @@ const __test = {
           doc.composing=!!content.composing;
           if(doc.dead){persistCurrentRecovery();return;}
           if(!doc.composing && doc.dirty && !doc.pendingApply){if(doc.manualPending){doc.manualPending=false;void runSave({manual:true});}else scheduleSave(SAVE_DEBOUNCE_MS);}
+          if(doc.liveUnsupported && !doc.composing) scheduleDraftMirror(true);
         }
         function onSnapshot(reply) {
           const pending=reply && doc.pulls.get(reply.id);
@@ -5880,7 +5960,7 @@ const __test = {
             }
             if (typeof doc.lastVersion !== "string" || !doc.lastVersion) return;
             storage.setItem(reviewStoreKey(doc.absPath), JSON.stringify({
-              v: 1,
+              v: 2,
               pathKey: reviewPathKey(doc.absPath),
               baseVersion: doc.lastVersion,
               groups: doc.review.groups.slice(0, 20),
@@ -5913,7 +5993,10 @@ const __test = {
             if (!alive() || !doc.review) return;
             if (!result || result.ok !== true || !Array.isArray(result.value && result.value.groups)) return; // 网络/宿主暂不可用：保留本地状态
             const valid = new Set((result.value.groups || []).filter((group) => group && !group.undoneAt).map((group) => group.groupId));
-            if (restoring.every((id) => valid.has(id))) return;
+            // Host-side chain validation is authoritative for "these groups are
+            // still the current document". undefined means an older host that
+            // does not return chainOk; fall back to the undoneAt check only.
+            if (result.value.chainOk !== false && restoring.every((id) => valid.has(id))) return;
             // Only clear when the provisional groups are still the current set;
             // a newer AI edit must never be discarded by this validation.
             if (doc.review.groups.length === restoring.length && doc.review.groups.every((id, i) => id === restoring[i])) {
@@ -5943,6 +6026,7 @@ const __test = {
         function flushClose() {
           if (doc.flushed) return;
           doc.flushed = true; doc.closeUntil = Date.now() + FLUSH_WAIT_MS + 80;
+          if (!doc.dirty) void clearDraftMirror("close");
           if (!doc.opened || !doc.absPath || !doc.dirty) return;
           persistCurrentRecovery();
           // The parent mirror survives iframe removal. Unknown/composing text
@@ -5952,8 +6036,19 @@ const __test = {
 
         function pullText() {
           if (doc.pendingApply || doc.applyUnknown || doc.composing) return Promise.resolve({text:doc.text,stale:true});
+          // The engine buffer is authoritative. mpEngine.setValue / history
+          // replacement deliberately does not publish a document-delta (the
+          // engine suppresses it), so a continuous parent mirror can lag behind
+          // the room. Save must ask the engine for the current text; the room's
+          // live.save validates materialize(room)===text and would otherwise
+          // reject the stale mirror forever as MP_LIVE_STALE.
+          if (doc.live) return requestSnapshot('save');
           if (doc.mirror?.continuous) return Promise.resolve({text:materialize(doc.mirror),stale:false,session:{...doc.mirror.session}});
           return requestSnapshot('save');
+        }
+
+        function stopSaveTimer() {
+          if (doc.saveTimer) { clearTimeout(doc.saveTimer); doc.saveTimer = null; }
         }
 
         function scheduleSave(delay) {
@@ -5992,6 +6087,12 @@ const __test = {
               showError("文件已创建，但本机草稿状态尚未确认；内容已保留，请再次保存。");return;
             }
             doc.lastVersion=result.value.version;doc.untitled=false;
+            if (typeof result.value.diskRevisionSha === "string" && /^[0-9a-f]{64}$/i.test(result.value.diskRevisionSha))
+              doc.baseSha256 = result.value.diskRevisionSha.toLowerCase();
+            // Only the real safe-create receipt opts into a live rejoin. Test
+            // doubles and older hosts omit `safe`; treating those as live would
+            // start an async open against a fixture with no engine.
+            if(result.value.safe===true && !doc.live && !doc.liveUnsupported) doc.needLiveJoin = true;
             const clean=seq===doc.editSeq && pulled.text===doc.firstSaveText;
             doc.dirty=!clean; doc.firstSaveText=null;
             if(workbenchDoc?.address===address)delete workbenchDoc.draft;
@@ -6007,6 +6108,7 @@ const __test = {
           } catch(e) {if(alive())showError("保存未确认，草稿已保留，请重试："+String(e?.message||e));}
           finally {
             doc.saving=false;
+            if(alive() && doc.needLiveJoin && !doc.dirty && !doc.untitled) await joinLiveIfNeeded().catch(() => {});
             if(alive() && !doc.untitled && (doc.saveQueued || doc.manualPending)) {
               doc.saveQueued=false; scheduleSave(0);
             }
@@ -6016,6 +6118,11 @@ const __test = {
           const manual = !!(options && options.manual);
           if (doc.dead) return;
           if (reviewSuppressesSave(doc)) return;
+          if (doc.conflict) {
+            stopSaveTimer();
+            if (manual) post("toast", "请先解决冲突，再保存");
+            return;
+          }
           // 有界预算耗尽后不再自动发保存请求（防持续竞争下无界后台唤醒）；
           // 显式保存（Ctrl+S）重置预算，输入改动只保留草稿等显式动作。
           if (doc.untitled) { if(manual) await saveUntitled(); return; }
@@ -6048,6 +6155,13 @@ const __test = {
           }
           const manualThisRun = manual || doc.manualPending;
           doc.manualPending = false;
+          if (manualThisRun) {
+            // A manual save queued behind an in-flight auto-save must still
+            // reset the STALE budget; otherwise the first stale reply is
+            // treated as exhausted and the user sees "对端持续编辑中" again.
+            doc.liveStaleRounds = 0;
+            doc.liveStaleBlocked = false;
+          }
           doc.saving = true;
           const saveSeq = doc.editSeq; // 保存飞行期间的新编辑靠它识别：宁可多存一轮，不许把脏标清掉
           if (doc.phase !== "dirty" && doc.phase !== "conflict") showPhase("saving", "保存中…");
@@ -6093,6 +6207,9 @@ const __test = {
               if (!alive()) return;
               if (result.ok === true) {
                 doc.lastVersion = result.value.version;
+                if (typeof result.value.diskRevisionSha === "string" && /^[0-9a-f]{64}$/i.test(result.value.diskRevisionSha))
+                  doc.baseSha256 = result.value.diskRevisionSha.toLowerCase();
+                doc.resolvedDisk = null;
                 doc.savedAt = Date.now();
                 doc.lastSavedText = pulled.text;
                 if (doc.live) doc.live = applyLiveReceipt(doc.live, result.value);
@@ -6113,6 +6230,7 @@ const __test = {
                   doc.textFresh = true;
                   doc.mirror = mirrorOf(pulled.text, pulled.session, doc.token);
                   doc.dirty = false;
+                  void clearDraftMirror("save");
                 } else {
                   doc.dirty = true;
                   doc.saveQueued = true;
@@ -6137,6 +6255,8 @@ const __test = {
                         const opened = await api("open", { path: doc.absPath, live: false });
                         if (alive() && shouldAdoptSavedVersion(opened, pulled.text)) {
                           doc.lastVersion = String(opened.value.version);
+                          if (typeof opened.value.diskRevisionSha === "string" && /^[0-9a-f]{64}$/i.test(opened.value.diskRevisionSha))
+                            doc.baseSha256 = opened.value.diskRevisionSha.toLowerCase();
                           doc.externalStale = false;
                           doc.conflict = false;
                           adopted = true;
@@ -6197,6 +6317,7 @@ const __test = {
             doc.saving = false;
             const reload=doc.reloadAfterSave;doc.reloadAfterSave=null;
             if(reload && alive()){if(doc.editSeq===reload.editSeq)void loadFromDisk(reload.opts);else doc.externalStale=true;}
+            if(alive() && doc.needLiveJoin && !doc.dirty && !doc.conflict) await joinLiveIfNeeded().catch(() => {});
             if (doc.saveQueued && alive()) {
               doc.saveQueued = false;
               if (doc.manualPending) {
@@ -6293,6 +6414,78 @@ const __test = {
           void loadFromDisk({}).finally(() => { doc.booting = false; });
         }
 
+        function draftMirrorEligible() {
+          return !!(doc.liveUnsupported && doc.opened && !doc.untitled && doc.absPath && doc.baseSha256
+            && doc.dirty && !doc.dead && !doc.saving && !doc.applyUnknown && !doc.review);
+        }
+        function cancelDraftMirror() {
+          if (doc.draftMirrorTimer) { clearTimeout(doc.draftMirrorTimer); doc.draftMirrorTimer = null; }
+          doc.draftMirrorSeq += 1;
+        }
+        function scheduleDraftMirror(immediate) {
+          if (!draftMirrorEligible()) return;
+          if (doc.draftMirrorTimer) { clearTimeout(doc.draftMirrorTimer); doc.draftMirrorTimer = null; }
+          if (immediate) void pushDraftMirror();
+          doc.draftMirrorTimer = setTimeout(() => {
+            doc.draftMirrorTimer = null;
+            void pushDraftMirror();
+          }, 1500);
+        }
+        async function pushDraftMirror() {
+          if (!draftMirrorEligible() || doc.pendingApply || doc.composing) return;
+          const seq = ++doc.draftMirrorSeq;
+          let text;
+          if (doc.mirror?.continuous) text = materialize(doc.mirror);
+          else {
+            const snap = await requestSnapshot("mirror");
+            if (!snap || snap.stale || seq !== doc.draftMirrorSeq || doc.dead) return;
+            text = snap.text;
+          }
+          try {
+            const result = await api("documents.draftMirror", {
+              path: doc.absPath, text, baseVersion: doc.lastVersion, baseSha256: doc.baseSha256,
+              docToken: doc.token, session: doc.mirror?.session || null,
+            });
+            if (seq !== doc.draftMirrorSeq || doc.dead) return;
+            if (result.ok === true) doc.draftMirror = { docToken: doc.token, textSha256: result.value?.textSha256 || "" };
+          } catch { /* mirror is best-effort; save path still fail-closed */ }
+        }
+        async function ensureDraftMirrorHandle() {
+          if (doc.draftMirror) return true;
+          if (!doc.absPath || doc.dead) return false;
+          try {
+            const result = await api("documents.draftRead", { path: doc.absPath, docToken: doc.token });
+            if (result.ok === true && result.value && typeof result.value.textSha256 === "string"
+              && /^[0-9a-f]{64}$/i.test(result.value.textSha256)) {
+              doc.draftMirror = { docToken: result.value.docToken || doc.token, textSha256: result.value.textSha256 };
+              return true;
+            }
+          } catch { /* old host or store unavailable */ }
+          return false;
+        }
+        async function probeDraftMirror() {
+          if (doc.untitled || !doc.absPath || doc.dead || doc.draftMirror) return;
+          if (!await ensureDraftMirrorHandle()) return;
+          // A mirror from an earlier unsupported/restarted session is not a
+          // recovery banner yet, but its handle must be known so a later save,
+          // close or reload can remove the row instead of blocking AI for 14 days.
+          if (!doc.liveUnsupported && !doc.dirty) showNotice("发现上次未保存的草稿镜像；保存或关闭时会清理，不会覆盖当前磁盘正文。");
+        }
+        async function clearDraftMirror(reason) {
+          if (!doc.absPath) { cancelDraftMirror(); return; }
+          if (!doc.liveUnsupported && !doc.draftMirror) { cancelDraftMirror(); return; }
+          cancelDraftMirror();
+          if (!await ensureDraftMirrorHandle()) return;
+          const token = doc.draftMirror.docToken || doc.token;
+          const textSha256 = doc.draftMirror.textSha256 || undefined;
+          try {
+            const result = await api("documents.draftClear", { path: doc.absPath, docToken: token, ...(textSha256 ? { textSha256 } : {}) });
+            if (result.ok === true && result.value?.removed > 0) doc.draftMirror = null;
+            // A newer/foreign generation is not ours to delete. Keep the handle
+            // and let the next explicit probe decide; never re-read-and-delete.
+          } catch { /* keep the handle for a later retry */ }
+        }
+
         function onDirty(content) {
           doc.dirty = true;
           doc.recoveryBackupFailed = false;
@@ -6307,6 +6500,7 @@ const __test = {
             showPhase("dirty", "编辑中…（磁盘已更新，保存时会冲突）");
           }
           scheduleSave(SAVE_DEBOUNCE_MS);
+          scheduleDraftMirror(true);
         }
 
         /** 外部磁盘变更：live 房间先从磁盘采纳（干净时自动进正文；有草稿时报告冲突）。 */
@@ -6315,8 +6509,11 @@ const __test = {
           const opts = options || {};
           if (!doc.live) return null;
           // R1：本地有未提交/编辑中的内容时不自动采纳磁盘，避免丢掉尚在交换途中的按键。
-          if (!opts.discard && (doc.dirty || doc.conflict || doc.saving)) {
+          // A conflict-resolved buffer is intentionally dirty; let the host decide
+          // whether the disk still matches room_resolved instead of faking conflict.
+          if (!opts.discard && (doc.dirty || doc.conflict || doc.saving) && !doc.resolvedDisk) {
             doc.externalStale = true;
+            stopSaveTimer();
             showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
             return null;
           }
@@ -6332,6 +6529,7 @@ const __test = {
               if (value.changed) post("live-refresh", { protocol: 2, docToken: doc.token });
               if (value.unsavedDraft && !opts.discard) {
                 doc.externalStale = true;
+                stopSaveTimer();
                 showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
                 return value;
               }
@@ -6376,7 +6574,7 @@ const __test = {
           if (!alive()) return;
           if (!opened || opened.ok !== true || !opened.value) {
             doc.externalStale = true;
-            if (doc.dirty || doc.conflict) showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
+            if (doc.dirty || doc.conflict) { stopSaveTimer(); showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑"); }
             return;
           }
           const diskVersion = String(opened.value.version || "");
@@ -6390,6 +6588,8 @@ const __test = {
           const verdict = externalDiskVerdict(diskText, currentText, savedText);
           if (verdict !== "conflict") {
             if (diskVersion) doc.lastVersion = diskVersion;
+            if (typeof opened.value.diskRevisionSha === "string" && /^[0-9a-f]{64}$/i.test(opened.value.diskRevisionSha))
+              doc.baseSha256 = opened.value.diskRevisionSha.toLowerCase();
             doc.externalStale = false;
             doc.conflict = false;
             if (doc.review) showPhase("review", "AI 修改了 " + doc.review.count + " 处，保存前请确认");
@@ -6397,7 +6597,7 @@ const __test = {
             return;
           }
           doc.externalStale = true;
-          if (doc.dirty || doc.conflict) showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
+          if (doc.dirty || doc.conflict) { stopSaveTimer(); showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑"); }
         }
         function onExternalEvent(event) {
           let data = {};
@@ -6426,6 +6626,7 @@ const __test = {
               if (doc.dirty && !doc.staleNotified) doc.staleNotified = true;
             }
             if (doc.dirty || doc.conflict) {
+              stopSaveTimer();
               showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
             }
             return;
@@ -6792,6 +6993,7 @@ const __test = {
           clearRecoverySlot(null,doc.absPath);
           const token=typeof slot?.docToken==='string'&&slot.docToken?slot.docToken:null;
           if(token){try{Promise.resolve(draftStore()?.clear?.(doc.absPath,token,slot?.session)).catch(error=>showNotice('清除恢复记录失败：'+String(error)));}catch(error){showNotice('清除恢复记录失败：'+String(error));}}
+          void clearDraftMirror("discard");
           setUiIfChanged({phase:'ready',detail:'已丢弃恢复内容',notice:'',recovery:null});
           return Promise.resolve();
         }
@@ -6848,6 +7050,7 @@ const __test = {
               return;
             }
             stopLive(true);   // 冲突后重载 = 放弃旧房间，重新 join
+            await clearDraftMirror('reload');
             setUiIfChanged({ phase: "loading", detail: "", notice: "" });
             const loaded = await loadFromDisk({ silent: false, discard: true });
             if (!loaded && alive() && (doc.dirty || doc.conflict)) {
@@ -6866,9 +7069,166 @@ const __test = {
         }
 
         // 横幅按钮回调（渲染侧通过 st.actions 取当前代）。
+        function syncConflictUi() { setUi((prev) => ({ ...prev })); }
+        function closeConflictPanel() {
+          doc.conflictSession = null;
+          doc.conflictChoices = [];
+          doc.conflictBusy = false;
+          syncConflictUi();
+        }
+        function chooseConflict(index, choice, text) {
+          const choiceList = Array.isArray(doc.conflictChoices) ? doc.conflictChoices.slice() : [];
+          if (!doc.conflictSession || index < 0 || index >= choiceList.length) return;
+          choiceList[index] = { ...choiceList[index], choice, ...(text === undefined ? {} : { text: String(text) }) };
+          doc.conflictChoices = choiceList;
+          syncConflictUi();
+        }
+        async function openConflict() {
+          if (!alive() || !doc.opened || !doc.absPath || doc.untitled) return;
+          if (doc.pendingApply || doc.applyUnknown || doc.saving) { showNotice('编辑器同步或保存进行中，暂时不能打开冲突；请稍后再试'); return; }
+          if (doc.conflictBusy) return;
+          const pathAtStart = doc.absPath;
+          doc.conflictBusy = true; syncConflictUi();
+          let result = null;
+          try { result = await api('documents.conflictOpen', { path: pathAtStart, cwd: doc.workspace }); } catch (e) { result = null; }
+          if (!alive() || doc.absPath !== pathAtStart) { doc.conflictBusy = false; syncConflictUi(); return; }
+          doc.conflictBusy = false;
+          if (!result || result.ok !== true) {
+            const code = result?.error?.code || '';
+            showNotice('打开冲突失败：' + String(result?.error?.message || code || 'unknown'));
+            syncConflictUi();
+            return;
+          }
+          const value = result.value || {};
+          if (value.conflict === false) {
+            closeConflictPanel();
+            doc.conflict = false;
+            doc.externalStale = false;
+            if (doc.review) showPhase('review', 'AI 修改了 ' + doc.review.count + ' 处，保存前请确认');
+            else if (doc.dirty) showPhase('dirty', '冲突已消失；当前编辑内容已保留');
+            else { showPhase('loading', ''); void loadFromDisk({ silent: true, reason: 'conflict-gone' }); }
+            return;
+          }
+          doc.conflictSession = value;
+          doc.conflictChoices = conflictDefaultChoices(value);
+          syncConflictUi();
+          setUi((prev) => ({ ...prev, railOpen: false }));
+        }
+        async function applyConflict() {
+          const session = doc.conflictSession;
+          if (!session || doc.conflictBusy) return;
+          if (!conflictApplyEnabled(session, doc.conflictChoices, doc.conflictBusy)) {
+            showNotice('请为每个冲突选择处理方式；手动编辑不能为空');
+            return;
+          }
+          if (doc.pendingApply || doc.applyUnknown || doc.saving) { showNotice('编辑器同步或保存进行中，暂时不能应用冲突选择；请稍后再试'); return; }
+          doc.conflictBusy = true; syncConflictUi();
+          let result = null;
+          try {
+            result = await api('documents.conflictResolve', {
+              path: doc.absPath, cwd: doc.workspace, conflictId: session.conflictId,
+              resolutions: conflictResolutionsFromChoices(doc.conflictChoices),
+            });
+          } catch (e) { result = null; }
+          if (!alive()) return;
+          doc.conflictBusy = false;
+          if (!result || result.ok !== true) {
+            const code = result?.error?.code || '';
+            if (code === 'MP_DOC_STALE' || code === 'MP_CONFLICT_NOT_FOUND' || code === 'MP_LIVE_NO_ROOM' || code === 'MP_LIVE_SESSION') {
+              closeConflictPanel();
+              doc.conflict = true;
+              doc.resolvedDisk = null;
+              stopSaveTimer();
+              showPhase('conflict', '冲突已变化或会话已过期；请重新点「查看冲突」');
+              showNotice('未应用：' + String(result?.error?.message || code));
+            } else {
+              syncConflictUi();
+              showNotice('解决冲突失败：' + String(result?.error?.message || code || 'unknown'));
+            }
+            return;
+          }
+          const value = result.value || {};
+          if (value.changed === false) {
+            closeConflictPanel();
+            if (value.resolved === true) {
+              doc.lastVersion = typeof value.diskVersion === 'string' && value.diskVersion ? value.diskVersion : doc.lastVersion;
+              doc.resolvedDisk = typeof value.resolvedDisk === 'string' && value.resolvedDisk ? value.resolvedDisk : session.diskHash;
+              // "Keep mine" did not change the buffer, but the buffer still
+              // differs from disk; mark dirty or Ctrl+S would be a clean no-op
+              // and the approved overwrite would never be written.
+              doc.dirty = true;
+              doc.staleNotified = false;
+              doc.liveStaleRounds = 0;
+              doc.liveStaleBlocked = false;
+              // A pending AI review must stay visible: manualSaveGate suppresses
+              // saving while review exists, so phase=dirty here would hide the
+              // 保留并保存/撤销本次 buttons and create a dead end.
+              if (doc.review) persistReviewState();
+            }
+            doc.conflict = false;
+            doc.externalStale = false;
+            stopSaveTimer();
+            if (doc.review) {
+              const multi = reviewIsMulti(doc.review);
+              showPhase('review', 'AI 修改了 ' + doc.review.count + ' 处' + (multi ? '（共 ' + doc.review.groups.length + ' 组）' : '') + '，保存前请确认');
+            } else {
+              showPhase(doc.dirty ? 'dirty' : 'ready', value.resolved === true ? '已保留我的版本；保存时会覆盖磁盘' : '冲突已解决（正文未改变）');
+            }
+            return;
+          }
+          // Optimistic review: the host wrote one conflict-resolve group. Set the
+          // review before closing so no pending save timer can write unreviewed
+          // text, and persist with the new disk version.
+          doc.lastVersion = typeof value.diskVersion === 'string' && value.diskVersion ? value.diskVersion : doc.lastVersion;
+          doc.resolvedDisk = typeof value.resolvedDisk === 'string' && value.resolvedDisk ? value.resolvedDisk : session.diskHash;
+          const groupId = typeof value.groupId === 'string' && value.groupId ? value.groupId : null;
+          if (groupId) {
+            const count = Array.isArray(value.applied) && value.applied.length ? value.applied.length : 1;
+            doc.review = mergeReviewGroup(doc.review, groupId, count);
+            persistReviewState();
+            doc.reviewDiff = null;
+            setUi((prev) => ({ ...prev, reviewDiff: null }));
+          }
+          doc.conflict = false;
+          doc.externalStale = false;
+          doc.staleNotified = false;
+          doc.liveStaleRounds = 0;
+          doc.liveStaleBlocked = false;
+          // The resolve changed the buffer relative to disk; never let a stale
+          // dirty bit turn the following Ctrl+S into a clean no-op.
+          doc.dirty = true;
+          stopSaveTimer();
+          closeConflictPanel();
+          if (doc.review) {
+            const multi = reviewIsMulti(doc.review);
+            showPhase('review', 'AI 修改了 ' + doc.review.count + ' 处' + (multi ? '（共 ' + doc.review.groups.length + ' 组）' : '') + '，保存前请确认');
+          } else {
+            showPhase('dirty', '冲突已解决；当前内容尚未保存');
+          }
+          // Do not call refreshLiveRoom here: R1 would turn the dirty buffer into
+          // a fake conflict. post() has no R1 guard and lets the facade exchange.
+          post('live-refresh', { protocol: 2, docToken: doc.token });
+          setTimeout(() => {
+            if (alive() && doc.resolvedDisk && !doc.review) showNotice('冲突已解决；正在等待编辑器同步');
+          }, 1500);
+        }
+        async function cancelConflict() {
+          if (doc.conflictBusy) return;
+          const session = doc.conflictSession;
+          const conflictId = session && session.conflictId;
+          closeConflictPanel();
+          if (!conflictId) return;
+          try { await api('documents.conflictCancel', { path: doc.absPath, conflictId }); }
+          catch (e) { /* session is memory-only; TTL will clear it */ }
+        }
+
         st.actions = {
           reloadDisk: forceReload,
           copyMine: copyMine,
+          openConflict,
+          applyConflict,
+          cancelConflict,
+          chooseConflict,
           restoreRecovery: restoreRecovery,
           discardRecovery: discardRecovery,
           clearNotices: clearRailNotices,
@@ -6946,10 +7306,18 @@ const __test = {
               doc.review = null;
               clearPersistedReview();
               doc.reviewDiff = null;
+              stopSaveTimer();
               setUi((prev) => ({ ...prev, reviewDiff: null, railOpen: false }));
               const message = '已撤销本次 AI 修改（' + groupIds.length + ' 组）；磁盘未改变';
-              showPhase(doc.dirty ? 'dirty' : 'ready', message);
-              showNotice(message);
+              if (result.value?.reopenedConflict === true) {
+                doc.conflict = true;
+                doc.resolvedDisk = null;
+                showPhase('conflict', '撤销后冲突重新出现：磁盘与编辑器都改了；请重新「查看冲突」');
+                showNotice('撤销成功；冲突已重新出现，保存前请先解决');
+              } else {
+                showPhase(doc.dirty ? 'dirty' : 'ready', message);
+                showNotice(message);
+              }
             }).catch((error) => showNotice('撤销失败：' + String(error && error.message ? error.message : error)));
           },
           reviewKeep: () => {
@@ -6958,6 +7326,11 @@ const __test = {
             clearPersistedReview();
             doc.reviewDiff = null;
             doc.ignoreRemoteGroupId = null;
+            // A review exists because the buffer contains accepted remote
+            // changes. Do not rely on a possibly-cleared dirty bit: mark it so
+            // the explicit keep action always reaches runSave instead of
+            // being treated as a clean no-op.
+            doc.dirty = true;
             setUi((prev) => ({ ...prev, reviewDiff: null, railOpen: false }));
             showPhase('dirty', '已保留 AI 修改，正在保存');
             scheduleSave(0);
@@ -7063,8 +7436,9 @@ const __test = {
         startSse();
 
         return () => {
-          doc.dead = true;
           try { flushClose(); } catch (e) { /* 已尽力 */ }
+          doc.dead = true;
+          cancelDraftMirror();
           // live 会话离场：先请 facade 解绑（iframe 还在时经上行 leave），再直接向宿主
           // 补一张 leave（幂等）兜底 iframe 已删的情形 —— 租约不落盘、不残留。
           try { stopLive(true); } catch (e) { /* 关闭路径不再抛 */ }
@@ -7112,12 +7486,17 @@ const __test = {
       const noticeItems = Array.isArray(ui.notices) ? ui.notices : [];
       const latestNotice = noticeItems[noticeItems.length - 1];
       const hasPopover = recoveredItems.length > 0 || reviewDiffItems.length > 0 || noticeItems.length > 0;
+      const doc = st.doc;
+      const conflictSession = doc && doc.conflictSession ? doc.conflictSession : null;
+      const conflictChoices = doc && Array.isArray(doc.conflictChoices) ? doc.conflictChoices : [];
+      const conflictBusy = !!(doc && doc.conflictBusy);
       const toggleRail = () => setUi((prev) => ({ ...prev, railOpen: !prev.railOpen }));
       const actions = [];
       let primaryText = "", primaryTone = "info";
       if (ui.phase === "conflict") {
         primaryText = "⚠ " + ui.detail;
         primaryTone = "warn";
+        actions.push({ label: "查看冲突", icon: "⇄", run: () => st.actions.openConflict && st.actions.openConflict() });
         actions.push({ label: "重载磁盘版本", icon: "↻", run: () => st.actions.reloadDisk && st.actions.reloadDisk() });
         actions.push({ label: "复制我的内容", icon: "⧉", run: () => st.actions.copyMine && st.actions.copyMine() });
       } else if (ui.phase === "review") {
@@ -7169,9 +7548,85 @@ const __test = {
       }, item.label);
       // B1: fixed 28px rail above the iframe. The rail is always present, so
       // banners and save status never change the editor geometry.
+      const conflictPanel = () => {
+        if (!conflictSession) return null;
+        const hunks = Array.isArray(conflictSession.hunks) ? conflictSession.hunks : [];
+        const body = hunks.length
+          ? hunks.map((hunk, index) => {
+            const choice = conflictChoices[index] || { index, choice: 'ours', text: '' };
+            const setChoice = (nextChoice, text) => st.actions.chooseConflict(index, nextChoice, text);
+            return h('div', {
+              key: 'conflict-hunk-' + index,
+              style: { padding: '8px 0', borderTop: index ? '1px solid color-mix(in srgb, currentColor 12%, transparent)' : 'none' },
+            },
+              h('div', { style: { fontWeight: 600, marginBottom: 6 } }, '第 ' + (index + 1) + '/' + hunks.length + ' 处冲突'),
+              h('div', { style: { display: 'grid', gap: 6, marginBottom: 8 } },
+                h('div', { style: { background: 'color-mix(in srgb, currentColor 5%, transparent)', padding: 6, borderRadius: 5 } },
+                  h('div', { style: { opacity: 0.65, fontSize: 11, marginBottom: 2 } }, 'base'),
+                  h('pre', { style: { margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11.5, maxHeight: 140, overflow: 'auto' } }, String(hunk.base || '').slice(0, 1500))),
+                h('div', { style: { background: 'color-mix(in srgb, #2a7 12%, transparent)', padding: 6, borderRadius: 5 } },
+                  h('div', { style: { opacity: 0.65, fontSize: 11, marginBottom: 2 } }, '我的'),
+                  h('pre', { style: { margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11.5, maxHeight: 140, overflow: 'auto' } }, String(hunk.ours || '').slice(0, 1500))),
+                h('div', { style: { background: 'color-mix(in srgb, #4f8ef7 12%, transparent)', padding: 6, borderRadius: 5 } },
+                  h('div', { style: { opacity: 0.65, fontSize: 11, marginBottom: 2 } }, '磁盘'),
+                  h('pre', { style: { margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11.5, maxHeight: 140, overflow: 'auto' } }, String(hunk.other || '').slice(0, 1500)))),
+              h('div', { style: { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' } },
+                ['ours', 'theirs', 'both', 'manual'].map((key) => h('label', {
+                  key: key, style: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11.5, cursor: 'pointer' },
+                },
+                  h('input', {
+                    type: 'radio', name: 'mp-conflict-' + index, checked: choice.choice === key,
+                    autoFocus: index === 0 && key === 'ours',
+                    onChange: () => setChoice(key),
+                  }), conflictChoiceLabel(key)))),
+              choice.choice === 'manual'
+                ? h('textarea', {
+                  value: choice.text || '',
+                  maxLength: 1024 * 1024,
+                  onChange: (event) => setChoice('manual', event.target.value),
+                  placeholder: '手动编辑这一处的结果',
+                  'aria-label': '第 ' + (index + 1) + ' 处手动结果',
+                  style: { width: '100%', boxSizing: 'border-box', minHeight: 56, marginTop: 6, padding: 5, fontSize: 12, fontFamily: 'inherit', resize: 'vertical' },
+                })
+                : null);
+          })
+          : h('div', { style: { padding: '10px 0', opacity: 0.85 } },
+            conflictSession.clean ? '这两边没有重叠冲突，可直接应用合并结果。' : '没有可显示的冲突块。');
+        return h('div', {
+          key: 'conflict-panel',
+          role: 'dialog',
+          'aria-label': '冲突解决',
+          style: {
+            position: 'absolute', top: 34, left: 8 + railInsetLeft, right: 8 + railInsetRight, bottom: 8,
+            zIndex: 60, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', minHeight: 0,
+            padding: 10, borderRadius: 8, border: '1px solid color-mix(in srgb, currentColor 22%, transparent)',
+            background: 'color-mix(in srgb, currentColor 8%, transparent)', backdropFilter: 'blur(12px)',
+            boxShadow: '0 8px 24px color-mix(in srgb, black 30%, transparent)', color: 'inherit', fontSize: 12,
+          },
+        },
+          h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flex: '0 0 auto', marginBottom: 6 } },
+            h('strong', { style: { flex: '1 1 auto', minWidth: 0 } }, '冲突解决 · ' + (hunks.length ? hunks.length + ' 处' : '可合并')),
+            h('button', {
+              type: 'button', className: 'mp-rail-btn', 'data-icon': '⌫', title: '关闭冲突面板',
+              onClick: () => st.actions.cancelConflict(),
+            }, '关闭')),
+          conflictSession.truncated ? h('div', { style: { flex: '0 0 auto', opacity: 0.75, marginBottom: 6 } }, conflictTruncatedNotice(conflictSession)) : null,
+          h('div', { style: { flex: '1 1 auto', minHeight: 0, overflow: 'auto', paddingRight: 2 } }, body),
+          h('div', { style: { display: 'flex', gap: 8, justifyContent: 'flex-end', flex: '0 0 auto', paddingTop: 8 } },
+            h('button', { type: 'button', className: 'mp-rail-btn', onClick: () => st.actions.cancelConflict() }, '取消'),
+            h('button', {
+              type: 'button', className: 'mp-rail-btn', disabled: !conflictApplyEnabled(conflictSession, conflictChoices, conflictBusy),
+              onClick: () => st.actions.applyConflict(),
+            }, conflictBusy ? '应用中…' : '应用选择')));
+      };
+
       return h("div", {
         ref: rootRef,
         onKeyDown: (event) => {
+          if (doc && doc.conflictSession) {
+            if (event.key === "Escape") { try { event.preventDefault(); } catch (e) { /* 忽略 */ } st.actions.cancelConflict(); return; }
+            if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { try { event.preventDefault(); } catch (e) { /* 忽略 */ } st.actions.applyConflict(); return; }
+          }
           if (event.key === "Escape" && ui.railOpen) setUi((prev) => ({ ...prev, railOpen: false }));
         },
         style: { position: "relative", width: "100%", height: "100%", display: "flex", flexDirection: "column", minHeight: 0, containerType: "inline-size", "--mp-rail-inset-left": railInsetLeft + "px", "--mp-rail-inset-right": railInsetRight + "px" },
@@ -7249,6 +7704,7 @@ const __test = {
           },
           style: { width: "100%", border: 0, background: "transparent", flex: "1 1 auto", minHeight: 0, height: "auto" },
         }),
+        conflictPanel(),
         hasPopover ? h("div", {
           key: "rail-popover",
           className: "mp-rail-popover",

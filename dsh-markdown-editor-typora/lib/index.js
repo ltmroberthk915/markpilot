@@ -320,7 +320,7 @@ const MODEL_TOOL = Symbol('markdown model tool');
 export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'diag']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'diag']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
 
@@ -1055,6 +1055,10 @@ export function createHost(options = {}) {
     return { ...(typeof cwd === 'string' && cwd ? {cwd} : {}), ...(invocation?.signal ? {signal:invocation.signal} : {}) };
   }
 
+  function diskRevisionSha(text) {
+    return createHash('sha256').update(String(text).replace(/\r\n?/g, '\n').replace(/^\uFEFF/, '')).digest('hex');
+  }
+
   async function apiOpen(payload, authority, resolvedTarget, invocation) {
     const path = typeof payload?.path === 'string' ? payload.path : '';
     if (!path) return badRequest('path is required');
@@ -1073,7 +1077,8 @@ export function createHost(options = {}) {
       } else text=await fs.readText(target, invocation?.signal);
       const after=await fs.stat(target, invocation?.signal);
       if(!after||String(after.version)!==String(info.version))continue;
-      const value={text,version:after.version,displayPath:target.displayPath,size:after.size,type:after.type};
+      const diskSha=diskRevisionSha(text);
+      const value={text,version:after.version,displayPath:target.displayPath,size:after.size,type:after.type,diskRevisionSha:diskSha};
       if (payload.live === true && baseline && authority !== MODEL_TOOL) {
         const canonical=await canonicalTarget(target);
         const seed=text.replace(/\r\n?/g,'\n');
@@ -1081,12 +1086,19 @@ export function createHost(options = {}) {
         if (closed) { live.leave(joined.client);throw codedError('MP_LIVE_CLOSED','editor host stopped'); }
         leases.set(joined.client,{canonical:pathKey(canonical)});
         value.live={client:joined.client,epoch:joined.epoch,version:joined.version,diskHash:joined.diskHash,dirty:joined.text!==seed,savedVersion:joined.savedVersion,
+          ...(typeof joined.resolvedDisk==='string'&&joined.resolvedDisk?{resolvedDisk:joined.resolvedDisk}:{}),
           ...(Array.isArray(joined.recovered)?{recovered:joined.recovered}:{})};
         value.text=joined.text;
       }
       return {ok:true,value};
     }
     throw codedError('FS_STALE_VERSION','file changed during read; retry after the external write finishes');
+  }
+
+  async function rejectDraftMirrorBeforeWrite(current) {
+    if (typeof live.getDraft !== 'function') return;
+    const mirror = await live.getDraft(nativeTargetPath(current), {});
+    if (mirror) throw codedError('MP_DOC_MIRROR_READONLY', 'an unsaved draft mirror exists for this document; refusing to overwrite it');
   }
 
   async function apiSave(payload) {
@@ -1102,6 +1114,7 @@ export function createHost(options = {}) {
       if(pathKey(await canonicalTarget(current))!==key)throw codedError('FS_STALE_VERSION','save target changed while queued');
       const before=await fs.stat(current);
       if(!before)throw codedError('FS_STALE_VERSION','file no longer exists');
+      if (payload.rejectIfMirror) await rejectDraftMirrorBeforeWrite(current);
       let result;
       const native=await fsStat(nativeTargetPath(current),{bigint:true}).catch(e=>{if(e.code!=='ENOENT')throw e;return null;});
       const local=!!native && versionOfBigInt(native)===String(before.version);
@@ -1129,7 +1142,7 @@ export function createHost(options = {}) {
       else try {result=await fs.writeText(current,text,{kind:'replaceIfVersion',version:baseVersion});}
       catch(error){if(!isSandboxWriteDenied(error))throw error;result=await directWriteText(fs,current,text,baseVersion);}
       const version=result?.version;broadcastChange(current,version);
-      const value={version,displayPath:current.displayPath,size:result.size??Buffer.byteLength(text,'utf8')};
+      const value={version,displayPath:current.displayPath,size:result.size??Buffer.byteLength(text,'utf8'),diskRevisionSha:diskRevisionSha(text)};
       if(payload.live&&result&&typeof result==='object'){
         // 已授权 live 保存专属：按客户端 applyLiveReceipt 约定透传最小 live 元数据
         // （savedVersion/liveVersion/epoch/diskHash；provider version 保持权威）。
@@ -1202,7 +1215,7 @@ export function createHost(options = {}) {
         if(record.version!==null && record.version!==String(info.version))
           throw codedError('FS_STALE_VERSION','draft target changed after its initial save');
         record.version=String(info.version);
-        return {ok:true,value:{path:candidate,requestedPath:join(rawDir,fileName),displayPath:target.displayPath||candidate,version:info.version,size:bytes.length,safe:true,draftId:id,idempotent:reused}};
+        return {ok:true,value:{path:candidate,requestedPath:join(rawDir,fileName),displayPath:target.displayPath||candidate,version:info.version,size:bytes.length,safe:true,draftId:id,idempotent:reused,diskRevisionSha:diskRevisionSha(payload.exactText)}};
       };
       const exists=await fsStat(candidate).then(()=>true,error=>{if(error.code==='ENOENT')return false;throw error;});
       if(exists)return receipt(true); // Exact-byte reconciliation also covers a lost reply / host restart.
@@ -1237,19 +1250,20 @@ export function createHost(options = {}) {
     const text = String(value || '');
     return process.platform === 'win32' ? text.replace(/\//g, '\\').toLowerCase() : text;
   }
-  // Only removes automatic `agent-before` copies that have a parseable sidecar.
+  // Only removes automatic copies for one tag that have a parseable sidecar.
   // Parked recovery files (`recovery/`) and user/other-tag archives are never in
   // this directory match set. A failed/missing sidecar means "leave it alone".
-  async function pruneAgentBeforeArchives(dir, currentArchivePath) {
+  async function pruneTaggedArchives(dir, currentArchivePath, tag = 'agent-before') {
+    const pattern = new RegExp('\\.' + tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.[0-9a-f]{16}\\.md$');
     let names;
     try { names = await readdir(dir); } catch { return; }
     const entries = [];
     for (const name of names) {
-      if (!/\.agent-before\.[0-9a-f]{16}\.md$/.test(name)) continue;
+      if (!pattern.test(name)) continue;
       const archivePath = join(dir, name), metaPath = archivePath + '.json';
       try {
         const meta = JSON.parse(await readFile(metaPath, 'utf8'));
-        if (meta?.schema !== 1 || meta?.tag !== 'agent-before' || typeof meta?.sourcePath !== 'string' || !isAbsolute(meta.sourcePath)) continue;
+        if (meta?.schema !== 1 || meta?.tag !== tag || typeof meta?.sourcePath !== 'string' || !isAbsolute(meta.sourcePath)) continue;
         if (typeof meta?.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(meta.sha256)) continue;
         const expectedKey = createHash('sha256').update(meta.sourcePath + '\0' + meta.tag + '\0' + meta.sha256).digest('hex').slice(0, 16);
         if (!name.endsWith('.' + expectedKey + '.md')) continue; // not the deterministic auto-copy name
@@ -1315,7 +1329,7 @@ export function createHost(options = {}) {
         docToken: typeof payload?.docToken === 'string' ? payload.docToken : null };
       try { await readFile(metaPath); }
       catch { await writeFile(metaPath, JSON.stringify(meta, null, 2), { encoding: 'utf8', flag: 'wx' }).catch(() => { /* concurrent writer */ }); }
-      if (options.prune === true) try { await pruneAgentBeforeArchives(dir, target); } catch { /* retention is best effort */ }
+      if (options.prune === true) try { await pruneTaggedArchives(dir, target, tag); } catch { /* retention is best effort */ }
       return { ok: true, value: { archivePath: target, metaPath, sha256: sha, bytes: bytes.length, idempotent: true } };
     }
     const temp = join(dir, `.mp-archive-${process.pid}-${randomUUID()}`);
@@ -1335,7 +1349,7 @@ export function createHost(options = {}) {
       baseVersion: typeof payload?.baseVersion === 'string' ? payload.baseVersion : null,
       docToken: typeof payload?.docToken === 'string' ? payload.docToken : null };
     await writeFile(target + '.json', JSON.stringify(meta, null, 2), { encoding: 'utf8', flag: 'wx' }).catch(() => { /* metadata is best effort */ });
-    if (options.prune === true) try { await pruneAgentBeforeArchives(dir, target); } catch { /* retention is best effort */ }
+    if (options.prune === true) try { await pruneTaggedArchives(dir, target, tag); } catch { /* retention is best effort */ }
     return { ok: true, value: { archivePath: target, metaPath: target + '.json', sha256: sha, bytes: bytes.length } };
   }
 
@@ -1544,8 +1558,10 @@ export function createHost(options = {}) {
       invocation?.signal?.throwIfAborted();
       const current=await fs.resolve(path,resolution);
       if(pathKey(await canonicalTarget(current))!==key)throw codedError('FS_STALE_VERSION','edit target changed while queued');
+      if (payload.rejectIfMirror) await rejectDraftMirrorBeforeWrite(current);
       const opened=await apiOpen(payload,MODEL_TOOL,current,invocation),value=opened.value;
       if(!opened.ok)return opened;
+      if (payload.rejectIfMirror) await rejectDraftMirrorBeforeWrite(current);
       if(payload.baseVersion&&payload.baseVersion!==value.version)throw codedError('FS_STALE_VERSION','file changed since read');
       const first=value.text.indexOf(oldString);
       if(first<0)throw codedError('FS_EDIT_NOT_FOUND','old_string was not found');
@@ -1600,6 +1616,24 @@ export function createHost(options = {}) {
           return await documents.reviewGroups(payload);
         case 'documents.undoGroups':
           return await documents.undoGroups(payload, invocation, invocation?.policy);
+        case 'documents.conflictOpen':
+          if (authority === MODEL_TOOL) return badRequest('editor UI authority required');
+          return await documents.conflictOpen(payload, invocation);
+        case 'documents.conflictResolve':
+          if (authority === MODEL_TOOL) return badRequest('editor UI authority required');
+          return await documents.conflictResolve(payload, invocation, invocation?.policy);
+        case 'documents.conflictCancel':
+          if (authority === MODEL_TOOL) return badRequest('editor UI authority required');
+          return await documents.conflictCancel(payload);
+        case 'documents.draftMirror':
+          if (authority === MODEL_TOOL) return badRequest('editor UI authority required');
+          return await documents.draftMirror(payload, invocation);
+        case 'documents.draftRead':
+          if (authority === MODEL_TOOL) return badRequest('editor UI authority required');
+          return await documents.draftRead(payload, invocation);
+        case 'documents.draftClear':
+          if (authority === MODEL_TOOL) return badRequest('editor UI authority required');
+          return await documents.draftClear(payload, invocation);
         case 'documents.merge3':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           return await documents.merge3(payload, invocation, invocation?.policy);
@@ -2069,6 +2103,11 @@ export function createMarkdownToolDefinition(dispatch) {
           diskChanged: { type: 'boolean' },
           bufferOwnedElsewhere: { type: 'boolean' },
           unsavedElsewhere: { type: 'boolean' },
+          writable: { type: 'boolean' },
+          draft: { type: 'boolean' },
+          mirrorDraft: { type: 'boolean' },
+          draftStale: { type: 'boolean' },
+          draftUnknown: { type: 'boolean' },
           checkpointPath: { type: 'string' },
           recoveryPath: { type: 'string' },
           error: {
@@ -2082,6 +2121,8 @@ export function createMarkdownToolDefinition(dispatch) {
               dirty: { type: 'boolean' },
               diskChanged: { type: 'boolean' },
               checkpointPath: { type: 'string' },
+              draftStale: { type: 'boolean' },
+              draftUnknown: { type: 'boolean' },
             },
           },
         },
@@ -2139,6 +2180,11 @@ export function createMarkdownToolDefinition(dispatch) {
             return {
               ok: true, action, version: value.version, revisionId: value.revisionId, readToken: value.readToken || value.version,
               displayPath: value.displayPath, source: value.source, dirty: value.dirty === true,
+              writable: value.writable !== false,
+              ...(value.draft === true ? { draft: true } : {}),
+              ...(value.mirrorDraft === true ? { mirrorDraft: true } : {}),
+              ...(value.draftStale === true ? { draftStale: true } : {}),
+              ...(value.draftUnknown === true ? { draftUnknown: true } : {}),
               blocks, totalBlocks: all.length, truncated: all.length > blocks.length,
             };
           }
@@ -2152,6 +2198,11 @@ export function createMarkdownToolDefinition(dispatch) {
             displayPath: value.displayPath,
             source: value.source,
             dirty: value.dirty === true,
+            writable: value.writable !== false,
+            ...(value.draft === true ? { draft: true } : {}),
+            ...(value.mirrorDraft === true ? { mirrorDraft: true } : {}),
+            ...(value.draftStale === true ? { draftStale: true } : {}),
+            ...(value.draftUnknown === true ? { draftUnknown: true } : {}),
             ...(typeof value.diskChanged === 'boolean' ? { diskChanged: value.diskChanged } : {}),
             ...(value.bufferOwnedElsewhere === true ? { bufferOwnedElsewhere: true } : {}),
             ...(value.unsavedElsewhere === true ? { unsavedElsewhere: true } : {}),

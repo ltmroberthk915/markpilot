@@ -767,7 +767,10 @@ test('markdown 工具定义：0.2.1 defineTool 形态（output.schema/render）+
   assert.ok(spec.output && spec.output.schema && typeof spec.output.render === 'function');
 
   const read = await spec.execute({ action: 'read', path: 'D:/a.md' });
-  assert.deepEqual(plain(read), { ok: true, action: 'read', text: '# hi', version: rev, revisionId: rev, readToken: rev, displayPath: 'D:/a.md', source: 'disk', dirty: false });
+  assert.deepEqual(plain(read), { ok: true, action: 'read', text: '# hi', version: rev, revisionId: rev, readToken: rev, displayPath: 'D:/a.md', source: 'disk', dirty: false, writable: true });
+  for (const key of Object.keys(plain(read))) assert.ok(spec.output.schema.properties[key], `read output ${key} must be declared in output.schema`);
+  for (const key of ['writable', 'draft', 'mirrorDraft', 'draftStale', 'draftUnknown'])
+    assert.ok(spec.output.schema.properties[key], `output.schema must declare ${key}`);
   assert.equal(calls[0].endpoint, 'documents.read');
 
   const edited = await spec.execute({ action: 'edit', path: 'D:/a.md', oldString: 'a', newString: 'b', baseVersion: rev });

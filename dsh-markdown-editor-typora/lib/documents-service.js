@@ -13,6 +13,7 @@ import { isAbsolute, sep } from 'node:path';
 
 const LIVE_REVISION = /^rev1:live:([^:]+):(\d+):([0-9a-f]{64})$/;
 const DISK_PREFIX = 'rev1:disk:';
+const MIRROR_PREFIX = 'rev1:mirror:';
 const SHA256_RE = /^[0-9a-f]{64}$/;
 const MAX_REPLACE_ALL = 1000;
 
@@ -32,6 +33,14 @@ export function normalizeCompare(text) {
   return normalizeEol(String(text)).replace(/^\uFEFF/, '');
 }
 
+// Revision identity must not depend on CRLF/BOM representation: a disk edit's
+// token is built from provider text while a buffer edit's token is built from
+// the decoded LF room text. Both sides use this normalized sha so a legitimate
+// review chain survives crossing the disk/buffer boundary.
+export function revisionTextSha(text) {
+  return sha256Text(normalizeCompare(text));
+}
+
 export function makeLiveRevisionId(epoch, version, textSha) {
   if (typeof epoch !== 'string' || !epoch || !Number.isSafeInteger(version) || !SHA256_RE.test(String(textSha)))
     throw new Error('invalid live revision components');
@@ -44,10 +53,19 @@ export function makeDiskRevisionId(version, textSha) {
   return DISK_PREFIX + version + ':' + textSha;
 }
 
+export function makeMirrorRevisionId(textSha) {
+  if (!SHA256_RE.test(String(textSha))) throw new Error('invalid mirror revision components');
+  return MIRROR_PREFIX + textSha;
+}
+
 export function parseRevisionId(value) {
   if (typeof value !== 'string' || !value) return null;
   const live = LIVE_REVISION.exec(value);
   if (live) return { kind: 'live', epoch: live[1], version: Number(live[2]), textSha: live[3] };
+  if (value.startsWith(MIRROR_PREFIX)) {
+    const textSha = value.slice(MIRROR_PREFIX.length);
+    return SHA256_RE.test(textSha) ? { kind: 'mirror', textSha } : null;
+  }
   if (value.startsWith(DISK_PREFIX)) {
     const rest = value.slice(DISK_PREFIX.length);
     const at = rest.lastIndexOf(':');
@@ -228,8 +246,7 @@ export function sameRevisionContent(a, b) {
   return !!(ka && kb && ka === kb);
 }
 
-export function merge3Text(baseText, oursText, otherText) {
-  const base = String(baseText).split('\n');
+export function merge3Text(baseText, oursText, otherText) {  const base = String(baseText).split('\n');
   const ours = String(oursText).split('\n');
   const other = String(otherText).split('\n');
   const a = diffLines(base, ours);
@@ -266,6 +283,128 @@ export function merge3Text(baseText, oursText, otherText) {
   }
   out.push(...base.slice(pos));
   return { clean: true, conflicts: [], text: out.join('\n') };
+}
+
+// Convert a line-diff between two full texts into character edits for the
+// review-group audit/inverse. Falls back to a single replacement only if the
+// line mapping cannot reproduce the target text exactly.
+export function changesFromTextDiff(beforeText, afterText) {
+  const before = normalizeEol(String(beforeText));
+  const after = normalizeEol(String(afterText));
+  if (before === after) return [];
+  const baseLines = before.split('\n');
+  const starts = [0];
+  for (let index = 0; index < baseLines.length - 1; index += 1)
+    starts.push(starts[index] + baseLines[index].length + 1);
+  const changes = diffLines(baseLines, after.split('\n')).map((hunk) => ({
+    from: starts[hunk.start] ?? before.length,
+    to: hunk.end >= baseLines.length ? before.length : (starts[hunk.end] ?? before.length),
+    insert: hunk.lines.join('\n'),
+  })).sort((a, b) => a.from - b.from || a.to - b.to);
+  if (applyChanges(before, changes) !== after) return [{ from: 0, to: before.length, insert: after }];
+  return changes;
+}
+
+function hunkIntersects(a, b) {
+  const ai = a.start === a.end, bi = b.start === b.end;
+  if (ai && bi) return a.start === b.start;
+  if (ai) return b.start < a.start && a.start < b.end;
+  if (bi) return a.start < b.start && b.start < a.end;
+  return a.start < b.end && b.start < a.end;
+}
+
+function sameLines(a, b) {
+  return a.length === b.length && a.every((line, index) => line === b[index]);
+}
+
+function sideWithin(base, group, side) {
+  const hunks = group.items.filter((item) => item.side === side).sort((a, b) => a.start - b.start);
+  if (hunks.length === 0) return base.slice(group.start, group.end);
+  const out = [];
+  let pos = group.start;
+  for (const hunk of hunks) {
+    out.push(...base.slice(pos, hunk.start), ...hunk.lines);
+    pos = hunk.end;
+  }
+  out.push(...base.slice(pos, group.end));
+  return out;
+}
+
+/**
+ * Resolve a 3-way line conflict. `resolutions` is null/undefined for the
+ * conflict-open view (returns hunks only), or an array in hunk order:
+ *   {choice:'ours'|'theirs'|'both'|'manual', text?: string, separator?: string}
+ * Non-overlapping changes from both sides are always preserved. Manual text is
+ * normalized and may not contain CR.
+ */
+export function resolve3Text(baseText, oursText, otherText, resolutions) {
+  const base = normalizeEol(String(baseText)).split('\n');
+  const ours = normalizeEol(String(oursText)).split('\n');
+  const other = normalizeEol(String(otherText)).split('\n');
+  const all = [
+    ...diffLines(base, ours).map((hunk) => ({ ...hunk, side: 'ours' })),
+    ...diffLines(base, other).map((hunk) => ({ ...hunk, side: 'theirs' })),
+  ].sort((a, b) => a.start - b.start || a.end - b.end || (a.side === 'ours' ? -1 : 1));
+  const groups = [];
+  for (const hunk of all) {
+    let group = groups[groups.length - 1];
+    if (group && group.items.some((item) => hunkIntersects(item, hunk))) {
+      group.items.push(hunk);
+      group.start = Math.min(group.start, hunk.start);
+      group.end = Math.max(group.end, hunk.end);
+    } else {
+      groups.push({ start: hunk.start, end: hunk.end, items: [hunk] });
+    }
+  }
+  const conflicts = [];
+  const out = [];
+  let pos = 0, conflictIndex = 0;
+  for (const group of groups) {
+    out.push(...base.slice(pos, group.start));
+    const oursLines = sideWithin(base, group, 'ours');
+    const otherLines = sideWithin(base, group, 'theirs');
+    const hasOurs = group.items.some((item) => item.side === 'ours');
+    const hasOther = group.items.some((item) => item.side === 'theirs');
+    if (!hasOurs) out.push(...otherLines);
+    else if (!hasOther) out.push(...oursLines);
+    else if (sameLines(oursLines, otherLines)) out.push(...oursLines);
+    else {
+      conflicts.push({
+        baseFrom: group.start, baseTo: group.end,
+        base: base.slice(group.start, group.end).join('\n'),
+        ours: oursLines.join('\n'), other: otherLines.join('\n'),
+      });
+      if (!Array.isArray(resolutions)) {
+        out.push(...oursLines); // text is discarded in open mode
+      } else {
+        const resolution = resolutions[conflictIndex];
+        if (!resolution || typeof resolution !== 'object') throw coded('MP_CONFLICT_RESOLUTIONS', 'each conflict needs a resolution');
+        const choice = resolution.choice;
+        if (choice === 'ours') out.push(...oursLines);
+        else if (choice === 'theirs') out.push(...otherLines);
+        else if (choice === 'both') {
+          const separator = typeof resolution.separator === 'string' ? normalizeEol(resolution.separator) : '\n';
+          if (separator.includes('\r')) throw coded('MP_CONFLICT_RESOLUTIONS', 'separator must not contain CR');
+          const sepLines = separator === '' ? [] : separator.split('\n');
+          if (sepLines.length && sepLines[0] === '') sepLines.shift();
+          if (sepLines.length && sepLines[sepLines.length - 1] === '') sepLines.pop();
+          out.push(...oursLines, ...sepLines, ...otherLines);
+        } else if (choice === 'manual') {
+          if (typeof resolution.text !== 'string') throw coded('MP_CONFLICT_RESOLUTIONS', 'manual resolution needs text');
+          const manual = normalizeEol(resolution.text);
+          if (manual.includes('\r')) throw coded('MP_CONFLICT_RESOLUTIONS', 'manual text must not contain CR');
+          if (manual.length > 1024 * 1024) throw coded('MP_CONFLICT_RESOLUTIONS', 'manual text exceeds 1MB');
+          out.push(...manual.split('\n'));
+        } else throw coded('MP_CONFLICT_RESOLUTIONS', 'unknown resolution choice');
+        conflictIndex += 1;
+      }
+    }
+    pos = group.end;
+  }
+  out.push(...base.slice(pos));
+  if (Array.isArray(resolutions) && (conflictIndex !== conflicts.length || resolutions.length !== conflicts.length))
+    throw coded('MP_CONFLICT_RESOLUTIONS', 'resolution count does not match conflict count');
+  return { clean: conflicts.length === 0, conflicts, text: conflicts.length && !Array.isArray(resolutions) ? null : out.join('\n') };
 }
 
 // Locate a literal oldString in `text` and return the minimal splice list.
@@ -310,6 +449,14 @@ export function createDocumentsService(deps) {
   const { live, openModel, edit, save, archive, resolve, stat, canonical, localPath, enqueue, sandboxMode, log } = deps;
   if (!live || typeof live.readRoom !== 'function' || typeof live.append !== 'function')
     throw new Error('documents service requires LiveDocuments.readRoom/append');
+  const CONFLICT_TTL_MS = 10 * 60 * 1000;
+  const CONFLICT_MAX = 32;
+  const conflictSessions = new Map();
+  function pruneConflictSessions() {
+    const now = Date.now();
+    for (const [id, session] of conflictSessions) if (session.expiresAt <= now) conflictSessions.delete(id);
+    while (conflictSessions.size > CONFLICT_MAX) conflictSessions.delete(conflictSessions.keys().next().value);
+  }
   if (typeof stat !== 'function') throw new Error('documents service requires a stat callback');
 
   function stale(a) {
@@ -328,6 +475,7 @@ export function createDocumentsService(deps) {
       const providerText = String(opened.value.text);
       const providerVersion = String(opened.value.version);
       const providerSha = sha256Text(providerText);
+      const providerRevisionSha = revisionTextSha(providerText);
       let room = null, canonicalPath = null;
       const native = localPath(target);
       if (native && isAbsolute(native)) {
@@ -355,10 +503,21 @@ export function createDocumentsService(deps) {
       }
       let source = 'disk', text = providerText, dirty = false, conflict = false, orphanDraft = false, external = false;
       let bufferOwnedElsewhere = false, unsavedElsewhere = false;
+      let writable = true, draft = false, mirrorDraft = false, draftStale = false, draftUnknown = false;
       let diskChanged = false;
       if (room) {
         const roomDirty = room.version !== room.savedVersion;
         diskChanged = room.savedTextAvailable ? (normalizeCompare(providerText) !== room.savedText) : null;
+        // A resolved conflict keeps the buffer authoritative until the next save,
+        // but only while the disk still has the exact hash the user resolved
+        // against. Any new external write re-enters conflict.
+        let conflictResolved = false;
+        if (room.resolvedDisk && diskChanged === true && roomDirty && typeof live.readDiskIdentity === 'function') {
+          try {
+            const identity = await live.readDiskIdentity(canonicalPath);
+            conflictResolved = !!(identity && identity.diskHash === room.resolvedDisk);
+          } catch { conflictResolved = false; }
+        }
         const localMembers = Number.isSafeInteger(room.localMembers) ? room.localMembers : 0;
         if (room.members > 0 && room.members > localMembers) {
           // Any non-local member (old EXE, another DSH instance) can delete the
@@ -371,23 +530,54 @@ export function createDocumentsService(deps) {
             source = 'disk'; external = true;
           } else {
             source = 'buffer'; text = room.text; dirty = roomDirty;
-            if (diskChanged === true) conflict = true;
+            if (diskChanged === true && !conflictResolved) conflict = true;
           }
         } else if (roomDirty) {
           source = 'disk'; orphanDraft = true;
         }
       }
+      // A mirror is independent of a live room: a clean room left behind by a
+      // crashed/restarted host must never hide an unsaved mirror. Read may still
+      // prefer the room text, but every dirty/stale/unknown mirror closes writes.
+      if (canonicalPath && localPath(target)) {
+        try {
+          const mirror = typeof live.getDraft === 'function' ? await live.getDraft(canonicalPath, {}) : null;
+          if (mirror) {
+            if (mirror.baseSha256 !== providerRevisionSha) {
+              draftStale = true; writable = false; unsavedElsewhere = true;
+            } else if (mirror.textSha256 !== providerRevisionSha) {
+              draft = true; mirrorDraft = true; writable = false; unsavedElsewhere = true;
+              // A clean room with no live members (host restart / unsupported
+              // fallback / another instance) must not hide the only unsaved
+              // buffer copy. A dirty/live room keeps its own text.
+              if (!room || (room.members === 0 && room.version === room.savedVersion)) {
+                source = 'mirror'; text = mirror.text; dirty = true;
+              }
+            }
+          }
+        } catch {
+          // A broken/unreadable mirror must not be silently treated as clean:
+          // the editor may still hold unsaved bytes, so writes stay closed.
+          draftUnknown = true; writable = false; unsavedElsewhere = true;
+        }
+      }
+      if (orphanDraft || conflict || unsavedElsewhere) writable = false;
       const textSha = sha256Text(text);
+      const textRevisionSha = revisionTextSha(text);
       const revisionId = source === 'buffer'
-        ? makeLiveRevisionId(room.epoch, room.version, textSha)
-        : makeDiskRevisionId(providerVersion, source === 'disk' ? providerSha : textSha);
+        ? makeLiveRevisionId(room.epoch, room.version, textRevisionSha)
+        : source === 'mirror'
+          ? makeMirrorRevisionId(textRevisionSha)
+          : makeDiskRevisionId(providerVersion, source === 'disk' ? providerRevisionSha : textRevisionSha);
       const revision = source === 'buffer'
         ? { kind: 'live', epoch: room.epoch, version: room.version, savedVersion: room.savedVersion, diskHash: room.diskHash }
-        : { kind: 'disk', version: providerVersion, diskHash: null };
+        : source === 'mirror'
+          ? { kind: 'mirror', textSha: textRevisionSha }
+          : { kind: 'disk', version: providerVersion, diskHash: null };
       return {
-        target, opened, canonical: canonicalPath, room, providerText, providerVersion, providerSha,
-        source, text, dirty, conflict, orphanDraft, external, diskChanged, textSha, revisionId, revision,
-        bufferOwnedElsewhere, unsavedElsewhere,
+        target, opened, canonical: canonicalPath, room, providerText, providerVersion, providerSha, providerRevisionSha,
+        source, text, dirty, conflict, orphanDraft, external, diskChanged, textSha, textRevisionSha, revisionId, revision,
+        bufferOwnedElsewhere, unsavedElsewhere, writable, draft, mirrorDraft, draftStale, draftUnknown,
       };
     }
     throw coded('FS_STALE_VERSION', 'file changed during read; retry after the external write finishes');
@@ -396,7 +586,7 @@ export function createDocumentsService(deps) {
   function requireBufferBase(a, raw) {
     const token = parseRevisionId(raw);
     if (!token || token.kind !== 'live') throw stale(a);
-    if (token.epoch !== a.room.epoch || token.version !== a.room.version || token.textSha !== a.textSha)
+    if (token.epoch !== a.room.epoch || token.version !== a.room.version || token.textSha !== a.textRevisionSha)
       throw stale(a);
   }
 
@@ -407,7 +597,7 @@ export function createDocumentsService(deps) {
     }
     const token = parseRevisionId(raw);
     if (token?.kind === 'disk') {
-      if (token.version !== a.providerVersion || token.textSha !== a.providerSha) throw stale(a);
+      if (token.version !== a.providerVersion || token.textSha !== a.providerRevisionSha) throw stale(a);
       return token.version;
     }
     if (typeof raw === 'string' && raw.startsWith('rev1:')) throw stale(a);
@@ -448,6 +638,63 @@ export function createDocumentsService(deps) {
 
   function payloadPath(a) { return a?.opened?.value?.displayPath || ''; }
 
+  async function draftMirror(payload, invocation) {
+    const untitled = payload?.untitled === true;
+    let filePath, queueKey;
+    if (!untitled) {
+      const target = await resolve(payload, invocation);
+      filePath = localPath(target);
+      if (!filePath || !isAbsolute(filePath)) return fail(coded('bad-request', 'draft mirror requires a local file path'), null);
+      queueKey = await canonical(target);
+    }
+    if (typeof live.putDraft !== 'function') return fail(coded('MP_DRAFT_UNSUPPORTED', 'draft index is not available in this host'), null);
+    const write = async () => {
+      try {
+        const value = await live.putDraft(filePath, {
+          text: payload?.text, baseVersion: payload?.baseVersion, baseSha256: payload?.baseSha256,
+          docToken: payload?.docToken, session: payload?.session, untitled,
+        });
+        return { ok: true, value: { source: value.source, kind: value.kind, textSha256: value.textSha256,
+          bytes: value.bytes, docToken: value.docToken, createdAt: value.createdAt, updatedAt: value.updatedAt } };
+      } catch (error) { return fail(coded(error?.code || 'MP_DRAFT_IO', String(error?.message || error)), null); }
+    };
+    return queueKey && enqueue ? enqueue(queueKey, write) : write();
+  }
+
+  async function draftRead(payload, invocation) {
+    const untitled = payload?.untitled === true;
+    let filePath;
+    if (!untitled) {
+      const target = await resolve(payload, invocation);
+      filePath = localPath(target);
+      if (!filePath || !isAbsolute(filePath)) return fail(coded('bad-request', 'draft read requires a local file path'), null);
+    }
+    if (typeof live.getDraft !== 'function') return fail(coded('MP_DRAFT_UNSUPPORTED', 'draft index is not available in this host'), null);
+    try {
+      const value = await live.getDraft(filePath, { untitled, docToken: payload?.docToken });
+      if (!value) return { ok: true, value: null };
+      return { ok: true, value: { text: value.text, textSha256: value.textSha256, bytes: value.bytes,
+        baseVersion: value.baseVersion, baseSha256: value.baseSha256, docToken: value.docToken,
+        session: value.session, createdAt: value.createdAt, updatedAt: value.updatedAt } };
+    } catch (error) { return fail(coded(error?.code || 'MP_DRAFT_IO', String(error?.message || error)), null); }
+  }
+
+  async function draftClear(payload, invocation) {
+    const untitled = payload?.untitled === true;
+    let filePath;
+    if (!untitled) {
+      const target = await resolve(payload, invocation);
+      filePath = localPath(target);
+      if (!filePath || !isAbsolute(filePath)) return fail(coded('bad-request', 'draft clear requires a local file path'), null);
+    }
+    if (typeof live.clearDraft !== 'function') return fail(coded('MP_DRAFT_UNSUPPORTED', 'draft index is not available in this host'), null);
+    try {
+      return { ok: true, value: await live.clearDraft(filePath, {
+        docToken: payload?.docToken, textSha256: payload?.textSha256, untitled,
+      }) };
+    } catch (error) { return fail(coded(error?.code || 'MP_DRAFT_IO', String(error?.message || error)), null); }
+  }
+
   async function read(payload, invocation) {
     let a;
     try { a = await authority(payload, invocation); }
@@ -474,6 +721,11 @@ export function createDocumentsService(deps) {
         external: a.external,
         bufferOwnedElsewhere: a.bufferOwnedElsewhere,
         unsavedElsewhere: a.unsavedElsewhere,
+        writable: a.writable !== false,
+        draft: a.draft === true,
+        mirrorDraft: a.mirrorDraft === true,
+        draftStale: a.draftStale === true,
+        draftUnknown: a.draftUnknown === true,
       },
     };
   }
@@ -537,9 +789,15 @@ export function createDocumentsService(deps) {
     try { a = await authority(payload, invocation); }
     catch (error) { return fail(error, null); }
     if (a.error) return a.error;
+    if (a.mirrorDraft || a.draftStale || a.draftUnknown)
+      return fail(coded('MP_DOC_MIRROR_READONLY', 'an unsaved draft mirror exists for this document; the mirror is read-only and cannot be a write baseline', {
+        source: a.source, draftStale: a.draftStale === true, draftUnknown: a.draftUnknown === true,
+      }), a);
     if (a.unsavedElsewhere) return fail(coded('MP_DOC_UNSAVED_ELSEWHERE', 'another window has unsaved edits in this document; save or resolve them there first', { source: a.source }), a);
     if (a.orphanDraft) return fail(coded('MP_DOC_ORPHAN_DRAFT', 'this document has an unsaved draft from a closed editor; open it and resolve the draft first', { source: a.source }), a);
     if (a.conflict) return fail(coded('MP_DOC_EXTERNAL_CONFLICT', 'the buffer has unsaved edits and the file changed on disk; resolve the conflict in the editor first', { source: a.source, dirty: a.dirty, diskChanged: a.diskChanged }), a);
+    const clearResolved = payload?.clearResolved === true;
+    if (clearResolved && invocation) return fail(coded('bad-request', 'clearResolved is editor-only'), a);
 
     const rawBase = typeof payload?.baseRevisionId === 'string' ? payload.baseRevisionId
       : (typeof payload?.baseVersion === 'string' ? payload.baseVersion : '');
@@ -612,6 +870,7 @@ export function createDocumentsService(deps) {
         try {
           result = await (enqueue || ((_key, action) => action()))(a.canonical, () => live.append(a.canonical, {
             epoch: a.room.epoch, baseVersion: a.room.version, baseText: a.text, changes, actor: 'agent', groupId,
+            ...(clearResolved ? { clearResolved: true } : {}),
           }));
         } catch (error) {
           if (error?.code === 'MP_LIVE_STALE') {
@@ -619,7 +878,7 @@ export function createDocumentsService(deps) {
             try {
               const now = await live.readRoom(a.canonical);
               if (now && now.epoch === a.room.epoch)
-                currentRevisionId = makeLiveRevisionId(now.epoch, now.version, now.textSha256);
+                currentRevisionId = makeLiveRevisionId(now.epoch, now.version, revisionTextSha(now.text));
             } catch { /* current revision is optional */ }
             return {
               ok: false,
@@ -632,7 +891,7 @@ export function createDocumentsService(deps) {
           }
           throw error;
         }
-        const revisionId = makeLiveRevisionId(result.epoch, result.version, result.textSha256);
+        const revisionId = makeLiveRevisionId(result.epoch, result.version, revisionTextSha(result.text));
         const newBlockId = block ? parseDocumentBlocks(newText).find((b) => b.ordinal === block.ordinal)?.id : null;
         await recordGroup(revisionId, auditChanges);
         return {
@@ -660,6 +919,7 @@ export function createDocumentsService(deps) {
           path: payload.path, cwd: payload.cwd, oldString: payload.oldString,
           newString: payload.newString, replaceAll: payload.replaceAll === true,
           baseVersion: diskBase ?? a.providerVersion,
+          rejectIfMirror: true,
         }, invocation);
         if (!result || result.ok !== true) return result || fail(coded('FS_IO_ERROR', 'edit failed'), a);
         const version = String(result.value.version);
@@ -673,7 +933,7 @@ export function createDocumentsService(deps) {
         await recordGroup(value.revisionId, auditChanges);
         return { ok: true, value };
       }
-      const result = await save({ path: payload.path, cwd: payload.cwd ?? invocation?.cwd, text: newText, baseVersion: diskBase });
+      const result = await save({ path: payload.path, cwd: payload.cwd ?? invocation?.cwd, text: newText, baseVersion: diskBase, rejectIfMirror: true });
       if (!result || result.ok !== true) return result || fail(coded('FS_IO_ERROR', 'save failed'), a);
       const version = String(result.value.version);
       const actual = await rereadDiskText(payload, invocation, version, newText);
@@ -699,7 +959,7 @@ export function createDocumentsService(deps) {
   }
 
   function diskResult(a, version, sha, changes, newText) {
-    const revisionId = makeDiskRevisionId(version, sha);
+    const revisionId = makeDiskRevisionId(version, revisionTextSha(newText));
     return {
       changed: true, source: 'disk', revisionId, displayPath: a.opened.value.displayPath,
       revision: { kind: 'disk', version, diskHash: null },
@@ -727,11 +987,13 @@ export function createDocumentsService(deps) {
     const code = (/SQLITE_BUSY|ERR_SQLITE/i.test(String(rawCode)) || /database is locked/i.test(message))
       ? 'MP_LIVE_BUSY' : rawCode;
     const value = { code, message };
-    if (a && code === 'MP_DOC_STALE') {
+    if (a && (code === 'MP_DOC_STALE' || code === 'MP_DOC_MIRROR_READONLY')) {
       value.currentRevisionId = a.revisionId;
       value.source = a.source;
       value.dirty = a.dirty;
       if (typeof a.diskChanged === 'boolean') value.diskChanged = a.diskChanged;
+      if (a.draftStale === true) value.draftStale = true;
+      if (a.draftUnknown === true) value.draftUnknown = true;
     }
     try { log?.warn?.('documents: %s: %s', code, value.message); } catch { /* best effort */ }
     return { ok: false, error: value };
@@ -790,7 +1052,7 @@ export function createDocumentsService(deps) {
           epoch: a.room.epoch, baseVersion: a.room.version, baseText: a.text, actor: 'agent',
           changes: [{ from: 0, to: a.text.length, insert: copy.text }],
         }));
-        const revisionId = makeLiveRevisionId(result.epoch, result.version, result.textSha256);
+        const revisionId = makeLiveRevisionId(result.epoch, result.version, revisionTextSha(result.text));
         return {
           ok: true,
           value: {
@@ -803,11 +1065,11 @@ export function createDocumentsService(deps) {
       } catch (error) { return fail(error, a); }
     }
     try {
-      const result = await save({ path: payload.path, cwd: payload.cwd ?? invocation?.cwd, text: copy.text, baseVersion: a.providerVersion });
+      const result = await save({ path: payload.path, cwd: payload.cwd ?? invocation?.cwd, text: copy.text, baseVersion: a.providerVersion, rejectIfMirror: true });
       if (!result || result.ok !== true) return result || fail(coded('FS_IO_ERROR', 'recovery save failed'), a);
       const version = String(result.value.version);
       const actual = await rereadDiskText(payload, invocation, version, copy.text);
-      const revisionId = makeDiskRevisionId(version, sha256Text(actual));
+      const revisionId = makeDiskRevisionId(version, revisionTextSha(actual));
       return {
         ok: true,
         value: {
@@ -840,6 +1102,156 @@ export function createDocumentsService(deps) {
     return { ok: true, value: { ...result.value, clean: true, merged: true } };
   }
 
+  async function conflictOpen(payload) {
+    pruneConflictSessions();
+    let a;
+    try { a = await authority(payload, {}); } catch (error) { return fail(error, null); }
+    if (a.error) return a.error;
+    if (!a.conflict) return { ok: true, value: { conflict: false, revisionId: a.revisionId, source: a.source } };
+    if (!a.room || !a.room.savedTextAvailable)
+      return fail(coded('MP_CONFLICT_NO_BASE', 'the common base text is unavailable; use reload/copy instead'), a);
+    if (typeof live.readDiskIdentity !== 'function')
+      return fail(coded('MP_CONFLICT_NO_BASE', 'disk identity is unavailable on this host'), a);
+    let disk;
+    try { disk = await live.readDiskIdentity(a.canonical); } catch (error) { return fail(error, a); }
+    if (normalizeCompare(disk.text) !== normalizeCompare(a.providerText)) return fail(stale(a), a);
+    let merged;
+    try { merged = resolve3Text(a.room.savedText, a.text, a.providerText, undefined); } catch (error) { return fail(error, a); }
+    const conflictId = randomUUID();
+    const session = {
+      conflictId, canonical: a.canonical, path: payload?.path ?? '',
+      baseRevision: a.revisionId, currentRevision: a.revisionId,
+      diskHash: disk.diskHash, baseText: a.room.savedText, oursText: a.text, otherText: a.providerText,
+      expiresAt: Date.now() + CONFLICT_TTL_MS,
+    };
+    conflictSessions.set(conflictId, session);
+    pruneConflictSessions();
+    const truncated = Buffer.byteLength(a.text, 'utf8') > 2 * 1024 * 1024 || a.text.split('\n').length > 2000;
+    return {
+      ok: true,
+      value: {
+        conflict: true, conflictId, path: payload?.path ?? '', displayPath: a.opened.value.displayPath,
+        baseRevision: session.baseRevision, currentRevision: session.currentRevision, diskHash: session.diskHash,
+        hunks: merged.conflicts, clean: merged.clean,
+        // The full base/ours/theirs texts stay in the host session. The client
+        // renders hunks only; it must never put three full documents into React
+        // state. A clean merge gets a bounded preview for the confirmation UI.
+        mergedText: merged.clean && merged.text != null && merged.text.length <= 200 * 1024 ? merged.text : null,
+        truncated, expiresAt: session.expiresAt,
+      },
+    };
+  }
+
+  async function conflictResolve(payload, invocation, policy) {
+    pruneConflictSessions();
+    const conflictId = typeof payload?.conflictId === 'string' ? payload.conflictId : '';
+    const session = conflictSessions.get(conflictId);
+    if (!session) return fail(coded('MP_CONFLICT_NOT_FOUND', 'conflict session expired or missing; open the conflict again'), null);
+    if (Date.now() > session.expiresAt) {
+      conflictSessions.delete(conflictId);
+      return fail(coded('MP_CONFLICT_NOT_FOUND', 'conflict session expired; open the conflict again'), null);
+    }
+    let a;
+    try { a = await authority(payload, invocation); } catch (error) { return fail(error, null); }
+    if (a.error) return a.error;
+    if (a.canonical !== session.canonical) return fail(stale(a), a);
+    if (!a.conflict) {
+      conflictSessions.delete(conflictId);
+      return { ok: true, value: { conflict: false, changed: false, revisionId: a.revisionId } };
+    }
+    if (!a.room || a.revisionId !== session.currentRevision) return fail(stale(a), a);
+    let disk;
+    try { disk = await live.readDiskIdentity(a.canonical); } catch (error) { return fail(error, a); }
+    if (disk.diskHash !== session.diskHash) return fail(stale(a), a);
+    if (!Array.isArray(payload?.resolutions)) return fail(coded('bad-request', 'resolutions is required'), a);
+    let resolved;
+    try { resolved = resolve3Text(session.baseText, session.oursText, session.otherText, payload.resolutions); }
+    catch (error) { return fail(error, a); }
+    if (resolved.text === a.text) {
+      // "Keep mine" is not a no-op from the conflict's point of view: the room
+      // must remember that the current external disk is user-approved, or a
+      // later save would be rejected forever. No text/version changes here.
+      if (typeof live.markResolved !== 'function') return fail(coded('MP_CONFLICT_NO_BASE', 'conflict resolution is unavailable on this host'), a);
+      let marked;
+      try {
+        marked = await live.markResolved(a.canonical, {
+          epoch: a.room.epoch, baseVersion: a.room.version, baseText: a.text,
+          expectedDiskHash: session.diskHash,
+        });
+      } catch (error) { return fail(error, a); }
+      conflictSessions.delete(conflictId);
+      return {
+        ok: true,
+        value: {
+          changed: false, resolved: true, source: a.source, revisionId: a.revisionId,
+          diskVersion: a.providerVersion, resolvedDisk: session.diskHash,
+          revision: { kind: 'live', epoch: a.room.epoch, version: marked.version, savedVersion: marked.savedVersion, diskHash: marked.diskHash },
+        },
+      };
+    }
+    if (typeof archive !== 'function' || typeof live.appendResolvedConflict !== 'function')
+      return fail(coded('MP_ARCHIVE_FAILED', 'conflict resolution is unavailable'), a);
+    let archived;
+    try {
+      archived = await archive({ path: a.canonical || a.opened.value.displayPath, text: a.text, tag: 'conflict-before', baseVersion: a.providerVersion });
+      if (!archived || archived.ok !== true) throw coded('MP_ARCHIVE_FAILED', 'pre-conflict archive failed');
+    } catch (error) { return fail(coded('MP_ARCHIVE_FAILED', 'pre-conflict archive failed: ' + String(error?.message || error)), a); }
+    let changes;
+    try { changes = changesFromTextDiff(a.text, resolved.text); } catch (error) { return fail(error, a); }
+    if (changes.length === 0) {
+      if (typeof live.markResolved !== 'function') return fail(coded('MP_CONFLICT_NO_BASE', 'conflict resolution is unavailable on this host'), a);
+      let marked;
+      try {
+        marked = await live.markResolved(a.canonical, {
+          epoch: a.room.epoch, baseVersion: a.room.version, baseText: a.text,
+          expectedDiskHash: session.diskHash,
+        });
+      } catch (error) { return fail(error, a); }
+      conflictSessions.delete(conflictId);
+      return {
+        ok: true,
+        value: {
+          changed: false, resolved: true, source: a.source, revisionId: a.revisionId,
+          diskVersion: a.providerVersion, resolvedDisk: session.diskHash,
+          revision: { kind: 'live', epoch: a.room.epoch, version: marked.version, savedVersion: marked.savedVersion, diskHash: marked.diskHash },
+        },
+      };
+    }
+    const groupId = randomUUID();
+    let result;
+    try {
+      result = await (enqueue || ((_key, action) => action()))(a.canonical, () => live.appendResolvedConflict(a.canonical, {
+        epoch: a.room.epoch, baseVersion: a.room.version, baseText: a.text,
+        expectedDiskHash: session.diskHash, changes, actor: 'agent', groupId,
+      }));
+    } catch (error) { return fail(error, a); }
+    const revisionId = makeLiveRevisionId(result.epoch, result.version, revisionTextSha(result.text));
+    const auditChanges = changes.map((change) => ({ ...change, removed: a.text.slice(change.from, change.to) }));
+    try {
+      await live.recordAgentGroup?.(a.canonical, {
+        groupId, actor: 'agent', kind: 'conflict-resolve',
+        baseRevision: a.revisionId, resultRevision: revisionId, changes: auditChanges,
+      });
+    } catch { /* audit is best effort; the write already succeeded */ }
+    conflictSessions.delete(conflictId);
+    return {
+      ok: true,
+      value: {
+        changed: true, source: 'buffer', revisionId, version: revisionId,
+        revision: { kind: 'live', epoch: result.epoch, version: result.version, savedVersion: result.savedVersion, diskHash: result.diskHash },
+        textSha256: result.textSha256, textLength: result.text.length,
+        groupId, diskVersion: a.providerVersion, resolvedDisk: session.diskHash,
+        checkpoint: archived?.value || null, applied: appliedOf(changes),
+      },
+    };
+  }
+
+  async function conflictCancel(payload) {
+    const conflictId = typeof payload?.conflictId === 'string' ? payload.conflictId : '';
+    const existed = conflictSessions.delete(conflictId);
+    return { ok: true, value: { cancelled: true, existed } };
+  }
+
   async function reviewGroup(payload) {
     let target;
     try { target = await resolve(payload, {}); } catch (error) { return fail(error, null); }
@@ -866,9 +1278,39 @@ export function createDocumentsService(deps) {
     for (let index = 0; index < ids.length; index += 1) {
       const group = await live.getAgentGroup(canonicalPath, String(ids[index]));
       if (!group) return fail(coded('MP_GROUP_NOT_FOUND', 'agent group is missing'), null);
-      groups.push({ index: index + 1, groupId: group.groupId, at: group.at, kind: group.kind, changes: group.changes || [], undoneAt: group.undoneAt ?? null });
+      groups.push({
+        index: index + 1, groupId: group.groupId, actor: group.actor, at: group.at, kind: group.kind,
+        baseRevision: group.baseRevision ?? null, resultRevision: group.resultRevision ?? null,
+        changes: group.changes || [], undoneAt: group.undoneAt ?? null,
+      });
     }
-    return { ok: true, value: { groups } };
+    // Host-side chain validation (P0). The authority text is the only fact that
+    // says "this group is still the current document"; the client must not
+    // reimplement sha256. Any inconsistency means the persisted review record
+    // is stale and must be dropped, never shown as a live review.
+    let chainOk = true, chainReason = 'ok', currentRevisionId = null;
+    try {
+      const a = await authority(payload, {});
+      if (a.error) { chainOk = false; chainReason = 'authority-error'; }
+      else {
+        currentRevisionId = a.revisionId;
+        if (groups.some((group) => group.undoneAt)) { chainOk = false; chainReason = 'undone'; }
+        else if (groups.some((group) => typeof group.baseRevision !== 'string' || !group.baseRevision
+          || typeof group.resultRevision !== 'string' || !group.resultRevision)) {
+          chainOk = false; chainReason = 'missing-revision';
+        } else {
+          for (let index = 1; index < groups.length; index += 1) {
+            if (!sameRevisionContent(groups[index - 1].resultRevision, groups[index].baseRevision)) {
+              chainOk = false; chainReason = 'broken-chain'; break;
+            }
+          }
+          if (chainOk && !sameRevisionContent(groups[groups.length - 1].resultRevision, a.revisionId)) {
+            chainOk = false; chainReason = 'not-current';
+          }
+        }
+      }
+    } catch { chainOk = false; chainReason = 'authority-error'; }
+    return { ok: true, value: { groups, chainOk, chainReason, currentRevisionId } };
   }
 
   async function undoGroups(payload, invocation, policy) {
@@ -890,10 +1332,15 @@ export function createDocumentsService(deps) {
       groups.push(group);
     }
     for (let i = 1; i < groups.length; i += 1) {
-      if (groups[i].baseRevision !== groups[i - 1].resultRevision)
+      if (!sameRevisionContent(groups[i].baseRevision, groups[i - 1].resultRevision))
         return fail(coded('MP_GROUP_STALE', 'agent groups are not a contiguous edit sequence'), a);
     }
     if (!sameRevisionContent(groups[groups.length - 1].resultRevision, a.revisionId)) return fail(stale(a), a);
+    // Undoing a conflict-resolution group must re-expose the original conflict.
+    // The inverse append carries clearResolved so room_resolved is deleted in
+    // the same room transaction; clearing before the append would make the
+    // append itself refuse as a conflict.
+    const hadConflictGroup = groups.some((group) => group.kind === 'conflict-resolve');
     let text = a.text;
     for (let i = groups.length - 1; i >= 0; i -= 1) {
       const group = groups[i];
@@ -911,13 +1358,18 @@ export function createDocumentsService(deps) {
       inverse.sort((x, y) => x.from - y.from);
       text = applyChanges(text, inverse);
     }
-    if (text === a.text) return { ok: true, value: { changed: false, source: a.source, version: a.revisionId, undoOf: groupIds } };
-    const result = await applyEdits({ path: payload.path, cwd: payload.cwd, edits: [{ from: 0, to: a.text.length, insert: text }], baseRevisionId: a.revisionId }, invocation, policy);
+    if (text === a.text) return { ok: true, value: { changed: false, source: a.source, version: a.revisionId, undoOf: groupIds, reopenedConflict: hadConflictGroup } };
+    const result = await applyEdits({
+      path: payload.path, cwd: payload.cwd,
+      edits: [{ from: 0, to: a.text.length, insert: text }],
+      baseRevisionId: a.revisionId,
+      ...(hadConflictGroup ? { clearResolved: true } : {}),
+    }, invocation, policy);
     if (!result || result.ok !== true) return result || fail(coded('FS_IO_ERROR', 'undo failed'), a);
     for (const groupId of groupIds) {
       try { await live.markAgentGroupUndone(a.canonical, String(groupId)); } catch { /* audit best effort */ }
     }
-    return { ok: true, value: { ...result.value, undoOf: groupIds } };
+    return { ok: true, value: { ...result.value, undoOf: groupIds, reopenedConflict: hadConflictGroup } };
   }
 
   async function undoGroup(payload, invocation, policy) {
@@ -933,6 +1385,8 @@ export function createDocumentsService(deps) {
     try { group = await live.getAgentGroup(a.canonical, groupId); }
     catch (error) { return fail(error, a); }
     if (!group || group.undoneAt) return fail(coded('MP_GROUP_NOT_FOUND', 'agent group is already undone or missing'), a);
+    if (group.kind === 'conflict-resolve')
+      return fail(coded('MP_GROUP_NOT_ALLOWED', 'conflict resolution groups can only be undone from the editor'), a);
     if (!sameRevisionContent(group.resultRevision, a.revisionId)) return fail(stale(a), a);
     const recent = await live.listAgentGroups(a.canonical, 20);
     const latest = recent.find((entry) => !entry.undoneAt);
@@ -954,6 +1408,10 @@ export function createDocumentsService(deps) {
     return { ok: true, value: { ...result.value, undoOf: groupId } };
   }
 
-  return { read, applyEdits, state, recover, discardRecovery, undoGroup, undoGroups, merge3, reviewGroup, reviewGroups };
+  return {
+    read, applyEdits, state, recover, discardRecovery, undoGroup, undoGroups, merge3,
+    reviewGroup, reviewGroups, conflictOpen, conflictResolve, conflictCancel,
+    draftMirror, draftRead, draftClear,
+  };
 }
 

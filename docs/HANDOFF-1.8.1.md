@@ -3,6 +3,8 @@
 > 交接范围：`dsh-markdown-editor-typora` 插件后续开发、发布与验收。
 > 交接基线：`main` 已推送，插件 1.8.1，GitHub Release / npm 均已发布。
 > 读者：接手本项目的工程师。先读第 1～3 节，再按第 4 节以后的任务顺序推进。
+>
+> **事故警告（2026-11-11）**：因在生产 DSH 上用 DevTools 强制 reload，触发 web-boot 插件 import 失败；随后 `~/.dsh/profiles/desktop/cordis.patch.yml` 与 `package.json` 的 `dsh.profile.bundles` 同时被截断，界面表现为“插件全没了”。恢复与教训见 [LOG-1.8.1 · 插件配置丢失事故](LOG-1.8.1-INCIDENT-PLUGIN-CONFIG-LOSS.md)。加载插件改动一律走插件管理器 + 正常重启，禁止生产环境强制 reload；改 profile 前同时备份两个文件并用 `list_bundles` 核对 enabled。**任何实机测试只用 DSH Web 端（独立测试 profile），不启动、不操作 DSH Desktop；Desktop 只做用户明确要求后的最终安装验收。**
 
 ---
 

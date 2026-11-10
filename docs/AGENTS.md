@@ -9,6 +9,17 @@
 5. 文件名按版本号命名：`RELEASE-<版本>.md`、`LOG-<版本区间>.md`，不使用日期命名。
 6. README 只增不删，改动后用 `scripts/verify-readme-keep.cjs` 证明旧内容全部保留。
 
+## 事故案例（强制阅读）
+
+- **2026-11-11 插件配置丢失**：在生产 DSH 上用 DevTools 强制 reload，触发 web-boot 插件 import 失败；随后 `~/.dsh/profiles/desktop/cordis.patch.yml` 与 `package.json` 的 `dsh.profile.bundles` 同时被截断，界面表现为插件全部消失。恢复与硬规则见 [LOG-1.8.1 · 插件配置丢失事故](LOG-1.8.1-INCIDENT-PLUGIN-CONFIG-LOSS.md)。加载插件改动只允许走插件管理器 + 正常重启，禁止生产环境强制 reload；改 profile 前必须同时备份 `cordis.patch.yml` 与 `package.json`，先用 `plugin_manager list_bundles` 确认 bundle 的 enabled 状态。
+
+## 实机测试环境（强制）
+
+1. **MarkPilot 的任何实机测试都用 DSH Web 端**：浏览器打开 Web GUI，使用**独立测试 profile**（不写生产 `desktop` profile），由浏览器自动化或真实键鼠完成；不启动、不操作 DSH Desktop。
+2. **禁止用 DSH Desktop 做日常开发验证**：Desktop 只用于最终打包安装后的验收，且必须在用户明确要求时进行；验收范围不得包含批量插件开关、DevTools reload、profile 配置修改。
+3. Web 端测试同样要遵守：先备份测试 profile、失败保留现场、不在生产 profile 上试错。
+4. 测试结果以 Web 端页面、host 日志与文件字节为准；不以 Desktop 界面“看起来正常”作为通过依据。
+
 ## 子代理路由（强制，2026-10-07 起）
 
 **按"有没有视觉能力"分工，不按"活难不难"分工。**

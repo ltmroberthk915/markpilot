@@ -223,6 +223,28 @@ test('T04 external：有未保存草稿时拒绝，写者不运行，原文件�
   A.leave(a.client);
 });
 
+test('T04b sealed keep-mine clears room_resolved so later saves are not blocked', async () => {
+  const w = await makeWorld('sealed-marker');
+  const A = new LiveDocuments({ directory: w.dir });
+  const a = await A.join(w.file, w.base);
+  A.exchange(a.client, { epoch: a.epoch, version: 0, seq: 1, changes: [{ from: 0, to: w.base.length, insert: 'MINE' }] });
+  await fs.writeFile(w.file, 'THEIRS\n');
+  const diskHash = await byteHashOf(w.file);
+  await A.markResolved(w.file, { epoch: a.epoch, baseVersion: 1, baseText: 'MINE', expectedDiskHash: diskHash });
+  const db = new (await import('node:sqlite')).DatabaseSync(path.join(w.dir, 'rooms.sqlite'));
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM room_resolved WHERE epoch=?').get(a.epoch).n, 1);
+  try {
+    const receipt = await A.external(w.file, async () => {
+      await fs.writeFile(w.file, 'MINE');
+      return { version: 'prov-sealed' };
+    }, { client: a.client, keepMineText: 'MINE' });
+    assert.equal(receipt.clean, true);
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'MINE');
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM room_resolved WHERE epoch=?').get(a.epoch).n, 0,
+      'sealed keep-mine must not leave a stale resolved marker blocking future saves');
+  } finally { db.close(); A.leave(a.client); }
+});
+
 test('T05 external 写入期间有新输入：落盘照实上报不误报，草稿保护（a 分叉 / b 恰同文）', async () => {
   // (a) 外部内容与草稿分叉：写成功、草稿保留、refresh 报告盘变
   const wa = await makeWorld('ext-mid-a');

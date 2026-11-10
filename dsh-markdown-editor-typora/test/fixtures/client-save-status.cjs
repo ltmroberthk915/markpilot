@@ -11,8 +11,8 @@ const drain=async()=>{for(let i=0;i<40;i++)await Promise.resolve();};
 function make(options={}){
  const effects=[],refs=[],listeners=new Map(),timers=new Map(),storage=options.storage||new Map(),slots=options.slots||new Map(),posts=[],requests=[],held=[];
  const transport={dropAck:false,holdAck:false,dropText:false,rejectApply:false};
- const uiHistory=[]; let rendering=false,refCursor=0; let timerId=0,now=0,definition,ui,cwd=options.cwd||'D:/probe',fetchHandler=req=>Promise.resolve(req.endpoint==='archive'?{ok:true,value:{archivePath:'D:/probe/.archive/'+String(req.payload?.tag||'draft')+'.md',sha256:'0'.repeat(64),bytes:String(req.payload?.text||'').length}}:{ok:true,value:{text:'disk-v1',version:'v1',displayPath:'D:/probe/a.md',size:7}});
- const engine={text:'',session:null,token:null,lastApply:null,composing:false};
+ const uiHistory=[]; let rendering=false,refCursor=0; let timerId=0,now=0,definition,ui,cwd=options.cwd||'D:/probe',fetchHandler=req=>Promise.resolve(req.endpoint==='archive'?{ok:true,value:{archivePath:'D:/probe/.archive/'+String(req.payload?.tag||'draft')+'.md',sha256:'0'.repeat(64),bytes:String(req.payload?.text||'').length}}:req.endpoint==='documents.draftRead'?{ok:true,value:null}:req.endpoint==='documents.draftClear'?{ok:true,value:{removed:0}}:{ok:true,value:{text:'disk-v1',version:'v1',displayPath:'D:/probe/a.md',size:7}});
+ const engine={text:'',session:null,token:null,lastApply:null,composing:false}; let liveVersion=0;
  const same=(a,b)=>!!a&&!!b&&a.epoch===b.epoch&&a.sourceRevision===b.sourceRevision;
  const add=(n,f)=>{if(!listeners.has(n))listeners.set(n,new Set());listeners.get(n).add(f);};
  const remove=(n,f)=>listeners.get(n)?.delete(f);
@@ -29,6 +29,7 @@ function make(options={}){
    }
    emit('apply-result',{protocol:2,docToken:c.docToken,applyId:c.applyId,applied,reason:applied?null:'composing',session:engine.session&&{...engine.session}});
   }else if(m.type==='requestText'&&engine.token===c.docToken){emit('text',{protocol:2,docToken:engine.token,id:c.id,session:{...engine.session},lastApply:engine.lastApply,text:engine.text,composing:engine.composing});}
+  else if(m.type==='live-flush'&&engine.token===c.docToken){emit('live-flush-result',{protocol:2,docToken:engine.token,id:c.id,ok:true,result:{client:'fixture-live',epoch:'fixture-epoch',version:liveVersion}});}
  }
  const win={postMessage(m){posts.push(m);if(options.syncWire)receive(m);else queueMicrotask(()=>receive(m));}};
  const React={useMemo:f=>f(),useRef:v=>{if(rendering)return refs[refCursor++];const r={current:v};refs.push(r);return r;},useState:v=>{if(!rendering)ui=v;return[ui,f=>{ui=typeof f==='function'?f(ui):f;uiHistory.push(ui.saveStatus);}];},useCallback:f=>f,useEffect:f=>{if(!rendering)effects.push(f);},createElement:(type,props,...children)=>({type,props,children})};
@@ -58,7 +59,7 @@ function make(options={}){
  const cleanups=effects.map(effect=>effect()).filter(value=>typeof value==='function');
  const cleanup=()=>{for(const dispose of [...cleanups].reverse())dispose();};
  const st=refs[2].current;st.doc.win=win;
- return{uiHistory,test:mod.__test,render(){rendering=true;refCursor=0;try{return mod.__test.EditorTabBodyInner(componentProps);}finally{rendering=false;}},setUiForRender(value){ui={...ui,...value};},st,posts,requests,storage,slots,timers,cleanup,message,transport,held,engine,draftStore,setFetch:f=>fetchHandler=f,setCwd:value=>{cwd=value;},ui:()=>ui,
+ return{uiHistory,test:mod.__test,render(){rendering=true;refCursor=0;try{return mod.__test.EditorTabBodyInner(componentProps);}finally{rendering=false;}},setUiForRender(value){ui={...ui,...value};},st,posts,requests,storage,slots,timers,cleanup,message,transport,held,engine,draftStore,setFetch:f=>fetchHandler=f,setCwd:value=>{cwd=value;},setLiveVersion:value=>{liveVersion=value;},ui:()=>ui,
   edit(text,composing=false){if(!engine.session)throw Error('Renderer not initialized');const before={...engine.session},beforeLength=engine.text.length;engine.session={...before,sourceRevision:before.sourceRevision+1};engine.text=text;engine.composing=composing;message('document-delta',{protocol:2,docToken:engine.token,before,after:{...engine.session},beforeLength,afterLength:text.length,changes:[{from:0,to:beforeLength,insert:text}],composing,lastApply:engine.lastApply});},
   composition(value){engine.composing=value;message('composition',{protocol:2,docToken:engine.token,session:{...engine.session},composing:value});},
   releaseAck(){for(const m of held.splice(0))message(m.type,m.content);},

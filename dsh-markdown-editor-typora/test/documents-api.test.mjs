@@ -8,6 +8,8 @@ import os from 'node:os';
 import http from 'node:http';
 import { createRequire } from 'node:module';
 import { createHost, createMarkdownToolDefinition, MODEL_TOOL } from '../lib/index.js';
+import { makeLiveRevisionId, makeMirrorRevisionId, parseRevisionId, revisionTextSha, sha256Text } from '../lib/documents-service.js';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
@@ -422,10 +424,20 @@ test('B4.2B-API2 multi-group review undo restores the whole sequence', async () 
     const reviewed = await host.dispatch('documents.reviewGroups', { path: w.file, groupIds: [first.value.groupId, second.value.groupId] });
     assert.equal(reviewed.ok, true, JSON.stringify(reviewed));
     assert.equal(reviewed.value.groups.length, 2);
+    assert.equal(reviewed.value.chainOk, true, JSON.stringify(reviewed.value));
+    assert.equal(typeof reviewed.value.groups[0].baseRevision, 'string');
+    assert.equal(typeof reviewed.value.groups[1].resultRevision, 'string');
     assert.equal(reviewed.value.groups[0].changes[0].insert, 'ONE');
     assert.equal(reviewed.value.groups[1].changes[0].insert, 'TWO');
+    const partial = await host.dispatch('documents.reviewGroups', { path: w.file, groupIds: [first.value.groupId] });
+    assert.equal(partial.ok, true, JSON.stringify(partial));
+    assert.equal(partial.value.chainOk, false, 'the last group must be the current document');
     const undone = await host.dispatch('documents.undoGroups', { path: w.file, groupIds: [first.value.groupId, second.value.groupId] });
     assert.equal(undone.ok, true, JSON.stringify(undone));
+    const afterUndo = await host.dispatch('documents.reviewGroups', { path: w.file, groupIds: [first.value.groupId, second.value.groupId] });
+    assert.equal(afterUndo.ok, true, JSON.stringify(afterUndo));
+    assert.equal(afterUndo.value.chainOk, false, 'undone groups cannot be restored');
+    assert.equal(afterUndo.value.chainReason, 'undone');
     const after = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
     assert.equal(after.value.text, 'one\ntwo\n');
     const groups = await liveDocs.listAgentGroups(w.file, 20);
@@ -484,6 +496,505 @@ test('B3-API5 a sandboxed session cannot apply a buffer edit outside its workspa
     assert.equal(apply.ok, false);
     assert.equal(apply.error.code, 'FS_SANDBOX_DENIED');
     assert.equal(await fs.readFile(w.file, 'utf8'), 'hello\n');
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B4.2B-API3 review chain survives the disk→buffer boundary on a CRLF file', async () => {
+  const w = await makeWorld('review-crlf', 'one\r\ntwo\r\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    // First AI edit happens on the disk (no room yet). Its revision token must
+    // use the comparison-normalized sha, not the raw CRLF provider bytes.
+    const diskRead = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(diskRead.value.source, 'disk');
+    const first = await host.dispatch('documents.applyEdits', {
+      path: w.file, baseRevisionId: diskRead.value.version, oldString: 'one', newString: 'ONE',
+    }, MODEL_TOOL, execution(w.root));
+    assert.equal(first.ok, true, JSON.stringify(first));
+    // Open the editor on the same file, then make the second AI edit in the buffer.
+    await liveDocs.join(w.file, 'ONE\ntwo\n');
+    const bufferRead = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(bufferRead.value.source, 'buffer');
+    const second = await host.dispatch('documents.applyEdits', {
+      path: w.file, baseRevisionId: bufferRead.value.version, oldString: 'two', newString: 'TWO',
+    }, MODEL_TOOL, execution(w.root));
+    assert.equal(second.ok, true, JSON.stringify(second));
+    const reviewed = await host.dispatch('documents.reviewGroups', {
+      path: w.file, groupIds: [first.value.groupId, second.value.groupId],
+    });
+    assert.equal(reviewed.ok, true, JSON.stringify(reviewed));
+    assert.equal(reviewed.value.chainOk, true, JSON.stringify(reviewed.value));
+    assert.equal(reviewed.value.chainReason, 'ok');
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B4.2B-API4 review chain rejects broken/missing/undone groups and accepts epoch changes', async () => {
+  const w = await makeWorld('review-chain', 'final\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const g1 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const g2 = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const g3 = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    const base = makeLiveRevisionId('e1', 0, sha256Text('base\n'));
+    const mid = makeLiveRevisionId('e1', 1, sha256Text('mid\n'));
+    const midOtherEpoch = makeLiveRevisionId('e2', 0, sha256Text('mid\n'));
+    const final = makeLiveRevisionId('e2', 1, sha256Text('final\n'));
+    await liveDocs.recordAgentGroup(w.file, { groupId: g1, kind: 'edit', baseRevision: base, resultRevision: mid, changes: [{ from: 0, to: 0, insert: 'x' }] });
+    await liveDocs.recordAgentGroup(w.file, { groupId: g2, kind: 'edit', baseRevision: midOtherEpoch, resultRevision: final, changes: [{ from: 0, to: 0, insert: 'y' }] });
+    const ok = await host.dispatch('documents.reviewGroups', { path: w.file, groupIds: [g1, g2] });
+    assert.equal(ok.ok, true, JSON.stringify(ok));
+    assert.equal(ok.value.chainOk, true, 'adjacent groups with the same content sha but different epochs are contiguous');
+    const reversed = await host.dispatch('documents.reviewGroups', { path: w.file, groupIds: [g2, g1] });
+    assert.equal(reversed.value.chainOk, false);
+    assert.equal(reversed.value.chainReason, 'broken-chain');
+    await liveDocs.recordAgentGroup(w.file, { groupId: g3, kind: 'edit', baseRevision: '', resultRevision: '', changes: [] });
+    const missing = await host.dispatch('documents.reviewGroups', { path: w.file, groupIds: [g3] });
+    assert.equal(missing.value.chainOk, false);
+    assert.equal(missing.value.chainReason, 'missing-revision');
+    await liveDocs.markAgentGroupUndone(w.file, g2);
+    const undone = await host.dispatch('documents.reviewGroups', { path: w.file, groupIds: [g2] });
+    assert.equal(undone.value.chainOk, false);
+    assert.equal(undone.value.chainReason, 'undone');
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B4.2B-API5 multi-group undo accepts a result revision from another epoch', async () => {
+  const w = await makeWorld('undo-epoch', 'world\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const g1 = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+    const g2 = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+    await liveDocs.recordAgentGroup(w.file, {
+      groupId: g1, kind: 'edit',
+      baseRevision: makeLiveRevisionId('old-epoch', 0, sha256Text('hello\n')),
+      resultRevision: makeLiveRevisionId('old-epoch', 1, sha256Text('mid\n')),
+      changes: [{ from: 0, to: 5, insert: 'mid', removed: 'hello' }],
+    });
+    await liveDocs.recordAgentGroup(w.file, {
+      groupId: g2, kind: 'edit',
+      baseRevision: makeLiveRevisionId('new-epoch', 0, sha256Text('mid\n')),
+      resultRevision: makeLiveRevisionId('new-epoch', 1, sha256Text('world\n')),
+      changes: [{ from: 0, to: 3, insert: 'world', removed: 'mid' }],
+    });
+    const undone = await host.dispatch('documents.undoGroups', { path: w.file, groupIds: [g1, g2] });
+    assert.equal(undone.ok, true, JSON.stringify(undone));
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'hello\n');
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B4.3-API1 conflict open/resolve enters review, does not write disk, and resists model undo', async () => {
+  const w = await makeWorld('conflict', 'base\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const member = await liveDocs.join(w.file, 'base\n');
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const exchanged = await liveDocs.exchange(member.client, {
+      epoch: member.epoch, version: 0, seq: 1, changes: [{ from: 0, to: 4, insert: 'ours' }],
+    });
+    assert.equal(exchanged.version, 1);
+    await fs.writeFile(w.file, 'theirs\n', 'utf8');
+    const conflicted = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(conflicted.value.conflict, true, JSON.stringify(conflicted.value));
+    const opened = await host.dispatch('documents.conflictOpen', { path: w.file, cwd: w.root });
+    assert.equal(opened.ok, true, JSON.stringify(opened));
+    assert.equal(opened.value.conflict, true);
+    assert.equal(opened.value.baseText, undefined, 'full base text must stay host-side');
+    assert.equal(opened.value.oursText, undefined);
+    assert.equal(opened.value.otherText, undefined);
+    assert.equal(opened.value.hunks.length, 1);
+    assert.equal(opened.value.hunks[0].base, 'base');
+    assert.equal(opened.value.hunks[0].ours, 'ours');
+    assert.equal(opened.value.hunks[0].other, 'theirs');
+    const resolved = await host.dispatch('documents.conflictResolve', {
+      path: w.file, cwd: w.root, conflictId: opened.value.conflictId,
+      resolutions: [{ choice: 'manual', text: 'merged' }],
+    });
+    assert.equal(resolved.ok, true, JSON.stringify(resolved));
+    assert.equal(resolved.value.changed, true);
+    const after = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(after.value.conflict, false, JSON.stringify(after.value));
+    assert.equal(after.value.text, 'merged\n');
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'theirs\n', 'resolve must not write the disk');
+    const groups = await liveDocs.listAgentGroups(w.file, 20);
+    assert.equal(groups[0].kind, 'conflict-resolve');
+    const modelUndo = await host.dispatch('documents.undoGroup', {
+      path: w.file, groupId: resolved.value.groupId,
+    }, MODEL_TOOL, execution(w.root));
+    assert.equal(modelUndo.ok, false, JSON.stringify(modelUndo));
+    assert.equal(modelUndo.error.code, 'MP_GROUP_NOT_ALLOWED');
+    const uiUndo = await host.dispatch('documents.undoGroups', {
+      path: w.file, groupIds: [resolved.value.groupId],
+    });
+    assert.equal(uiUndo.ok, true, JSON.stringify(uiUndo));
+    assert.equal(uiUndo.value.reopenedConflict, true, JSON.stringify(uiUndo.value));
+    const undone = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(undone.value.text, 'ours\n');
+    assert.equal(undone.value.conflict, true, 'undoing a conflict-resolution group must re-expose the original conflict');
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B4.3-ADV1 undoing a conflict-resolve revokes save authorization', async () => {
+  const w = await makeWorld('conflict-undo-save', 'base\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const member = await liveDocs.join(w.file, 'base\n');
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    await liveDocs.exchange(member.client, {
+      epoch: member.epoch, version: 0, seq: 1, changes: [{ from: 0, to: 4, insert: 'ours' }],
+    });
+    await fs.writeFile(w.file, 'theirs\n', 'utf8');
+    const opened = await host.dispatch('documents.conflictOpen', { path: w.file, cwd: w.root });
+    assert.equal(opened.ok, true, JSON.stringify(opened));
+    const resolved = await host.dispatch('documents.conflictResolve', {
+      path: w.file, cwd: w.root, conflictId: opened.value.conflictId,
+      resolutions: [{ choice: 'manual', text: 'merged\n' }],
+    });
+    assert.equal(resolved.ok, true, JSON.stringify(resolved));
+    const undo = await host.dispatch('documents.undoGroups', { path: w.file, groupIds: [resolved.value.groupId] });
+    assert.equal(undo.ok, true, JSON.stringify(undo));
+    const room = await liveDocs.readRoom(w.file);
+    assert.ok(room, 'room still exists');
+    assert.equal(room.text, 'ours\n');
+    let wrote = false;
+    const save = await liveDocs.save(member.client, {
+      epoch: member.epoch, version: room.version, text: room.text,
+    }, async () => { wrote = true; await fs.writeFile(w.file, room.text, 'utf8'); return { ok: true }; }).catch((error) => error);
+    assert.equal(save.code, 'MP_FILE_CONFLICT', 'revoked resolution must refuse the save');
+    assert.equal(wrote, false, 'writer must not run');
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'theirs\n', 'external disk must remain intact');
+    const db = new DatabaseSync(path.join(w.live, 'rooms.sqlite'));
+    try {
+      const row = db.prepare('SELECT disk FROM room_resolved WHERE epoch=?').get(member.epoch);
+      assert.equal(row?.disk, '', 'undo keeps an explicit sentinel marker');
+    } finally { db.close(); }
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B4.3-ADV2 all-ours resolution authorizes the overwrite and writes only on save', async () => {
+  const w = await makeWorld('conflict-ours', 'base\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const member = await liveDocs.join(w.file, 'base\n');
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    await liveDocs.exchange(member.client, {
+      epoch: member.epoch, version: 0, seq: 1, changes: [{ from: 0, to: 4, insert: 'ours' }],
+    });
+    await fs.writeFile(w.file, 'theirs\n', 'utf8');
+    const opened = await host.dispatch('documents.conflictOpen', { path: w.file, cwd: w.root });
+    assert.equal(opened.ok, true, JSON.stringify(opened));
+    const resolved = await host.dispatch('documents.conflictResolve', {
+      path: w.file, cwd: w.root, conflictId: opened.value.conflictId,
+      resolutions: [{ choice: 'ours' }],
+    });
+    assert.equal(resolved.ok, true, JSON.stringify(resolved));
+    assert.equal(resolved.value.changed, false);
+    assert.equal(resolved.value.resolved, true);
+    const after = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(after.value.conflict, false, JSON.stringify(after.value));
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'theirs\n', 'resolve itself is zero-write');
+    const room = await liveDocs.readRoom(w.file);
+    assert.equal(room.text, 'ours\n');
+    const saved = await liveDocs.save(member.client, {
+      epoch: member.epoch, version: room.version, text: room.text,
+    }, async () => { await fs.writeFile(w.file, 'ours\n', 'utf8'); return { ok: true }; });
+    assert.equal(saved.savedVersion, room.version);
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'ours\n');
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B3.3b-API1 a fresh dirty mirror is readable but never writable', async () => {
+  const w = await makeWorld('mirror-read', 'disk\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    await liveDocs.putDraft(w.file, {
+      text: 'draft\n', baseVersion: 'v0', baseSha256: revisionTextSha('disk\n'), docToken: 'mirror-read-token',
+    });
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const read = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(read.ok, true, JSON.stringify(read));
+    assert.equal(read.value.source, 'mirror');
+    assert.equal(read.value.text, 'draft\n');
+    assert.equal(read.value.dirty, true);
+    assert.equal(read.value.writable, false);
+    assert.equal(read.value.draft, true);
+    assert.match(read.value.version, /^rev1:mirror:/);
+    assert.equal(parseRevisionId(read.value.version).kind, 'mirror');
+
+    const apply = await host.dispatch('documents.applyEdits', {
+      path: w.file, baseRevisionId: read.value.version, edits: [{ oldString: 'draft', newString: 'AI' }],
+    }, MODEL_TOOL, execution(w.root));
+    assert.equal(apply.ok, false);
+    assert.equal(apply.error.code, 'MP_DOC_MIRROR_READONLY');
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'disk\n');
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B3.3b-API2 a stale or unknown mirror returns disk text and closes writes', async () => {
+  const w = await makeWorld('mirror-stale', 'disk\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    await liveDocs.putDraft(w.file, {
+      text: 'old draft\n', baseVersion: 'v0', baseSha256: 'b'.repeat(64), docToken: 'stale-token',
+    });
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const stale = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(stale.ok, true, JSON.stringify(stale));
+    assert.equal(stale.value.source, 'disk');
+    assert.equal(stale.value.text, 'disk\n');
+    assert.equal(stale.value.writable, false);
+    assert.equal(stale.value.draftStale, true);
+    assert.equal(stale.value.draft, false);
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B3.3b-API3 editor mirror endpoints write/read/clear without model authority', async () => {
+  const w = await makeWorld('mirror-api', 'disk\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const write = await host.dispatch('documents.draftMirror', {
+      path: w.file, text: 'draft\n', baseVersion: 'v0', baseSha256: revisionTextSha('disk\n'), docToken: 'mirror-api-token',
+    });
+    assert.equal(write.ok, true, JSON.stringify(write));
+    assert.match(write.value.textSha256, /^[0-9a-f]{64}$/);
+    const read = await host.dispatch('documents.draftRead', { path: w.file, docToken: 'mirror-api-token' });
+    assert.equal(read.ok, true, JSON.stringify(read));
+    assert.equal(read.value.text, 'draft\n');
+    const clear = await host.dispatch('documents.draftClear', { path: w.file, docToken: 'mirror-api-token' });
+    assert.equal(clear.ok, true, JSON.stringify(clear));
+    assert.equal(clear.value.removed, 1);
+    const modelRead = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(modelRead.ok, true, JSON.stringify(modelRead));
+    assert.equal(modelRead.value.source, 'disk');
+    assert.equal(modelRead.value.text, 'disk\n');
+    assert.equal(modelRead.value.writable, true);
+    const denied = await host.dispatch('documents.draftMirror', { path: w.file, text: 'x', docToken: 'x' }, MODEL_TOOL, execution(w.root));
+    assert.equal(denied.ok, false);
+    assert.equal(denied.error.code, 'bad-request');
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B3.3b-API4 a clean room cannot mask an unsaved mirror', async () => {
+  const w = await makeWorld('mirror-clean-room', 'disk\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const joined = await liveDocs.join(w.file, 'disk\n');
+    const db = new DatabaseSync(path.join(w.live, 'rooms.sqlite'));
+    db.prepare('DELETE FROM clients WHERE epoch=?').run(joined.epoch);
+    db.close();
+    await liveDocs.putDraft(w.file, {
+      text: 'typed by user\n', baseVersion: 'v0', baseSha256: revisionTextSha('disk\n'), docToken: 'clean-room-token',
+    });
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const read = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(read.ok, true, JSON.stringify(read));
+    assert.equal(read.value.writable, false);
+    assert.equal(read.value.mirrorDraft, true);
+    assert.equal(read.value.source, 'mirror');
+    assert.equal(read.value.text, 'typed by user\n');
+    assert.equal(read.value.draft, true);
+    const apply = await host.dispatch('documents.applyEdits', {
+      path: w.file, baseRevisionId: read.value.version, edits: [{ oldString: 'disk', newString: 'AI' }],
+    }, MODEL_TOOL, execution(w.root));
+    assert.equal(apply.ok, false);
+    assert.equal(apply.error.code, 'MP_DOC_MIRROR_READONLY');
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'disk\n');
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B3.3b-API5 a corrupt mirror is unknown, not clean', async () => {
+  const w = await makeWorld('mirror-corrupt', 'disk\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    await liveDocs.putDraft(w.file, {
+      text: 'corrupt me\n', baseVersion: 'v0', baseSha256: revisionTextSha('disk\n'), docToken: 'corrupt-token',
+    });
+    const db = new DatabaseSync(path.join(w.live, 'rooms.sqlite'));
+    db.prepare("UPDATE draft_index SET text_sha=? WHERE source LIKE '%doc.md'").run('0'.repeat(64));
+    db.close();
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const read = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(read.ok, true, JSON.stringify(read));
+    assert.equal(read.value.source, 'disk');
+    assert.equal(read.value.text, 'disk\n');
+    assert.equal(read.value.writable, false);
+    assert.equal(read.value.draftUnknown, true);
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B4.3-ADV2b theirs and both choices resolve without writing disk', async () => {
+  const w = await makeWorld('conflict-choices', 'base\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const member = await liveDocs.join(w.file, 'base\n');
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    await liveDocs.exchange(member.client, {
+      epoch: member.epoch, version: 0, seq: 1, changes: [{ from: 0, to: 4, insert: 'ours' }],
+    });
+    await fs.writeFile(w.file, 'theirs\n', 'utf8');
+    const first = await host.dispatch('documents.conflictOpen', { path: w.file, cwd: w.root });
+    assert.equal(first.ok, true, JSON.stringify(first));
+    const mine = await host.dispatch('documents.conflictResolve', {
+      path: w.file, cwd: w.root, conflictId: first.value.conflictId, resolutions: [{ choice: 'theirs' }],
+    });
+    assert.equal(mine.ok, true, JSON.stringify(mine));
+    assert.equal(mine.value.changed, true);
+    let read = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(read.value.text, 'theirs\n');
+    assert.equal(read.value.conflict, false);
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'theirs\n');
+
+    await fs.writeFile(w.file, 'theirs2\n', 'utf8');
+    const second = await host.dispatch('documents.conflictOpen', { path: w.file, cwd: w.root });
+    assert.equal(second.ok, true, JSON.stringify(second));
+    const both = await host.dispatch('documents.conflictResolve', {
+      path: w.file, cwd: w.root, conflictId: second.value.conflictId, resolutions: [{ choice: 'both' }],
+    });
+    assert.equal(both.ok, true, JSON.stringify(both));
+    assert.equal(both.value.changed, true);
+    read = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.match(read.value.text, /theirs2/);
+    assert.match(read.value.text, /theirs/);
+    assert.equal(read.value.conflict, false);
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'theirs2\n', 'resolve must not write disk');
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B4.3-ADV4 a later join ticket carries the resolved disk marker', async () => {
+  const w = await makeWorld('conflict-ticket', 'base\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const member = await liveDocs.join(w.file, 'base\n');
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    await liveDocs.exchange(member.client, {
+      epoch: member.epoch, version: 0, seq: 1, changes: [{ from: 0, to: 4, insert: 'ours' }],
+    });
+    await fs.writeFile(w.file, 'theirs\n', 'utf8');
+    const opened = await host.dispatch('documents.conflictOpen', { path: w.file, cwd: w.root });
+    const resolved = await host.dispatch('documents.conflictResolve', {
+      path: w.file, cwd: w.root, conflictId: opened.value.conflictId,
+      resolutions: [{ choice: 'manual', text: 'merged\n' }],
+    });
+    assert.equal(resolved.ok, true, JSON.stringify(resolved));
+    const second = await liveDocs.join(w.file, 'theirs\n');
+    assert.equal(second.resolvedDisk, resolved.value.resolvedDisk);
+    assert.equal(second.resolvedDisk, opened.value.diskHash);
+    const room = await liveDocs.readRoom(w.file);
+    assert.equal(room.resolvedDisk, opened.value.diskHash);
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B4.3-API2 conflict cancel is zero-write and a stale buffer refuses resolve', async () => {
+  const w = await makeWorld('conflict-cancel', 'base\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const member = await liveDocs.join(w.file, 'base\n');
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    await liveDocs.exchange(member.client, {
+      epoch: member.epoch, version: 0, seq: 1, changes: [{ from: 0, to: 4, insert: 'ours' }],
+    });
+    await fs.writeFile(w.file, 'theirs\n', 'utf8');
+    const opened = await host.dispatch('documents.conflictOpen', { path: w.file, cwd: w.root });
+    assert.equal(opened.ok, true, JSON.stringify(opened));
+    const cancelled = await host.dispatch('documents.conflictCancel', { path: w.file, conflictId: opened.value.conflictId });
+    assert.equal(cancelled.ok, true);
+    const missing = await host.dispatch('documents.conflictResolve', {
+      path: w.file, cwd: w.root, conflictId: opened.value.conflictId, resolutions: [{ choice: 'ours' }],
+    });
+    assert.equal(missing.ok, false);
+    assert.equal(missing.error.code, 'MP_CONFLICT_NOT_FOUND');
+    const openedAgain = await host.dispatch('documents.conflictOpen', { path: w.file, cwd: w.root });
+    assert.equal(openedAgain.ok, true, JSON.stringify(openedAgain));
+    await liveDocs.exchange(member.client, {
+      epoch: member.epoch, version: 1, seq: 2, changes: [{ from: 0, to: 4, insert: 'mine' }],
+    });
+    const stale = await host.dispatch('documents.conflictResolve', {
+      path: w.file, cwd: w.root, conflictId: openedAgain.value.conflictId, resolutions: [{ choice: 'ours' }],
+    });
+    assert.equal(stale.ok, false, JSON.stringify(stale));
+    assert.equal(stale.error.code, 'MP_DOC_STALE');
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'theirs\n');
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B4.3-API3 resolved conflict saves once and clears room_resolved', async () => {
+  const w = await makeWorld('conflict-save', 'base\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const member = await liveDocs.join(w.file, 'base\n');
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    await liveDocs.exchange(member.client, {
+      epoch: member.epoch, version: 0, seq: 1, changes: [{ from: 0, to: 4, insert: 'ours' }],
+    });
+    await fs.writeFile(w.file, 'theirs\n', 'utf8');
+    const opened = await host.dispatch('documents.conflictOpen', { path: w.file, cwd: w.root });
+    const resolved = await host.dispatch('documents.conflictResolve', {
+      path: w.file, cwd: w.root, conflictId: opened.value.conflictId,
+      resolutions: [{ choice: 'manual', text: 'merged' }],
+    });
+    assert.equal(resolved.ok, true, JSON.stringify(resolved));
+    const saved = await liveDocs.save(member.client, { epoch: member.epoch, version: 2, text: 'merged\n' }, async () => {
+      await fs.writeFile(w.file, 'merged\n', 'utf8');
+      return { ok: true, version: 'prov-merged' };
+    });
+    assert.equal(saved.ok, true, JSON.stringify(saved));
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'merged\n');
+    const { DatabaseSync } = await import('node:sqlite');
+    const db = new DatabaseSync(path.join(w.live, 'rooms.sqlite'), { readOnly: true });
+    try { assert.equal(db.prepare('SELECT COUNT(*) AS n FROM room_resolved').get().n, 0); }
+    finally { db.close(); }
+    const after = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(after.value.conflict, false, JSON.stringify(after.value));
+    assert.equal(after.value.dirty, false);
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B4.3-API4 a second external change after resolve re-enters conflict and refuses save', async () => {
+  const w = await makeWorld('conflict-again', 'base\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const member = await liveDocs.join(w.file, 'base\n');
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    await liveDocs.exchange(member.client, {
+      epoch: member.epoch, version: 0, seq: 1, changes: [{ from: 0, to: 4, insert: 'ours' }],
+    });
+    await fs.writeFile(w.file, 'theirs\n', 'utf8');
+    const opened = await host.dispatch('documents.conflictOpen', { path: w.file, cwd: w.root });
+    const resolved = await host.dispatch('documents.conflictResolve', {
+      path: w.file, cwd: w.root, conflictId: opened.value.conflictId,
+      resolutions: [{ choice: 'manual', text: 'merged' }],
+    });
+    assert.equal(resolved.ok, true, JSON.stringify(resolved));
+    await fs.writeFile(w.file, 'theirs-again\n', 'utf8');
+    const after = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(after.value.conflict, true, JSON.stringify(after.value));
+    await assert.rejects(
+      () => liveDocs.save(member.client, { epoch: member.epoch, version: 2, text: 'merged\n' }, async () => {
+        await fs.writeFile(w.file, 'merged\n', 'utf8');
+        return { ok: true, version: 'should-not-write' };
+      }),
+      (error) => error.code === 'MP_FILE_CONFLICT',
+    );
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'theirs-again\n');
     host.close();
   } finally { w.restore(); }
 });

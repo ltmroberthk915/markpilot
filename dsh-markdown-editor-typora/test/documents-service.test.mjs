@@ -6,7 +6,7 @@ import {
   createDocumentsService, parseRevisionId, makeLiveRevisionId, makeDiskRevisionId,
   sha256Text, normalizeCompare, isCanonicalUnder, replaceExact,
   parseDocumentBlocks, findDocumentBlock, merge3Text,
-  revisionContentKey, sameRevisionContent,
+  revisionContentKey, sameRevisionContent, resolve3Text, changesFromTextDiff, applyChanges,
 } from '../lib/documents-service.js';
 
 function makeWorld(options = {}) {
@@ -514,4 +514,50 @@ test('review undo across live epochs compares content identity, not epoch', () =
   assert.equal(sameRevisionContent(oldEpoch, `rev1:live:aaaaaaaa-1111-4111-8111-111111111111:4:${sha}`), true);
   assert.equal(sameRevisionContent(oldEpoch, `rev1:live:aaaaaaaa-1111-4111-8111-111111111111:3:${'b'.repeat(64)}`), false);
   assert.equal(sameRevisionContent(oldEpoch, 'not-a-revision'), false);
+});
+
+test('B4.3c-S1 resolve3Text keeps independent changes and resolves overlapping hunks', () => {
+  const base = 'a\nb\nc\n';
+  const ours = 'a\nB\nc\n';
+  const other = 'a\nb\nC\n';
+  const clean = resolve3Text(base, ours, other, undefined);
+  assert.equal(clean.clean, true);
+  assert.equal(clean.text, 'a\nB\nC\n');
+  assert.equal(clean.conflicts.length, 0);
+
+  const conflictingOurs = 'a\nX\nc\n';
+  const conflictingOther = 'a\nY\nc\n';
+  const open = resolve3Text(base, conflictingOurs, conflictingOther, undefined);
+  assert.equal(open.clean, false);
+  assert.equal(open.text, null);
+  assert.equal(open.conflicts.length, 1);
+  assert.equal(open.conflicts[0].base, 'b');
+  assert.equal(open.conflicts[0].ours, 'X');
+  assert.equal(open.conflicts[0].other, 'Y');
+  assert.equal(resolve3Text(base, conflictingOurs, conflictingOther, [{ choice: 'ours' }]).text, conflictingOurs);
+  assert.equal(resolve3Text(base, conflictingOurs, conflictingOther, [{ choice: 'theirs' }]).text, conflictingOther);
+  assert.equal(resolve3Text(base, conflictingOurs, conflictingOther, [{ choice: 'both' }]).text, 'a\nX\nY\nc\n');
+  assert.equal(resolve3Text(base, conflictingOurs, conflictingOther, [{ choice: 'manual', text: 'M' }]).text, 'a\nM\nc\n');
+  assert.equal(resolve3Text(base, conflictingOurs, conflictingOurs, undefined).clean, true);
+});
+
+test('B4.3c-S2 resolve3Text is byte-stable for CRLF inputs and rejects bad resolutions', () => {
+  assert.equal(resolve3Text('a\r\nb\r\n', 'a\r\nB\r\n', 'a\r\nb\r\n', undefined).text, 'a\nB\n');
+  assert.throws(() => resolve3Text('a\nb\n', 'a\nX\n', 'a\nY\n', []), (error) => error.code === 'MP_CONFLICT_RESOLUTIONS');
+  assert.throws(() => resolve3Text('a\nb\n', 'a\nX\n', 'a\nY\n', [{ choice: 'bogus' }]), (error) => error.code === 'MP_CONFLICT_RESOLUTIONS');
+  assert.throws(() => resolve3Text('a\nb\n', 'a\nX\n', 'a\nY\n', [{ choice: 'manual' }]), (error) => error.code === 'MP_CONFLICT_RESOLUTIONS');
+  assert.equal(resolve3Text('a\nb\n', 'a\nX\n', 'a\nY\n', [{ choice: 'manual', text: 'x\r\ny' }]).text, 'a\nx\ny\n');
+});
+
+test('B4.3c-S3 changesFromTextDiff round-trips and falls back safely', () => {
+  const before = 'a\nb\nc\n';
+  const after = 'a\nB\nc\nD\n';
+  const changes = changesFromTextDiff(before, after);
+  assert.ok(changes.length > 0);
+  for (const change of changes) {
+    assert.ok(Number.isSafeInteger(change.from) && Number.isSafeInteger(change.to));
+    assert.ok(change.from <= change.to);
+  }
+  assert.equal(changesFromTextDiff(before, before).length, 0);
+  assert.equal(applyChanges(before, changes), after);
 });
