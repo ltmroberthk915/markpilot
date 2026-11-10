@@ -265,8 +265,33 @@ test('B3-API7 a room owned only by another process is disk authority; dirty else
   } finally { dirtyWorld.restore(); }
 });
 
-test('B3-API8 UI recovery restores an append copy through disk CAS and discard removes it', async () => {
-  const w = await makeWorld('recover', 'hello\n');
+test('B4.1-API1 markdown blocks/edit blockId goes through the live room and returns a group id', async () => {
+  const w = await makeWorld('blocks', '# A\nalpha\n\n## B\nbeta\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    await liveDocs.join(w.file, '# A\nalpha\n\n## B\nbeta\n');
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const tool = createMarkdownToolDefinition(host.dispatch);
+    const blocks = await tool.execute({ action: 'blocks', path: w.file }, execution(w.root));
+    assert.equal(blocks.ok, true, JSON.stringify(blocks));
+    assert.equal(blocks.blocks.length, 2);
+    assert.match(blocks.readToken, /^rev1:live:/);
+    const target = blocks.blocks[1];
+    const edit = await tool.execute({
+      action: 'edit', path: w.file, blockId: target.id,
+      newString: '## B\nBETA\n', baseVersion: blocks.readToken,
+    }, execution(w.root));
+    assert.equal(edit.ok, true, JSON.stringify(edit));
+    assert.equal(edit.blockId, target.id);
+    assert.match(edit.groupId, /^[0-9a-f-]{36}$/);
+    assert.equal(edit.saved, false);
+    const after = await tool.execute({ action: 'read', path: w.file }, execution(w.root));
+    assert.equal(after.text, '# A\nalpha\n\n## B\nBETA\n');
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B3-API8 UI recovery restores an append copy through disk CAS and discard removes it', async () => {  const w = await makeWorld('recover', 'hello\n');
   try {
     const liveDocs = new LiveDocuments({ directory: w.live });
     const joined = await liveDocs.join(w.file, 'hello\n');

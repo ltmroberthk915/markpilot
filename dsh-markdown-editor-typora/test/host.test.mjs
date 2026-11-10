@@ -767,7 +767,7 @@ test('markdown 工具定义：0.2.1 defineTool 形态（output.schema/render）+
   assert.ok(spec.output && spec.output.schema && typeof spec.output.render === 'function');
 
   const read = await spec.execute({ action: 'read', path: 'D:/a.md' });
-  assert.deepEqual(plain(read), { ok: true, action: 'read', text: '# hi', version: rev, revisionId: rev, displayPath: 'D:/a.md', source: 'disk', dirty: false });
+  assert.deepEqual(plain(read), { ok: true, action: 'read', text: '# hi', version: rev, revisionId: rev, readToken: rev, displayPath: 'D:/a.md', source: 'disk', dirty: false });
   assert.equal(calls[0].endpoint, 'documents.read');
 
   const edited = await spec.execute({ action: 'edit', path: 'D:/a.md', oldString: 'a', newString: 'b', baseVersion: rev });

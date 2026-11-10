@@ -33,7 +33,7 @@ import { createRequire } from 'node:module';
 import rawDiskStore from '../host/document-store.js';
 import rawLiveStore from '../host/live-documents.js';
 import rawTextCodec from '../host/text-codec.js';
-import { createDocumentsService } from './documents-service.js';
+import { createDocumentsService, parseDocumentBlocks } from './documents-service.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize, sep, extname, basename, resolve as pathResolve, isAbsolute, relative as pathRelative }  from 'node:path';
 
@@ -1965,9 +1965,10 @@ export function createMarkdownToolDefinition(dispatch) {
       '共享会话失效（MP_LIVE_*）或归档失败（MP_ARCHIVE_FAILED）时不要改用其它写工具，重新 read 或让用户重试。',
     ].join(' '),
     parameters: {
-      action: { type: 'string', required: true, description: 'read = 读当前正文（text+version）；edit = 在当前正文上字面替换。', enum: ['read', 'edit'] },
+      action: { type: 'string', required: true, description: 'read = 读当前正文（text+version）；edit = 在当前正文上字面替换或替换整块；blocks = 列出文档块 ID。', enum: ['read', 'edit', 'blocks'] },
       path: { type: 'string', required: true, description: '文件的绝对路径。' },
       cwd: { type: 'string', description: '可选：相对路径的解析基准目录。' },
+      blockId: { type: 'string', description: 'action=edit 可选：从 blocks 结果拿到的 section ID；与 oldString 二选一。' },
       oldString: { type: 'string', description: 'action=edit 必填：要替换的原文字面量（须唯一，除非 replaceAll）。' },
       newString: { type: 'string', description: 'action=edit 必填：替换后的文字面量。' },
       replaceAll: { type: 'boolean', description: 'action=edit 可选：替换所有出现（默认 false，最多 1000 处）。' },
@@ -1981,6 +1982,26 @@ export function createMarkdownToolDefinition(dispatch) {
         properties: {
           ok: { type: 'boolean', required: true },
           action: { type: 'string', required: true },
+          readToken: { type: 'string' },
+          blockId: { type: 'string' },
+          groupId: { type: 'string' },
+          blocks: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', required: true },
+                ordinal: { type: 'number' },
+                kind: { type: 'string' },
+                level: { type: 'number' },
+                title: { type: 'string' },
+                from: { type: 'number' },
+                to: { type: 'number' },
+                textLength: { type: 'number' },
+                preview: { type: 'string' },
+              },
+            },
+          },
           text: { type: 'string' },
           version: { type: 'string' },
           revisionId: { type: 'string' },
@@ -2020,25 +2041,39 @@ export function createMarkdownToolDefinition(dispatch) {
           const dirty = value.dirty === true ? '，含未保存修改' : '';
           return textBlock(`${value.displayPath ?? ''}（${where}${dirty}）\nversion: ${String(value.version ?? '')}\n\n${head}`);
         }
+        if (value.action === 'blocks') {
+          const blocks = Array.isArray(value.blocks) ? value.blocks : [];
+          const lines = blocks.slice(0, 200).map((b) => `- ${b.id}  ${b.kind === 'heading' ? '#'.repeat(b.level) + ' ' : ''}${b.title}  (${b.textLength} 字符) ${b.preview ? '— ' + String(b.preview).slice(0, 80) : ''}`);
+          return textBlock(`块列表：${value.displayPath ?? ''}（${blocks.length} 个）\nreadToken: ${String(value.readToken ?? value.version ?? '')}\n${lines.join('\n')}${blocks.length > 200 ? '\n…（仅显示前 200 个）' : ''}`);
+        }
         const target = value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘；请让用户确认后自行保存';
         const copy = value.checkpointPath ? `；改前副本：${value.checkpointPath}` : '';
         const recovery = value.recoveryPath ? `；恢复副本：${value.recoveryPath}` : '';
-        return textBlock(`已应用编辑：${value.displayPath ?? ''}${value.changed === false ? '（内容未变）' : ''}；${target}${copy}${recovery}；新版本：${String(value.version ?? '')}`);
+        const block = value.blockId ? `；块：${value.blockId}` : '';
+        return textBlock(`已应用编辑：${value.displayPath ?? ''}${value.changed === false ? '（内容未变）' : ''}；${target}${block}${copy}${recovery}；新版本：${String(value.version ?? '')}${value.groupId ? '；groupId：' + value.groupId : ''}`);
       },
     },
     async execute(args, execution) {
-      const action = args?.action === 'edit' ? 'edit' : 'read';
+      const action = args?.action === 'edit' ? 'edit' : (args?.action === 'blocks' ? 'blocks' : 'read');
       try {
-        if (action === 'read') {
+        if (action === 'read' || action === 'blocks') {
           const result = await dispatch('documents.read', { path: args?.path, cwd: args?.cwd }, MODEL_TOOL, execution);
           if (result.ok !== true) return { ok: false, action, error: result.error };
           const value = result.value;
+          if (action === 'blocks') {
+            return {
+              ok: true, action, version: value.version, revisionId: value.revisionId, readToken: value.readToken || value.version,
+              displayPath: value.displayPath, source: value.source, dirty: value.dirty === true,
+              blocks: parseDocumentBlocks(String(value.text ?? '')),
+            };
+          }
           return {
             ok: true,
             action,
             text: value.text,
             version: value.version,
             revisionId: value.revisionId,
+            readToken: value.readToken || value.version,
             displayPath: value.displayPath,
             source: value.source,
             dirty: value.dirty === true,
@@ -2050,6 +2085,7 @@ export function createMarkdownToolDefinition(dispatch) {
         const result = await dispatch('documents.applyEdits', {
           path: args?.path,
           cwd: args?.cwd,
+          blockId: args?.blockId,
           oldString: args?.oldString,
           newString: args?.newString,
           replaceAll: args?.replaceAll === true,
@@ -2063,11 +2099,14 @@ export function createMarkdownToolDefinition(dispatch) {
           action,
           version: value.version,
           revisionId: value.revisionId,
+          readToken: value.version,
           displayPath: value.displayPath,
           changed: value.changed,
           source: value.source,
           dirty: value.dirty === true,
           saved: value.saved === true,
+          ...(value.blockId ? { blockId: value.blockId } : {}),
+          ...(value.groupId ? { groupId: value.groupId } : {}),
           ...(value.checkpoint?.archivePath ? { checkpointPath: value.checkpoint.archivePath } : {}),
           ...(typeof value.recoveryPath === 'string' && value.recoveryPath ? { recoveryPath: value.recoveryPath } : {}),
         };

@@ -18,7 +18,7 @@ test('registry fallback converts author required:true into JSON-Schema required 
   assert.deepEqual(def.parameters.required, ['action', 'path']);
   assert.equal(def.parameters.properties.action.type, 'string');
   assert.equal(def.parameters.properties.action.required, undefined);
-  assert.deepEqual(def.parameters.properties.action.enum, ['read', 'edit']);
+  assert.deepEqual(def.parameters.properties.action.enum, ['read', 'edit', 'blocks']);
   assert.deepEqual(def.output.schema.required, ['ok', 'action']);
   assert.deepEqual(def.output.schema.properties.error.required, ['code', 'message']);
   assert.equal(typeof def.output.render, 'function');

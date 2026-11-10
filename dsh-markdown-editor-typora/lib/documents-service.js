@@ -8,7 +8,7 @@
 // A live edit is appended to the room log (never written to disk by this
 // service); the editor applies it as a remote change and its normal save path
 // persists it. A disk edit delegates to the existing guarded endpoints.
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { isAbsolute, sep } from 'node:path';
 
 const LIVE_REVISION = /^rev1:live:([^:]+):(\d+):([0-9a-f]{64})$/;
@@ -109,6 +109,65 @@ export function applyChanges(text, changes) {
   }
   parts.push(text.slice(end));
   return parts.join('');
+}
+
+// B4.1: top-level Markdown sections used by the `blocks` tool action. A heading
+// starts a new block; fenced code is opaque so `#` inside a fence is not a
+// heading. IDs combine the ordinal with the section hash, so an edit made
+// against a stale read cannot silently target a different section.
+export function parseDocumentBlocks(text) {
+  const src = String(text);
+  const lineAt = [];
+  let from = 0;
+  while (from <= src.length) {
+    const nl = src.indexOf('\n', from);
+    const end = nl < 0 ? src.length : nl;
+    lineAt.push({ from, end, text: src.slice(from, end).replace(/\r$/, '') });
+    if (nl < 0) break;
+    from = nl + 1;
+  }
+  const starts = [];
+  let fence = null;
+  for (const line of lineAt) {
+    const trimmed = line.text.replace(/^\s{0,3}/, '');
+    if (fence) {
+      if (trimmed.startsWith(fence)) fence = null;
+      continue;
+    }
+    const f = /^(`{3,}|~{3,})/.exec(trimmed);
+    if (f) { fence = f[1][0]; continue; }
+    const m = /^(#{1,6})\s+(.+?)\s*$/.exec(line.text);
+    if (m) starts.push({ from: line.from, level: m[1].length, title: m[2] });
+  }
+  const ranges = [];
+  for (let i = 0; i < starts.length; i++) {
+    const start = starts[i];
+    const end = i + 1 < starts.length ? starts[i + 1].from : src.length;
+    const body = src.slice(start.from, end);
+    const hash = sha256Text(body).slice(0, 8);
+    ranges.push({
+      id: `b${i + 1}-${hash}`, ordinal: i + 1, kind: 'heading', level: start.level,
+      title: start.title, from: start.from, to: end, textLength: body.length,
+      preview: body.split('\n').map((line) => line.trim()).find((line) => line.length > 0) || '',
+    });
+  }
+  if (starts.length === 0 || starts[0].from > 0) {
+    const end = starts.length ? starts[0].from : src.length;
+    const body = src.slice(0, end);
+    if (body.length > 0) {
+      ranges.unshift({
+        id: `b0-${sha256Text(body).slice(0, 8)}`, ordinal: 0, kind: 'preamble', level: 0,
+        title: '(preamble)', from: 0, to: end, textLength: body.length,
+        preview: body.split('\n').map((line) => line.trim()).find((line) => line.length > 0) || '',
+      });
+    }
+  }
+  return ranges;
+}
+
+export function findDocumentBlock(text, blockId) {
+  if (typeof blockId !== 'string' || !/^b\d+-[0-9a-f]{8}$/.test(blockId)) return null;
+  return parseDocumentBlocks(text).find((block) => block.id === blockId) || null;
 }
 
 // Locate a literal oldString in `text` and return the minimal splice list.
@@ -308,6 +367,7 @@ export function createDocumentsService(deps) {
         revisionId: a.revisionId,
         revision: a.revision,
         version: a.revisionId,
+        readToken: a.revisionId,
         textSha256: a.textSha,
         dirty: a.dirty,
         diskChanged: a.diskChanged,
@@ -384,12 +444,25 @@ export function createDocumentsService(deps) {
 
     const rawBase = typeof payload?.baseRevisionId === 'string' ? payload.baseRevisionId
       : (typeof payload?.baseVersion === 'string' ? payload.baseVersion : '');
+    const isBlock = typeof payload?.blockId === 'string' && payload.blockId.length > 0;
+    const groupId = isBlock ? randomUUID() : null;
     const isOldString = typeof payload?.oldString === 'string';
     const isEdits = Array.isArray(payload?.edits);
 
     try {
       let changes, newText, diskBase = null;
-      if (isOldString) {
+      if (isBlock) {
+        if (typeof payload.newString !== 'string') return fail(coded('bad-request', 'newString is required'), a);
+        const block = findDocumentBlock(a.text, payload.blockId);
+        if (!block) return fail(coded('MP_BLOCK_NOT_FOUND', 'block id no longer matches this document; read blocks again'), a);
+        if (a.source === 'buffer') requireBufferBase(a, rawBase);
+        else {
+          if (!rawBase) return fail(coded('MP_DOC_STALE', 'baseRevisionId is required for block edits'), a);
+          diskBase = requireDiskBase(a, rawBase, { required: true });
+        }
+        changes = [{ from: block.from, to: block.to, insert: normalizeEol(payload.newString) }];
+        newText = applyChanges(a.text, changes);
+      } else if (isOldString) {
         if (typeof payload.newString !== 'string') return fail(coded('bad-request', 'newString is required'), a);
         if (a.source === 'buffer') {
           requireBufferBase(a, rawBase);
@@ -457,6 +530,7 @@ export function createDocumentsService(deps) {
             version: revisionId,
             textSha256: result.textSha256, dirty: true, saved: false,
             applied: appliedOf(changes), checkpoint: archived, textLength: result.text.length,
+            ...(isBlock ? { blockId: payload.blockId, groupId } : {}),
             ...(typeof result.recoveryPath === 'string' && result.recoveryPath ? { recoveryPath: result.recoveryPath } : {}),
           },
         };
@@ -476,13 +550,17 @@ export function createDocumentsService(deps) {
         if (!result || result.ok !== true) return result || fail(coded('FS_IO_ERROR', 'edit failed'), a);
         const version = String(result.value.version);
         const actual = await rereadDiskText(payload, invocation, version, newText);
-        return { ok: true, value: diskResult(a, version, sha256Text(actual), changes, actual) };
+        const value = diskResult(a, version, sha256Text(actual), changes, actual);
+        if (isBlock) { value.blockId = payload.blockId; value.groupId = groupId; }
+        return { ok: true, value };
       }
       const result = await save({ path: payload.path, cwd: payload.cwd ?? invocation?.cwd, text: newText, baseVersion: diskBase });
       if (!result || result.ok !== true) return result || fail(coded('FS_IO_ERROR', 'save failed'), a);
       const version = String(result.value.version);
       const actual = await rereadDiskText(payload, invocation, version, newText);
-      return { ok: true, value: diskResult(a, version, sha256Text(actual), changes, actual) };
+      const value = diskResult(a, version, sha256Text(actual), changes, actual);
+      if (isBlock) { value.blockId = payload.blockId; value.groupId = groupId; }
+      return { ok: true, value };
     } catch (error) {
       return fail(error, a);
     }

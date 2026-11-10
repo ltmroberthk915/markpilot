@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {
   createDocumentsService, parseRevisionId, makeLiveRevisionId, makeDiskRevisionId,
   sha256Text, normalizeCompare, isCanonicalUnder, replaceExact,
+  parseDocumentBlocks, findDocumentBlock,
 } from '../lib/documents-service.js';
 
 function makeWorld(options = {}) {
@@ -394,4 +395,56 @@ test('B3.3-S4 discard respects the same sandbox policy as recovery writes', asyn
   assert.equal(result.ok, false);
   assert.equal(result.error.code, 'FS_SANDBOX_DENIED');
   assert.equal(w.calls.discard, undefined);
+});
+
+test('B4.1-S1 block parser finds heading sections, ignores fences, and IDs are content-bound', () => {
+  const text = '# A\nalpha\n\n```md\n# not a heading\n```\n\n## B\nbeta\n';
+  const blocks = parseDocumentBlocks(text);
+  assert.deepEqual(blocks.map((b) => b.title), ['A', 'B']);
+  assert.equal(blocks[0].from, 0);
+  assert.equal(blocks[1].level, 2);
+  assert.equal(findDocumentBlock(text, blocks[1].id).title, 'B');
+  assert.equal(findDocumentBlock(text, 'b1-deadbeef'), null);
+  assert.equal(parseDocumentBlocks('```\n# fenced\n```\n')[0].kind, 'preamble');
+  const changed = text.replace('beta', 'BETA');
+  assert.notEqual(parseDocumentBlocks(changed)[1].id, blocks[1].id);
+});
+
+test('B4.1-S2 block edit replaces exactly the selected section through buffer append', async () => {
+  const text = '# A\nalpha\n\n## B\nbeta\n';
+  const room = { epoch: 'e-1', version: 2, savedVersion: 2, diskHash: 'd1', text, savedText: text, savedTextAvailable: true, members: 1, textSha256: sha256Text(text) };
+  const w = makeWorld({ room, text });
+  const block = parseDocumentBlocks(text)[1];
+  const token = makeLiveRevisionId(room.epoch, room.version, sha256Text(room.text));
+  const result = await w.service.applyEdits({ path: w.file, blockId: block.id, newString: '## B\nBETA\n', baseRevisionId: token }, {}, undefined);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.value.blockId, block.id);
+  assert.match(result.value.groupId, /^[0-9a-f-]{36}$/);
+  assert.equal(w.calls.append.length, 1);
+  assert.deepEqual(w.calls.append[0].changes, [{ from: block.from, to: block.to, insert: '## B\nBETA\n' }]);
+});
+
+test('B4.1-S3 unknown block IDs fail closed without touching the document', async () => {
+  const text = '# A\nalpha\n';
+  const room = { epoch: 'e-1', version: 2, savedVersion: 2, diskHash: 'd1', text, savedText: text, savedTextAvailable: true, members: 1, textSha256: sha256Text(text) };
+  const w = makeWorld({ room, text });
+  const token = makeLiveRevisionId(room.epoch, room.version, sha256Text(room.text));
+  const result = await w.service.applyEdits({ path: w.file, blockId: 'b9-deadbeef', newString: 'x', baseRevisionId: token }, {}, undefined);
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, 'MP_BLOCK_NOT_FOUND');
+  assert.equal(w.calls.append.length, 0);
+});
+
+test('B4.1-S4 block edit on an unopened file writes through the disk CAS', async () => {
+  const text = '# A\nalpha\n\n# B\nbeta\n';
+  const w = makeWorld({ text });
+  const read = await w.service.read({ path: w.file }, {});
+  const block = parseDocumentBlocks(text)[1];
+  const result = await w.service.applyEdits({ path: w.file, blockId: block.id, newString: '# B\nBETA\n', baseRevisionId: read.value.version }, {}, undefined);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.value.source, 'disk');
+  assert.equal(result.value.saved, true);
+  assert.equal(w.calls.save.length, 1);
+  assert.equal(w.calls.save[0].text, '# A\nalpha\n\n# B\nBETA\n');
+  assert.equal(w.calls.save[0].baseVersion, 'v1');
 });
