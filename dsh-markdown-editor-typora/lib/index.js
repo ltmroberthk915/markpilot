@@ -320,7 +320,7 @@ const MODEL_TOOL = Symbol('markdown model tool');
 export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'diag']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'diag']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
 
@@ -1592,6 +1592,9 @@ export function createHost(options = {}) {
           return await documents.recover(payload, invocation, invocation?.policy);
         case 'documents.discardRecovery':
           return await documents.discardRecovery(payload, invocation, invocation?.policy);
+        case 'documents.undoGroup':
+          if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
+          return await documents.undoGroup(payload, invocation, invocation?.policy);
         case 'docs/create': return await apiDocsCreate(payload);
         case 'docs/recent': return await apiDocsRecent(payload);
         case 'docs/archive':
@@ -1966,10 +1969,11 @@ export function createMarkdownToolDefinition(dispatch) {
       '共享会话失效（MP_LIVE_*）或归档失败（MP_ARCHIVE_FAILED）时不要改用其它写工具，重新 read 或让用户重试。',
     ].join(' '),
     parameters: {
-      action: { type: 'string', required: true, description: 'read = 读当前正文（text+version）；edit = 在当前正文上字面替换或替换整块；blocks = 列出文档块 ID。', enum: ['read', 'edit', 'blocks'] },
+      action: { type: 'string', required: true, description: 'read = 读当前正文（text+version）；edit = 在当前正文上字面替换或替换整块；blocks = 列出文档块 ID；undo = 撤销最近一组 AI 编辑。', enum: ['read', 'edit', 'blocks', 'undo'] },
       path: { type: 'string', required: true, description: '文件的绝对路径。' },
       cwd: { type: 'string', description: '可选：相对路径的解析基准目录。' },
       blockId: { type: 'string', description: 'action=edit 可选：从 blocks 结果拿到的 section ID；与 oldString 二选一。' },
+      groupId: { type: 'string', description: 'action=undo 必填：edit 返回的 groupId。' },
       oldString: { type: 'string', description: 'action=edit 必填：要替换的原文字面量（须唯一，除非 replaceAll）。' },
       newString: { type: 'string', description: 'action=edit 必填：替换后的文字面量。' },
       replaceAll: { type: 'boolean', description: 'action=edit 可选：替换所有出现（默认 false，最多 1000 处）。' },
@@ -1986,6 +1990,7 @@ export function createMarkdownToolDefinition(dispatch) {
           readToken: { type: 'string' },
           blockId: { type: 'string' },
           groupId: { type: 'string' },
+          undoOf: { type: 'string' },
           totalBlocks: { type: 'number' },
           truncated: { type: 'boolean' },
           blocks: {
@@ -2050,6 +2055,9 @@ export function createMarkdownToolDefinition(dispatch) {
           const lines = blocks.map((b) => `- ${b.id}  ${b.kind === 'heading' ? '#'.repeat(b.level) + ' ' : ''}${b.title}  (${b.textLength} 字符) ${b.preview ? '— ' + String(b.preview).slice(0, 80) : ''}`);
           return textBlock(`块列表：${value.displayPath ?? ''}（${blocks.length}/${total} 个）\nreadToken: ${String(value.readToken ?? value.version ?? '')}\n${lines.join('\n')}${value.truncated ? '\n…（仅显示前 200 个）' : ''}`);
         }
+        if (value.action === 'undo') {
+          return textBlock(`已撤销 AI 编辑组：${value.undoOf ?? ''}；${value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘'}；新版本：${String(value.version ?? '')}；撤销组：${String(value.groupId ?? '')}`);
+        }
         const target = value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘；请让用户确认后自行保存';
         const copy = value.checkpointPath ? `；改前副本：${value.checkpointPath}` : '';
         const recovery = value.recoveryPath ? `；恢复副本：${value.recoveryPath}` : '';
@@ -2058,7 +2066,7 @@ export function createMarkdownToolDefinition(dispatch) {
       },
     },
     async execute(args, execution) {
-      const action = args?.action === 'edit' ? 'edit' : (args?.action === 'blocks' ? 'blocks' : 'read');
+      const action = args?.action === 'edit' ? 'edit' : args?.action === 'blocks' ? 'blocks' : args?.action === 'undo' ? 'undo' : 'read';
       try {
         if (action === 'read' || action === 'blocks') {
           const result = await dispatch('documents.read', { path: args?.path, cwd: args?.cwd }, MODEL_TOOL, execution);
@@ -2086,6 +2094,19 @@ export function createMarkdownToolDefinition(dispatch) {
             ...(typeof value.diskChanged === 'boolean' ? { diskChanged: value.diskChanged } : {}),
             ...(value.bufferOwnedElsewhere === true ? { bufferOwnedElsewhere: true } : {}),
             ...(value.unsavedElsewhere === true ? { unsavedElsewhere: true } : {}),
+          };
+        }
+        if (action === 'undo') {
+          const result = await dispatch('documents.undoGroup', { path: args?.path, cwd: args?.cwd, groupId: args?.groupId }, MODEL_TOOL, execution);
+          if (result.ok !== true) return { ok: false, action, error: result.error };
+          const value = result.value;
+          return {
+            ok: true, action, version: value.version, revisionId: value.revisionId, readToken: value.version,
+            displayPath: value.displayPath, changed: value.changed, source: value.source,
+            dirty: value.dirty === true, saved: value.saved === true,
+            groupId: value.groupId, undoOf: value.undoOf,
+            ...(value.checkpoint?.archivePath ? { checkpointPath: value.checkpoint.archivePath } : {}),
+            ...(typeof value.recoveryPath === 'string' && value.recoveryPath ? { recoveryPath: value.recoveryPath } : {}),
           };
         }
         const result = await dispatch('documents.applyEdits', {

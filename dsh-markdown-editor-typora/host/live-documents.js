@@ -52,12 +52,16 @@ function database(directory) {
       CREATE INDEX IF NOT EXISTS append_recovery_source ON append_recovery(source, at DESC);
       CREATE TABLE IF NOT EXISTS agent_group (
         group_id TEXT PRIMARY KEY, source TEXT NOT NULL, actor TEXT NOT NULL, kind TEXT NOT NULL,
-        base_revision TEXT, result_revision TEXT, at INTEGER NOT NULL);
+        base_revision TEXT, result_revision TEXT, at INTEGER NOT NULL,
+        changes TEXT, undone_at INTEGER);
       CREATE INDEX IF NOT EXISTS agent_group_source ON agent_group(source, at DESC);
       CREATE TABLE IF NOT EXISTS writers (file TEXT PRIMARY KEY, owner TEXT NOT NULL, pid INTEGER NOT NULL, since INTEGER NOT NULL);`);
     // Rooms kept by an earlier draft release held leases without timestamps.
     if (!db.prepare('PRAGMA table_info(writers)').all().some(column => column.name === 'since'))
       db.exec('DROP TABLE writers; CREATE TABLE writers (file TEXT PRIMARY KEY, owner TEXT NOT NULL, pid INTEGER NOT NULL, since INTEGER NOT NULL);');
+    const groupColumns = db.prepare('PRAGMA table_info(agent_group)').all().map((column) => column.name);
+    if (!groupColumns.includes('changes')) db.exec('ALTER TABLE agent_group ADD COLUMN changes TEXT');
+    if (!groupColumns.includes('undone_at')) db.exec('ALTER TABLE agent_group ADD COLUMN undone_at INTEGER');
     // The rooms store is per machine and account. A database carried here from
     // another device or profile (synced or copied LOCALAPPDATA) must not seat
     // stale authority over files it has never seen on this host.
@@ -742,10 +746,36 @@ class LiveDocuments {
     const file = await canonicalFile(filePath), key = fileKey(file);
     const now = Number.isSafeInteger(entry.at) ? entry.at : Date.now();
     const db = this.db;
-    db.prepare('INSERT OR REPLACE INTO agent_group(group_id,source,actor,kind,base_revision,result_revision,at) VALUES(?,?,?,?,?,?,?)')
+    const rawChanges = Array.isArray(entry.changes) ? JSON.stringify(entry.changes.map((c) => ({
+      from: Number(c.from) || 0, to: Number(c.to) || 0,
+      insert: String(c.insert ?? ''), removed: String(c.removed ?? ''),
+    }))) : null;
+    const changes = rawChanges && rawChanges.length <= 4 * 1024 * 1024 ? rawChanges : null;
+    db.prepare('INSERT OR REPLACE INTO agent_group(group_id,source,actor,kind,base_revision,result_revision,at,changes,undone_at) VALUES(?,?,?,?,?,?,?,?,NULL)')
       .run(groupId, key, String(entry.actor || 'agent').slice(0, 32), String(entry.kind || 'edit').slice(0, 32),
-        String(entry.baseRevision || '').slice(0, 512), String(entry.resultRevision || '').slice(0, 512), now);
+        String(entry.baseRevision || '').slice(0, 512), String(entry.resultRevision || '').slice(0, 512), now, changes);
     return { groupId, source: key, at: now };
+  }
+  async getAgentGroup(filePath, groupId) {
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    const filename = path.join(path.resolve(this.directory), 'rooms.sqlite');
+    if (!fs.existsSync(filename)) return null;
+    const {DatabaseSync} = require('node:sqlite');
+    let db;
+    try { db = new DatabaseSync(filename, {readOnly:true}); } catch { return null; }
+    try {
+      if (db.prepare("SELECT value FROM meta WHERE key='host'").get()?.value !== hostStamp()) return null;
+      const row = db.prepare('SELECT group_id AS groupId,actor,kind,base_revision AS baseRevision,result_revision AS resultRevision,at,changes,undone_at AS undoneAt FROM agent_group WHERE source=? AND group_id=?').get(key, String(groupId || ''));
+      if (!row) return null;
+      try { row.changes = row.changes ? JSON.parse(row.changes) : []; } catch { row.changes = []; }
+      return row;
+    } catch { return null; }
+    finally { try { db.close(); } catch { /* already closed */ } }
+  }
+  async markAgentGroupUndone(filePath, groupId) {
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    this.db.prepare('UPDATE agent_group SET undone_at=? WHERE source=? AND group_id=?').run(Date.now(), key, String(groupId || ''));
+    return true;
   }
   async listAgentGroups(filePath, limit = 20) {
     const file = await canonicalFile(filePath), key = fileKey(file);
@@ -756,7 +786,7 @@ class LiveDocuments {
     try { db = new DatabaseSync(filename, {readOnly:true}); } catch { return []; }
     try {
       if (db.prepare("SELECT value FROM meta WHERE key='host'").get()?.value !== hostStamp()) return [];
-      return db.prepare('SELECT group_id AS groupId,actor,kind,base_revision AS baseRevision,result_revision AS resultRevision,at FROM agent_group WHERE source=? ORDER BY at DESC LIMIT ?')
+      return db.prepare('SELECT group_id AS groupId,actor,kind,base_revision AS baseRevision,result_revision AS resultRevision,at,undone_at AS undoneAt FROM agent_group WHERE source=? ORDER BY at DESC LIMIT ?')
         .all(key, Math.max(1, Math.min(100, Number(limit) || 20)));
     } catch { return []; }
     finally { try { db.close(); } catch { /* already closed */ } }

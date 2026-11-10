@@ -454,10 +454,10 @@ export function createDocumentsService(deps) {
       : (typeof payload?.baseVersion === 'string' ? payload.baseVersion : '');
     const isBlock = typeof payload?.blockId === 'string' && payload.blockId.length > 0;
     const groupId = randomUUID();
-    const recordGroup = async (resultRevision) => {
+    const recordGroup = async (resultRevision, auditChanges) => {
       try { await live.recordAgentGroup?.(a.canonical, {
         groupId, actor: 'agent', kind: isBlock ? 'block-edit' : 'edit',
-        baseRevision: a.revisionId, resultRevision,
+        baseRevision: a.revisionId, resultRevision, changes: auditChanges,
       }); } catch { /* audit is best effort; never fail an edit because of it */ }
     };
     const isOldString = typeof payload?.oldString === 'string';
@@ -509,6 +509,7 @@ export function createDocumentsService(deps) {
         return fail(coded('bad-request', 'oldString/newString or edits are required'), a);
       }
 
+      const auditChanges = changes.map((c) => ({ ...c, removed: a.text.slice(c.from, c.to) }));
       if (newText === a.text) return { ok: true, value: resultValue(a, changes, null, false) };
 
       if (a.source === 'buffer') {
@@ -542,7 +543,7 @@ export function createDocumentsService(deps) {
         }
         const revisionId = makeLiveRevisionId(result.epoch, result.version, result.textSha256);
         const newBlockId = block ? parseDocumentBlocks(newText).find((b) => b.ordinal === block.ordinal)?.id : null;
-        await recordGroup(revisionId);
+        await recordGroup(revisionId, auditChanges);
         return {
           ok: true,
           value: {
@@ -578,7 +579,7 @@ export function createDocumentsService(deps) {
           value.previousBlockId = block.id;
         }
         value.groupId = groupId;
-        await recordGroup(value.revisionId);
+        await recordGroup(value.revisionId, auditChanges);
         return { ok: true, value };
       }
       const result = await save({ path: payload.path, cwd: payload.cwd ?? invocation?.cwd, text: newText, baseVersion: diskBase });
@@ -591,7 +592,7 @@ export function createDocumentsService(deps) {
         value.previousBlockId = block.id;
       }
       value.groupId = groupId;
-      await recordGroup(value.revisionId);
+      await recordGroup(value.revisionId, auditChanges);
       return { ok: true, value };
     } catch (error) {
       return fail(error, a);
@@ -728,5 +729,40 @@ export function createDocumentsService(deps) {
     } catch (error) { return fail(error, a); }
   }
 
-  return { read, applyEdits, state, recover, discardRecovery };
+  async function undoGroup(payload, invocation, policy) {
+    let a;
+    try { a = await authority(payload, invocation); }
+    catch (error) { return fail(error, null); }
+    if (a.error) return a.error;
+    if (typeof live.getAgentGroup !== 'function' || typeof live.markAgentGroupUndone !== 'function')
+      return fail(coded('MP_GROUP_NOT_FOUND', 'agent group audit is unavailable'), a);
+    const groupId = typeof payload?.groupId === 'string' ? payload.groupId : '';
+    if (!/^[0-9a-f-]{36}$/i.test(groupId)) return fail(coded('MP_GROUP_NOT_FOUND', 'groupId is invalid'), a);
+    let group;
+    try { group = await live.getAgentGroup(a.canonical, groupId); }
+    catch (error) { return fail(error, a); }
+    if (!group || group.undoneAt) return fail(coded('MP_GROUP_NOT_FOUND', 'agent group is already undone or missing'), a);
+    if (group.resultRevision !== a.revisionId) return fail(stale(a), a);
+    const recent = await live.listAgentGroups(a.canonical, 20);
+    const latest = recent.find((entry) => !entry.undoneAt);
+    if (!latest || latest.groupId !== groupId) return fail(coded('MP_GROUP_NOT_LATEST', 'only the latest agent edit group can be undone'), a);
+    if (!Array.isArray(group.changes) || group.changes.length === 0)
+      return fail(coded('MP_GROUP_STALE', 'agent group has no inverse changes'), a);
+    const edits = [];
+    for (const change of group.changes.slice().reverse()) {
+      const from = Number(change.from), to = Number(change.to);
+      const inserted = String(change.insert ?? ''), removed = String(change.removed ?? '');
+      if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || to < from || a.text.slice(from, from + inserted.length) !== inserted)
+        return fail(coded('MP_GROUP_STALE', 'document no longer matches this edit group'), a);
+      edits.push({ from, to: from + inserted.length, insert: removed });
+    }
+    edits.sort((x, y) => x.from - y.from);
+    const result = await applyEdits({ path: payload.path, cwd: payload.cwd, edits, baseRevisionId: a.revisionId }, invocation, policy);
+    if (!result || result.ok !== true) return result || fail(coded('FS_IO_ERROR', 'undo failed'), a);
+    try { await live.markAgentGroupUndone(a.canonical, groupId); } catch { /* audit best effort */ }
+    return { ok: true, value: { ...result.value, undoOf: groupId } };
+  }
+
+  return { read, applyEdits, state, recover, discardRecovery, undoGroup };
 }
+

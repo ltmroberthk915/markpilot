@@ -291,6 +291,12 @@ test('B4.1-API1 markdown blocks/edit blockId goes through the live room and retu
     assert.equal(afterBlocks.blocks.some((b) => b.id === edit.blockId), true);
     const groups = await liveDocs.listAgentGroups(w.file);
     assert.equal(groups.some((g) => g.groupId === edit.groupId && g.kind === 'block-edit'), true);
+    const undone = await tool.execute({ action: 'undo', path: w.file, groupId: edit.groupId }, execution(w.root));
+    assert.equal(undone.ok, true, JSON.stringify(undone));
+    const restored = await tool.execute({ action: 'read', path: w.file }, execution(w.root));
+    assert.equal(restored.text, '# A\nalpha\n\n## B\nbeta\n');
+    const afterUndo = await liveDocs.listAgentGroups(w.file);
+    assert.equal(afterUndo.find((g) => g.groupId === edit.groupId)?.undoneAt > 0, true);
     host.close();
   } finally { w.restore(); }
 });
