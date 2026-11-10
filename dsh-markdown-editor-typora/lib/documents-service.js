@@ -207,10 +207,10 @@ function diffLines(base, other) {
   return out;
 }
 
-// A live revision token embeds the client epoch in addition to version/sha.
-// After closing/reopening an editor the epoch changes while the buffered
-// content (and therefore version/sha) is the same. Undo validation must
-// compare content identity, not the process-local epoch.
+// A live revision token embeds the client epoch/version in addition to the
+// content sha. Closing/reopening may reset the epoch/version while the buffer
+// content is unchanged, so undo validation compares the text sha; the inverse
+// changes are still verified against the current text before applying.
 export function revisionContentKey(revision) {
   const s = String(revision == null ? "" : revision);
   const m = /^rev1:(?:live|disk):(.+)$/i.exec(s);
@@ -219,11 +219,8 @@ export function revisionContentKey(revision) {
   const at = body.lastIndexOf(':');
   if (at <= 0) return null;
   const sha = body.slice(at + 1);
-  const before = body.slice(0, at);
-  const versionAt = before.lastIndexOf(':');
-  const version = versionAt < 0 ? before : before.slice(versionAt + 1);
-  if (!version || !/^[0-9a-f]{64}$/i.test(sha)) return null;
-  return version + ':' + sha.toLowerCase();
+  if (!/^[0-9a-f]{64}$/i.test(sha)) return null;
+  return sha.toLowerCase();
 }
 export function sameRevisionContent(a, b) {
   if (String(a) === String(b)) return true;
