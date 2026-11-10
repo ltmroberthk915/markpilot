@@ -14,6 +14,7 @@
 4. **B4.2b-full / B5 内核大改都没有开始编码**。已有明确边界、失败经验和候选架构，但尚未落码；不要把它们说成“已完成设计”。
 5. **性能预热方案已失败并回退**：1.7.6 的 iframe 保活/预热破坏 Markdown 显示，不能再直接重试。启动慢的根因是 iframe/CM6 启动本身约 718–775 ms，不是左栏按钮。
 6. **不要为了收尾而压缩验收**：本项目的数据安全问题是真实事故驱动的，review/undo/conflict 都必须保留“先归档、fail-closed、不自动覆盖”的不变量。
+7. **前期调研结论**：CodeMirror 6 / VS Code / ProseMirror / Lexical 都把“不可变文档状态 + 单一 transaction 入口 + 显式 undo 边界”作为核心；VS Code 的 3-way merge editor 是 B4.3 的直接范式；CRDT（Zed/Yjs）成本高，当前没有必须引入的需求。详见 §2.7。
 
 ---
 
@@ -208,6 +209,224 @@ diskChanged = room ? normalize(provider.text) !== room.savedText : false
 - 市场条目的 tarball 指向 GitHub Release，不指向 npm（npm 也提供同一 tarball）。
 - 若改成 npm 解包安装，必须重启宿主；不要在运行中替换 `node_modules` 目录。
 - npm 发布需要 **WebAuthn 安全密钥 2FA**；`npm publish` 会打印浏览器认证 URL，完成安全密钥后回车。发布成功后 `npm view --prefer-online` 才能看到最新版本，CDN/代理缓存可能滞后几分钟。
+
+---
+
+### 2.7 前期调研：主流与前沿编辑器的处理方式
+
+> 调研目的：给 B4.2b-full / B4.3 / B5 找可复用的成熟模式，避免自己发明一套“文档权威 + 撤销 + 冲突”的语义。
+> 调研快照：2026-11；链接以官方文档/源码为准。这里记录的是**架构模式**，不是让 MarkPilot 照搬产品功能。
+
+#### 2.7.1 一张表
+
+| 项目 | 文档/更新模型 | 撤销与审阅 | 冲突/协同 | 持久化与恢复 | 对本项目最有价值的一点 |
+|---|---|---|---|---|---|
+| **CodeMirror 6** | 不可变 `EditorState` + `Transaction`；`ChangeSet` 描述区间替换；扩展用 StateField/annotation | `@codemirror/history` 扩展；事务可带 annotation/metadata；远端事务可不进本地历史 | `@codemirror/collab` 以中央 authority + rebase 为核心，不是 CRDT | 本身不管磁盘；view 只渲染 viewport | **事务是唯一写入口**；review 应做成 transaction annotation/group，而不是只在外层拼 group |
+| **VS Code / Monaco** | 共享 `ITextModel`（Monaco core）；所有编辑是 model 上的操作；`versionId` 单调递增 | `pushStackElement()` 把一组编辑合成一个 undo 元素；`alternativeVersionId` 用于撤销/重做后的版本判断 | 多编辑器共享同一 model；AI 修改进入 working set，Keep/Undo；冲突用 3-way merge editor | 保存/备份/hot exit 由 workbench 管理；model 可恢复 | **一个 model 权威** + **显式 undo 组边界**；AI 修改先 review 再 Keep/Undo |
+| **ProseMirror** | 不可变文档树 + `Transaction`/`Step`；所有更新经 transaction | `prosemirror-history` 观察 transaction、存 inverse；transaction meta 控制是否进历史 | `prosemirror-collab` 中央 authority 接受/拒绝 steps，客户端 rebase | 序列化 JSON/HTML；持久化由应用负责 | **所有更新必须经过单一 transaction pipeline**；undo 的“逆操作”应基于操作记录，而不是文本 diff |
+| **Lexical** | 不可变 `EditorState` 快照；`editor.update()` 内批量修改，commit 后锁定 | 历史可由内置 history 或协作层管理；更新监听器拿快照 | 协作模式让 Yjs 拥有初始状态（`initialEditorState: null`），Lexical 不做第二权威 | 序列化 JSON；持久化由应用负责 | **状态快照 + 单一 update 入口**；协作时明确“谁是初始权威” |
+| **Zed** | CRDT 文本/多 buffer；锚点、tombstone 处理删除与并发 | 编辑历史与协作层结合 | 实时多人协作；CRDT 保证收敛 | 本地文件 + 协作会话 | 若真要做 CRDT，**锚点/墓碑/undo 语义**是核心成本；单机不需要先付这个成本 |
+| **Obsidian** | Markdown 文件 + 编辑器 buffer；文件是长期权威 | 文件恢复快照可查看差异/恢复 | 无内建实时协同（Sync 另算） | **File Recovery** 定期保存完整快照，存在 vault 外，保留期可配；可 diff/restore | **周期快照 + 显式恢复 UI** 是比“只存增量”更稳的兜底；MarkPilot 已有 archive/recovery，但还没有周期快照产品化 |
+| **Yjs（协作库）** | CRDT 共享类型（Y.Text 等） | `Y.UndoManager` 可按 shared type/origin 选择性撤销；`captureTimeout` 合并编辑；`stopCapturing()` 切组；StackItem 可带 cursor meta | CRDT 自动收敛；适合离线/多 writer | 需要持久化 update/state | **选择性 undo + origin/组边界**的成熟参考；但引入 CRDT 会把 Markdown 文本变成 CRDT 文档，成本高 |
+| **VS Code Copilot / AI 编辑器** | 编辑器 model + AI working set | AI 改动先进 working set，Keep/Undo；diff review；可恢复 checkpoint | 冲突不自动覆盖；用户决定 | 由编辑器保存/checkpoint | **AI 修改默认是 pending review**，不能直接落盘；与我们的 review 方向一致，但我们还缺原生 undo/装饰 diff |
+| **Git / VS Code merge editor** | 共同 base + ours/theirs 三方 | 逐冲突 Accept Current/Incoming/Both/Compare；Result 面板可手改 | 3-way merge；不可自动合并时人工决定 | 保存/暂存后完成合并 | B4.3 的直接参考：**base / current / incoming / result** 四区 + 逐块选择 + 手动编辑 |
+
+#### 2.7.2 CodeMirror 6：事务是不可变状态的唯一入口
+
+官方系统指南明确把架构分成“函数式核心、命令式外壳”：
+
+- `EditorState` 是不可变值；旧 state 仍完整可用；
+- 编辑通过 `Transaction` 描述，`dispatch` 后才产生新 state；
+- 事务可以带 **annotations**（例如 `userEvent`）和 **effects**；
+- `ChangeSet` 是纯值，扩展可以精确追踪变化，因此 undo history、collaborative editing 可以在 core 外实现；
+- 文档变化位置全部相对“事务开始文档”，multiple changes 一次性描述；
+- 重置文档推荐**新建 state**，而不是发一个事务，避免旧 undo history 残留。
+
+官方指南：<https://codemirror.net/docs/guide/>
+
+对本项目的含义：
+
+1. 我们已经在用 CM6，但 review 仍然在外层 client 拼 group；**B4.2b-full 应把 review group 做成 transaction annotation/state field**，让 CM6 自己知道“这组变更属于同一个 review”。
+2. 远端事务本来就可以不进本地 history；如果要让 Ctrl+Z 整组撤销 AI 修改，必须由 renderer 侧产生带 annotation 的事务，并明确 `addToHistory` 语义；不能只靠 host 的文本 inverse。
+3. CM6 官方把 collaboration 作为独立包，核心不绑定 OT/CRDT；这支持我们“先把本地做稳，再决定协同”的路线。
+
+#### 2.7.3 VS Code / Monaco：一个 Model + 显式 undo 组
+
+VS Code 的源码组织把 Monaco Editor Core 放在 `src/vs/editor`，workbench 只是宿主；Monaco 的 `ITextModel` 是多个编辑器共享的文档 model。
+
+源码事实（可直接搜索）：
+
+- `src/vs/editor/common/model.ts` 定义 `pushStackElement()`；
+- `src/vs/editor/common/model/editStack.ts` 负责 undo/redo 栈，记录 `alternativeVersionId`；
+- `src/vs/editor/common/model/textModel.ts` 有 `_alternativeVersionId`，`pushStackElement()` 调 `_commandManager.pushStackElement()`；
+- `versionId` 单调递增，`alternativeVersionId` 用于“撤销后是否回到某个历史状态”的判断。
+
+源码：<https://github.com/microsoft/vscode/blob/main/src/vs/editor/common/model/editStack.ts>
+<https://github.com/microsoft/vscode/blob/main/src/vs/editor/common/model/textModel.ts>
+
+AI 审阅的产品模式（VS Code Copilot 文档）：
+
+- AI 改文件后进入 **working set**，用户可以 **Keep / Undo**；
+- 可以打开变更文件的 diff；
+- 有 checkpoint 恢复；
+- Keep 只是清除 pending review，不等于自动提交 Git。
+
+文档：<https://code.visualstudio.com/docs/copilot/chat/copilot-edits>
+
+对本项目的含义：
+
+1. **一个权威 model + 一组显式 undo 边界**比“多个真相 + 文本 diff”可靠；B5 的 `DocumentSession` 应参考这个形状。
+2. AI 修改默认 pending，用户 Keep/Undo；我们 1.8.1 的 review 已经方向正确，但 **undo 边界在 host，不在 renderer**，这是 B4.2b-full 要补的。
+3. `alternativeVersionId` 的教训：**版本号不是内容哈希**；跨撤销/重做/重开时，不能用“版本号相等”判断“内容相同”。1.8.1 的 epoch/sha 误判就是同类问题的变体。
+
+#### 2.7.4 ProseMirror：所有更新经过 transaction，undo 存 inverse
+
+ProseMirror 指南的核心：
+
+- 文档是持久化（不可变）值；每次更新产生新文档；
+- 所有更新经过 `Transaction`；`prosemirror-transform` 记录可重放的 steps；
+- `prosemirror-history` 通过观察 transaction、保存 inverse 来实现 undo；
+- transaction 可以带 metadata（如 `addToHistory:false`）；
+- collaborative editing 使用**中央 authority**：authority 决定 step 顺序；并发客户端被拒后 rebase 再提交。
+
+文档：<https://prosemirror.net/docs/guide/>
+
+对本项目的含义：
+
+1. 我们 host 的 `merge3` 是“行级 diff + 全文替换”，不是 step/transaction；B5 如果要做真正的 intent pipeline，应把“操作”而不是“最终文本”作为协议的一部分。
+2. 中央 authority 与我们现在 `LiveDocuments` 的房间模型同构；**不需要为了协同先上 CRDT**。
+3. transaction metadata 是 review group 的天然载体；这与 CM6 的 annotation 是同一思路。
+
+#### 2.7.5 Lexical：不可变快照 + 明确的初始权威
+
+Lexical 官方文档：
+
+- “source of truth is not the DOM, but an underlying state model”；
+- EditorState 在 update 期间可变、commit 后不可变；
+- 更新必须通过 `editor.update()`，异步工作要先做完再进入 update；
+- 协作时可以让 Yjs 拥有初始状态（`initialEditorState: null`），Lexical 不抢初始权威；
+- `getEditorState()` 是已提交快照，`setEditorState()` 用于设置状态。
+
+文档：<https://lexical.dev/docs/concepts/editor-state>
+
+对本项目的含义：
+
+1. “谁是初始权威”必须在协议里写死；B5 的 session 打开时要明确 disk/buffer/mirror 哪个是初始值。
+2. 异步操作（读取 recovery、拉取远端）必须在进入写事务前完成；不能在一个 update 里 await 后再改状态。
+
+#### 2.7.6 Zed：CRDT 的锚点与墓碑
+
+Zed 官方文档确认它支持实时多人协作；其源码中 `crates/text`、`crates/multi_buffer` 使用 CRDT 语义，测试与注释提到 tombstone、CRDT order、anchor。源码搜索可见：
+
+- `crates/editor/src/selection.rs` 注释提到删除的 CRDT fragment 保留为 tombstone；
+- `crates/multi_buffer/src/multi_buffer_tests.rs` 讨论 anchor 在 CRDT order 中的位置。
+
+文档：<https://zed.dev/docs/collaboration>
+源码：<https://github.com/zed-industries/zed/tree/main/crates/text>
+
+对本项目的含义：
+
+- CRDT 不是“加个库”那么简单：锚点、墓碑、undo、选区映射都要重做；
+- MarkPilot 当前是单机 + live room OT，**没有必须上 CRDT 的需求**；B5 的默认方案应是中央 session + CAS，CRDT 只在明确多 writer 离线场景再评估。
+
+#### 2.7.7 Obsidian：周期快照 + 显式恢复
+
+Obsidian 的 File Recovery：
+
+- 定期保存**完整快照**（默认最短 5 分钟，保留 7 天，可配置）；
+- 快照存在 vault 外（全局设置目录），按绝对路径索引；
+- 可查看差异、复制或恢复；
+- 明确说明它不是完整备份方案。
+
+文档：<https://help.obsidian.md/plugins/file-recovery>
+
+对本项目的含义：
+
+1. MarkPilot 已有 `agent-before` 归档 + recovery slot，但这是“事件驱动”的；
+2. 可考虑增加“周期快照”（尤其是大文档/长时间编辑），但必须先解决保留策略、磁盘上限和隐私；
+3. 恢复 UI 的“查看差异/复制/恢复”三动作值得借鉴；不要做“一键自动恢复”。
+
+#### 2.7.8 Yjs UndoManager：选择性撤销与组边界
+
+Yjs 的 `Y.UndoManager`：
+
+- 可绑定一个或多个 shared type；
+- 默认追踪本地、无 origin 的修改；
+- `trackedOrigins` 可以只追踪指定来源；
+- `captureTimeout` 默认 500ms，合并相邻编辑；
+- `stopCapturing()` 强制下一笔不合并；
+- StackItem 可存 cursor meta，撤销时恢复。
+
+文档：<https://docs.yjs.dev/api/undo-manager>
+
+对本项目的含义：
+
+- “review 组”本质上是一个 **capture boundary**：AI 的一次 applyEdits 必须是不可与用户输入合并的组；
+- 我们的 host group 已经做到“组边界”，但 renderer 历史没有；B4.2b-full 应对齐这个语义；
+- 若未来做 CRDT，UndoManager 的 `trackedOrigins` 可以直接表达“只撤销 AI/只撤销用户”。
+
+#### 2.7.9 AI 编辑器：pending review 是行业默认
+
+VS Code Copilot 的 working set / Keep / Undo / diff / checkpoint 说明：
+
+- AI 修改默认不直接成为“已接受”；
+- 用户先 review，再 Keep 或 Undo；
+- diff 是审阅的主要界面；
+- checkpoint 是失败恢复，不是自动保存。
+
+这与 MarkPilot 1.8.1 的 review 方向一致；差距是：
+
+- 我们没有 CM6 原生 undo group；
+- diff 是 client 文本面板，不是编辑器装饰；
+- review 关闭/重开依赖 localStorage，不是内核状态；
+- 没有“多文件 working set”概念（MarkPilot 单文档，暂不需要）。
+
+#### 2.7.10 冲突 UI：VS Code 3-way merge editor 是直接范式
+
+VS Code 的 merge editor：
+
+- 三栏：Incoming（左）/ Current（右）/ Result（下）；
+- 每个冲突：Accept Current / Accept Incoming / Accept Both / Compare；
+- Result 可直接手动编辑；
+- 有 unresolved count，全部解决后 Complete Merge；
+- base 视图可切换。
+
+文档：<https://code.visualstudio.com/docs/sourcecontrol/merge-conflicts>
+
+B4.3 应直接采用这套交互语义，而不是自创：
+
+- **base / ours / theirs / result** 四区；
+- 每个 hunk 四选一 + manual；
+- 未解决计数；
+- 应用前不写盘；
+- 结果面板可手改；
+- 完成后进入 review（保留/撤销），而不是直接保存。
+
+#### 2.7.11 对本项目的直接结论
+
+**应该借鉴的：**
+
+1. **单一权威 model + 单一更新入口**（VS Code model / CM6 transaction / ProseMirror transaction / Lexical update）。
+2. **显式 undo 边界**（VS Code `pushStackElement` / Yjs `stopCapturing` / CM6 annotation）。
+3. **AI 修改 pending review**（VS Code working set / Keep/Undo）。
+4. **3-way 冲突 UI + 逐块选择 + 手动 result**（VS Code merge editor）。
+5. **周期快照作为恢复兜底**（Obsidian File Recovery），与现有 archive/recovery 互补。
+
+**不应该照搬的：**
+
+1. 不要为了“前沿”直接引入 CRDT；Zed 的锚点/墓碑/undo 成本很高，当前没有多 writer 离线需求。
+2. 不要把 Markdown 改成富文本 block model；MarkPilot 的差异化和兼容性都建立在 Markdown 纯文本上。
+3. 不要在没有 renderer 构建/五通道预算时改 CM6 core；1.7.6 已经证明代价。
+4. 不要把“版本号”当“内容身份”；1.8.1 的 sha 修复是必要基础。
+
+**对 B5 的最终建议：**
+
+- 采用 **宿主 DocumentSession + 单一 intent 入口**（方案 A），参考 VS Code model + ProseMirror transaction；
+- 保留 CM6 作为 view，不把权威放进 renderer；
+- review/undo 用 **transaction annotation + host group 双写校验**，而不是文本 diff；
+- 冲突用 B4.3 的 3-way session；
+- CRDT 仅作为未来可选，不进入 B5 第一阶段；
+- 任何“统一四个真相”的改动都必须保留现有 CAS、归档、fail-closed 不变量。
 
 ---
 
