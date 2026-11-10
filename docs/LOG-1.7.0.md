@@ -76,7 +76,7 @@ rev1:disk:<providerVersion>:<sha256(text)>
 
 ```text
 npm test
-tests 411, pass 410, fail 0, skipped 1
+tests 413, pass 412, fail 0, skipped 1
 ```
 
 新增用例：
@@ -84,6 +84,7 @@ tests 411, pass 410, fail 0, skipped 1
 - `test/live-documents-authority.test.mjs`（7）：readRoom 不建库/不写库、坏库回退、干净与脏房间、stale/invalid/no-member、`saved<floor`、leave 保留未 ack agent 变更、两实例同 base 只赢一个。
 - `test/documents-service.test.mjs`（12）：authority 三态、BOM/CRLF、orphan/conflict、stale、append 竞态映射、干净/脏归档、disk 委托、policy（read-only/workspace-write 内外/danger/未知 mode）、token、路径包含、replaceExact。
 - `test/documents-api.test.mjs`（7）：端点权限、buffer append 不写盘 + live save 落盘、disk CAS、模型工具、sandbox 拒绝、HTTP 拒绝、非本宿主房间退化为 disk/拒绝。
+- `test/markdown-tool-registration.test.mjs`（2）：author DSL → registry JSON Schema 的 required 转换；`defineTool` 不可导入时回退 `tools.register`，且 read 渲染输出完整 revision token。
 - 扩展 `host`/`host-lazy-binding`；工具 buffer 路径由 API4 覆盖。
 
 ### 4.2 突变验证（注掉修复必须变红）
@@ -112,18 +113,23 @@ git diff --numstat README.md        → 11 0（只增不删）
 
 ### 4.4 实装与热载验证
 
-- 主树 `main` 已 fast-forward 到 `08c339c`；profile 的 `node_modules/dsh-markdown-editor-typora` 是指向主树插件目录的 junction，安装版 `package.json` 读取为 **1.7.0**。
+- 主树 `main` 已 fast-forward 到 `c2483f0`；profile 的 `node_modules/dsh-markdown-editor-typora` 是指向主树插件目录的 junction，安装版 `package.json` 读取为 **1.7.0**。
 - `plugin_manager` 对 `include:dsh-markdown-editor-typora` 执行 disable → enable，两次均返回 `application:"applied"`，强制宿主重载插件（无需重启整个 DSH）。
-- 通过宿主 Node inspector（`127.0.0.1:9230`，pid 27096）只读检查 host graph：
-  - `generation: 2`、`digest: 4b4c484d8f11`、`hosts: 1`、`retired: active`；
-  - `hasAppend: true`、`hasReadRoom: true` —— 运行中的 `LiveDocuments` 已包含 1.7.0 新增方法，不是旧代。
-- 本编码会话的 Agent preset 不含 `markdown` 工具，无法从本会话直接发起 AI 工具调用；AI 读/改未保存正文需在 MarkPilot 侧（带该工具的会话）做一次真机操作。建议验收：打开 md → 改一段不保存 → 让 AI `markdown read` 应返回 `source:"buffer"`、`dirty:true`、`rev1:live:...`；再让 AI 改另一段，应返回 `saved:false`、编辑区立即出现、磁盘此刻不变，并给出 `agent-before` 归档路径。
+- 通过宿主 Node inspector（`127.0.0.1:9230`）只读检查 host graph：`generation: 2`、`digest: 4b4c484d8f11`、`hosts: 1`、`retired: active`，`hasAppend/readRoom=true` —— 运行中的 `LiveDocuments` 已包含 1.7.0 新增方法。
+- **真机首测发现两个阻断**（本会话 Agent preset 未暴露 markdown 工具，是因为工具没注册成功，不是 preset 问题）：
+  1. `@deepseek-ai/dsh-tools` 在 junction/npm 安装形态下不在插件 ESM 解析路径；`registerMarkdownTool` 的 `import()` 失败后只告警，`markdown` 工具**从未注册**。宿主 tools 服务实测 global data 44 条，无 `markdown`。修复：`registerMarkdownTool` 捕获导入失败后，用 `authorSchemaToRegistrySchema` 将 author DSL 转成 `tools.register` 接受的 JSON Schema 回退注册（`229a3f9`）。真机 schema 探针注册→`has:true`→dispose 通过；重载后工具进入 tools 表，本会话可直接调用。
+  2. `read` 渲染把 revision token 截到 16 字符，模型拿不到完整 `baseVersion`，无法安全回写 buffer。修复：渲染完整 `version: ...`（`d7fca4e`）；新增断言 `rev1:live:...` 完整出现。
+- 真机通过工具调用：
+  - `markdown.read` → `source:"disk"`、完整 `rev1:disk:<providerVersion>:<sha256>`；
+  - `markdown.edit` 对磁盘文件写入 → `saved:true`，改后 token 与写后复读一致。
+- **缓冲区路径本机未完成**：MarkPilot 编辑器打开文档时 `%LOCALAPPDATA%\.markpilot\live-v1\rooms.sqlite` 的 `rooms` 表为 0，工具读仍返回 disk；判定为热重载后旧 iframe 的 live 会话未重建，需要**干净重启 DSH** 后重新打开文档复测，不是 host service 的结论。复测判据不变：先改一段不保存 → read 应 `source:"buffer"`、`dirty:true`、`rev1:live:`；再 AI 改另一段 → `saved:false`、编辑区立即出现、磁盘此刻不变，并给 `agent-before` 路径。
 
 ## 5. 对抗审阅
 
 两轮设计对抗 + 两轮实现对抗（报告在 `.mp-verify/b3-inventory/ADVERSARIAL-*.md`）：
 
 - P0（设计）：provider BOM/CRLF 口径、`saved<floor` 假冲突、append 后未投递关窗、HTTP 注入、readRoom 写锁——全部在落码中修复并有对应测试。
+- P0（真机）：`@deepseek-ai/dsh-tools` 不在插件安装形态的 ESM 解析路径，`markdown` 工具从未注册；修复为 JSON Schema 回退注册（`229a3f9`）。read 渲染截断 revision token；修复为完整 token（`d7fca4e`）。
 - P0（实现）：旧 EXE 3.6.17 的旧 `leave` 会在未 ack 窗口删房。修法不是重建 EXE，而是 §3 的"非本宿主成员"规则：房间里有旧 EXE/另一宿主进程的活 client 时，不再 append（干净→磁盘写，脏→`MP_DOC_UNSAVED_ELSEWHERE`），因此旧 EXE 关闭时没有 agent change 可删。极窄的"AI 先 append、旧 EXE 后 join、DSH 宿主再关闭"序列留给 B3.2 的 recovery 副本或 EXE 重建。
 - P1（实现）：disk `edits[]` 委托 `apiSave` 缺 policy 检查（已补 `checkWritePolicy`）；`enqueue` 键与 `queueSave` 大小写域不一致（已包 `pathKey`）；disk oldString 无 base 无 CAS（已强制 providerVersion）；append 竞态错误缺 `currentRevisionId`/`checkpointPath`（已补）；disk token sha 用计算文本而非落盘文本（已写后复读）；`readRoom` 打不开 WAL 库时硬失败（已退回 disk 权威）；UNC 长路径归一。
 - P2：归档 64MB 上限/增长、checkpoint 无用户入口、`MP_LIVE_READ` 失败面、非本宿主房间只读退化均已登记；`model-authority` 的旧断言按新前置拒绝调整（服务层先拒，provider 不再被调用）。
@@ -134,7 +140,7 @@ git diff --numstat README.md        → 11 0（只增不删）
 
 | 文件 | 字节 | SHA-256 |
 | --- | --- | --- |
-| `lib/index.js` | 104216 | `0b8e503e0646caa6a9cadd29b95d8415e950010aded103da16cbd3adf00cfe9e` |
+| `lib/index.js` | 106467 | `3c44c47bad158967eddac416900d70849bef443d9c5617865f806461460c6d77` |
 | `lib/documents-service.js` | 23962 | `25a78b5e6d21073c04201efc84010c1ea6bea3a14310f97de9e9dffbe1de0756` |
 | `host/live-documents.js` | 37853 | `8896709e3a48fa3b37ecddfdb3c0fd59c41f712a119fb9c35e05a2cd41d441d1` |
 | `MarkPilot-CM6/shell/live-documents.js` | 37853 | `8896709e3a48fa3b37ecddfdb3c0fd59c41f712a119fb9c35e05a2cd41d441d1` |
