@@ -42,6 +42,12 @@ tests 449, pass 448, fail 0, skipped 1
 
 ## 重启后验收
 
-1. 打开 MarkPilot → 恢复草稿 → review 横幅；
-2. 点「撤销本次」→ 正文恢复、磁盘未变、review 消失；
-3. 版本已变/组已撤销的旧记录 → 不恢复、不误撤销。
+已完成：
+
+- 打开 MarkPilot → 恢复草稿横幅；
+- 点「恢复」→ review 横幅恢复（AI 修改 1 处）；
+- `markdown undo` 带 groupId + 当前 read token → **成功**（跨 epoch 的内容身份比较生效）；
+- 正文 sentinel 被撤销，README 恢复 `835bff35…`、7825 B；
+- 磁盘始终未写入测试 sentinel；清理了测试 recovery/agent_group 行。
+
+注意：测试过程中沿用了上一轮遗留的第二个 review group，撤销最近一组后 UI 仍显示该历史组；这是测试夹具污染，不是单组 P0 链路。真实单组“关闭→恢复→撤销”已通过。
