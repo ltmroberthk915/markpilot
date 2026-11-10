@@ -36,11 +36,11 @@ AI 修改 buffer 后：
 
 ```text
 npm test
-tests 445, pass 444, fail 0, skipped 1
+tests 446, pass 445, fail 0, skipped 1
 ```
 
 - `B4.2B-R1`：append 的 `groupId` 进入 exchange updates。
-- `B4.2B-API1`：受信任 UI 可 `reviewGroup` + `undoGroup`，正文恢复。
+- `B4.2B-API1`：受信任 UI 可 `reviewGroup` + `undoGroup`，正文恢复。\n- `B4.2B-API2`：两组连续 review 一次 `undoGroups` 全量恢复，两个组都标记 `undoneAt`。
 - 真机：
   - README 打开，AI 追加 `B4.2B-REVIEW-PROBE`；
   - 等 3 秒，磁盘 hash 仍为 `835bff35…`、7825 B，未自动保存；
@@ -55,12 +55,12 @@ tests 445, pass 444, fail 0, skipped 1
 - renderer/core 的原生 CM6 undo group、装饰 diff、原生 Ctrl+Z 整组撤销。
 - 磁盘权威编辑的 review。
 - review 未决时关闭后，重开只回到客户端恢复草稿，不恢复“审阅状态”；这是有意选择：先保证不丢文本、不写盘。
-- 多组 AI 修改目前只允许撤销最近一组；更早组仍保留，UI 文案已明确“多组，只可撤销最近一组”。
+- 多组 AI 修改通过 `documents.undoGroups` 一次性原子撤销；组必须连续，最后一组必须等于当前 revision。
 
 ## 6. 边界验证（B4.2b-edge）
 
 - 真机：AI 修改后按 Ctrl+S，等待 3 秒磁盘仍为原 hash/7825 B，review 横幅仍在。
 - 真机：review 未决时直接关闭编辑面，磁盘仍为原 hash；重开后出现“检测到上次关闭时未保存的内容”，可选择恢复/丢弃。
-- 真机：多组入口按 `review.groups` 累积；按钮显示“撤销最近一组”，撤销后提示更早组仍保留。
+- 多组入口按 `review.groups` 累积；`documents.undoGroups` 按组链模拟逆变换，最后一次性写回；`B4.2B-API2` 覆盖两组连续撤销。
 - 差异面板：显示红/绿行、修改序号/替换长度；最多 12 处、每处 1500 字符。
 - 多组 review 状态（累积、最近组、multi 判定、保存抑制）已加入 `test/client.test.mjs`；关闭/重开、Ctrl+S 拦截仍为真机用例。
