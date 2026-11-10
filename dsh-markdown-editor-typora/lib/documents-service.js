@@ -436,6 +436,7 @@ export function createDocumentsService(deps) {
         version: a.revisionId, revisionId: a.revisionId,
         head: a.room ? { epoch: a.room.epoch, version: a.room.version, savedVersion: a.room.savedVersion } : null,
         recovery: recovery.filter((entry) => entry.sha256 !== a.textSha).slice(0, 5), recommended,
+        groups: typeof live.listAgentGroups === 'function' ? await live.listAgentGroups(a.canonical, 5) : [],
       },
     };
   }
@@ -452,7 +453,13 @@ export function createDocumentsService(deps) {
     const rawBase = typeof payload?.baseRevisionId === 'string' ? payload.baseRevisionId
       : (typeof payload?.baseVersion === 'string' ? payload.baseVersion : '');
     const isBlock = typeof payload?.blockId === 'string' && payload.blockId.length > 0;
-    const groupId = isBlock ? randomUUID() : null;
+    const groupId = randomUUID();
+    const recordGroup = async (resultRevision) => {
+      try { await live.recordAgentGroup?.(a.canonical, {
+        groupId, actor: 'agent', kind: isBlock ? 'block-edit' : 'edit',
+        baseRevision: a.revisionId, resultRevision,
+      }); } catch { /* audit is best effort; never fail an edit because of it */ }
+    };
     const isOldString = typeof payload?.oldString === 'string';
     const isEdits = Array.isArray(payload?.edits);
 
@@ -535,6 +542,7 @@ export function createDocumentsService(deps) {
         }
         const revisionId = makeLiveRevisionId(result.epoch, result.version, result.textSha256);
         const newBlockId = block ? parseDocumentBlocks(newText).find((b) => b.ordinal === block.ordinal)?.id : null;
+        await recordGroup(revisionId);
         return {
           ok: true,
           value: {
@@ -543,7 +551,8 @@ export function createDocumentsService(deps) {
             version: revisionId,
             textSha256: result.textSha256, dirty: true, saved: false,
             applied: appliedOf(changes), checkpoint: archived, textLength: result.text.length,
-            ...(isBlock ? { blockId: newBlockId, previousBlockId: block.id, groupId } : {}),
+            ...(isBlock ? { blockId: newBlockId, previousBlockId: block.id } : {}),
+            groupId,
             ...(typeof result.recoveryPath === 'string' && result.recoveryPath ? { recoveryPath: result.recoveryPath } : {}),
           },
         };
@@ -567,8 +576,9 @@ export function createDocumentsService(deps) {
         if (isBlock) {
           value.blockId = parseDocumentBlocks(actual).find((b) => b.ordinal === block.ordinal)?.id || null;
           value.previousBlockId = block.id;
-          value.groupId = groupId;
         }
+        value.groupId = groupId;
+        await recordGroup(value.revisionId);
         return { ok: true, value };
       }
       const result = await save({ path: payload.path, cwd: payload.cwd ?? invocation?.cwd, text: newText, baseVersion: diskBase });
@@ -579,8 +589,9 @@ export function createDocumentsService(deps) {
       if (isBlock) {
         value.blockId = parseDocumentBlocks(actual).find((b) => b.ordinal === block.ordinal)?.id || null;
         value.previousBlockId = block.id;
-        value.groupId = groupId;
       }
+      value.groupId = groupId;
+      await recordGroup(value.revisionId);
       return { ok: true, value };
     } catch (error) {
       return fail(error, a);

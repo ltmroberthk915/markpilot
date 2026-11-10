@@ -49,6 +49,11 @@ function database(directory) {
       CREATE TABLE IF NOT EXISTS append_recovery (
         source TEXT NOT NULL, recoveryPath TEXT PRIMARY KEY, epoch TEXT NOT NULL,
         version INTEGER NOT NULL, at INTEGER NOT NULL, bytes INTEGER NOT NULL, sha256 TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS append_recovery_source ON append_recovery(source, at DESC);
+      CREATE TABLE IF NOT EXISTS agent_group (
+        group_id TEXT PRIMARY KEY, source TEXT NOT NULL, actor TEXT NOT NULL, kind TEXT NOT NULL,
+        base_revision TEXT, result_revision TEXT, at INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS agent_group_source ON agent_group(source, at DESC);
       CREATE TABLE IF NOT EXISTS writers (file TEXT PRIMARY KEY, owner TEXT NOT NULL, pid INTEGER NOT NULL, since INTEGER NOT NULL);`);
     // Rooms kept by an earlier draft release held leases without timestamps.
     if (!db.prepare('PRAGMA table_info(writers)').all().some(column => column.name === 'since'))
@@ -728,6 +733,31 @@ class LiveDocuments {
       const stored = db.prepare("SELECT value FROM meta WHERE key='host'").get()?.value;
       if (stored !== hostStamp()) return [];
       return listAppendRecoveryRows(db, key);
+    } catch { return []; }
+    finally { try { db.close(); } catch { /* already closed */ } }
+  }
+  async recordAgentGroup(filePath, entry = {}) {
+    const groupId = String(entry.groupId || '');
+    if (!/^[0-9a-f-]{36}$/i.test(groupId)) return null;
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    const now = Number.isSafeInteger(entry.at) ? entry.at : Date.now();
+    const db = this.db;
+    db.prepare('INSERT OR REPLACE INTO agent_group(group_id,source,actor,kind,base_revision,result_revision,at) VALUES(?,?,?,?,?,?,?)')
+      .run(groupId, key, String(entry.actor || 'agent').slice(0, 32), String(entry.kind || 'edit').slice(0, 32),
+        String(entry.baseRevision || '').slice(0, 512), String(entry.resultRevision || '').slice(0, 512), now);
+    return { groupId, source: key, at: now };
+  }
+  async listAgentGroups(filePath, limit = 20) {
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    const filename = path.join(path.resolve(this.directory), 'rooms.sqlite');
+    if (!fs.existsSync(filename)) return [];
+    const {DatabaseSync} = require('node:sqlite');
+    let db;
+    try { db = new DatabaseSync(filename, {readOnly:true}); } catch { return []; }
+    try {
+      if (db.prepare("SELECT value FROM meta WHERE key='host'").get()?.value !== hostStamp()) return [];
+      return db.prepare('SELECT group_id AS groupId,actor,kind,base_revision AS baseRevision,result_revision AS resultRevision,at FROM agent_group WHERE source=? ORDER BY at DESC LIMIT ?')
+        .all(key, Math.max(1, Math.min(100, Number(limit) || 20)));
     } catch { return []; }
     finally { try { db.close(); } catch { /* already closed */ } }
   }

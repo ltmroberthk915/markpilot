@@ -51,7 +51,7 @@ tests 437, pass 436, fail 0, skipped 1
 ## 6. 边界/后续
 
 - 不解析 setext/列表/表格/行内格式；不提供选区锚点。
-- `groupId` 目前只返回，未持久化到审计表；B4.2 审查组再落库。
+- 每次 AI 编辑生成 `groupId`；buffer 与磁盘编辑都写入 `agent_group` 审计表（source/actor/kind/base/result/at），`documents.state` 返回最近 5 组。`groupId` 目前只用于审计，不提供回滚；B4.2 再消费。
 - `blocks` 一次最多返回 200 个（`totalBlocks/truncated` 标明截断）；超大文档的解析/输出后续可加按需分页。
 - 无 ATX 标题的文档标记为单个 `kind:'document'` 块，避免把纯段落误当普通 section。
 
@@ -65,5 +65,6 @@ tests 437, pass 436, fail 0, skipped 1
 - **无标题文档**：单块标 `kind:'document'`，不冒充普通 section。
 - **blockId + oldString 同时给出**：`bad-request`，不做二选一猜测。
 - **blocks 上限**：工具层截 200 并返回 `totalBlocks/truncated`；错误码写进工具说明。
-- 未处理（已登记）：CRLF 磁盘夹具混合换行取证、`groupId` 尚无消费者、setext 标题不解析。
+- 未处理（已登记）：CRLF 磁盘夹具混合换行取证、setext 标题不解析。
+- 已补：`groupId` 写入 `agent_group` 审计表，`state` 可读最近 5 组。
 
