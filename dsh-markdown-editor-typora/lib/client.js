@@ -4019,6 +4019,7 @@ const __test = {
     var docsModeOn = false;        // 文档工作台是否打开（列表+编辑器都在浮层里，主区域留给对话）
 
     var workbenchDoc = null, workspaceIntent = 0, workspaceNotice = "";
+    var workbenchPrewarm = false; // hidden live-less editor instance; reveal reuses its iframe
     var editorLeaveGuards = new Map();
     var workspaceService = null;
     const WORKSPACE_DRAFT_KEY = "dsh.markpilot.workspace-drafts.v1";
@@ -4116,11 +4117,22 @@ const __test = {
         writeSettings(window.localStorage,{enabled:true}); mountLayout(docsCtx);
       }
     }
+    function revealPrewarmedWorkspace() {
+      if (!workbenchDoc) return false;
+      ++workspaceIntent;
+      workbenchPrewarm = false;
+      docsModeOn = true;
+      workspaceNotice = "";
+      enableWorkbench();
+      bumpOverlay();
+      try { if (typeof layoutReapply === "function") layoutReapply(); } catch (e) { /* 忽略 */ }
+      return true;
+    }
     async function chooseWorkbenchDoc(entry) {
       var intent=++workspaceIntent;
       var check=await prepareWorkspaceLeave();
       if (!check || intent!==workspaceIntent || !check()) return false;
-      workbenchDoc=entry; workspaceNotice=""; docsModeOn=true; clearClosedOverlayKeys();
+      workbenchDoc=entry; workspaceNotice=""; docsModeOn=true; workbenchPrewarm=false; clearClosedOverlayKeys();
       setWorkspaceAutoOpenSuppressed(workspaceKey(entry && entry.workspace), false);
       enableWorkbench(); bumpOverlay(); return true;
     }
@@ -4202,7 +4214,11 @@ const __test = {
         }
         if (!entry) return;
         if (entry.draft && !pendingWorkspaceDraft(context,entry)) throw new Error("无法保留空白草稿，请检查本机存储空间。");
-        workbenchDoc=entry; workspaceNotice=""; docsModeOn=true; clearClosedOverlayKeys();
+        if (options && options.prewarm === true) {
+          workbenchDoc=entry; workspaceNotice=""; docsModeOn=false; workbenchPrewarm=true; clearClosedOverlayKeys();
+          bumpOverlay(); return;
+        }
+        workbenchDoc=entry; workspaceNotice=""; docsModeOn=true; workbenchPrewarm=false; clearClosedOverlayKeys();
         setWorkspaceAutoOpenSuppressed(context.key,false);
         enableWorkbench(); bumpOverlay();
       } catch(e) {
@@ -4211,6 +4227,26 @@ const __test = {
           else { try { console.warn("[markpilot] 自动恢复文档失败：",e); } catch(e2) { /* 忽略 */ } }
         }
       }
+    }
+    var prewarmTimer = 0;
+    function schedulePrewarmWorkbench(attempt) {
+      if (prewarmTimer || typeof window === "undefined") return;
+      var tries = Number(attempt) || 0;
+      prewarmTimer = setTimeout(function () {
+        prewarmTimer = 0;
+        try {
+          if (docsModeOn || overlayDoc || workbenchDoc) return;
+          var cfg = readSettings(window.localStorage);
+          if (cfg.enabled !== true || cfg.workspaceOpenMode === "files" || cfg.workspaceOpenMode === "blank") return;
+          var context = workspaceContext();
+          if (!context.sessionId || !context.key) {
+            if (tries < 6) schedulePrewarmWorkbench(tries + 1);
+            return;
+          }
+          if (pendingWorkspaceDraft(context)) return;
+          void openWorkspace(context, { auto: true, prewarm: true }).catch(function () { /* 预热失败不影响点击 */ });
+        } catch (e) { /* 预热失败不影响点击 */ }
+      }, tries ? 1500 : 1000);
     }
     /* ── 文档链接接管：file:// 链接与路径芯片 ─────────────────────────────
      * 宿主对 file:// 的点击没有实际打开动作（点了没反应）；路径芯片则走宿主预览，
@@ -4317,6 +4353,8 @@ const __test = {
     function closeDocsWorkbench() {
       ++workspaceIntent; workspaceNotice="";
       docsModeOn = false;
+      workbenchPrewarm = false;
+      workbenchDoc = null;
       clearOverlayDoc();
       bumpOverlay();
       if (typeof layoutReapply === "function") layoutReapply();
@@ -4678,6 +4716,7 @@ const __test = {
             ? h(EditorTabBodyInner, {
                 useTabInfo: function () { return { tab: { contentId: active.address, id: "dsh-markdown-editor-typora-docs", draft:active.draft, workspace:active.workspace } }; },
                 sessionId: active.sessionId || context.sessionId, workbenchCollapsed: collapsed,
+                prewarm: props.prewarm === true,
                 railInsetLeft: collapsed ? 52 : 0,
                 railInsetRight: 20,
               })
@@ -5038,6 +5077,7 @@ const __test = {
           }
         } catch (e0) { /* 忽略 */ }
         if (docsModeOn || overlayDoc) void closeWorkspaceEditor();
+        else if (workbenchDoc && revealPrewarmedWorkspace()) { /* already booted */ }
         else void openWorkspace(workspaceContext());
         try {
           var lay = docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("layout") : null;
@@ -5106,7 +5146,22 @@ const __test = {
           onPointerCancel: onHandleUp,
         }, h(DocsWorkbench, {
           close: closeWorkspaceEditor,
+          prewarm: workbenchPrewarm,
         }));
+      }
+      if (!d && workbenchDoc && workbenchPrewarm) {
+        // Startup prewarm only: read-only/live-less; close unmounts it.
+        return h("div", {
+          id: "mp-stage",
+          "data-mp-prewarm": "1",
+          "aria-hidden": "true",
+          style: {
+            position: "fixed", left: -10000, top: 0, width: "62vw", height: "100%",
+            display: "flex", flexDirection: "column", minWidth: 0,
+            visibility: "hidden", pointerEvents: "none", zIndex: -1,
+            overflow: "hidden",
+          },
+        }, h(DocsWorkbench, { close: closeWorkspaceEditor, prewarm: true }));
       }
       if (!d || !d.tab) return workspaceNotice ? h(WorkspaceNotice) : null;
       var closeBtn = h("button", {
@@ -5204,6 +5259,7 @@ const __test = {
       const address = tab && tab.contentId;
       const parsed = React.useMemo(() => parseFileAddress(address), [address]);
       const depKey = parsed ? [parsed.scope, parsed.sessionId || "", parsed.path].join("|") : null;
+  React.useEffect(() => { setUi((prev) => prev.booted ? { ...prev, booted: false } : prev); }, [depKey]);
       const tabVisible = !(tab && tab.visible === false);
       const sessionIdFromProps = typeof props.sessionId === "string" ? props.sessionId : "";
 
@@ -5213,6 +5269,13 @@ const __test = {
       const frameRef = React.useRef(null);
       const rootRef = React.useRef(null);
       const st = React.useRef({ doc: null, actions: {} }).current;
+  const prewarmRef = React.useRef(props.prewarm === true);
+  prewarmRef.current = props.prewarm === true;
+  React.useEffect(() => {
+    if (props.prewarm === true || !st.doc || !st.doc.prewarmActive) return;
+    st.doc.prewarmActive = false;
+    void loadFromDisk({ silent: true, reason: "prewarm-reveal" });
+  }, [props.prewarm]);
       const inputActionsRef = React.useRef(props.inputActions);
       inputActionsRef.current = props.inputActions;
       const workbenchCollapsedRef = React.useRef(props.workbenchCollapsed === true);
@@ -5223,7 +5286,7 @@ const __test = {
         if (win) { try { win.postMessage({ __dshmd: true, dir: "down", type: "appearance", content: editorAppearance() }, "*"); } catch (e) { /* load/ready retries */ } }
       }, [props.workbenchCollapsed]);
 
-      const [ui, setUi] = React.useState({ phase: "loading", detail: "", notice: "", recovery: null, recovered: null, saveStatus: "", notices: [] });
+      const [ui, setUi] = React.useState({ phase: "loading", detail: "", notice: "", recovery: null, recovered: null, saveStatus: "", notices: [], booted: false });
       const setUiIfChanged = React.useCallback((next) => {
         setUi((prev) => {
           if (prev.phase === next.phase && prev.detail === next.detail && prev.notice === next.notice) return prev;
@@ -5281,6 +5344,7 @@ const __test = {
           pollTimer: null,
           pollFailures: 0,
           externalStale: false,
+          prewarmActive: false,
           staleNotified: false,
           tabVisible: tabVisible,
           notice: "",
@@ -5642,6 +5706,11 @@ const __test = {
         function commitApplied(pending,reply,snapshot) {
           const value=pending.value,restore=pending.kind==='restore';
           doc.opened=true;doc.text=value.text;doc.textFresh=true;doc.lastVersion=value.version;
+          doc.prewarmActive = pending.prewarm === true;
+          if (doc.prewarmActive && !prewarmRef.current) {
+            doc.prewarmActive = false;
+            setTimeout(function () { if (alive()) void loadFromDisk({ silent: true, reason: "prewarm-reveal-late" }); }, 0);
+          }
           doc.lastSavedText=value.text;
           doc.displayPath=value.displayPath||doc.absPath;doc.size=value.size;
           doc.mirror=mirrorOf(value.text,reply.session,doc.token);doc.composing=false;
@@ -6155,6 +6224,7 @@ const __test = {
 
         async function loadFromDisk(options) {
           const opts = options || {};
+          const prewarmAtStart = prewarmRef.current === true;
           if (doc.dead || doc.pendingApply || doc.applyUnknown) return false;
           if (doc.saving) {doc.reloadAfterSave={opts:{...opts},editSeq:doc.editSeq};return false;}
           refreshPath();
@@ -6168,12 +6238,12 @@ const __test = {
             if (doc.untitled) {
               var recovery=await draftStore()?.readLatest?.(doc.absPath);
               result={ok:true,value:{text:typeof recovery?.text==="string" ? recovery.text : (doc.firstSaveText || ""),version:null,displayPath:doc.absPath,size:0}};
-            } else result = await api("open", {path:pathAtStart, live:!doc.liveUnsupported});
+            } else result = await api("open", {path:pathAtStart, live:!doc.liveUnsupported && prewarmAtStart !== true});
             if (!ownsLoad()) return false;
             if (doc.opened && (doc.editSeq !== editSeqAtStart || doc.composing || (!opts.discard && (doc.dirty || doc.conflict)))) { doc.externalStale = true; return false; }
             if (result.ok !== true) { if (!opts.silent) showError("打开失败：" + (result.error?.message || result.error?.code || "error")); return false; }
             const value=result.value,firstOpen=!doc.opened;
-            return await applyToFrame({kind:firstOpen?'open':'reload',value,firstOpen,opts,path:pathAtStart,baseVersion:versionAtStart,loadSeq,editSeq:editSeqAtStart});
+            return await applyToFrame({kind:firstOpen?'open':'reload',value,firstOpen,opts,path:pathAtStart,baseVersion:versionAtStart,loadSeq,editSeq:editSeqAtStart,prewarm:prewarmAtStart});
           } catch(error) {
             if (!ownsLoad() || doc.editSeq !== editSeqAtStart) return false;
             if (!opts.silent) showError("打开失败：" + String(error?.message || error));
@@ -6574,6 +6644,7 @@ const __test = {
             return;
           }
           if (type === "init") {
+            setUi((prev) => prev.booted ? prev : { ...prev, booted: true });
             syncAppearance();
             doc.editorReady = true;
             if (data.content && data.content.again === true && doc.pendingApply) {
@@ -7077,6 +7148,21 @@ const __test = {
       },
         h("style", { key: "rail-css" }, RAIL_CSS),
         h("div", {
+          key: "boot-skeleton",
+          "data-mp-boot-skeleton": "1",
+          role: "status",
+          "aria-hidden": ui.booted ? "true" : undefined,
+          "aria-label": "正在打开编辑器",
+          style: {
+            position: "absolute", inset: 0, zIndex: 60, pointerEvents: "none",
+            display: ui.booted ? "none" : "flex", alignItems: "center", justifyContent: "center",
+            background: "color-mix(in srgb, var(--mp-bg, #1b2028) 88%, transparent)",
+            color: "color-mix(in srgb, currentColor 60%, transparent)",
+            font: "12px/1.5 system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif",
+            letterSpacing: ".02em",
+          },
+        }, h("span", null, "正在打开编辑器…")),
+        h("div", {
           className: "mp-rail",
           role: "toolbar",
           "aria-label": "文档状态与提示",
@@ -7512,6 +7598,7 @@ const __test = {
         }
         for (let i = 0; i < dead.length; i += 1) { try { localStorage.removeItem(dead[i]); } catch (e) { /* 忽略 */ } }
       } catch (e) { /* 无存储 */ }
+      schedulePrewarmWorkbench();
     }
 
     exports.apply = apply;
