@@ -94,6 +94,12 @@ node scripts/sync-core.mjs --check  → CHECK_OK 124 files, 7351676 bytes, coreH
 
 - B3.1 已实测 clean/dirty buffer、AI buffer edit、agent-before、恢复原文；B3.2 的路径与提示由新增单元/API 测试覆盖。
 - 两轮设计/时序对抗（`.mp-verify/b3.2/ADVERSARIAL-*.md`）抓到的 P0：raw-byte vs LF-text sha、未提交副本误报、parked 被 append 挤出、fsync/提交窗口、HTTP 触发 prune；本批已按上表修掉。
+- **真机关窗恢复冒烟**（`D:\BuyKey\Typora-Editor-App\README.md`，外部备份后恢复）：
+  1. MarkPilot 打开 README，`markdown.read` 返回 `source:"buffer"`、`rev1:live:…:0`；AI edit 末尾加 `B3.2-LIVE-PROBE`，返回 `恢复副本 …recovery\agent-append\README.md…md`。
+  2. 立即删除 rooms 的 clients/rooms 行（模拟旧 EXE 删房）并把 README 恢复为测试前字节、原 mtime；`append_recovery` 行保留。
+  3. plugin disable/enable 后重新点 Markdown，客户端顶部出现：**“该文件存在 1 份共享会话恢复的草稿副本（原件未被覆盖）”**，带“查看/知道了”。`append_recovery` 行 version=1、bytes=7743，副本内容含 `B3.2-LIVE-PROBE`。
+  4. 清理测试行/副本后 README SHA-256 仍为 `835bff35…`、7825 字节，与测试前完全一致。
+  - 说明：删房是 SQLite 模拟而非自然关窗；但走的是真实 `join`/客户端横幅链路，不是单元桩。
 - `main` fast-forward 到 `b6e42f2`；profile junction 指向主树，`plugin_manager` disable/enable 返回 `application:"applied"`；热载后 `markdown.read` 正常返回磁盘完整 revision，证明新 host 代码可加载。未重启 DSH。
 - 最终文件身份：`MarkPilot-CM6/shell/live-documents.js` = `dsh-markdown-editor-typora/host/live-documents.js`，48399 字节，SHA-256 `9b413d32…`；`host.json` 1443 字节 `c5c5be9e…`；`documents-service.js` 26639 字节 `bdc35dbd…`；`index.js` 110778 字节 `0bb4eca1…`。
 - 剩余已知边界：64 MiB 全文同步写在 SQLite 写事务内，超大文档会阻塞事件循环/并发读；`documents.state` 的只读 WAL 连接仍可能创建 `-wal/-shm`（B3.1 既有）；sidecar 丢失的磁盘孤儿不计数；无 base_sha 三态/自动恢复；`kind` 在客户端 recovery 投影里被忽略。均不阻塞本批 P0。
