@@ -690,6 +690,31 @@ function applyMirrorDelta(mirror,event){
     function reviewSuppressesSave(state) {
       return !!(state && state.review);
     }
+    const REVIEW_STORE_PREFIX = "dsh-markdown-editor-typora:review:v1:";
+    function reviewPathKey(path) {
+      return String(path == null ? "" : path).replace(/\\/g, "/").toLowerCase();
+    }
+    function reviewStoreKey(path) {
+      return REVIEW_STORE_PREFIX + encodeURIComponent(reviewPathKey(path));
+    }
+    /** Pure validation for a persisted review record; never trust localStorage. */
+    function normalizeReviewRecord(raw, path, baseVersion) {
+      let value = raw;
+      if (typeof raw === "string") { try { value = JSON.parse(raw); } catch { return null; } }
+      if (!value || typeof value !== "object" || value.v !== 1) return null;
+      if (String(value.pathKey || "") !== reviewPathKey(path)) return null;
+      if (typeof baseVersion !== "string" || !baseVersion || String(value.baseVersion || "") !== baseVersion) return null;
+      if (!Array.isArray(value.groups) || value.groups.length === 0 || value.groups.length > 20) return null;
+      const groups = [];
+      for (const id of value.groups) {
+        if (typeof id !== "string" || !/^[0-9a-f-]{36}$/i.test(id) || groups.includes(id)) return null;
+        groups.push(id);
+      }
+      const count = Number(value.count);
+      if (!Number.isSafeInteger(count) || count < groups.length || count > 100000) return null;
+      const at = Number(value.at);
+      return { v: 1, pathKey: reviewPathKey(path), baseVersion, groups, count, at: Number.isFinite(at) ? at : 0 };
+    }
 
     /** 轮询档位：SSE 健康/页面隐藏/后台 tab 时返回 null（不调度）；断开首档 2s，三次后 6s。 */
     function nextPollDelay(state) {
@@ -3605,6 +3630,7 @@ function normDocs(d) {
 const __test = {
       createDraftStore,
       mergeReviewGroup, reviewUndoGroup, reviewIsMulti, reviewSuppressesSave,
+      reviewPathKey, reviewStoreKey, normalizeReviewRecord,
       normalizeSavedText, shouldAdoptSavedVersion, shouldVerifyExternalEvent, externalDiskVerdict,
       constants: {
         TAB_TYPE_ID: TAB_TYPE_ID,
@@ -5649,6 +5675,7 @@ const __test = {
           // 必须如实标记脏 —— baseVersion/lastVersion 仍指向磁盘版本，绝不能把共享正文
           // 当成"已在盘上"的基线；后续落盘只能走 live 票（房间校验）路径。
           doc.dirty=restore||doc.untitled||(pending.firstOpen&&value.live&&value.live.dirty===true);
+          if (pending.firstOpen || restore) restorePersistedReview();
           if(pending.firstOpen && !doc.untitled) recordRecentDoc({path:doc.absPath,scope:"absolute"},doc.sessionId,doc.workspace);
           doc.conflict=false;doc.externalStale=false;doc.staleNotified=false;
           if(restore)doc.editSeq++;
@@ -5747,6 +5774,7 @@ const __test = {
           showPhase('dirty',doc.composing?'输入中…':'编辑中…');
           if (remoteGroupId && remoteGroupId !== doc.ignoreRemoteGroupId) {
             doc.review = mergeReviewGroup(doc.review, remoteGroupId, Array.isArray(delta.changes) ? delta.changes.length : 1);
+        persistReviewState();
             doc.reviewDiff = null;
             setUi((prev) => ({ ...prev, reviewDiff: null }));
             const multi = reviewIsMulti(doc.review);
@@ -5825,6 +5853,66 @@ const __test = {
           // B1b: non-status feedback is a rail notice; it must never replace
           // or extend the top save acknowledgement.
           post("toast", message);
+        }
+
+        function reviewStorage() {
+          try { return typeof window !== "undefined" ? window.localStorage : null; } catch (e) { return null; }
+        }
+        function clearPersistedReview() {
+          const storage = reviewStorage();
+          if (!storage || !doc.absPath) return;
+          try { storage.removeItem(reviewStoreKey(doc.absPath)); } catch (e) { /* 无存储 */ }
+        }
+        function persistReviewState() {
+          const storage = reviewStorage();
+          if (!storage || !doc.absPath) return;
+          try {
+            if (!doc.review || !Array.isArray(doc.review.groups) || doc.review.groups.length === 0) {
+              storage.removeItem(reviewStoreKey(doc.absPath));
+              return;
+            }
+            if (typeof doc.lastVersion !== "string" || !doc.lastVersion) return;
+            storage.setItem(reviewStoreKey(doc.absPath), JSON.stringify({
+              v: 1,
+              pathKey: reviewPathKey(doc.absPath),
+              baseVersion: doc.lastVersion,
+              groups: doc.review.groups.slice(0, 20),
+              count: Math.max(doc.review.groups.length, Number(doc.review.count) || doc.review.groups.length),
+              at: Date.now(),
+            }));
+          } catch (e) { /* 无存储/配额满：review 仍在内存中 */ }
+        }
+        function restorePersistedReview() {
+          const storage = reviewStorage();
+          if (!storage || !doc.absPath || !doc.dirty) return false;
+          let record = null;
+          try { record = normalizeReviewRecord(storage.getItem(reviewStoreKey(doc.absPath)), doc.absPath, doc.lastVersion); } catch (e) { record = null; }
+          if (!record) {
+            clearPersistedReview();
+            return false;
+          }
+          // Provisional review is installed synchronously, before any autosave
+          // timer can write the AI changes; host validation follows async.
+          doc.review = mergeReviewGroup(null, record.groups[0], record.count - (record.groups.length - 1));
+          for (let i = 1; i < record.groups.length; i += 1) doc.review = mergeReviewGroup(doc.review, record.groups[i], 1);
+          const restoring = record.groups.slice();
+          const multi = reviewIsMulti(doc.review);
+          showPhase("review", "AI 修改了 " + doc.review.count + " 处" + (multi ? "（共 " + doc.review.groups.length + " 组）" : "") + "，保存前请确认");
+          void api("documents.reviewGroups", { path: doc.absPath, groupIds: restoring }).then((result) => {
+            if (!alive() || !doc.review) return;
+            if (!result || result.ok !== true || !Array.isArray(result.value && result.value.groups)) return; // 网络/宿主暂不可用：保留本地状态
+            const valid = new Set((result.value.groups || []).filter((group) => group && !group.undoneAt).map((group) => group.groupId));
+            if (restoring.every((id) => valid.has(id))) return;
+            // Only clear when the provisional groups are still the current set;
+            // a newer AI edit must never be discarded by this validation.
+            if (doc.review.groups.length === restoring.length && doc.review.groups.every((id, i) => id === restoring[i])) {
+              doc.review = null;
+              clearPersistedReview();
+              if (doc.phase === "review") showPhase(doc.dirty ? "dirty" : "ready", "");
+              showNotice("之前的 AI 修改审阅已过期，已取消恢复；当前正文未变");
+            }
+          }).catch(() => { /* 保留；撤销时仍由宿主校验 */ });
+          return true;
         }
 
         function writeRecovery(text, stale) {
@@ -6845,6 +6933,7 @@ const __test = {
               }
               doc.ignoreRemoteGroupId = result.value?.groupId || null;
               doc.review = null;
+              clearPersistedReview();
               doc.reviewDiff = null;
               setUi((prev) => ({ ...prev, reviewDiff: null, railOpen: false }));
               const message = '已撤销本次 AI 修改（' + groupIds.length + ' 组）；磁盘未改变';
@@ -6855,6 +6944,7 @@ const __test = {
           reviewKeep: () => {
             if (!doc.review) return;
             doc.review = null;
+            clearPersistedReview();
             doc.reviewDiff = null;
             doc.ignoreRemoteGroupId = null;
             setUi((prev) => ({ ...prev, reviewDiff: null, railOpen: false }));

@@ -845,7 +845,7 @@ export function createDocumentsService(deps) {
     for (let index = 0; index < ids.length; index += 1) {
       const group = await live.getAgentGroup(canonicalPath, String(ids[index]));
       if (!group) return fail(coded('MP_GROUP_NOT_FOUND', 'agent group is missing'), null);
-      groups.push({ index: index + 1, groupId: group.groupId, at: group.at, kind: group.kind, changes: group.changes || [] });
+      groups.push({ index: index + 1, groupId: group.groupId, at: group.at, kind: group.kind, changes: group.changes || [], undoneAt: group.undoneAt ?? null });
     }
     return { ok: true, value: { groups } };
   }

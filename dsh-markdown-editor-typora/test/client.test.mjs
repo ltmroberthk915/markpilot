@@ -363,3 +363,19 @@ test('保存后 stat 版本变化：正文相同才采纳，正文不同仍冲�
   assert.equal(T.externalDiskVerdict('a\nb', 'a\nb + edit', 'a\nb'), 'own-save');
   assert.equal(T.externalDiskVerdict('external', 'a\nb', 'a\nb'), 'conflict');
 });
+
+test('审阅态持久化：严格校验路径、基准版本、组 ID 和计数', async () => {
+  const { test: T } = await loadClientFactory();
+  const g1 = '11111111-1111-4111-8111-111111111111';
+  const g2 = '22222222-2222-4222-8222-222222222222';
+  const raw = JSON.stringify({ v: 1, pathKey: T.reviewPathKey('D:\\Docs\\A.md'), baseVersion: 'v1', groups: [g1, g2], count: 3, at: 12 });
+  const ok = T.normalizeReviewRecord(raw, 'd:/docs/a.md', 'v1');
+  assert.equal(JSON.stringify(ok), JSON.stringify({ v: 1, pathKey: 'd:/docs/a.md', baseVersion: 'v1', groups: [g1, g2], count: 3, at: 12 }));
+  assert.equal(T.normalizeReviewRecord(raw, 'D:\\Docs\\B.md', 'v1'), null);
+  assert.equal(T.normalizeReviewRecord(raw, 'D:\\Docs\\A.md', 'v2'), null);
+  assert.equal(T.normalizeReviewRecord('not json', 'D:\\Docs\\A.md', 'v1'), null);
+  assert.equal(T.normalizeReviewRecord({ ...JSON.parse(raw), groups: [] }, 'D:\\Docs\\A.md', 'v1'), null);
+  assert.equal(T.normalizeReviewRecord({ ...JSON.parse(raw), groups: [g1, g1] }, 'D:\\Docs\\A.md', 'v1'), null);
+  assert.equal(T.normalizeReviewRecord({ ...JSON.parse(raw), count: 1 }, 'D:\\Docs\\A.md', 'v1'), null);
+  assert.equal(T.reviewStoreKey('D:\\Docs\\A.md'), T.reviewStoreKey('d:/docs/a.md'));
+});
