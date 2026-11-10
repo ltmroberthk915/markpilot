@@ -2,6 +2,8 @@
 
 # MarkPilot · 万可百律
 
+[![开放插件市场](https://img.shields.io/endpoint?url=https%3A%2F%2Fdshopen.org%2Fbadge%2Fdsh-markdown-editor-typora.json)](https://dshopen.org/zh/plugins/dsh-markdown-editor-typora/)
+
 ## MarkPilot for DSH 1.1 · IDE 式 Markdown × AI 工作台
 
 **一边写文档，一边聊 AI，让思路直接变成项目里的 Markdown。** 文件树、编辑器与 AI 对话同屏，整理方案、推敲公式、编写项目文档，都能边写边讨论。

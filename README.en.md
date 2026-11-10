@@ -2,6 +2,8 @@
 
 # MarkPilot
 
+[![开放插件市场](https://img.shields.io/endpoint?url=https%3A%2F%2Fdshopen.org%2Fbadge%2Fdsh-markdown-editor-typora.json)](https://dshopen.org/zh/plugins/dsh-markdown-editor-typora/)
+
 ## MarkPilot for DSH 1.1 · An IDE-style Markdown workspace beside your AI
 
 **Write, discuss and keep the result in your project.** Bring files, Markdown editing and DSH chat together for project docs, research notes and technical writing.

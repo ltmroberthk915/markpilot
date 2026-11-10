@@ -35,3 +35,39 @@
 - 全量测试：342 项，341 通过、1 项 POSIX 跳过、0 失败（更名后按新路由/tab/恢复槽断言）。
 - `node scripts/sync-core.mjs --check`、`node scripts/sync-host.mjs` 均通过。
 - 打包：`dsh-markdown-editor-typora-1.4.0.tgz`（见发布记录哈希）。
+
+## 1.4.0 发布与验证（2026-11-08 13:35–13:45）
+
+- Git main `6b56420`，标签 `dsh-markdown-editor-typora-v1.4.0`（轻量标签）。
+- GitHub Release：https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-editor-typora-v1.4.0 ，资产 `dsh-markdown-editor-typora-1.4.0.tgz`，2,761,504 字节。
+- TGZ SHA-256：`7bed7827a9e269ad93ac4f3d656f5347fd2d3c5c5ece90b6d0316dafbc431bdd`；GitHub asset digest、npm 下载包、本地打包三方一致（worktree 与 D:\BuyKey\markpilot-public 两个 checkout 各自 npm pack 同哈希）。
+- npm：`dsh-markdown-editor-typora@1.4.0` 已发布，latest=1.4.0。首次发布新包名时 npm 先建了一个 `0.0.0-stage` 占位（staged publishing），随后 1.4.0 正常可见；两者同属本账号。
+- 旧包 `dsh-markdown-typora@1.3.1` 已 `npm deprecate`，提示安装新包；旧包不删除。
+- 本机 desktop profile：依赖键、bundles 条目、pnpm-lock 与 node_modules junction 全部从旧名换到 `dsh-markdown-editor-typora`（备份 `D:\BuyKey\dsh-backup-desktop-rename-20261108-133335`）；旧 junction 只指向旧目录，已按目标校验后移除。
+- headless profile 仍是旧的 `dsh-markdown-typora@1.3.1`，待桌面验证通过后升级/替换。
+- 市场文案与 PR 由另一会话负责（用户明确不让我改），本记录不涉及。
+
+## 打包复核
+
+- `package.json` name=`dsh-markdown-editor-typora` version=`1.4.0`，repository.directory/homepage 已指向新目录。
+- 解包复核：`cordis.patch.yml` id/name 均为新名；shipped js 中无旧路由 `/dsh-markdown-typora`、旧 tab `dsh-markdown-typora/editor`、旧恢复槽前缀。
+- `node scripts/sync-core.mjs --check` 通过；`node scripts/sync-host.mjs` → `HOST_SYNC_OK 9 files`。
+
+## 独立对抗验证（子代理）与处置（2026-11-08 13:20–13:45）
+
+子代理在隔离 harness（真实 HTTP + 真实文件系统 + 临时 LOCALAPPDATA 的 rooms.sqlite）自建 48 个对抗用例，结论：**未能证伪核心刷新修复**（48/48 通过；官方 external-refresh 9/9；仓库 342 项 341 pass / 1 skip）。核心链路 SSE → host refresh → 房间 adopt → exchange delta → 正文，在写类型、大文件、Unicode/路径别名、冲突、双窗口、双外部写者下自洽。
+
+### 已按报告处置
+
+- **R1（编辑中误采纳）**：`refreshLiveRoom()` 在非 discard 路径先检查 `doc.dirty / doc.conflict / doc.saving`，命中就只弹冲突横幅、不自动采纳。
+- **R2（失败静默）**：refresh 失败改为冲突横幅（带错误码），不再 `return null` 静默；外部删除/编码错误可见。
+- **R3（瞬时冲突不重试）**：`MP_FILE_CONFLICT / MP_FILE_MISSING / MP_FILE_BUSY` 有界重试（最多 2 次，300/600ms）。
+- **R5（成功后 phase 不重置）**：refresh 成功且无脏草稿时，若仍停在 conflict 则回到 ready。
+- **R-extra（官方测试碰真实数据库）**：`test/external-refresh.test.mjs` 改为给 `createHost` 传临时目录的 `LiveDocuments`，结束 `retireLiveStorage()` 并删临时目录；跑测试不再 sweep 用户真实 `%LOCALAPPDATA%\.markpilot\live-v1`（已核对真实 rooms.sqlite 的 mtime 不再变化）。
+
+### 记录在案、暂不改动
+
+- **R4（banner 的「重载磁盘版本」走 forceReload 而非 refresh(discard)）**：现有 forceReload（leave→以磁盘重载）经子代理 15/15 并发用例验证可用；`refresh(discard)` 的宿主路径也已由 C1/C2 验证。UI 改走 discard 会改变“关房间/丢房间草稿”的语义，留到 1.4.1 在真实浏览器复验后处理，避免在改名发版这一版引入新的编辑期风险。
+- **R6（无浏览器级验证）**：`post("live-refresh")` 是 fire-and-forget，facade 重基只能在真实 DSH 窗口验证——由用户重启后实测。
+- **R7（无跨 OS 进程/UNC/慢盘/>2MB/MP_SAVE_BUSY 覆盖）**：同进程双 host + SQLite/WAL 已验证；跨进程与极端 IO 属后续测试扩展。
+- **R8（Windows 句柄语义）**：目标被打开时 rename 返回 EPERM，是 Windows 行为，不是插件缺陷。
