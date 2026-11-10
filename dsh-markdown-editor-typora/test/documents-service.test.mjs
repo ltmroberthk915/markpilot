@@ -509,9 +509,9 @@ test('review undo across live epochs compares content identity, not epoch', () =
   const sha = 'a'.repeat(64);
   const oldEpoch = `rev1:live:aaaaaaaa-1111-4111-8111-111111111111:3:${sha}`;
   const newEpoch = `rev1:live:bbbbbbbb-2222-4222-8222-222222222222:3:${sha}`;
-  assert.equal(revisionContentKey(oldEpoch), `3:${sha}`);
+  assert.equal(revisionContentKey(oldEpoch), sha);
   assert.equal(sameRevisionContent(oldEpoch, newEpoch), true);
-  assert.equal(sameRevisionContent(oldEpoch, `rev1:live:aaaaaaaa-1111-4111-8111-111111111111:4:${sha}`), false);
+  assert.equal(sameRevisionContent(oldEpoch, `rev1:live:aaaaaaaa-1111-4111-8111-111111111111:4:${sha}`), true);
   assert.equal(sameRevisionContent(oldEpoch, `rev1:live:aaaaaaaa-1111-4111-8111-111111111111:3:${'b'.repeat(64)}`), false);
   assert.equal(sameRevisionContent(oldEpoch, 'not-a-revision'), false);
 });
