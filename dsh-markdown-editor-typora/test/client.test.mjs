@@ -350,9 +350,13 @@ test('审阅状态：多组累积、只撤最近一组、审阅中禁止保存',
 test('保存后 stat 版本变化：正文相同才采纳，正文不同仍冲突', async () => {
   const { test: T } = await loadClientFactory();
   const opened = { ok: true, value: { version: 'v2', text: '\uFEFFa\r\nb\r\n' } };
-  assert.equal(T.shouldAdoptSavedVersion(opened, 'v2', 'a\nb\n'), true);
-  assert.equal(T.shouldAdoptSavedVersion(opened, 'v3', 'a\nb\n'), false);
-  assert.equal(T.shouldAdoptSavedVersion({ ok: true, value: { version: 'v2', text: 'different' } }, 'v2', 'a\nb\n'), false);
-  assert.equal(T.shouldAdoptSavedVersion({ ok: false }, 'v2', 'a\nb\n'), false);
+  assert.equal(T.shouldAdoptSavedVersion(opened, 'a\nb\n'), true);
+  assert.equal(T.shouldAdoptSavedVersion({ ok: true, value: { version: 'v3', text: 'a\nb\n' } }, 'a\nb\n'), true);
+  assert.equal(T.shouldAdoptSavedVersion({ ok: true, value: { version: 'v2', text: 'different' } }, 'a\nb\n'), false);
+  assert.equal(T.shouldAdoptSavedVersion({ ok: false }, 'a\nb\n'), false);
   assert.equal(T.normalizeSavedText('\uFEFFx\r\ny'), 'x\ny');
+  assert.equal(T.shouldIgnoreExternalEvent({ saving: true }, 999999), true);
+  assert.equal(T.shouldIgnoreExternalEvent({ savedAt: 1000 }, 1500), true);
+  assert.equal(T.shouldIgnoreExternalEvent({ savedAt: 1000 }, 3000), false);
+  assert.equal(T.shouldIgnoreExternalEvent({}, 3000), false);
 });

@@ -41,6 +41,7 @@ window.__ModuleLoader__.load({
     const API_BASE = "/dsh-markdown-editor-typora/api/";
     const FRAME_SRC = "/dsh-markdown-editor-typora/renderer-cm6/index.html";
     const SAVE_DEBOUNCE_MS = 1500;   // 与桌面壳 _autoSaveTimer 同拍
+  const SAVE_RECONCILE_GRACE_MS = 1200; // 保存成功后忽略自身写入触发的 mtime/ctime 事件
     const PULL_TIMEOUT_MS = 2000;    // requestText 超时：超时就不保存，绝不拿旧缓存盖新内容
     const FLUSH_WAIT_MS = 120;       // 关闭后接收已排队输入消息的宽限期
     const RECOVERY_PREFIX = "dsh-markdown-editor-typora:recovery:";
@@ -654,10 +655,15 @@ function applyMirrorDelta(mirror,event){
     // A post-save stat version can differ merely because the provider's version
     // string includes ctime/mtime nanoseconds. Only keep the conflict when the
     // disk text really differs from the text we just saved.
-    function shouldAdoptSavedVersion(opened, statVersion, savedText) {
+    function shouldAdoptSavedVersion(opened, savedText) {
       return !!(opened && opened.ok === true && opened.value
-        && String(opened.value.version) === String(statVersion)
+        && typeof opened.value.version === 'string' && opened.value.version
         && normalizeSavedText(opened.value.text) === normalizeSavedText(savedText));
+    }
+    function shouldIgnoreExternalEvent(state, now) {
+      const s = state || {};
+      const at = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+      return !!(s.saving || (s.savedAt && at - Number(s.savedAt) < SAVE_RECONCILE_GRACE_MS));
     }
 
     // Pure review-state helpers: shared by the editor and the portable client tests.
@@ -3593,7 +3599,7 @@ function normDocs(d) {
 const __test = {
       createDraftStore,
       mergeReviewGroup, reviewUndoGroup, reviewIsMulti, reviewSuppressesSave,
-      normalizeSavedText, shouldAdoptSavedVersion,
+      normalizeSavedText, shouldAdoptSavedVersion, shouldIgnoreExternalEvent,
       constants: {
         TAB_TYPE_ID: TAB_TYPE_ID,
         FILE_ADDRESS_PREFIX: FILE_ADDRESS_PREFIX,
@@ -5263,7 +5269,7 @@ const __test = {
           live: null, liveUnsupported: false, liveFlushSeq: 0, liveFlushWaiters: new Map(), liveStatus: null,
           liveStaleRounds: 0, liveStaleBlocked: false,
           liveRecoveredShownFor: null, liveRecoveredItems: null,
-          review: null, remoteGroups: null, ignoreRemoteGroupId: null,
+          review: null, remoteGroups: null, ignoreRemoteGroupId: null, savedAt: 0,
           es: null,
           esHealthy: false,
           pollTimer: null,
@@ -5981,6 +5987,7 @@ const __test = {
               if (!alive()) return;
               if (result.ok === true) {
                 doc.lastVersion = result.value.version;
+                doc.savedAt = Date.now();
                 if (doc.live) doc.live = applyLiveReceipt(doc.live, result.value);
                 let recoveryClean = false;
                 try {
@@ -6021,7 +6028,7 @@ const __test = {
                       let adopted = false;
                       try {
                         const opened = await api("open", { path: doc.absPath, live: false });
-                        if (alive() && shouldAdoptSavedVersion(opened, stat.value.version, pulled.text)) {
+                        if (alive() && shouldAdoptSavedVersion(opened, pulled.text)) {
                           doc.lastVersion = String(opened.value.version);
                           doc.externalStale = false;
                           doc.conflict = false;
@@ -6252,6 +6259,11 @@ const __test = {
           try { data = JSON.parse(event.data) || {}; } catch (e) { data = {}; }
           if (data.path && doc.absPath && !samePath(data.path, doc.absPath)) return;
           if (!doc.opened) return; // 握手/首次 open 之前的事件没有落点（boot 自己会读磁盘）
+          // Our own save changes mtime/ctime and can emit a watch event before
+          // the post-save stat reconciliation has adopted the new version.
+          // Never turn that self-event into a conflict; the save path will
+          // compare the disk text and decide.
+          if (shouldIgnoreExternalEvent(doc, Date.now())) return;
           // live 会话：磁盘事件的采纳权在共享房间（external 写入会被 adopt 成房间更新），
           // 这里只催一次 refresh，绝不 loadFromDisk 覆盖共享草稿。
           if (doc.live) { void refreshLiveRoom(); return; }
