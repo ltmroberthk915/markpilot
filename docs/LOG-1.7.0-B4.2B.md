@@ -29,7 +29,7 @@ AI 修改 buffer 后：
 - 只 review **live buffer** 的 AI 编辑；磁盘权威编辑不进入（已落盘，没有“审阅前不保存”语义）。
 - review 期间不自动保存；用户继续编辑仍保留 review，Ctrl+S 被拦截。
 - 撤销只允许最新未撤销组；当前 revision/文本不匹配时拒绝。
-- `查看差异` 使用 rail 面板显示红/绿 `- 旧 / + 新`，最多 12 处、每处 1500 字符；真机已确认显示“修改 1（替换 48 字符）”及新旧文本。
+- `查看差异` 使用 rail 面板显示红/绿 `- 旧 / + 新`，最多 12 处、每处 1500 字符；多组时通过 `documents.reviewGroups` 一次显示全部组，行首标“第 N 组”。真机已确认单组显示；多组由 `B4.2B-API2` 覆盖。
 - 未改 core/renderer；无需 coreHash 变更。
 
 ## 4. 测试
@@ -40,7 +40,7 @@ tests 446, pass 445, fail 0, skipped 1
 ```
 
 - `B4.2B-R1`：append 的 `groupId` 进入 exchange updates。
-- `B4.2B-API1`：受信任 UI 可 `reviewGroup` + `undoGroup`，正文恢复。\n- `B4.2B-API2`：两组连续 review 一次 `undoGroups` 全量恢复，两个组都标记 `undoneAt`。
+- `B4.2B-API1`：受信任 UI 可 `reviewGroup` + `undoGroup`，正文恢复。\n- `B4.2B-API2`：两组连续 review 一次 `undoGroups` 全量恢复，两个组都标记 `undoneAt`；同一夹具验证 `reviewGroups` 返回两组差异。
 - 真机：
   - README 打开，AI 追加 `B4.2B-REVIEW-PROBE`；
   - 等 3 秒，磁盘 hash 仍为 `835bff35…`、7825 B，未自动保存；
