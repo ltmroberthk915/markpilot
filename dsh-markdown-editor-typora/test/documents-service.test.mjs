@@ -6,6 +6,7 @@ import {
   createDocumentsService, parseRevisionId, makeLiveRevisionId, makeDiskRevisionId,
   sha256Text, normalizeCompare, isCanonicalUnder, replaceExact,
   parseDocumentBlocks, findDocumentBlock, merge3Text,
+  revisionContentKey, sameRevisionContent,
 } from '../lib/documents-service.js';
 
 function makeWorld(options = {}) {
@@ -502,4 +503,15 @@ test('B4.3b-S2 merge3 service writes only a clean merge and never writes conflic
   assert.equal(conflict.ok, true, JSON.stringify(conflict));
   assert.equal(conflict.value.clean, false);
   assert.equal(conflictWorld.calls.append.length, 0);
+});
+
+test('review undo across live epochs compares content identity, not epoch', () => {
+  const sha = 'a'.repeat(64);
+  const oldEpoch = `rev1:live:aaaaaaaa-1111-4111-8111-111111111111:3:${sha}`;
+  const newEpoch = `rev1:live:bbbbbbbb-2222-4222-8222-222222222222:3:${sha}`;
+  assert.equal(revisionContentKey(oldEpoch), `3:${sha}`);
+  assert.equal(sameRevisionContent(oldEpoch, newEpoch), true);
+  assert.equal(sameRevisionContent(oldEpoch, `rev1:live:aaaaaaaa-1111-4111-8111-111111111111:4:${sha}`), false);
+  assert.equal(sameRevisionContent(oldEpoch, `rev1:live:aaaaaaaa-1111-4111-8111-111111111111:3:${'b'.repeat(64)}`), false);
+  assert.equal(sameRevisionContent(oldEpoch, 'not-a-revision'), false);
 });
