@@ -111,9 +111,9 @@ B3.1 的 buffer 编辑已有 `agent-before` 归档（改前文本），但有两
 | 恢复副本写失败/回读不一致 | `MP_RECOVERY_FAILED`，不提交 append |
 | 正文 >64MiB | `MP_RECOVERY_TOO_LARGE`，不提交 |
 | 事务 stale | 删除本次创建的副本，返回 `MP_DOC_STALE`（保留原 currentRevision） |
-| 副本写入后、COMMIT 前进程死亡 | `committed:false`，join/state 不提示；房间日志仍是真源 |
-| COMMIT 后、committed 标记前死亡 | append 已提交；副本不可见，房间日志/leave 保护仍在 |
-| sidecar 被外部截断/破坏 | 副本文件保留但不再被列出（P2，已知；不自动删除） |
+| 副本写入后、COMMIT 前进程死亡 | 行随事务回滚；join/state 不提示（文件为无行孤儿） |
+| COMMIT 后进程死亡 | 行已提交；fsync 成功的副本可被列出 |
+| sidecar 被外部截断/破坏 | 权威索引在 `append_recovery` 表，sidecar 只供人工查看；不影响列出（P2） |
 | 清理失败 | 只 warn，不影响主操作 |
 | sidecar 损坏 | 不删除、不列入 state/recovered |
 | 旧 EXE 删房 | 已提交副本仍在；下次 join 若磁盘不含该 sha 则提示 |
