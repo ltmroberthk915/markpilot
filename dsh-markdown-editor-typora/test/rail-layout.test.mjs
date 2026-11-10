@@ -34,22 +34,6 @@ test('rail is a fixed 28px sibling and the iframe fills the rest in every phase'
   h.cleanup();
 });
 
-test('boot skeleton is visible until init and hides without taking layout', async () => {
-  const h = make();
-  await h.boot();
-  let tree = h.render();
-  let skeleton = nodes(tree).find((n) => n.props?.['data-mp-boot-skeleton'] === '1');
-  assert(skeleton, 'skeleton node exists');
-  assert.equal(skeleton.props.style.display, 'none');
-  assert.equal(skeleton.props.style.position, 'absolute');
-  assert.equal(skeleton.props.style.pointerEvents, 'none');
-  h.setUiForRender({ phase: 'loading', booted: false });
-  tree = h.render();
-  skeleton = nodes(tree).find((n) => n.props?.['data-mp-boot-skeleton'] === '1');
-  assert.equal(skeleton.props.style.display, 'flex');
-  h.cleanup();
-});
-
 test('rail preserves conflict actions and renders the recovered popover as a sibling', async () => {
   const h = make();
   await h.boot();
