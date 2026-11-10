@@ -775,10 +775,12 @@ class LiveDocuments {
         throw fault('MP_RECOVERY_INVALID', '恢复索引不属于本宿主');
       const row = db.prepare('SELECT recoveryPath FROM append_recovery WHERE source=? AND recoveryPath=?').get(key, resolved);
       if (!row) throw fault('MP_RECOVERY_NOT_FOUND', '恢复副本已不存在');
+      // Remove the payload first: if the file is locked, keep the index row and
+      // report failure instead of claiming a discard that leaves an inert file.
+      fs.rmSync(resolved, {force: true});
+      try { fs.rmSync(resolved + '.json', {force: true}); } catch { /* best effort */ }
       db.prepare('DELETE FROM append_recovery WHERE source=? AND recoveryPath=?').run(key, resolved);
     } finally { db.close(); }
-    try { fs.rmSync(resolved, {force: true}); } catch { /* locked: row is already gone, file is inert */ }
-    try { fs.rmSync(resolved + '.json', {force: true}); } catch { /* best effort */ }
     return {removed: true, recoveryPath: resolved};
   }
   // B3: append one authoritative remote edit to the shared buffer. Never

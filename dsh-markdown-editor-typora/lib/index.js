@@ -1591,7 +1591,7 @@ export function createHost(options = {}) {
         case 'documents.recover':
           return await documents.recover(payload, invocation, invocation?.policy);
         case 'documents.discardRecovery':
-          return await documents.discardRecovery(payload, invocation);
+          return await documents.discardRecovery(payload, invocation, invocation?.policy);
         case 'docs/create': return await apiDocsCreate(payload);
         case 'docs/recent': return await apiDocsRecent(payload);
         case 'docs/archive':

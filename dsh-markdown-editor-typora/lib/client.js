@@ -6665,11 +6665,15 @@ const __test = {
                 showNotice('恢复失败：' + String(result?.error?.message || result?.error?.code || 'unknown'));
                 return;
               }
-              removeLiveRecovered(index, result.value?.saved === false ? '已恢复到编辑器缓冲区，请审阅后保存' : '已恢复到文件');
+              removeLiveRecovered(index, result.value?.saved === false ? '已请求恢复到编辑器缓冲区，请确认编辑器内容后保存' : '已恢复到文件');
               if (result.value?.saved === true) {
                 if (doc.live) stopLive(true);
                 showPhase('loading', '');
                 void loadFromDisk({ silent: false });
+              } else {
+                // The buffer append is delivered through the live exchange; pull
+                // a snapshot once so the UI does not claim a state it has not seen.
+                setTimeout(() => { if (alive() && !doc.dead) void requestSnapshot('apply'); }, 350);
               }
             }).catch((error) => showNotice('恢复失败：' + String(error && error.message ? error.message : error)));
           },

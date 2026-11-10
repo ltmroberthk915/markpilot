@@ -46,7 +46,7 @@
 
 ```text
 npm test
-tests 429, pass 428, fail 0, skipped 1
+tests 430, pass 429, fail 0, skipped 1
 ```
 
 - `B3.3-S1/S2/S3`：buffer 恢复、脏 buffer/旧 token 拒绝、丢弃。
@@ -57,3 +57,14 @@ tests 429, pass 428, fail 0, skipped 1
 
 - 真机：打开文档 → AI 改 → 删房 → 重开横幅 → 点恢复/丢弃 → 验证编辑器、磁盘、token。
 - 未做：自动恢复、diff3、untitled/liveUnsupported 宿主草稿（B3.3b）。
+
+## 6. 对抗修正
+
+`.mp-verify/b3.3a/ADVERSARIAL.md` 的 1 个 P0 + 5 个 P1：
+
+- **P0**：客户端 `doc.lastVersion` 是 provider/disk 版本，不是 `rev1:` token。recover 增加“clean 文档接受 providerVersion”的兼容分支；`B3-API8` 直接用 `baseVersion:'v0'` 复现客户端路径。
+- **P1**：`discardRecovery` 增加与 recover 相同的 `checkWritePolicy`；新增只读沙箱用例。
+- **P1**：buffer 恢复后 UI 不再只说“已恢复”，改为“已请求恢复到编辑器缓冲区”，并主动拉一次 snapshot 核对。
+- **P1**：pre-recovery 归档先于 CAS 失败会留档（用户副本，保留不删，已登记）。
+- **P1**：external 分支的编辑器广播/关窗时序未做真实并发夹；留作真机回归。
+- **P1**：discard 改为先删文件、成功后再删 DB 行，避免“UI 说丢弃成功但盘上仍有不可索引文件”。

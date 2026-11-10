@@ -535,11 +535,14 @@ export function createDocumentsService(deps) {
     return { ok: false, error: value };
   }
 
-  async function discardRecovery(payload) {
+  async function discardRecovery(payload, invocation, policy) {
     if (typeof live.discardAppendRecovery !== 'function')
       return fail(coded('MP_RECOVERY_NOT_FOUND', 'recovery discard is unavailable'), null);
     try {
-      const result = await live.discardAppendRecovery(payload?.path, payload?.recoveryPath);
+      const target = await resolve(payload, invocation);
+      const canonicalPath = await canonical(target);
+      await checkWritePolicy({ canonical: canonicalPath }, policy);
+      const result = await live.discardAppendRecovery(canonicalPath, payload?.recoveryPath);
       return { ok: true, value: { removed: result?.removed === true, recoveryPath: result?.recoveryPath || payload?.recoveryPath } };
     } catch (error) { return fail(error, null); }
   }

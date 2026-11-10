@@ -281,7 +281,9 @@ test('B3-API8 UI recovery restores an append copy through disk CAS and discard r
     const read = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
     assert.equal(read.value.source, 'disk');
     const restored = await host.dispatch('documents.recover', {
-      path: w.file, recoveryPath: appended.recoveryPath, baseVersion: read.value.version,
+      // This is the raw provider/disk version the editor tab stores in
+      // doc.lastVersion, not the rev1 token returned by documents.read.
+      path: w.file, recoveryPath: appended.recoveryPath, baseVersion: 'v0',
     });
     assert.equal(restored.ok, true, JSON.stringify(restored));
     assert.equal(restored.value.recovered, true);

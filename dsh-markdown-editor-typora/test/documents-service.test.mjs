@@ -382,8 +382,16 @@ test('B3.3-S2 recover refuses dirty buffers, stale tokens, and invalid recovery 
 
 test('B3.3-S3 discard removes exactly the requested recovery row through the live store', async () => {
   const w = makeWorld();
-  const result = await w.service.discardRecovery({ path: w.file, recoveryPath: 'C:/recovery/copy.md' }, {});
+  const result = await w.service.discardRecovery({ path: w.file, recoveryPath: 'C:/recovery/copy.md' }, {}, undefined);
   assert.equal(result.ok, true);
   assert.equal(result.value.removed, true);
   assert.equal(w.calls.discard, 1);
+});
+
+test('B3.3-S4 discard respects the same sandbox policy as recovery writes', async () => {
+  const w = makeWorld({ sandboxMode: 'read-only' });
+  const result = await w.service.discardRecovery({ path: w.file, recoveryPath: 'C:/recovery/copy.md' }, {}, { mode: 'read-only' });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, 'FS_SANDBOX_DENIED');
+  assert.equal(w.calls.discard, undefined);
 });
