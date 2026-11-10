@@ -660,10 +660,16 @@ function applyMirrorDelta(mirror,event){
         && typeof opened.value.version === 'string' && opened.value.version
         && normalizeSavedText(opened.value.text) === normalizeSavedText(savedText));
     }
-    function shouldIgnoreExternalEvent(state, now) {
+    function shouldVerifyExternalEvent(state, now) {
       const s = state || {};
       const at = Number.isFinite(Number(now)) ? Number(now) : Date.now();
-      return !!(s.saving || (s.savedAt && at - Number(s.savedAt) < SAVE_RECONCILE_GRACE_MS));
+      return !!(s.dirty && s.savedAt && at - Number(s.savedAt) < SAVE_RECONCILE_GRACE_MS);
+    }
+    function externalDiskVerdict(diskText, currentText, lastSavedText) {
+      const disk = normalizeSavedText(diskText);
+      if (disk === normalizeSavedText(currentText)) return 'same';
+      if (lastSavedText && disk === normalizeSavedText(lastSavedText)) return 'own-save';
+      return 'conflict';
     }
 
     // Pure review-state helpers: shared by the editor and the portable client tests.
@@ -3599,7 +3605,7 @@ function normDocs(d) {
 const __test = {
       createDraftStore,
       mergeReviewGroup, reviewUndoGroup, reviewIsMulti, reviewSuppressesSave,
-      normalizeSavedText, shouldAdoptSavedVersion, shouldIgnoreExternalEvent,
+      normalizeSavedText, shouldAdoptSavedVersion, shouldVerifyExternalEvent, externalDiskVerdict,
       constants: {
         TAB_TYPE_ID: TAB_TYPE_ID,
         FILE_ADDRESS_PREFIX: FILE_ADDRESS_PREFIX,
@@ -5269,7 +5275,7 @@ const __test = {
           live: null, liveUnsupported: false, liveFlushSeq: 0, liveFlushWaiters: new Map(), liveStatus: null,
           liveStaleRounds: 0, liveStaleBlocked: false,
           liveRecoveredShownFor: null, liveRecoveredItems: null,
-          review: null, remoteGroups: null, ignoreRemoteGroupId: null, savedAt: 0,
+          review: null, remoteGroups: null, ignoreRemoteGroupId: null, savedAt: 0, lastSavedText: "", externalVerifyTimer: null,
           es: null,
           esHealthy: false,
           pollTimer: null,
@@ -5636,6 +5642,7 @@ const __test = {
         function commitApplied(pending,reply,snapshot) {
           const value=pending.value,restore=pending.kind==='restore';
           doc.opened=true;doc.text=value.text;doc.textFresh=true;doc.lastVersion=value.version;
+          doc.lastSavedText=value.text;
           doc.displayPath=value.displayPath||doc.absPath;doc.size=value.size;
           doc.mirror=mirrorOf(value.text,reply.session,doc.token);doc.composing=false;
           // 共享房间的未存草稿不是磁盘状态：open 带回的正文若与磁盘种子不同（value.live.dirty），
@@ -5988,6 +5995,7 @@ const __test = {
               if (result.ok === true) {
                 doc.lastVersion = result.value.version;
                 doc.savedAt = Date.now();
+                doc.lastSavedText = pulled.text;
                 if (doc.live) doc.live = applyLiveReceipt(doc.live, result.value);
                 let recoveryClean = false;
                 try {
@@ -6254,19 +6262,57 @@ const __test = {
           }
         }
 
+        function scheduleExternalVerify() {
+          if (doc.externalVerifyTimer) clearTimeout(doc.externalVerifyTimer);
+          doc.externalVerifyTimer = setTimeout(() => {
+            doc.externalVerifyTimer = null;
+            void verifyExternalVersion();
+          }, 60);
+        }
+        async function verifyExternalVersion() {
+          if (!alive() || !doc.opened || doc.saving || doc.dead) return;
+          let opened;
+          try { opened = await api("open", { path: doc.absPath, live: false }); }
+          catch (e) { opened = null; }
+          if (!alive()) return;
+          if (!opened || opened.ok !== true || !opened.value) {
+            doc.externalStale = true;
+            if (doc.dirty || doc.conflict) showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
+            return;
+          }
+          const diskVersion = String(opened.value.version || "");
+          if (diskVersion && diskVersion === String(doc.lastVersion)) {
+            doc.externalStale = false;
+            return;
+          }
+          const diskText = normalizeSavedText(opened.value.text);
+          const currentText = doc.mirror?.continuous ? normalizeSavedText(materialize(doc.mirror)) : normalizeSavedText(doc.text);
+          const savedText = normalizeSavedText(doc.lastSavedText || "");
+          const verdict = externalDiskVerdict(diskText, currentText, savedText);
+          if (verdict !== "conflict") {
+            if (diskVersion) doc.lastVersion = diskVersion;
+            doc.externalStale = false;
+            doc.conflict = false;
+            if (doc.review) showPhase("review", "AI 修改了 " + doc.review.count + " 处，保存前请确认");
+            else if (doc.phase === "conflict") showPhase(doc.dirty ? "dirty" : "ready", "");
+            return;
+          }
+          doc.externalStale = true;
+          if (doc.dirty || doc.conflict) showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
+        }
         function onExternalEvent(event) {
           let data = {};
           try { data = JSON.parse(event.data) || {}; } catch (e) { data = {}; }
           if (data.path && doc.absPath && !samePath(data.path, doc.absPath)) return;
           if (!doc.opened) return; // 握手/首次 open 之前的事件没有落点（boot 自己会读磁盘）
-          // Our own save changes mtime/ctime and can emit a watch event before
-          // the post-save stat reconciliation has adopted the new version.
-          // Never turn that self-event into a conflict; the save path will
-          // compare the disk text and decide.
-          if (shouldIgnoreExternalEvent(doc, Date.now())) return;
+          // Our own save can emit a watch event while the editor still has
+          // unsaved edits. Defer that event and verify the disk text before
+          // turning it into a conflict; real external edits still conflict.
+          if (doc.saving) return;
           // live 会话：磁盘事件的采纳权在共享房间（external 写入会被 adopt 成房间更新），
           // 这里只催一次 refresh，绝不 loadFromDisk 覆盖共享草稿。
           if (doc.live) { void refreshLiveRoom(); return; }
+          if (shouldVerifyExternalEvent(doc, Date.now())) { scheduleExternalVerify(); return; }
           const version = data.version == null ? "" : String(data.version);
           const accepted = shouldAcceptExternal({
             dirty: doc.dirty,
@@ -6922,6 +6968,7 @@ const __test = {
           // 补一张 leave（幂等）兜底 iframe 已删的情形 —— 租约不落盘、不残留。
           try { stopLive(true); } catch (e) { /* 关闭路径不再抛 */ }
           if (doc.saveTimer) { clearTimeout(doc.saveTimer); doc.saveTimer = null; }
+          if (doc.externalVerifyTimer) { clearTimeout(doc.externalVerifyTimer); doc.externalVerifyTimer = null; }
           if (doc.pendingApply) { clearTimeout(doc.pendingApply.timer); doc.pendingApply.resolve?.(false); doc.pendingApply.resolve=null; }
           if (doc.pollTimer) { clearTimeout(doc.pollTimer); doc.pollTimer = null; }
           // A pending close flush owns its deadline after React unmount. Its

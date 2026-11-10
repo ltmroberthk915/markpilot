@@ -355,8 +355,11 @@ test('保存后 stat 版本变化：正文相同才采纳，正文不同仍冲�
   assert.equal(T.shouldAdoptSavedVersion({ ok: true, value: { version: 'v2', text: 'different' } }, 'a\nb\n'), false);
   assert.equal(T.shouldAdoptSavedVersion({ ok: false }, 'a\nb\n'), false);
   assert.equal(T.normalizeSavedText('\uFEFFx\r\ny'), 'x\ny');
-  assert.equal(T.shouldIgnoreExternalEvent({ saving: true }, 999999), true);
-  assert.equal(T.shouldIgnoreExternalEvent({ savedAt: 1000 }, 1500), true);
-  assert.equal(T.shouldIgnoreExternalEvent({ savedAt: 1000 }, 3000), false);
-  assert.equal(T.shouldIgnoreExternalEvent({}, 3000), false);
+  assert.equal(T.shouldVerifyExternalEvent({ dirty: true, savedAt: 1000 }, 1500), true);
+  assert.equal(T.shouldVerifyExternalEvent({ dirty: true, savedAt: 1000 }, 3000), false);
+  assert.equal(T.shouldVerifyExternalEvent({ dirty: false, savedAt: 1000 }, 1500), false);
+  assert.equal(T.shouldVerifyExternalEvent({}, 3000), false);
+  assert.equal(T.externalDiskVerdict('a\nb', 'a\nb', 'saved'), 'same');
+  assert.equal(T.externalDiskVerdict('a\nb', 'a\nb + edit', 'a\nb'), 'own-save');
+  assert.equal(T.externalDiskVerdict('external', 'a\nb', 'a\nb'), 'conflict');
 });
