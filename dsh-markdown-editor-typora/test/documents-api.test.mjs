@@ -403,6 +403,33 @@ test('B4.2B-API1 trusted UI can review and undo an AI group without model author
   } finally { w.restore(); }
 });
 
+test('B4.2B-API2 multi-group review undo restores the whole sequence', async () => {
+  const w = await makeWorld('review-multi', 'one\ntwo\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    await liveDocs.join(w.file, 'one\ntwo\n');
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const firstRead = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    const first = await host.dispatch('documents.applyEdits', {
+      path: w.file, baseRevisionId: firstRead.value.version, oldString: 'one', newString: 'ONE',
+    }, MODEL_TOOL, execution(w.root));
+    assert.equal(first.ok, true, JSON.stringify(first));
+    const secondRead = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    const second = await host.dispatch('documents.applyEdits', {
+      path: w.file, baseRevisionId: secondRead.value.version, oldString: 'two', newString: 'TWO',
+    }, MODEL_TOOL, execution(w.root));
+    assert.equal(second.ok, true, JSON.stringify(second));
+    const undone = await host.dispatch('documents.undoGroups', { path: w.file, groupIds: [first.value.groupId, second.value.groupId] });
+    assert.equal(undone.ok, true, JSON.stringify(undone));
+    const after = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(after.value.text, 'one\ntwo\n');
+    const groups = await liveDocs.listAgentGroups(w.file, 20);
+    assert.equal(groups.find((g) => g.groupId === first.value.groupId)?.undoneAt > 0, true);
+    assert.equal(groups.find((g) => g.groupId === second.value.groupId)?.undoneAt > 0, true);
+    host.close();
+  } finally { w.restore(); }
+});
+
 test('B3-API8 UI recovery restores an append copy through disk CAS and discard removes it', async () => {  const w = await makeWorld('recover', 'hello\n');
   try {
     const liveDocs = new LiveDocuments({ directory: w.live });

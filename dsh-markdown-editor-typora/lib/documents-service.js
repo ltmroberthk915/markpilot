@@ -833,6 +833,55 @@ export function createDocumentsService(deps) {
     } };
   }
 
+  async function undoGroups(payload, invocation, policy) {
+    let a;
+    try { a = await authority(payload, invocation); }
+    catch (error) { return fail(error, null); }
+    if (a.error) return a.error;
+    if (typeof live.getAgentGroup !== 'function' || typeof live.markAgentGroupUndone !== 'function')
+      return fail(coded('MP_GROUP_NOT_FOUND', 'agent group audit is unavailable'), a);
+    const groupIds = Array.isArray(payload?.groupIds) ? payload.groupIds.slice(0, 20) : [];
+    if (groupIds.length === 0 || groupIds.some((id) => !/^[0-9a-f-]{36}$/i.test(String(id))))
+      return fail(coded('MP_GROUP_NOT_FOUND', 'groupIds is invalid'), a);
+    const groups = [];
+    for (const groupId of groupIds) {
+      let group;
+      try { group = await live.getAgentGroup(a.canonical, String(groupId)); }
+      catch (error) { return fail(error, a); }
+      if (!group || group.undoneAt) return fail(coded('MP_GROUP_NOT_FOUND', 'agent group is already undone or missing'), a);
+      groups.push(group);
+    }
+    for (let i = 1; i < groups.length; i += 1) {
+      if (groups[i].baseRevision !== groups[i - 1].resultRevision)
+        return fail(coded('MP_GROUP_STALE', 'agent groups are not a contiguous edit sequence'), a);
+    }
+    if (groups[groups.length - 1].resultRevision !== a.revisionId) return fail(stale(a), a);
+    let text = a.text;
+    for (let i = groups.length - 1; i >= 0; i -= 1) {
+      const group = groups[i];
+      if (!Array.isArray(group.changes) || group.changes.length === 0)
+        return fail(coded('MP_GROUP_STALE', 'agent group has no inverse changes'), a);
+      const inverse = [];
+      for (const change of group.changes) {
+        const from = Number(change.from), to = Number(change.to);
+        const inserted = String(change.insert ?? ''), removed = String(change.removed ?? '');
+        if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || to < from
+          || text.slice(from, from + inserted.length) !== inserted)
+          return fail(coded('MP_GROUP_STALE', 'document no longer matches this edit group'), a);
+        inverse.push({ from, to: from + inserted.length, insert: removed });
+      }
+      inverse.sort((x, y) => x.from - y.from);
+      text = applyChanges(text, inverse);
+    }
+    if (text === a.text) return { ok: true, value: { changed: false, source: a.source, version: a.revisionId, undoOf: groupIds } };
+    const result = await applyEdits({ path: payload.path, cwd: payload.cwd, edits: [{ from: 0, to: a.text.length, insert: text }], baseRevisionId: a.revisionId }, invocation, policy);
+    if (!result || result.ok !== true) return result || fail(coded('FS_IO_ERROR', 'undo failed'), a);
+    for (const groupId of groupIds) {
+      try { await live.markAgentGroupUndone(a.canonical, String(groupId)); } catch { /* audit best effort */ }
+    }
+    return { ok: true, value: { ...result.value, undoOf: groupIds } };
+  }
+
   async function undoGroup(payload, invocation, policy) {
     let a;
     try { a = await authority(payload, invocation); }
@@ -867,6 +916,6 @@ export function createDocumentsService(deps) {
     return { ok: true, value: { ...result.value, undoOf: groupId } };
   }
 
-  return { read, applyEdits, state, recover, discardRecovery, undoGroup, merge3, reviewGroup };
+  return { read, applyEdits, state, recover, discardRecovery, undoGroup, undoGroups, merge3, reviewGroup };
 }
 

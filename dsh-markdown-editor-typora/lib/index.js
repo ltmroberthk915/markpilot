@@ -320,7 +320,7 @@ const MODEL_TOOL = Symbol('markdown model tool');
 export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'diag']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.undoGroups', 'diag']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
 
@@ -1596,6 +1596,8 @@ export function createHost(options = {}) {
           return await documents.undoGroup(payload, invocation, invocation?.policy);
         case 'documents.reviewGroup':
           return await documents.reviewGroup(payload);
+        case 'documents.undoGroups':
+          return await documents.undoGroups(payload, invocation, invocation?.policy);
         case 'documents.merge3':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           return await documents.merge3(payload, invocation, invocation?.policy);

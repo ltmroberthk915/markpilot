@@ -5724,12 +5724,12 @@ const __test = {
             doc.reviewDiff = null;
             setUi((prev) => ({ ...prev, reviewDiff: null }));
             const multi = reviewIsMulti(doc.review);
-            showPhase('review', 'AI 修改了 ' + doc.review.count + ' 处' + (multi ? '（多组，只可撤销最近一组）' : '') + '，保存前请确认');
+            showPhase('review', 'AI 修改了 ' + doc.review.count + ' 处' + (multi ? '（共 ' + doc.review.groups.length + ' 组）' : '') + '，保存前请确认');
           } else if (remoteGroupId && remoteGroupId === doc.ignoreRemoteGroupId) {
             doc.ignoreRemoteGroupId = null;
           } else if (doc.review) {
             const multi = reviewIsMulti(doc.review);
-            showPhase('review', 'AI 修改了 ' + doc.review.count + ' 处' + (multi ? '（多组，只可撤销最近一组）' : '') + '，保存前请确认');
+            showPhase('review', 'AI 修改了 ' + doc.review.count + ' 处' + (multi ? '（共 ' + doc.review.groups.length + ' 组）' : '') + '，保存前请确认');
           }
           if(doc.saveTimer){clearTimeout(doc.saveTimer);doc.saveTimer=null;}
           if(!doc.composing && !doc.review)scheduleSave(SAVE_DEBOUNCE_MS);
@@ -6751,10 +6751,9 @@ const __test = {
             const review = doc.review;
             if (!review || !doc.absPath) return;
             if (doc.pendingApply || doc.applyUnknown || doc.saving) { showNotice('编辑器同步或保存进行中，暂时不能撤销；请稍后再试'); return; }
-            const groupId = reviewUndoGroup(review);
-            const multi = reviewIsMulti(review);
-            if (!groupId) return;
-            void api('documents.undoGroup', { path: doc.absPath, groupId }).then((result) => {
+            const groupIds = Array.isArray(review.groups) ? review.groups.slice() : [];
+            if (!groupIds.length) return;
+            void api('documents.undoGroups', { path: doc.absPath, groupIds }).then((result) => {
               if (!result || result.ok !== true) {
                 showNotice('撤销失败：' + String(result?.error?.message || result?.error?.code || 'unknown') + '；当前内容未变，可继续保留或重读');
                 return;
@@ -6763,7 +6762,7 @@ const __test = {
               doc.review = null;
               doc.reviewDiff = null;
               setUi((prev) => ({ ...prev, reviewDiff: null, railOpen: false }));
-              const message = multi ? '已撤销最近一组 AI 修改；更早的 AI 组仍保留，磁盘未改变' : '已撤销本次 AI 修改；磁盘未改变';
+              const message = '已撤销本次 AI 修改（' + groupIds.length + ' 组）；磁盘未改变';
               showPhase(doc.dirty ? 'dirty' : 'ready', message);
               showNotice(message);
             }).catch((error) => showNotice('撤销失败：' + String(error && error.message ? error.message : error)));
@@ -6931,8 +6930,7 @@ const __test = {
       } else if (ui.phase === "review") {
         primaryText = "AI 修改待确认：" + ui.detail;
         primaryTone = "warn";
-        const multiReview = reviewIsMulti(st.doc && st.doc.review);
-        actions.push({ label: multiReview ? "撤销最近一组" : "撤销本次", icon: "↶", run: () => st.actions.reviewUndo && st.actions.reviewUndo() });
+        actions.push({ label: "撤销本次", icon: "↶", run: () => st.actions.reviewUndo && st.actions.reviewUndo() });
         actions.push({ label: "保留并保存", icon: "✓", run: () => st.actions.reviewKeep && st.actions.reviewKeep() });
         actions.push({ label: "查看差异", icon: "≠", run: () => st.actions.reviewDiff && st.actions.reviewDiff() });
       } else if (ui.phase === "recovery" && ui.recovery) {
