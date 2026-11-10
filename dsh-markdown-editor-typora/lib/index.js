@@ -1969,11 +1969,23 @@ export function createMarkdownToolDefinition(dispatch) {
       '共享会话失效（MP_LIVE_*）或归档失败（MP_ARCHIVE_FAILED）时不要改用其它写工具，重新 read 或让用户重试。',
     ].join(' '),
     parameters: {
-      action: { type: 'string', required: true, description: 'read = 读当前正文（text+version）；edit = 在当前正文上字面替换或替换整块；blocks = 列出文档块 ID；undo = 撤销最近一组 AI 编辑。', enum: ['read', 'edit', 'blocks', 'undo'] },
+      action: { type: 'string', required: true, description: 'read = 读当前正文；edit = 字面/整块替换；blocks = 列块 ID；batch = 原子应用多处非重叠 edits；undo = 撤销最近一组 AI 编辑。', enum: ['read', 'edit', 'blocks', 'batch', 'undo'] },
       path: { type: 'string', required: true, description: '文件的绝对路径。' },
       cwd: { type: 'string', description: '可选：相对路径的解析基准目录。' },
       blockId: { type: 'string', description: 'action=edit 可选：从 blocks 结果拿到的 section ID；与 oldString 二选一。' },
       groupId: { type: 'string', description: 'action=undo 必填：edit 返回的 groupId。' },
+      edits: {
+        type: 'array',
+        description: 'action=batch 必填：按 from 升序、互不重叠的 {from,to,insert}。',
+        items: {
+          type: 'object',
+          properties: {
+            from: { type: 'number', required: true },
+            to: { type: 'number', required: true },
+            insert: { type: 'string', required: true },
+          },
+        },
+      },
       oldString: { type: 'string', description: 'action=edit 必填：要替换的原文字面量（须唯一，除非 replaceAll）。' },
       newString: { type: 'string', description: 'action=edit 必填：替换后的文字面量。' },
       replaceAll: { type: 'boolean', description: 'action=edit 可选：替换所有出现（默认 false，最多 1000 处）。' },
@@ -2007,6 +2019,17 @@ export function createMarkdownToolDefinition(dispatch) {
                 to: { type: 'number' },
                 textLength: { type: 'number' },
                 preview: { type: 'string' },
+              },
+            },
+          },
+          applied: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                from: { type: 'number' },
+                to: { type: 'number' },
+                insertedLength: { type: 'number' },
               },
             },
           },
@@ -2055,6 +2078,10 @@ export function createMarkdownToolDefinition(dispatch) {
           const lines = blocks.map((b) => `- ${b.id}  ${b.kind === 'heading' ? '#'.repeat(b.level) + ' ' : ''}${b.title}  (${b.textLength} 字符) ${b.preview ? '— ' + String(b.preview).slice(0, 80) : ''}`);
           return textBlock(`块列表：${value.displayPath ?? ''}（${blocks.length}/${total} 个）\nreadToken: ${String(value.readToken ?? value.version ?? '')}\n${lines.join('\n')}${value.truncated ? '\n…（仅显示前 200 个）' : ''}`);
         }
+        if (value.action === 'batch') {
+          const count = Array.isArray(value.applied) ? value.applied.length : 0;
+          return textBlock(`已批量应用 ${count} 处编辑：${value.displayPath ?? ''}${value.changed === false ? '（内容未变）' : ''}；${value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘'}；新版本：${String(value.version ?? '')}${value.groupId ? '；groupId：' + value.groupId : ''}`);
+        }
         if (value.action === 'undo') {
           return textBlock(`已撤销 AI 编辑组：${value.undoOf ?? ''}；${value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘'}；新版本：${String(value.version ?? '')}；撤销组：${String(value.groupId ?? '')}`);
         }
@@ -2066,7 +2093,8 @@ export function createMarkdownToolDefinition(dispatch) {
       },
     },
     async execute(args, execution) {
-      const action = args?.action === 'edit' ? 'edit' : args?.action === 'blocks' ? 'blocks' : args?.action === 'undo' ? 'undo' : 'read';
+      const action = args?.action === 'edit' ? 'edit' : args?.action === 'blocks' ? 'blocks'
+        : args?.action === 'batch' ? 'batch' : args?.action === 'undo' ? 'undo' : 'read';
       try {
         if (action === 'read' || action === 'blocks') {
           const result = await dispatch('documents.read', { path: args?.path, cwd: args?.cwd }, MODEL_TOOL, execution);
@@ -2094,6 +2122,22 @@ export function createMarkdownToolDefinition(dispatch) {
             ...(typeof value.diskChanged === 'boolean' ? { diskChanged: value.diskChanged } : {}),
             ...(value.bufferOwnedElsewhere === true ? { bufferOwnedElsewhere: true } : {}),
             ...(value.unsavedElsewhere === true ? { unsavedElsewhere: true } : {}),
+          };
+        }
+        if (action === 'batch') {
+          const result = await dispatch('documents.applyEdits', {
+            path: args?.path, cwd: args?.cwd, edits: args?.edits,
+            baseVersion: args?.baseVersion, baseRevisionId: args?.baseRevisionId,
+          }, MODEL_TOOL, execution);
+          if (result.ok !== true) return { ok: false, action, error: result.error };
+          const value = result.value;
+          return {
+            ok: true, action, version: value.version, revisionId: value.revisionId, readToken: value.version,
+            displayPath: value.displayPath, changed: value.changed, source: value.source,
+            dirty: value.dirty === true, saved: value.saved === true, applied: value.applied,
+            groupId: value.groupId,
+            ...(value.checkpoint?.archivePath ? { checkpointPath: value.checkpoint.archivePath } : {}),
+            ...(typeof value.recoveryPath === 'string' && value.recoveryPath ? { recoveryPath: value.recoveryPath } : {}),
           };
         }
         if (action === 'undo') {

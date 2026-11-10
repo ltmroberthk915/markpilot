@@ -301,6 +301,32 @@ test('B4.1-API1 markdown blocks/edit blockId goes through the live room and retu
   } finally { w.restore(); }
 });
 
+test('B4.3-API1 markdown batch applies multiple edits with one group and one append', async () => {
+  const text = '# A\nalpha\n\n# B\nbeta\n';
+  const w = await makeWorld('batch', text);
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    await liveDocs.join(w.file, text);
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const tool = createMarkdownToolDefinition(host.dispatch);
+    const read = await tool.execute({ action: 'read', path: w.file }, execution(w.root));
+    const a = text.indexOf('alpha'), b = text.indexOf('beta');
+    const result = await tool.execute({
+      action: 'batch', path: w.file, baseVersion: read.readToken,
+      edits: [
+        { from: a, to: a + 5, insert: 'ALPHA' },
+        { from: b, to: b + 4, insert: 'BETA' },
+      ],
+    }, execution(w.root));
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.applied.length, 2);
+    assert.match(result.groupId, /^[0-9a-f-]{36}$/);
+    const after = await tool.execute({ action: 'read', path: w.file }, execution(w.root));
+    assert.equal(after.text, '# A\nALPHA\n\n# B\nBETA\n');
+    host.close();
+  } finally { w.restore(); }
+});
+
 test('B4.2A-API2 undo resolves the same sandbox policy as edit', async () => {
   const w = await makeWorld('undo-policy', '# A\nalpha\n\n# B\nbeta\n');
   try {
