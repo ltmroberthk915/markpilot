@@ -1276,6 +1276,54 @@ disk-clean
 - 任何预热都不能在隐藏 iframe 里创建第二份文档；
 - 失败则立即回退，不合并。
 
+### 9.4 工具调用流式渲染期间按键卡顿（2026-11-10 诊断）
+
+**现象**：AI 连续调用工具、聊天区不断向下追加“工具调用”卡片时，在 MarkPilot 编辑器里按住一个键，会每出现一张新工具卡就卡一下；松开后恢复。
+
+**环境事实**：
+
+- 当前 DSH 桌面进程只有一个 renderer 进程（PID 45812，`--type=renderer`）；聊天 UI 与 MarkPilot 的 iframe 编辑器共享同一个 renderer 主线程。
+- 这是**运行时流式渲染卡顿**，与 §9.1 的“首次打开 iframe/CM6 慢”不是同一个问题。
+
+**代码层定位（app.asar 内 `@deepseek-ai/dsh-client-ui-chat`）**：
+
+1. **聊天 transcript 没有虚拟化**。`ChatView` 用 `entries` 直接 `renderSlot("conversation.chat.flow", {entries,...})` 渲染所有行；`useVirtualizer` 只用于右侧 Turn Navigator 的 28px 标记轨，不用于消息正文。
+2. **每次 content commit 都可能在 layout effect 里强制滚到底**。`useChatScroll` 的 `processContent()` 在 `useLayoutEffect` 中执行；条件包含 `order.length` / `lastKey` / `running` 变化，且 `reading.followingTail` 为真时调用 `reading.followTail()`。
+3. `followTail()` → `ChatViewport.scrollToBottom()`：
+   - 读 `clientHeight` / `scrollHeight` / `scrollTop`（`scrollMetrics`）；
+   - `reclaimBelow()`；
+   - 再读一次 scroll metrics 并写 `scrollTop`。
+   这是**一次同步布局读 + 写**，在 layout effect 中运行，发生在浏览器 paint 前。
+4. 新工具卡会改变 `order.length` / 行高；若用户正在底部跟随，几乎每张新卡都触发上述路径。长会话中 transcript 行数不断增长，React reconciliation + 整棵 scroll 容器的 `scrollHeight` 计算也随之变贵。
+5. 伴随的视觉工作：
+   - 工具卡/运行状态有 CSS transition、shimmer/whale 动画、`data-chat-motion` 下的 `margin-top .16s` transition；
+   - 工具卡展开/收起还有 `ResizeObserver` 测量；
+   - 这些和 scroll 的强制布局叠加，进一步占用主线程。
+6. 按键重复（Windows key repeat）由 renderer 事件循环派发；主线程被上述 task 占用时，`keydown/keypress` 会延迟甚至合并。按住键时每一张新工具卡都可能造成一次可感知的 repeat gap；单击时同样有延迟，只是不容易察觉。
+
+**因此主因不是**：
+
+- 不是左栏按钮或路由；
+- 不是 MarkPilot 的保存/自动保存；
+- 不是 CM6 的 keymap/快捷键处理本身；
+- 不是单张工具卡的 JS 特别慢，而是 **transcript 无虚拟化 + 每次工具更新强制滚动/布局 + 同一 renderer 主线程** 三者的叠加，长会话放大。
+
+**建议修复顺序（先低风险，再结构改动）**：
+
+1. **合并滚动到 rAF**：`processContent` 不再同步 `scrollHeight` 读+写；把 follow-tail 合并到每帧一次，使用 `scrollTop = 1e9` 或缓存 metrics，避免 layout effect 里读 layout；同帧多个工具事件只滚一次。
+2. **跳过不可见/无需滚动的更新**：只在 `followingTail` 且确实发生高度变化时滚；工具卡切换时若当前已有 pending scroll，合并而不是排队。
+3. **虚拟化/延迟已完成 turn**：只保留可视窗口 + 尾部 live 行；或对已完成 turn 用 `content-visibility:auto` + `contain-intrinsic-size`，避免 `scrollHeight` 触发所有历史行布局。
+4. **减少运行态动画**：工具卡流式更新时禁用 `margin-top` transition；运行 whale/shimmer 用 `transform/opacity`，并对行加 `contain: layout paint style`。
+5. **缩小 React 更新范围**：让 `ChatView` 只订阅尾部变化；工具行按 `callId + status` memo；不要每个 streaming chunk 重建整个 `entries` 数组。
+6. **隔离编辑器**：若前三步仍不够，再把 MarkPilot iframe 做成独立 renderer（Electron `webview` / 独立 `WebContents` 或 OOPIF）；这是架构改动，最后做。
+
+**验收/测量**：
+
+- 在 DSH renderer 上用 `PerformanceObserver({type:"longtask"})` 记录工具卡更新前后；确认 long task 落在 chat commit/scroll，而不是 CM6；
+- DevTools Performance 看 `Layout` / `UpdateLayoutTree` / `Task` 时长；对比“长会话 vs 新会话”是否随行数增长；
+- 按住键 + 连续工具调用，记录 keydown 间隔 p95 与掉帧；目标：无 >50ms 的 repeat gap，长会话不随 transcript 行数线性恶化；
+- 先做 1+2（低风险）复测，再决定 3/6；不要先改 CM6 引擎。
+
 ---
 
 ## 10. 发布与实装 Runbook
