@@ -330,3 +330,19 @@ test('插入对话载荷：开头永远带文档绝对路径，再空一行接�
   assert.equal(T.composeInsertionText('', 'x'), 'x');
   assert.equal(T.composeInsertionText(null, 'x'), 'x');
 });
+test('审阅状态：多组累积、只撤最近一组、审阅中禁止保存', async () => {
+  const { test: T } = await loadClientFactory();
+  const first = T.mergeReviewGroup(null, 'g-1', 2);
+  assert.deepEqual(JSON.parse(JSON.stringify(first)), { groups: ['g-1'], count: 2 });
+  const second = T.mergeReviewGroup(first, 'g-2', 3);
+  assert.deepEqual(JSON.parse(JSON.stringify(second)), { groups: ['g-1', 'g-2'], count: 5 });
+  assert.deepEqual(JSON.parse(JSON.stringify(first)), { groups: ['g-1'], count: 2 }, 'helper must not mutate the previous review');
+  assert.equal(T.reviewIsMulti(second), true);
+  assert.equal(T.reviewIsMulti(first), false);
+  assert.equal(T.reviewUndoGroup(second), 'g-2');
+  assert.equal(T.reviewUndoGroup(first), 'g-1');
+  assert.equal(T.reviewUndoGroup(null), null);
+  assert.equal(T.reviewSuppressesSave({ review: second }), true);
+  assert.equal(T.reviewSuppressesSave({ review: null }), false);
+  assert.equal(T.reviewSuppressesSave({}), false);
+});

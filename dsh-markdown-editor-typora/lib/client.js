@@ -648,6 +648,25 @@ function applyMirrorDelta(mirror,event){
       return items;
     }
 
+    // Pure review-state helpers: shared by the editor and the portable client tests.
+    function mergeReviewGroup(review, groupId, changeCount) {
+      const groups = review && Array.isArray(review.groups) ? review.groups.slice() : [];
+      if (groupId && !groups.includes(groupId)) groups.push(groupId);
+      const previous = review && Number.isFinite(Number(review.count)) ? Number(review.count) : 0;
+      const added = Number.isFinite(Number(changeCount)) && Number(changeCount) > 0 ? Number(changeCount) : 1;
+      return { groups, count: previous + added };
+    }
+    function reviewUndoGroup(review) {
+      return review && Array.isArray(review.groups) && review.groups.length
+        ? review.groups[review.groups.length - 1] : null;
+    }
+    function reviewIsMulti(review) {
+      return !!(review && Array.isArray(review.groups) && review.groups.length > 1);
+    }
+    function reviewSuppressesSave(state) {
+      return !!(state && state.review);
+    }
+
     /** 轮询档位：SSE 健康/页面隐藏/后台 tab 时返回 null（不调度）；断开首档 2s，三次后 6s。 */
     function nextPollDelay(state) {
       const s = state || {};
@@ -3561,6 +3580,7 @@ function normDocs(d) {
 
 const __test = {
       createDraftStore,
+      mergeReviewGroup, reviewUndoGroup, reviewIsMulti, reviewSuppressesSave,
       constants: {
         TAB_TYPE_ID: TAB_TYPE_ID,
         FILE_ADDRESS_PREFIX: FILE_ADDRESS_PREFIX,
@@ -5700,20 +5720,15 @@ const __test = {
           if(doc.dead){persistCurrentRecovery();return true;}
           showPhase('dirty',doc.composing?'输入中…':'编辑中…');
           if (remoteGroupId && remoteGroupId !== doc.ignoreRemoteGroupId) {
-            if (!doc.review) {
-              doc.review = { groups: [remoteGroupId], count: Array.isArray(delta.changes) ? delta.changes.length : 1 };
-            } else {
-              if (!doc.review.groups.includes(remoteGroupId)) doc.review.groups.push(remoteGroupId);
-              doc.review.count += Array.isArray(delta.changes) ? delta.changes.length : 1;
-            }
+            doc.review = mergeReviewGroup(doc.review, remoteGroupId, Array.isArray(delta.changes) ? delta.changes.length : 1);
             doc.reviewDiff = null;
             setUi((prev) => ({ ...prev, reviewDiff: null }));
-            const multi = doc.review.groups.length > 1;
+            const multi = reviewIsMulti(doc.review);
             showPhase('review', 'AI 修改了 ' + doc.review.count + ' 处' + (multi ? '（多组，只可撤销最近一组）' : '') + '，保存前请确认');
           } else if (remoteGroupId && remoteGroupId === doc.ignoreRemoteGroupId) {
             doc.ignoreRemoteGroupId = null;
           } else if (doc.review) {
-            const multi = doc.review.groups.length > 1;
+            const multi = reviewIsMulti(doc.review);
             showPhase('review', 'AI 修改了 ' + doc.review.count + ' 处' + (multi ? '（多组，只可撤销最近一组）' : '') + '，保存前请确认');
           }
           if(doc.saveTimer){clearTimeout(doc.saveTimer);doc.saveTimer=null;}
@@ -5818,7 +5833,7 @@ const __test = {
 
         function scheduleSave(delay) {
           if (doc.dead) return;
-          if (doc.review) return;   // AI review must reach a decision before the timer can write.
+          if (reviewSuppressesSave(doc)) return;   // AI review must reach a decision before the timer can write.
           if (doc.saveTimer) { clearTimeout(doc.saveTimer); doc.saveTimer = null; }
           doc.saveTimer = setTimeout(() => {
             doc.saveTimer = null;
@@ -5875,7 +5890,7 @@ const __test = {
         async function runSave(options) {
           const manual = !!(options && options.manual);
           if (doc.dead) return;
-          if (doc.review) return;
+          if (reviewSuppressesSave(doc)) return;
           // 有界预算耗尽后不再自动发保存请求（防持续竞争下无界后台唤醒）；
           // 显式保存（Ctrl+S）重置预算，输入改动只保留草稿等显式动作。
           if (doc.untitled) { if(manual) await saveUntitled(); return; }
@@ -6060,7 +6075,7 @@ const __test = {
          */
         function manualSave(content) {
           if (doc.dead) return;
-          if (doc.review) { post("toast", "存在 AI 修改待确认，请先点「保留并保存」或「撤销本次」"); return; }
+          if (reviewSuppressesSave(doc)) { post("toast", "存在 AI 修改待确认，请先点「保留并保存」或「撤销本次」"); return; }
           if(doc.untitled){void runSave({manual:true});return;}
           if (doc.recovery && doc.phase === 'recovery') { post("toast", "存在未保存的恢复内容，请先点「恢复」或「丢弃」"); return; }
           doc.liveStaleBlocked = false;   // 显式保存 = 重置 STALE 退避预算（只此显式入口重置）
@@ -6736,8 +6751,9 @@ const __test = {
             const review = doc.review;
             if (!review || !doc.absPath) return;
             if (doc.pendingApply || doc.applyUnknown || doc.saving) { showNotice('编辑器同步或保存进行中，暂时不能撤销；请稍后再试'); return; }
-            const groupId = review.groups[review.groups.length - 1];
-            const multi = review.groups.length > 1;
+            const groupId = reviewUndoGroup(review);
+            const multi = reviewIsMulti(review);
+            if (!groupId) return;
             void api('documents.undoGroup', { path: doc.absPath, groupId }).then((result) => {
               if (!result || result.ok !== true) {
                 showNotice('撤销失败：' + String(result?.error?.message || result?.error?.code || 'unknown') + '；当前内容未变，可继续保留或重读');
@@ -6764,7 +6780,8 @@ const __test = {
           reviewDiff: () => {
             const review = doc.review;
             if (!review || !doc.absPath) return;
-            const groupId = review.groups[review.groups.length - 1];
+            const groupId = reviewUndoGroup(review);
+            if (!groupId) return;
             void api('documents.reviewGroup', { path: doc.absPath, groupId }).then((result) => {
               if (!result || result.ok !== true) { showNotice('读取差异失败：' + String(result?.error?.message || result?.error?.code || 'unknown')); return; }
               const changes = Array.isArray(result.value?.changes) ? result.value.changes : [];
@@ -6914,7 +6931,7 @@ const __test = {
       } else if (ui.phase === "review") {
         primaryText = "AI 修改待确认：" + ui.detail;
         primaryTone = "warn";
-        const multiReview = !!(st.doc && st.doc.review && Array.isArray(st.doc.review.groups) && st.doc.review.groups.length > 1);
+        const multiReview = reviewIsMulti(st.doc && st.doc.review);
         actions.push({ label: multiReview ? "撤销最近一组" : "撤销本次", icon: "↶", run: () => st.actions.reviewUndo && st.actions.reviewUndo() });
         actions.push({ label: "保留并保存", icon: "✓", run: () => st.actions.reviewKeep && st.actions.reviewKeep() });
         actions.push({ label: "查看差异", icon: "≠", run: () => st.actions.reviewDiff && st.actions.reviewDiff() });
