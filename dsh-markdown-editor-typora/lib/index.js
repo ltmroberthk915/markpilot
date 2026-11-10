@@ -18,7 +18,7 @@
 //      unhandled rejection + watcher 泄漏。这里 await 捕获并幂等 close。
 //   4. 每个 async 分支都有 try/catch，错误以 {ok:false,error:{code,message}} 返回，code 原样透传。
 
-import { readFile, stat as fsStat, realpath, writeFile, mkdir, open as fsOpen, link as fsLink, unlink as fsUnlink, rename as fsRename } from 'node:fs/promises';
+import { readFile, stat as fsStat, realpath, writeFile, mkdir, open as fsOpen, link as fsLink, unlink as fsUnlink, rename as fsRename, readdir } from 'node:fs/promises';
 import { createReadStream, readFileSync, writeFileSync, appendFileSync, renameSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { tmpdir, homedir } from 'node:os';
@@ -320,7 +320,7 @@ const MODEL_TOOL = Symbol('markdown model tool');
 export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'diag']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'diag']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
 
@@ -804,7 +804,7 @@ export function createHost(options = {}) {
     openModel: (payload, invocation) => apiOpen(payload, MODEL_TOOL, undefined, invocation),
     edit: (payload, invocation) => apiEdit(payload, invocation),
     save: (payload) => apiSave(payload),
-    archive: (payload) => apiDocsArchive(payload),
+    archive: (payload) => apiDocsArchive(payload, { prune: true }),
     resolve: (payload, invocation) => fs.resolve(payload?.path ?? '', resolveOptions(payload, invocation)),
     stat: (target) => fs.stat(target),
     canonical: (target) => canonicalTarget(target),
@@ -1231,6 +1231,52 @@ export function createHost(options = {}) {
   }
 
   const ARCHIVE_MAX_BYTES = 64 * 1024 * 1024;
+  const AGENT_BEFORE_KEEP_PER_SOURCE = 20;
+  const AGENT_BEFORE_KEEP_TOTAL = 200;
+  function archiveSourceFold(value) {
+    const text = String(value || '');
+    return process.platform === 'win32' ? text.replace(/\//g, '\\').toLowerCase() : text;
+  }
+  // Only removes automatic `agent-before` copies that have a parseable sidecar.
+  // Parked recovery files (`recovery/`) and user/other-tag archives are never in
+  // this directory match set. A failed/missing sidecar means "leave it alone".
+  async function pruneAgentBeforeArchives(dir, currentArchivePath) {
+    let names;
+    try { names = await readdir(dir); } catch { return; }
+    const entries = [];
+    for (const name of names) {
+      if (!/\.agent-before\.[0-9a-f]{16}\.md$/.test(name)) continue;
+      const archivePath = join(dir, name), metaPath = archivePath + '.json';
+      try {
+        const meta = JSON.parse(await readFile(metaPath, 'utf8'));
+        if (meta?.schema !== 1 || meta?.tag !== 'agent-before' || typeof meta?.sourcePath !== 'string' || !isAbsolute(meta.sourcePath)) continue;
+        if (typeof meta?.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(meta.sha256)) continue;
+        const expectedKey = createHash('sha256').update(meta.sourcePath + '\0' + meta.tag + '\0' + meta.sha256).digest('hex').slice(0, 16);
+        if (!name.endsWith('.' + expectedKey + '.md')) continue; // not the deterministic auto-copy name
+        const at = Date.parse(meta.archivedAt);
+        entries.push({ archivePath, metaPath, source: archiveSourceFold(meta.sourcePath), at: Number.isFinite(at) ? at : 0 });
+      } catch { /* no sidecar: not an automatic copy we own */ }
+    }
+    if (!entries.length) return;
+    entries.sort((a, b) => (b.at - a.at) || String(b.archivePath).localeCompare(String(a.archivePath)));
+    const keep = new Set();
+    const perSource = new Map();
+    for (const entry of entries) {
+      const count = perSource.get(entry.source) || 0;
+      if (count < AGENT_BEFORE_KEEP_PER_SOURCE) {
+        perSource.set(entry.source, count + 1);
+        if (keep.size < AGENT_BEFORE_KEEP_TOTAL) keep.add(entry.archivePath);
+      }
+    }
+    // The caller is about to hand this path to the model. Never delete it, even
+    // when an unusually large archive set has already filled the total cap.
+    if (currentArchivePath) keep.add(currentArchivePath);
+    for (const entry of entries) {
+      if (keep.has(entry.archivePath)) continue;
+      try { await fsUnlink(entry.archivePath); } catch { /* locked: leave it */ }
+      try { await fsUnlink(entry.metaPath); } catch { /* locked: leave it */ }
+    }
+  }
   function archiveDirectory() {
     const base = process.env.LOCALAPPDATA || process.env.XDG_DATA_HOME || homedir();
     return join(base, '.markpilot', 'draft-archive');
@@ -1242,7 +1288,7 @@ export function createHost(options = {}) {
    * destroying the only surviving draft, and to snapshot the current text before
    * a recovery apply.
    */
-  async function apiDocsArchive(payload) {
+  async function apiDocsArchive(payload, options = {}) {
     const rawPath = typeof payload?.path === 'string' ? payload.path : '';
     const text = payload?.text;
     const tag = typeof payload?.tag === 'string' && /^[a-z0-9][a-z0-9-]{0,31}$/i.test(payload.tag) ? payload.tag.toLowerCase() : 'draft';
@@ -1261,7 +1307,16 @@ export function createHost(options = {}) {
     const target = join(dir, name);
     const existing = await readFile(target).then(buf => buf, error => { if (error.code === 'ENOENT') return null; throw error; });
     if (existing && createHash('sha256').update(existing).digest('hex') === sha) {
-      return { ok: true, value: { archivePath: target, metaPath: target + '.json', sha256: sha, bytes: bytes.length, idempotent: true } };
+      const metaPath = target + '.json';
+      // Older releases could leave an archive without a sidecar. Repair it so
+      // retention can account for the file and the returned metaPath exists.
+      const meta = { schema: 1, sourcePath: rawPath, tag, archivedAt: new Date().toISOString(), sha256: sha, bytes: bytes.length,
+        baseVersion: typeof payload?.baseVersion === 'string' ? payload.baseVersion : null,
+        docToken: typeof payload?.docToken === 'string' ? payload.docToken : null };
+      try { await readFile(metaPath); }
+      catch { await writeFile(metaPath, JSON.stringify(meta, null, 2), { encoding: 'utf8', flag: 'wx' }).catch(() => { /* concurrent writer */ }); }
+      if (options.prune === true) try { await pruneAgentBeforeArchives(dir, target); } catch { /* retention is best effort */ }
+      return { ok: true, value: { archivePath: target, metaPath, sha256: sha, bytes: bytes.length, idempotent: true } };
     }
     const temp = join(dir, `.mp-archive-${process.pid}-${randomUUID()}`);
     try {
@@ -1280,6 +1335,7 @@ export function createHost(options = {}) {
       baseVersion: typeof payload?.baseVersion === 'string' ? payload.baseVersion : null,
       docToken: typeof payload?.docToken === 'string' ? payload.docToken : null };
     await writeFile(target + '.json', JSON.stringify(meta, null, 2), { encoding: 'utf8', flag: 'wx' }).catch(() => { /* metadata is best effort */ });
+    if (options.prune === true) try { await pruneAgentBeforeArchives(dir, target); } catch { /* retention is best effort */ }
     return { ok: true, value: { archivePath: target, metaPath: target + '.json', sha256: sha, bytes: bytes.length } };
   }
 
@@ -1528,9 +1584,15 @@ export function createHost(options = {}) {
         case 'documents.applyEdits':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           return await documents.applyEdits(payload, invocation, invocation?.policy);
+        case 'documents.state':
+        case 'documents.reconcile':
+          if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
+          return await documents.state(payload, invocation);
         case 'docs/create': return await apiDocsCreate(payload);
         case 'docs/recent': return await apiDocsRecent(payload);
-        case 'docs/archive': return await apiDocsArchive(payload);
+        case 'docs/archive':
+          if (payload?.tag === 'agent-before' && authority !== MODEL_TOOL) return badRequest('model tool authority required');
+          return await apiDocsArchive(payload, { prune: authority === MODEL_TOOL && payload?.tag === 'agent-before' });
         case 'diag': {
           lastDiag = { receivedAt: Date.now(), payload };
           // 诊断同时落盘一份，验收时用 PowerShell 直接读，不必开 DevTools、也不受接口鉴权影响。
@@ -1927,6 +1989,7 @@ export function createMarkdownToolDefinition(dispatch) {
           bufferOwnedElsewhere: { type: 'boolean' },
           unsavedElsewhere: { type: 'boolean' },
           checkpointPath: { type: 'string' },
+          recoveryPath: { type: 'string' },
           error: {
             type: 'object',
             additionalProperties: false,
@@ -1955,7 +2018,8 @@ export function createMarkdownToolDefinition(dispatch) {
         }
         const target = value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘；请让用户确认后自行保存';
         const copy = value.checkpointPath ? `；改前副本：${value.checkpointPath}` : '';
-        return textBlock(`已应用编辑：${value.displayPath ?? ''}${value.changed === false ? '（内容未变）' : ''}；${target}${copy}；新版本：${String(value.version ?? '')}`);
+        const recovery = value.recoveryPath ? `；恢复副本：${value.recoveryPath}` : '';
+        return textBlock(`已应用编辑：${value.displayPath ?? ''}${value.changed === false ? '（内容未变）' : ''}；${target}${copy}${recovery}；新版本：${String(value.version ?? '')}`);
       },
     },
     async execute(args, execution) {
@@ -2001,6 +2065,7 @@ export function createMarkdownToolDefinition(dispatch) {
           dirty: value.dirty === true,
           saved: value.saved === true,
           ...(value.checkpoint?.archivePath ? { checkpointPath: value.checkpoint.archivePath } : {}),
+          ...(typeof value.recoveryPath === 'string' && value.recoveryPath ? { recoveryPath: value.recoveryPath } : {}),
         };
       } catch (error) {
         return { ok: false, action, error: { code: errorCode(error), message: String(error?.message ?? error) } };

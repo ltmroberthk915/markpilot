@@ -61,6 +61,18 @@ test('B3-API1 documents.read sees the live buffer and no HTTP authority can call
     assert.equal(read.value.dirty, false);
     assert.match(read.value.version, /^rev1:live:/);
 
+    const state = await host.dispatch('documents.state', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(state.ok, true);
+    assert.equal(state.value.state, 'clean');
+    assert.equal(state.value.source, 'buffer');
+    assert.equal(state.value.recovery.length, 0);
+    const overHttpState = await host.dispatch('documents.state', { path: w.file });
+    assert.equal(overHttpState.ok, false);
+    assert.equal(overHttpState.error.code, 'bad-request');
+    const overHttpReconcile = await host.dispatch('documents.reconcile', { path: w.file });
+    assert.equal(overHttpReconcile.ok, false);
+    assert.equal(overHttpReconcile.error.code, 'bad-request');
+
     const overHttp = await host.dispatch('documents.read', { path: w.file });
     assert.equal(overHttp.ok, false);
     assert.equal(overHttp.error.code, 'bad-request');
@@ -87,6 +99,9 @@ test('B3-API2 applyEdits on a live buffer appends to the room, leaves disk uncha
     assert.equal(apply.value.saved, false);
     assert.equal(apply.value.dirty, true);
     assert.equal(apply.value.checkpoint.archivePath.includes('agent-before'), true);
+    assert.equal(typeof apply.value.recoveryPath, 'string');
+    assert.match(apply.value.recoveryPath, /agent-append/);
+    assert.equal(await fs.readFile(apply.value.recoveryPath, 'utf8'), 'bye\n');
     assert.equal(await fs.readFile(w.file, 'utf8'), 'hello\n', 'buffer apply must not write disk');
 
     const after = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
@@ -153,6 +168,11 @@ test('B3-API4 the markdown model tool follows the same endpoints and reports sav
     assert.equal(edit.saved, false);
     assert.equal(edit.dirty, true);
     assert.ok(edit.version.startsWith('rev1:live:'));
+    assert.equal(typeof edit.recoveryPath, 'string');
+    assert.match(edit.recoveryPath, /agent-append/);
+    assert.equal(await fs.readFile(edit.recoveryPath, 'utf8'), 'bye\n');
+    const rendered = tool.output.render({ action: 'edit' }, edit);
+    assert.match(rendered[0].text, /恢复副本：/);
     assert.equal(await fs.readFile(w.file, 'utf8'), 'hello\n');
     host.close();
   } finally { w.restore(); }

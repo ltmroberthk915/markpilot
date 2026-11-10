@@ -46,6 +46,9 @@ function database(directory) {
         source TEXT NOT NULL, recoveryPath TEXT PRIMARY KEY, epoch TEXT NOT NULL,
         version INTEGER NOT NULL, saved INTEGER NOT NULL, at INTEGER NOT NULL,
         bytes INTEGER NOT NULL, sha256 TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS append_recovery (
+        source TEXT NOT NULL, recoveryPath TEXT PRIMARY KEY, epoch TEXT NOT NULL,
+        version INTEGER NOT NULL, at INTEGER NOT NULL, bytes INTEGER NOT NULL, sha256 TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS writers (file TEXT PRIMARY KEY, owner TEXT NOT NULL, pid INTEGER NOT NULL, since INTEGER NOT NULL);`);
     // Rooms kept by an earlier draft release held leases without timestamps.
     if (!db.prepare('PRAGMA table_info(writers)').all().some(column => column.name === 'since'))
@@ -56,7 +59,7 @@ function database(directory) {
     const stamp = hostStamp(), stored = db.prepare("SELECT value FROM meta WHERE key='host'").get();
     if (stored && stored.value !== stamp)
       atomic(db, () => {
-        db.exec('DELETE FROM writers; DELETE FROM changes; DELETE FROM clients; DELETE FROM rooms;');
+        db.exec('DELETE FROM writers; DELETE FROM changes; DELETE FROM clients; DELETE FROM rooms; DELETE FROM append_recovery;');
         db.prepare("INSERT OR REPLACE INTO meta VALUES('host',?)").run(stamp);
       });
     else if (!stored) atomic(db, () => db.prepare("INSERT OR REPLACE INTO meta VALUES('host',?)").run(stamp));
@@ -102,6 +105,125 @@ const sweptLocations = new Set(), RECOVERY_BATCH = 4, RECOVERY_ROWS = 500;
 // Agent appends do not write disk; a 10s ceiling keeps an AI tool call from
 // waiting the full 30s save lease while a slow external save is in flight.
 const APPEND_BUSY_TIMEOUT_MS = 10000;
+// B3.2: independent post-append copies live apart from the room log, so an
+// editor close/old-EXE room deletion cannot drop the only copy of an agent
+// edit that was not acknowledged yet. Bounded per source; never touches the
+// parked recovery files below `recovery/`.
+const APPEND_RECOVERY_KEEP = 20;
+const APPEND_RECOVERY_MAX_BYTES = 64 * 1024 * 1024;
+function safeStem(file) {
+  return path.basename(file).replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 64) || 'document';
+}
+function appendRecoveryStem(file) {
+  return safeStem(file) + '.' + digest(fileKey(file)).slice(0, 8);
+}
+function appendRecoveryDirectory(directory) {
+  return path.join(path.resolve(directory), 'recovery', 'agent-append');
+}
+function appendRecoveryPath(directory, file, epoch, version, bytes) {
+  const epochPart = String(epoch).replace(/[^A-Za-z0-9-]/g, '').slice(0, 8) || 'epoch';
+  const sha = digest(bytes);
+  return path.join(appendRecoveryDirectory(directory),
+    appendRecoveryStem(file) + '.' + epochPart + '.agent-append.' + version + '.' + sha.slice(0, 16) + '.md');
+}
+function writeAtomicSync(target, bytes) {
+  const temp = target + '.tmp-' + process.pid + '-' + uuid();
+  try {
+    const fd = fs.openSync(temp, 'wx', 0o600);
+    try { fs.writeSync(fd, bytes); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+    try {
+      fs.renameSync(temp, target);
+    } catch (error) {
+      // A retry may find the deterministic copy already published. Accept only
+      // byte-identical content; never overwrite a different copy.
+      let existing = null;
+      try { existing = fs.readFileSync(target); } catch { /* publish error is reported below */ }
+      if (!existing || !existing.equals(bytes)) throw error;
+    }
+  } finally {
+    try { fs.rmSync(temp, {force: true}); } catch { /* best effort */ }
+  }
+}
+function writeReplaceDurableSync(target, bytes) {
+  const temp = target + '.tmp-' + process.pid + '-' + uuid();
+  try {
+    const fd = fs.openSync(temp, 'wx', 0o600);
+    try { fs.writeSync(fd, bytes); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+    try { fs.renameSync(temp, target); }
+    catch (error) {
+      try { fs.rmSync(target, {force: true}); } catch { /* best effort */ }
+      fs.renameSync(temp, target);
+    }
+  } finally {
+    try { fs.rmSync(temp, {force: true}); } catch { /* best effort */ }
+  }
+}
+// Caller holds the SQLite write transaction (BEGIN IMMEDIATE), so exchange()
+// and another append cannot advance the room while the copy is written. Kept
+// synchronous deliberately: the copy must be durable before COMMIT.
+function writeAppendRecoverySync(directory, file, epoch, version, text) {
+  const bytes = Buffer.from(String(text), 'utf8');
+  if (bytes.length > APPEND_RECOVERY_MAX_BYTES) throw fault('MP_RECOVERY_TOO_LARGE', '文档过大，无法为本次 AI 编辑创建恢复副本');
+  const dir = appendRecoveryDirectory(directory);
+  const target = appendRecoveryPath(directory, file, epoch, version, bytes), metaPath = target + '.json';
+  const sha = digest(bytes);
+  fs.mkdirSync(dir, {recursive: true, mode: 0o700});
+  let createdTarget = false;
+  try {
+    if (fs.existsSync(target)) {
+      const existing = fs.readFileSync(target);
+      if (!existing.equals(bytes)) throw fault('MP_RECOVERY_FAILED', '恢复副本命名冲突，已拒绝写入');
+    } else {
+      writeAtomicSync(target, bytes);
+      createdTarget = true;
+    }
+    const meta = {
+      schema: 1, kind: 'agent-append', sourcePath: file, epoch: String(epoch),
+      version, at: Date.now(), bytes: bytes.length, sha256: sha, textLength: String(text).length,
+    };
+    writeReplaceDurableSync(metaPath, Buffer.from(JSON.stringify(meta, null, 2), 'utf8'));
+    const check = fs.readFileSync(target);
+    if (!check.equals(bytes)) throw fault('MP_RECOVERY_FAILED', '恢复副本复核失败，已拒绝提交');
+    const back = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+    if (back?.sha256 !== sha || back?.kind !== 'agent-append') throw fault('MP_RECOVERY_FAILED', '恢复副本元数据复核失败，已拒绝提交');
+    return {path: target, created: createdTarget, bytes: bytes.length, sha256: sha, at: back.at};
+  } catch (error) {
+    // Never delete a pre-existing valid copy because this attempt's sidecar
+    // write failed. Only the file created by this attempt is ours to remove.
+    if (createdTarget) {
+      try { fs.rmSync(target, {force: true}); } catch { /* best effort */ }
+      try { fs.rmSync(metaPath, {force: true}); } catch { /* best effort */ }
+    }
+    if (error?.code === 'MP_RECOVERY_TOO_LARGE' || error?.code === 'MP_RECOVERY_FAILED') throw error;
+    throw fault('MP_RECOVERY_FAILED', '恢复副本写入失败：' + String(error?.message || error));
+  }
+}
+function appendRecoveryRows(db, key) {
+  return db.prepare('SELECT recoveryPath,sha256,at,epoch,version,bytes FROM append_recovery WHERE source=? ORDER BY at DESC, version DESC LIMIT ?')
+    .all(key, APPEND_RECOVERY_KEEP);
+}
+function listAppendRecoveryRows(db, key) {
+  const out = [];
+  for (const row of appendRecoveryRows(db, key)) {
+    try {
+      const bytes = fs.readFileSync(row.recoveryPath);
+      if (bytes.length !== row.bytes || digest(bytes) !== row.sha256) continue;
+      out.push({ recoveryPath: row.recoveryPath, sha256: row.sha256, at: Number(row.at) || 0,
+        epoch: String(row.epoch || ''), version: Number(row.version) || 0, bytes: bytes.length, kind: 'agent-append' });
+    } catch { /* missing/damaged file: no path to hand to the user */ }
+  }
+  return out;
+}
+function pruneAppendRecoveryRows(db, key, currentPath) {
+  const rows = db.prepare('SELECT recoveryPath,sha256,at,epoch,version,bytes FROM append_recovery WHERE source=? ORDER BY at DESC, version DESC')
+    .all(key);
+  for (const extra of rows.slice(APPEND_RECOVERY_KEEP)) {
+    if (currentPath && extra.recoveryPath === currentPath) continue;
+    try { db.prepare('DELETE FROM append_recovery WHERE recoveryPath=?').run(extra.recoveryPath); } catch { /* best effort */ }
+    try { fs.rmSync(extra.recoveryPath, {force: true}); } catch { /* locked/raced: leave it */ }
+    try { fs.rmSync(extra.recoveryPath + '.json', {force: true}); } catch { /* locked/raced: leave it */ }
+  }
+}
 function recoveryFile(directory, room) {
   const name = path.basename(room.file).replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 64) || 'document';
   return path.join(path.resolve(directory), 'recovery',
@@ -258,7 +380,10 @@ async function readDisk(file) {
     if (error.code === 'ENOENT') throw fault('MP_FILE_MISSING', '原文件已不在磁盘上（可能被重命名或删除），草稿已保留：' + file);
     throw error;
   }
-  return {hash:snap.baseline.sha256, text:decodeDocument(snap.bytes, file).text.replace(/\r\n?/g, '\n')};
+  const decoded = decodeDocument(snap.bytes, file).text.replace(/\r\n?/g, '\n');
+  let mtimeMs = 0;
+  try { mtimeMs = fs.statSync(file).mtimeMs; } catch { /* stat is advisory only */ }
+  return {hash:snap.baseline.sha256, text:decoded, textSha256:digest(Buffer.from(decoded, 'utf8')), mtimeMs};
 }
 function checkedLength(changes, length) {
   if (!Array.isArray(changes) || !changes.length) throw fault('MP_LIVE_CHANGE', '无效的协同编辑');
@@ -382,8 +507,34 @@ class LiveDocuments {
       hosts.add(this); // 首个成员入座才登记 host；从未加入/全部离开的实例不占强引用
       // Surface parked drafts for this file so the UI can offer restoring
       // them instead of silently discarding a crashed window's work.
-      const recovered = db.prepare('SELECT source,recoveryPath,epoch AS recoveryEpoch,version,saved,at,bytes,sha256 FROM recovery WHERE source=? ORDER BY at DESC LIMIT 3').all(key);
-      return recovered.length ? {...joined, recovered} : joined;
+      const parked = db.prepare('SELECT source,recoveryPath,epoch AS recoveryEpoch,version,saved,at,bytes,sha256 FROM recovery WHERE source=? ORDER BY at DESC LIMIT 5').all(key);
+      // A clean room can be a fresh one created from disk after an old EXE
+      // deleted the previous room. Agent-append copies are then the only
+      // surviving record of an edit the editor never acknowledged. A dirty
+      // room remains the authority, so append copies are informational only
+      // in that case (and never override room text).
+      const appendCopies = [];
+      if (joined.version === joined.savedVersion) {
+        try {
+          appendCopies.push(...listAppendRecoveryRows(db, key)
+            .filter((entry) => entry.sha256 !== disk.hash && entry.sha256 !== disk.textSha256 && entry.at >= disk.mtimeMs));
+        } catch { /* recovery index is auxiliary; never block opening */ }
+      }
+      const recovered = [];
+      const seen = new Set();
+      const addRecovery = (entry) => {
+        const id = String(entry.recoveryPath);
+        const sha = typeof entry.sha256 === 'string' ? entry.sha256 : '';
+        if (seen.has(id) || (sha && seen.has('sha:' + sha))) return;
+        seen.add(id);
+        if (sha) seen.add('sha:' + sha);
+        recovered.push(entry);
+      };
+      // Parked rows are the only surviving draft for a crashed editor; never
+      // let newer informational append copies crowd them out of the 5-slot UI.
+      for (const entry of parked.slice().sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0))) addRecovery(entry);
+      for (const entry of appendCopies) addRecovery(entry);
+      return recovered.length ? {...joined, recovered: recovered.slice(0, 5)} : joined;
     }, this.directory, this.leaseOptions());
   }
   member(client, epoch) {
@@ -563,6 +714,23 @@ class LiveDocuments {
       return null;
     } finally { try { db.close(); } catch { /* already closed */ } }
   }
+  // B3.2: read-only list of independent post-append copies. Never creates the
+  // recovery directory, never touches the rooms database.
+  async listAppendRecovery(filePath) {
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    const filename = path.join(path.resolve(this.directory), 'rooms.sqlite');
+    if (!fs.existsSync(filename)) return [];
+    const {DatabaseSync} = require('node:sqlite');
+    let db;
+    try { db = new DatabaseSync(filename, {readOnly:true}); } catch { return []; }
+    try {
+      try { db.exec('PRAGMA busy_timeout=2000'); } catch { /* best effort */ }
+      const stored = db.prepare("SELECT value FROM meta WHERE key='host'").get()?.value;
+      if (stored !== hostStamp()) return [];
+      return listAppendRecoveryRows(db, key);
+    } catch { return []; }
+    finally { try { db.close(); } catch { /* already closed */ } }
+  }
   // B3: append one authoritative remote edit to the shared buffer. Never
   // touches disk or `saved`; the change is delivered to every member through
   // the normal exchange() update stream. The transaction re-checks epoch,
@@ -578,25 +746,49 @@ class LiveDocuments {
     if (!localStoreUsable(filename)) throw fault('MP_LIVE_NO_ROOM', '文档没有共享会话，请重新读取后再试');
     return withFileCommit(file, async () => {
       const db = this.db;
-      return atomic(db, () => {
-        const room = roomFor(db, key);
-        if (!room) throw fault('MP_LIVE_NO_ROOM', '文档没有共享会话，请重新读取后再试');
-        if (room.epoch !== epoch) throw fault('MP_LIVE_SESSION', '文档协同会话已改变');
-        const members = db.prepare('SELECT pid FROM clients WHERE epoch=?').all(room.epoch)
-          .filter(({pid}) => alive(pid)).length;
-        if (!members) throw fault('MP_LIVE_NO_MEMBER', '没有在线的编辑器会话，请重新读取后再试');
-        if (room.version !== baseVersion || materialize(db, room) !== baseText)
-          throw fault('MP_LIVE_STALE', '文档刚有新编辑，请重新读取后再应用');
-        const length = checkedLength(changes, room.length);
-        const version = room.version + 1;
-        db.prepare('INSERT INTO changes VALUES(?,?,?,?,?)')
-          .run(room.epoch, version, actor, 0, JSON.stringify(changes));
-        db.prepare('UPDATE rooms SET version=?,length=? WHERE epoch=?').run(version, length, room.epoch);
-        room.version = version; room.length = length;
-        compact(db, room);
-        const text = materialize(db, room);
-        return {...head(room), text, textSha256:digest(Buffer.from(text,'utf8'))};
-      });
+      let recoveryPath = null, recoveryCreated = false;
+      try {
+        const result = atomic(db, () => {
+          const room = roomFor(db, key);
+          if (!room) throw fault('MP_LIVE_NO_ROOM', '文档没有共享会话，请重新读取后再试');
+          if (room.epoch !== epoch) throw fault('MP_LIVE_SESSION', '文档协同会话已改变');
+          const members = db.prepare('SELECT pid FROM clients WHERE epoch=?').all(room.epoch)
+            .filter(({pid}) => alive(pid)).length;
+          if (!members) throw fault('MP_LIVE_NO_MEMBER', '没有在线的编辑器会话，请重新读取后再试');
+          if (room.version !== baseVersion || materialize(db, room) !== baseText)
+            throw fault('MP_LIVE_STALE', '文档刚有新编辑，请重新读取后再应用');
+          const length = checkedLength(changes, room.length);
+          const version = room.version + 1;
+          const nextText = apply(baseText, changes);
+          if (nextText.length !== length) throw fault('MP_LIVE_CHANGE', '协同编辑的长度校验失败');
+          // The recovery copy is post-edit and durable before COMMIT. It is the
+          // independent copy used when the room is retired before the editor
+          // acknowledges this change. The transaction stays open for the write,
+          // so exchange() cannot advance the room underneath this snapshot.
+          const written = writeAppendRecoverySync(this.directory, file, room.epoch, version, nextText);
+          recoveryPath = written.path;
+          recoveryCreated = written.created === true;
+          // The row is committed atomically with the change. It is the
+          // discovery record; the file is the payload.
+          db.prepare('INSERT OR REPLACE INTO append_recovery VALUES(?,?,?,?,?,?,?)')
+            .run(key, written.path, room.epoch, version, written.at || Date.now(), written.bytes, written.sha256);
+          db.prepare('INSERT INTO changes VALUES(?,?,?,?,?)')
+            .run(room.epoch, version, actor, 0, JSON.stringify(changes));
+          db.prepare('UPDATE rooms SET version=?,length=? WHERE epoch=?').run(version, length, room.epoch);
+          room.version = version; room.length = length;
+          compact(db, room);
+          const text = materialize(db, room);
+          return {...head(room), text, textSha256:digest(Buffer.from(text,'utf8')), recoveryPath};
+        });
+        try { pruneAppendRecoveryRows(db, key, recoveryPath); } catch { /* retention is best effort */ }
+        return result;
+      } catch (error) {
+        if (recoveryCreated && recoveryPath) {
+          try { fs.rmSync(recoveryPath, {force: true}); } catch { /* best effort */ }
+          try { fs.rmSync(recoveryPath + '.json', {force: true}); } catch { /* best effort */ }
+        }
+        throw error;
+      }
     }, this.directory, { ...this.leaseOptions(), busyTimeoutMs: Math.min(this.leaseOptions().busyTimeoutMs ?? APPEND_BUSY_TIMEOUT_MS, APPEND_BUSY_TIMEOUT_MS) });
   }
   leave(client) {

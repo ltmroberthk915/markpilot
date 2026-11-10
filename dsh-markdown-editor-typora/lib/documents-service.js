@@ -320,6 +320,59 @@ export function createDocumentsService(deps) {
     };
   }
 
+  // B3.2 read-only state/reconcile: same authority() read, no archive, no
+  // append, no room creation and no disk write. The recovery list is only an
+  // index of independently written post-append copies; it never overrides the
+  // room/disk authority.
+  async function state(payload, invocation) {
+    let a;
+    try { a = await authority(payload, invocation); }
+    catch (error) { return fail(error, null); }
+    if (a.error) {
+      const code = a.error?.error?.code;
+      if (code === 'FS_NOT_FOUND' || code === 'ENOENT') {
+        return {
+          ok: true,
+          value: {
+            path: payload?.path ?? '', displayPath: payload?.path ?? '', canonical: null,
+            state: 'missing', source: 'disk', dirty: false, diskChanged: null,
+            conflict: false, orphanDraft: false, external: false,
+            bufferOwnedElsewhere: false, unsavedElsewhere: false,
+            version: null, revisionId: null, head: null, recovery: [], recommended: 'none',
+          },
+        };
+      }
+      return a.error;
+    }
+    let recovery = [];
+    try {
+      if (a.canonical && typeof live.listAppendRecovery === 'function')
+        recovery = await live.listAppendRecovery(a.canonical);
+    } catch { /* informational only */ }
+    const stateName = a.conflict ? 'conflict'
+      : a.orphanDraft ? 'orphan'
+        : a.bufferOwnedElsewhere ? 'owned-elsewhere'
+          : a.unsavedElsewhere ? 'unsaved-elsewhere'
+            : a.external ? 'external'
+              : a.source === 'buffer' ? (a.dirty ? 'dirty' : 'clean') : 'disk';
+    const recommended = stateName === 'conflict' || stateName === 'owned-elsewhere' || stateName === 'unsaved-elsewhere'
+      ? 'resolve'
+      : stateName === 'orphan' ? 'recover'
+        : stateName === 'external' ? 'reload' : 'none';
+    return {
+      ok: true,
+      value: {
+        path: payload?.path ?? '', displayPath: a.opened.value.displayPath, canonical: a.canonical,
+        state: stateName, source: a.source, dirty: a.dirty === true, diskChanged: a.diskChanged,
+        conflict: a.conflict === true, orphanDraft: a.orphanDraft === true, external: a.external === true,
+        bufferOwnedElsewhere: a.bufferOwnedElsewhere === true, unsavedElsewhere: a.unsavedElsewhere === true,
+        version: a.revisionId, revisionId: a.revisionId,
+        head: a.room ? { epoch: a.room.epoch, version: a.room.version, savedVersion: a.room.savedVersion } : null,
+        recovery: recovery.filter((entry) => entry.sha256 !== a.textSha).slice(0, 5), recommended,
+      },
+    };
+  }
+
   async function applyEdits(payload, invocation, policy) {
     let a;
     try { a = await authority(payload, invocation); }
@@ -404,6 +457,7 @@ export function createDocumentsService(deps) {
             version: revisionId,
             textSha256: result.textSha256, dirty: true, saved: false,
             applied: appliedOf(changes), checkpoint: archived, textLength: result.text.length,
+            ...(typeof result.recoveryPath === 'string' && result.recoveryPath ? { recoveryPath: result.recoveryPath } : {}),
           },
         };
       }
@@ -481,5 +535,5 @@ export function createDocumentsService(deps) {
     return { ok: false, error: value };
   }
 
-  return { read, applyEdits };
+  return { read, applyEdits, state };
 }

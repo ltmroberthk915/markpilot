@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, stat, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, stat, rm, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createHost } from '../lib/index.js';
+import { createHost, MODEL_TOOL } from '../lib/index.js';
 
 const fsStub = {
   async resolve(path) { return { targetKey: String(path), displayPath: String(path) }; },
@@ -56,6 +56,40 @@ test('docs/archive is idempotent for identical bytes', async () => {
     assert.equal(second.ok, true);
     assert.equal(second.value.archivePath, first.value.archivePath);
     assert.equal(second.value.idempotent, true);
+    await host.close();
+  } finally {
+    if (previous === undefined) delete process.env.LOCALAPPDATA;
+    else process.env.LOCALAPPDATA = previous;
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+test('docs/archive keeps only the newest 20 agent-before copies and leaves other tags alone', async () => {
+  const base = await mkdtemp(join(tmpdir(), 'mp-archive-retain-'));
+  const previous = process.env.LOCALAPPDATA;
+  process.env.LOCALAPPDATA = base;
+  try {
+    const host = createHost({ fs: fsStub, log: SILENT_LOG, connectionProvider: provider });
+    const source = join(base, '秋招笔试', '北交所面试材料.md');
+    const dir = join(base, '.markpilot', 'draft-archive');
+    const overHttp = await host.dispatch('docs/archive', { path: source, text: 'HTTP', tag: 'agent-before' });
+    assert.equal(overHttp.ok, false);
+    assert.equal(overHttp.error.code, 'bad-request');
+    for (let i = 0; i < 25; i++) {
+      const result = await host.dispatch('docs/archive', { path: source, text: 'VERSION-' + i, tag: 'agent-before' }, MODEL_TOOL);
+      assert.equal(result.ok, true, JSON.stringify(result));
+    }
+    const userCopy = await host.dispatch('docs/archive', { path: source, text: 'USER-COPY', tag: 'draft' });
+    assert.equal(userCopy.ok, true);
+    const names = await readdir(dir);
+    const automatic = names.filter((name) => /\.agent-before\.[0-9a-f]{16}\.md$/.test(name));
+    assert.equal(automatic.length, 20);
+    const textOf = async (name) => readFile(join(dir, name), 'utf8');
+    const texts = await Promise.all(automatic.map(textOf));
+    assert.equal(texts.includes('VERSION-24'), true);
+    assert.equal(texts.includes('VERSION-0'), false);
+    assert.equal(names.includes(userCopy.value.archivePath.slice(userCopy.value.archivePath.lastIndexOf('\\') + 1)), true);
+    assert.equal(await readFile(userCopy.value.archivePath, 'utf8'), 'USER-COPY');
     await host.close();
   } finally {
     if (previous === undefined) delete process.env.LOCALAPPDATA;

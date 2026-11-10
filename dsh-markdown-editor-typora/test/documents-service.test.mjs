@@ -17,6 +17,7 @@ function makeWorld(options = {}) {
   if (room && room.localMembers === undefined) room.localMembers = room.members;
   const live = {
     async readRoom(p) { assert.equal(p, file); return room; },
+    async listAppendRecovery(p) { assert.equal(p, file); return options.recovery ?? []; },
     async append(p, req) {
       assert.equal(p, file);
       calls.append.push(req);
@@ -24,13 +25,16 @@ function makeWorld(options = {}) {
       room.version += 1;
       room.text = next;
       room.textSha256 = sha256Text(next);
-      return { epoch: room.epoch, version: room.version, savedVersion: room.savedVersion, diskHash: room.diskHash, text: next, textSha256: sha256Text(next) };
+      return { epoch: room.epoch, version: room.version, savedVersion: room.savedVersion, diskHash: room.diskHash, text: next, textSha256: sha256Text(next), recoveryPath: options.recoveryPath };
     },
   };
   const service = createDocumentsService({
     live,
     sandboxMode: options.sandboxMode,
-    async openModel() { return { ok: true, value: { text, version, displayPath: file, size: text.length } }; },
+    async openModel() {
+      if (options.missing) return { ok: false, error: { code: 'FS_NOT_FOUND', message: 'missing' } };
+      return { ok: true, value: { text, version, displayPath: file, size: text.length } };
+    },
     async edit(payload) {
       calls.edit.push(payload);
       if (payload.oldString !== undefined && !text.includes(payload.oldString)) return { ok: false, error: { code: 'FS_EDIT_NOT_FOUND', message: 'not found' } };
@@ -282,4 +286,52 @@ test('B3-S10 path containment, EOL compare and exact replace semantics are stabl
   const all = replaceExact('a b a', 'a', 'x', true);
   assert.deepEqual(all.changes, [{ from: 0, to: 1, insert: 'x' }, { from: 4, to: 5, insert: 'x' }]);
   assert.equal(all.newText, 'x b x');
+});
+
+test('B3-S11 state/reconcile is read-only and reports clean/disk/conflict with recovery index', async () => {
+  const disk = makeWorld();
+  const diskState = await disk.service.state({ path: disk.file }, {});
+  assert.equal(diskState.ok, true);
+  assert.equal(diskState.value.state, 'disk');
+  assert.equal(diskState.value.recommended, 'none');
+  assert.equal(diskState.value.recovery.length, 0);
+
+  const cleanRoom = { epoch: 'e-1', version: 2, savedVersion: 2, diskHash: 'd1', text: 'hello\n', savedText: 'hello\n', savedTextAvailable: true, members: 1, textSha256: sha256Text('hello\n') };
+  const clean = makeWorld({ room: cleanRoom, recovery: [
+    { recoveryPath: 'C:/recovery/a.md', sha256: 'a'.repeat(64), at: 1, kind: 'agent-append' },
+    { recoveryPath: 'C:/recovery/b.md', sha256: sha256Text('hello\n'), at: 2, kind: 'agent-append' },
+  ] });
+  const cleanState = await clean.service.state({ path: clean.file }, {});
+  assert.equal(cleanState.ok, true);
+  assert.equal(cleanState.value.state, 'clean');
+  assert.equal(cleanState.value.source, 'buffer');
+  assert.equal(cleanState.value.recovery.length, 1);
+  assert.equal(cleanState.value.recovery[0].kind, 'agent-append');
+  assert.equal(cleanState.value.recovery[0].recoveryPath, 'C:/recovery/a.md');
+  assert.equal(clean.calls.archive.length, 0);
+
+  const conflictRoom = { epoch: 'e-1', version: 3, savedVersion: 2, diskHash: 'd1', text: 'buffer\n', savedText: 'old\n', savedTextAvailable: true, members: 1, textSha256: sha256Text('buffer\n') };
+  const conflict = makeWorld({ room: conflictRoom });
+  const conflictState = await conflict.service.state({ path: conflict.file }, {});
+  assert.equal(conflictState.value.state, 'conflict');
+  assert.equal(conflictState.value.recommended, 'resolve');
+  assert.equal(conflict.calls.append.length, 0);
+  assert.equal(conflict.calls.archive.length, 0);
+
+  const missing = makeWorld({ missing: true });
+  const missingState = await missing.service.state({ path: missing.file }, {});
+  assert.equal(missingState.ok, true);
+  assert.equal(missingState.value.state, 'missing');
+  assert.equal(missingState.value.recommended, 'none');
+  assert.equal(missing.calls.archive.length, 0);
+});
+
+test('B3-S12 buffer apply returns the independent recovery path', async () => {
+  const room = { epoch: 'e-1', version: 2, savedVersion: 2, diskHash: 'd1', text: 'hello\n', savedText: 'hello\n', savedTextAvailable: true, members: 1, textSha256: sha256Text('hello\n') };
+  const w = makeWorld({ room, recoveryPath: 'C:/live/recovery/agent-append/a.md' });
+  const read = await w.service.read({ path: w.file }, {});
+  const apply = await w.service.applyEdits({ path: w.file, baseRevisionId: read.value.version, oldString: 'hello', newString: 'bye' }, {}, undefined);
+  assert.equal(apply.ok, true);
+  assert.equal(apply.value.recoveryPath, 'C:/live/recovery/agent-append/a.md');
+  assert.equal(apply.value.saved, false);
 });

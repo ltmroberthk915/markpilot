@@ -28,6 +28,13 @@ test('registry fallback converts author required:true into JSON-Schema required 
     version: 'rev1:live:e-1:7:' + 'a'.repeat(64), text: 'hi',
   });
   assert.match(rendered[0].text, /rev1:live:e-1:7:/);
+  const edited = def.output.render({ action: 'edit' }, {
+    ok: true, action: 'edit', displayPath: 'D:/a.md', saved: false,
+    checkpointPath: 'C:/archive/before.md', recoveryPath: 'C:/live/recovery/agent-append/after.md',
+    version: 'rev1:live:e-1:8:' + 'b'.repeat(64),
+  });
+  assert.match(edited[0].text, /改前副本：C:\/archive\/before\.md/);
+  assert.match(edited[0].text, /恢复副本：C:\/live\/recovery\/agent-append\/after\.md/);
 });
 
 test('registerMarkdownTool falls back to tools.register when defineTool is unavailable in this tree', async () => {
