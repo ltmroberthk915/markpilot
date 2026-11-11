@@ -659,3 +659,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 更新前备份 `D:\BuyKey\desktop-profile-backup-20261112-0500`；未重启 Desktop。
 - 全量 541/540/1。
 - 明确限制：read/applyEdits 仍直连实时权威；P1 完整 11 状态/客户端接线未完成；不是 2.0 正式版。
+
+## 61. P1 影子只读测试补齐
+
+- 新增 `documents.session` 不创建 live room、不写盘的测试；
+- P1 已有 66 场景 0 差异、11 状态动作表、TTL/cap、MODEL_TOOL 拒绝；
+- P1 影子闸门可视为完成；P1 客户端接线仍不在本轮范围。
+- 全量 542/541/1。
