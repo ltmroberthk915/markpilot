@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { createHash } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { createHost, MODEL_TOOL } from '../lib/index.js';
 
@@ -84,8 +84,28 @@ test('P1-G1 live room states: dirty, conflict, orphan, mirror match state', asyn
       const mirror = await compareShadow(host, mirrorFile, `mirror-${index}`);
       assert.equal(mirror.value.source, 'mirror');
       scenarios += 1;
+
+      const recoveryFile = path.join(root, `recovery-${index}.md`);
+      await fs.writeFile(recoveryFile, base, 'utf8');
+      const recoveryJoin = await live.join(recoveryFile, base);
+      await live.append(recoveryFile, { epoch: recoveryJoin.epoch, baseVersion: 0, baseText: base, actor: 'agent', changes: [{ from: 5, to: 5, insert: 'R' }] });
+      const recoveryRoom = await live.readRoom(recoveryFile);
+      await live.append(recoveryFile, { epoch: recoveryRoom.epoch, baseVersion: recoveryRoom.version, baseText: recoveryRoom.text, actor: 'agent', changes: [{ from: recoveryRoom.text.length, to: recoveryRoom.text.length, insert: 'S' }] });
+      const recovery = await compareShadow(host, recoveryFile, `recovery-${index}`);
+      assert.equal(recovery.value.recovery.length >= 1, true);
+      scenarios += 1;
+
+      const reviewFile = path.join(root, `review-${index}.md`);
+      await fs.writeFile(reviewFile, base, 'utf8');
+      await live.recordAgentGroup(reviewFile, {
+        groupId: randomUUID(), actor: 'agent', kind: 'edit',
+        changes: [{ from: 5, to: 5, insert: 'Q' }], baseRevision: 'base', resultRevision: 'result',
+      });
+      const review = await compareShadow(host, reviewFile, `review-${index}`);
+      assert.equal(review.value.groups.length >= 1, true);
+      scenarios += 1;
     }
-    assert.equal(scenarios, 20);
+    assert.equal(scenarios, 30);
     host.close();
   } finally {
     host.close();
