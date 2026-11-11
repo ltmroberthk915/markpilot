@@ -261,3 +261,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
   - 目标在 `D:\BuyKey\deepseek harness 探索任务\...-恢复-....md`
   - 当前 Web session 的 workspace-write 不允许写该目录
 - 未生成副本，未绕过沙箱；该客户端动作为未提交草稿，需改“目标路径选择/允许目录”后再测。
+
+## 11. P4 另存为模态真机（通过）
+
+- 新建并保存 `p4-modal-real.md`，外部删除后 missing 横幅出现；
+- 点击「另存为…」打开路径输入模态，改目标为 `D:\BuyKey\Typora-Editor-App\p4-modal-copy.md`；
+- 点击保存：副本创建成功，正文 `# p4-modal-real`，原路径未重建；
+- 目标在允许 workspace 内，未绕过沙箱；测试文件已清理。
