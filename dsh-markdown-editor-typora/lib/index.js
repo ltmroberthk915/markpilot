@@ -2462,6 +2462,7 @@ export function createMarkdownToolDefinition(dispatch) {
             dirty: value.dirty === true, saved: value.saved === true,
             ...(Array.isArray(value.conflicts) ? { conflicts: value.conflicts } : {}),
             ...(value.groupId ? { groupId: value.groupId } : {}),
+            ...(value.checkpoint?.archivePath ? { checkpointPath: value.checkpoint.archivePath } : {}),
           };
         }
         if (action === 'batch') {
