@@ -383,3 +383,15 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 对比 `documents.session` 与 `documents.state` 的 state/source/dirty/conflict/version/revisionId/orphanDraft/external/unsavedElsewhere，0 差异；
 - 覆盖保存后 cache 刷新、改名后 missing；尚未覆盖 dirty/conflict/orphan/mirror/review/recovery 组合，故不能宣称 G1 全绿。
 - 全量 525/524/1。
+
+## 24. 1.9.0 正式打包与 Desktop 实装（2026-11-11）
+
+- 最终包 `dsh-markdown-editor-typora-1.9.0.tgz`，150 files，SHA256 `848C845D988A37A8D31FD6404EDD36358C4E370CCDD6CF6273F3805182058C60`。
+- 隔离 profile `mp-pkg-test` 安装成功。
+- Desktop 从 rc.9 更新到 `file:...1.9.0.tgz`：
+  - node_modules 实体目录
+  - version 1.9.0
+  - Markdown 模型工具可调用
+  - 未重启 Desktop；UI 最终验收待做
+- 更新前备份：`D:\BuyKey\desktop-profile-backup-20261111-1400`。
+- 全量 525/524/1。
