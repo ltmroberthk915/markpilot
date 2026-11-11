@@ -517,6 +517,8 @@ test('P1-API documents.session is a read-only editor snapshot', async () => {
     assert.equal(session.value.state, 'disk');
     assert.equal(Array.isArray(session.value.allowedActions), true);
     assert.equal(session.value.allowedActions.includes('save'), false);
+    assert.equal(await fs.access(path.join(w.live, 'rooms.sqlite')).then(() => true, () => false), false, 'session must not create a live room');
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'body\n');
     const model = await host.dispatch('documents.session', { path: w.file }, MODEL_TOOL, execution(w.root));
     assert.equal(model.ok, false);
     host.close();
@@ -550,6 +552,26 @@ test('P1-API documents.session normalizes missing and refreshes after creation',
     assert.equal(second.value.state, 'disk');
     host.close();
   } finally { w.restore(); }
+});
+
+test('P1-API session cache refreshes after save and rename', async () => {
+  const w = await makeWorld('session-refresh', 'body\n');
+  const renamed = w.file + '-renamed.md';
+  try {
+    const host = createHost({ fs: provider(w.file), log: { warn() {} } });
+    const first = await host.dispatch('documents.session', { path: w.file });
+    const opened = await host.dispatch('open', { path: w.file });
+    const saved = await host.dispatch('save', { path: w.file, text: 'changed\n', baseVersion: opened.value.version });
+    assert.equal(saved.ok, true);
+    const second = await host.dispatch('documents.session', { path: w.file });
+    assert.equal(second.ok, true);
+    assert.notEqual(second.value.version, first.value.version);
+    await fs.rename(w.file, renamed);
+    const third = await host.dispatch('documents.session', { path: w.file });
+    assert.equal(third.ok, true);
+    assert.equal(third.value.state, 'missing');
+    host.close();
+  } finally { await fs.rename(renamed, w.file).catch(() => {}); w.restore(); }
 });
 
 test('B3-API5 a sandboxed session cannot apply a buffer edit outside its workspace', async () => {
