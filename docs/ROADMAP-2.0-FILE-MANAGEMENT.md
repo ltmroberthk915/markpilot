@@ -660,3 +660,5 @@ node scripts/sync-core.mjs --check
 > **P4（2026-11-11）**：host missing latch（`cdaba73`）+ 客户端 missing 横幅（`60aee5b`）已落；headless Web 真机：新建/保存→外部删除→横幅「文件已不存在」+重试/复制→写回→横幅消失、旧路径未重建；全量 507/506/1。脏稿复制/重试分支与 saveAs/fileState 未接。
 
 > **P4 真机（2026-11-11）**：干净文件删除→横幅→写回恢复；脏稿删除→「当前编辑内容保留、未写盘」→Ctrl+S 零重建→写回进入冲突；两条均用隔离 headless Edge。复制按钮剪贴板、saveAs/locate/恢复中心未测。
+
+> **P4 saveAs（2026-11-11）**：`4308ba4` host `docs/saveAs` 走 `ctx.fs.writeText(kind:'createIfAbsent')`，契约 `{path源,targetPath目标,text}`；严格绝对路径/.md/拒绝 ADS/保留名/`\\?\`/尾点空格/`..`；editor-only；测试覆盖创建/不覆盖/不安全名/provider 调用/模型拒绝。客户端动作、recents、live 重绑未接。
