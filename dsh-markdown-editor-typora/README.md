@@ -1,4 +1,4 @@
-> **更名（1.4.0 起）：** 本插件包名改为 **`dsh-markdown-editor-typora`**（原 `dsh-markdown-typora` 停在 1.3.x）。安装：`dsh plugin --profile desktop add dsh-markdown-editor-typora@1.4.0`。
+> **更名（1.4.0 起）：** 本插件包名改为 **`dsh-markdown-editor-typora`**（原 `dsh-markdown-typora` 停在 1.3.x）。当前候选：**1.9.0-rc.3**（B4.3 冲突解决 + B3.3b 草稿镜像）；安装：`dsh plugin --profile desktop add <绝对路径>/dsh-markdown-editor-typora-1.9.0-rc.3.tgz`。历史 1.4.0 安装方式仅作参考。
 
 # dsh-markdown-typora
 
@@ -17,7 +17,7 @@
 - **技术写作，也能赏心悦目。** Typora 式即时渲染、可编辑公式与表格、离线 Mermaid、十套主题与透明外观。
 - **保存有反馈，写作少打断。** 自动保存、版本冲突提示与草稿恢复；未保存持续显示，已保存三秒后消失。
 
-**开始使用：** `dsh plugin --profile desktop add dsh-markdown-typora@1.1.0`。重启 DSH，点击左侧 **Markdown**；打开策略位于 **设置 → Markdown 编辑器 → 打开与切换**。
+**开始使用：** 从本仓库构建的 `dsh-markdown-editor-typora-1.9.0-rc.3.tgz` 安装（`dsh plugin --profile desktop add <绝对路径>/dsh-markdown-editor-typora-1.9.0-rc.3.tgz`）。重启 DSH，点击左侧 **Markdown**；打开策略位于 **设置 → Markdown 编辑器 → 打开与切换**。
 
 
 

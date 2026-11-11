@@ -164,6 +164,38 @@ test('B3.3b-client live-mode save clears an adopted residual mirror', async () =
   h.cleanup();
 });
 
+test('B3.3b-client clean close clears an adopted mirror', async () => {
+  const h = make();
+  h.setFetch((req) => {
+    if (req.endpoint === 'open') return { ok: true, value: { ...opened('base', 'v1').value, diskRevisionSha: 'a'.repeat(64) } };
+    if (req.endpoint === 'documents.draftRead') return { ok: true, value: { docToken: 'old-token', textSha256: 'b'.repeat(64) } };
+    if (req.endpoint === 'documents.draftClear') return { ok: true, value: { removed: 1 } };
+    return { ok: true, value: {} };
+  });
+  await h.boot();
+  assert.ok(h.st.doc.draftMirror);
+  h.cleanup();
+  await drain();
+  assert.equal(h.requests.filter((r) => r.endpoint === 'documents.draftClear').length, 1);
+});
+
+test('B3.3b-client removed:0 keeps the mirror handle instead of deleting a newer row', async () => {
+  const h = make();
+  h.setFetch((req) => {
+    if (req.endpoint === 'open') return { ok: true, value: { ...opened('base', 'v1').value, diskRevisionSha: 'a'.repeat(64) } };
+    if (req.endpoint === 'documents.draftRead') return { ok: true, value: { docToken: 'old-token', textSha256: 'b'.repeat(64) } };
+    if (req.endpoint === 'documents.draftClear') return { ok: true, value: { removed: 0 } };
+    return { ok: true, value: {} };
+  });
+  await h.boot();
+  const doc = h.st.doc;
+  doc.recovery = { text: 'old', docToken: 'old-token' };
+  h.st.actions.discardRecovery();
+  await drain();
+  assert.equal(h.requests.filter((r) => r.endpoint === 'documents.draftClear').length, 1);
+  assert.ok(doc.draftMirror, 'a mismatch must not drop the handle');
+});
+
 test('B3.3b-client mirror is not sent while a live room owns the buffer', async () => {
   const h = make();
   await h.boot();

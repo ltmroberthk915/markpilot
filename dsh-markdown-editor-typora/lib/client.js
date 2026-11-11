@@ -5362,17 +5362,6 @@ const __test = {
           copyMine: null,
         };
         st.doc = doc;
-        if (typeof window !== "undefined" && /(?:^|[#&])mpdebug(?:$|[&/])/.test(String(window.location?.hash || ""))) {
-          window.__mpDocDebug = () => ({
-            token: doc.token,
-            liveUnsupported: doc.liveUnsupported === true, live: !!doc.live, dirty: doc.dirty === true,
-            baseSha256: doc.baseSha256 || "", lastVersion: doc.lastVersion || null, phase: doc.phase,
-            draftMirror: doc.draftMirror || null, draftMirrorTimer: !!doc.draftMirrorTimer,
-            opened: doc.opened === true, untitled: doc.untitled === true, absPath: doc.absPath || "",
-            conflict: doc.conflict === true, review: doc.review || null,
-          });
-          window.__mpTestUnsupported = () => { doc.liveUnsupported = true; doc.live = null; return true; };
-        }
         setUi((prev) => ({ ...prev, phase: "loading", detail: "", notice: "", recovery: null, railOpen: false, notices: [] }));
         setUi((prev) => (prev.recovered || prev.saveStatus ? { ...prev, recovered: null, saveStatus: "" } : prev));   // 新文档代际不继承恢复提示或保存回执
 

@@ -1,4 +1,4 @@
-# MarkPilot 1.9.0-rc.2 发布候选（B4.3 + B3.3b 草稿镜像）
+# MarkPilot 1.9.0-rc.3 发布候选（B4.3 + B3.3b 草稿镜像）
 
 日期：2026-11-11
 
@@ -23,7 +23,7 @@
 
 ## 验证
 
-- `npm test`：496 / 495 pass / 1 skip / 0 fail。
+- `npm test`：498 / 497 pass / 1 skip / 0 fail。
 - `sync-host --check`：9 files；`sync-core --check`：124 files / 7,351,676 bytes；coreHash `4499e09378a8743fd1ec985c11bf8046f33b55350688dd9d996b839fe0d589ba`。
 - Web 独立 `mp-web-test` 真机（未操作 Desktop）：
   - 「用我的」→ 写盘 `mine`，`rooms.saved=1`，`room_resolved` 清空；
@@ -40,19 +40,19 @@
 - 超过约 3000 行文档的冲突面板会返回 `MP_MERGE_LIMIT`（fail-closed，提示重载/复制），尚未做友好 UI 提示。
 - `room_resolved` 旧 root 不认识该表；混合版本宿主不要共用同一文档。
 - 新测试 `test/client-conflict-ui.test.mjs` 与本文档尚未提交。
-- B3.3b mirror 仍可能被 stale client / PID 复用误判为活房间；不自动删除未知归属的新一代 mirror；`#mpdebug` 调试钩子随包发布（仅 hash 触发，GA 前应移除）。
+- B3.3b mirror 仍可能被 stale client / PID 复用误判为活房间；不自动删除未知归属的新一代 mirror。
 
 ## 产物
 
-- `dsh-markdown-editor-typora-1.9.0-rc.2.tgz`
+- `dsh-markdown-editor-typora-1.9.0-rc.3.tgz`
 - 149 files / 2.8 MB
-- SHA256 `E9E995C04EDEF4CB074733F548DA0E890F1F6E3E4F0848200FC7FC07803FDE55`
-- 源码冻结提交 `0c85f40`（B4.3 + B3.3b，24 files / +4196/−78）
+- SHA256 `36DC88823A00FD50F857815BECC77038174242921B6D458857636C55E5E36A06`
+- 修复 GA 清理项：移除 `#mpdebug` 调试钩子、补 clean-close/removed:0 测试、更新 README/SHA256SUMS
 
 **注意**：rc.1 与更早的 1.9.0 包在 B3.3b 之前构建，不包含 `draft_index`/mirror 代码；rc.2 为 B4.3+B3.3b 的新候选，不能与 rc.1 混用。
 
 ## 包安装验证
 
-- rc.2 已在隔离 profile `~/.dsh/profiles/mp-pkg-test` 中从 tarball 安装成功（pnpm `file:` 包）；
-- 启动该 profile 的 DSH Web，Markdown 面板可打开，`facadetest.md` 编辑器加载成功；
+- rc.3 已在隔离 profile `~/.dsh/profiles/mp-pkg-test` 中从 tarball 安装成功（pnpm `file:` 包，版本 1.9.0-rc.3）；
+- rc.2 的 Markdown 面板/编辑器加载已通过；rc.3 变更仅为移除 debug hooks、补测试、README/SHA，包结构一致；
 - 未在 DSH Desktop 安装；正式实装前需用户明确确认。
