@@ -435,3 +435,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 虚拟 provider（targetKey 非本地绝对路径）使用 `tmpdir/markpilot-archive/<sha>.md` 稳定合成路径，避免写不进；
 - 测试：disk applyEdits 归档改前正文、虚拟 provider 归档、写入成功；全量 528/527/1。
 - 未接 fs 守卫读取 draft_index、未做 lookup 连续失败 fail-closed；P5 继续。
+
+## 30. P5 write guard 覆盖 draft_index
+
+- `lookupDocument` 在无房间时查询 draft_index mirror；存在 mirror 即返回 dirty/source=mirror，通用 fs 写被 `MP_DOC_DIRTY` 拒绝；
+- 新增测试：无 room 的 mirror 被 guard 看见；
+- 全量 529/528/1。
+- 仍未做 lookup 连续失败 fail-closed / fsSessionIntents / fsArchiveAll。
