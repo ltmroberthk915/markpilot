@@ -2112,12 +2112,28 @@ export function createWriteGuard({ fs, lookup, log, pluginName = 'markpilot-writ
       for (const method of ['writeText', 'editText', 'patchText', 'deleteFile', 'moveFile']) {
         const original = ctx.fs[method];
         if (typeof original !== 'function') continue;
-        ctx.fs[method] = async function guardedFsSession(target, ...args) {
-          const state = await stateOf(target);
-          if (state && state.dirty) throw writeGuardError(WRITE_GUARD_DIRTY, state.path || target?.displayPath || target?.targetKey || '');
+        const hadOwn = Object.prototype.hasOwnProperty.call(ctx.fs, method);
+        const wrapper = async function guardedFsSession(target, ...args) {
+          const checked = method === 'moveFile' ? [target, args[0]] : [target];
+          for (const candidate of checked) {
+            const state = await stateOf(candidate);
+            if (state && state.dirty) throw writeGuardError(WRITE_GUARD_DIRTY, state.path || candidate?.displayPath || candidate?.targetKey || '');
+          }
           return original.call(this, target, ...args);
         };
-        disposers.push(() => { try { ctx.fs[method] = original; } catch { /* best effort */ } });
+        try { ctx.fs[method] = wrapper; }
+        catch (error) {
+          for (const dispose of disposers.splice(0).reverse()) { try { dispose(); } catch { /* best effort */ } }
+          installed.delete(ctx);
+          throw error;
+        }
+        disposers.push(() => {
+          try {
+            if (ctx.fs[method] !== wrapper) return;
+            if (hadOwn) ctx.fs[method] = original;
+            else delete ctx.fs[method];
+          } catch { /* best effort */ }
+        });
       }
     }
     const add = (event, handler) => {

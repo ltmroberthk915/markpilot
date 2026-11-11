@@ -144,6 +144,7 @@ test('fsSessionIntents wraps ctx.fs writes and refuses dirty sessions', async ()
   h.ctx.fs = {
     writeText: async () => { calls += 1; return 'wrote'; },
     editText: async () => { calls += 1; return 'edited'; },
+    moveFile: async () => { calls += 1; return 'moved'; },
   };
   makeGuard({ fsSessionIntents: true, lookup: async () => ({ dirty: true, path: 'D:/probe/a.md' }) }).install(h.ctx);
   await assert.rejects(() => h.ctx.fs.writeText(TARGET, 'x'), (error) => error.code === 'MP_DOC_DIRTY');
@@ -153,4 +154,20 @@ test('fsSessionIntents wraps ctx.fs writes and refuses dirty sessions', async ()
   makeGuard({ fsSessionIntents: true, lookup: async () => ({ dirty: false, path: 'D:/probe/a.md' }) }).install(clean.ctx);
   assert.equal(await clean.ctx.fs.writeText(TARGET, 'x'), 'wrote');
   assert.equal(calls, 1);
+});
+
+
+test('fsSessionIntents checks moveFile destination too', async () => {
+  const h = makeCtx();
+  let calls = 0;
+  h.ctx.fs = { moveFile: async () => { calls += 1; return 'moved'; } };
+  makeGuard({
+    fsSessionIntents: true,
+    lookup: async (target) => (target?.displayPath === 'D:/probe/dest.md' ? { dirty: true, path: 'D:/probe/dest.md' } : null),
+  }).install(h.ctx);
+  await assert.rejects(
+    () => h.ctx.fs.moveFile({ targetKey: 'D:/probe/src.md', displayPath: 'D:/probe/src.md' }, { targetKey: 'D:/probe/dest.md', displayPath: 'D:/probe/dest.md' }),
+    (error) => error.code === 'MP_DOC_DIRTY' && error.path === 'D:/probe/dest.md',
+  );
+  assert.equal(calls, 0);
 });

@@ -335,6 +335,25 @@ test('错误码原样透传（含 cause.code / AbortError）', () => {
 
 /* ───────────────────────── 宿主 API（apply + mock ctx + 真实 HTTP） ───────────────────────── */
 
+test('apply honors fsSessionIntents config strictly', async () => {
+  const makeCtxWithEvents = () => {
+    const fs = createMockFs({ 'D:/docs/a.md': 'a\n' });
+    const { ctx } = createMockContext(fs);
+    ctx.on = () => () => {};
+    return { ctx, before: ctx.fs.writeText };
+  };
+  const off = makeCtxWithEvents();
+  apply(off.ctx, {});
+  assert.equal(off.ctx.fs.writeText, off.before, 'default off must not wrap ctx.fs');
+
+  const on = makeCtxWithEvents();
+  apply(on.ctx, { fsSessionIntents: true });
+  assert.notEqual(on.ctx.fs.writeText, on.before, 'flag on must wrap ctx.fs');
+  const notBoolean = makeCtxWithEvents();
+  apply(notBoolean.ctx, { fsSessionIntents: 'true' });
+  assert.equal(notBoolean.ctx.fs.writeText, notBoolean.before, 'only strict boolean enables the wrapper');
+});
+
 test('apply(ctx) 挂 prefix 路由；open/save/stat/edit 走 mock ctx.fs 与真实 HTTP', async () => {
   const fs = createMockFs({ 'D:/docs/a.md': '# A\n' });
   const { ctx, routes } = createMockContext(fs);
