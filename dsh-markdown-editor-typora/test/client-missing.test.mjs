@@ -131,10 +131,10 @@ test('P4 client missing banner reports a rename candidate', async () => {
 
 test('P4 client readonly save error surfaces a save-as escape', async () => {
   const h = make();
-  let saved = 0;
+  let saved = 0; let saveCalls = 0;
   h.setFetch((req) => {
     if (req.endpoint === 'open') return opened('base', 'v1');
-    if (req.endpoint === 'save') return { ok: false, error: { code: 'EACCES', message: 'denied' } };
+    if (req.endpoint === 'save') { saveCalls += 1; return { ok: false, error: { code: 'EACCES', message: 'denied' } }; }
     if (req.endpoint === 'saveAs') { saved += 1; return { ok: true, value: { path: 'D:/probe/copy.md', version: 'v-copy', size: 4 } }; }
     return { ok: true, value: {} };
   });
@@ -143,6 +143,10 @@ test('P4 client readonly save error surfaces a save-as escape', async () => {
   h.message('manual-save', { source: 'ctrl-s' });
   await drain();
   assert.equal(h.st.doc.readonly, true);
+  const frozenSaves = saveCalls;
+  h.edit('more');
+  await h.advance(2000);
+  assert.equal(saveCalls, frozenSaves, 'readonly must stop autosave');
   assert.equal(h.ui().phase, 'readonly');
   h.st.actions.openSaveAs();
   assert.equal(h.ui().saveAsOpen, true);

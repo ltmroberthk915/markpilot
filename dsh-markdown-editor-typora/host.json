@@ -18,8 +18,8 @@
     },
     {
       "path": "safe-file.js",
-      "bytes": 8371,
-      "sha256": "d6878ec47d8670232171a130250340ba8ac4707baebe8f6b3c4ed9f8e9106915"
+      "bytes": 8594,
+      "sha256": "fcc9ba8d1fb67fbe25c0231881709cc7e69c4d533a580dbe4168e7d22ef3d515"
     },
     {
       "path": "native-worker-lease.js",

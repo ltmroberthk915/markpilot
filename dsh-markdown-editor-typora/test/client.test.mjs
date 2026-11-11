@@ -431,6 +431,8 @@ test('P4 client saveErrorKind: missing/conflict/error 三分支', async () => {
   assert.equal(T.saveErrorKind({ code: 'FS_STALE_VERSION', message: 'changed' }), 'conflict');
   assert.equal(T.saveErrorKind({ code: 'FS_IO_ERROR' }), 'error');
   assert.equal(T.saveErrorKind({ code: 'EACCES' }), 'readonly');
+  assert.equal(T.saveErrorKind({ code: 'FS_PERMISSION_DENIED' }), 'readonly');
+  assert.equal(T.saveErrorKind({ code: 'MP_FILE_LINKED' }), 'readonly');
   assert.equal(T.saveErrorKind(null), 'error');
 });
 

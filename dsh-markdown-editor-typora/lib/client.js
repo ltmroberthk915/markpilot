@@ -776,7 +776,7 @@ function applyMirrorDelta(mirror,event){
     function saveErrorKind(error) {
       if (!error) return "error";
       if (error.reason === "missing" || error.code === "MP_FILE_MISSING") return "missing";
-      if (["EACCES", "EPERM", "EBUSY", "EROFS"].includes(error.code)) return "readonly";
+      if (["EACCES", "EPERM", "EBUSY", "EROFS", "FS_PERMISSION_DENIED", "MP_FILE_LINKED"].includes(error.code)) return "readonly";
       if (error.code === "FS_STALE_VERSION") return "conflict";
       return "error";
     }
@@ -5941,7 +5941,7 @@ const __test = {
           // missing 是删/改名后的显性 latch：输入、apply、live 刷新只能把文档标脏，
           // 不能把横幅顶掉而留下一个静默停写的 dirty 状态。
           if (doc.missing && phase !== "missing" && phase !== "error") return;
-          if (doc.readonly && phase !== "readonly" && phase !== "error") return;
+          if (!doc.missing && doc.readonly && phase !== "readonly" && phase !== "missing" && phase !== "error") return;
           saveStatus.update(doc.dirty);
           doc.phase = phase;
           doc.detail = detail || "";
@@ -6670,12 +6670,13 @@ const __test = {
           doc.missing = false;
           doc.externalStale = false;
           doc.staleNotified = false;
+          if (doc.readonly) { showPhase("readonly", "文件只读或被占用；当前编辑内容保留、未写盘，可另存为副本"); return; }
           if (doc.conflict) showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
           else showPhase(doc.dirty ? "dirty" : "ready", doc.dirty ? "编辑中…" : "");
         }
 
         function enterReadonly() {
-          if (doc.readonly) return;
+          if (doc.readonly || doc.missing) return;
           doc.readonly = true;
           doc.externalStale = true;
           doc.staleNotified = true;
@@ -6688,6 +6689,7 @@ const __test = {
           doc.readonly = false;
           doc.externalStale = false;
           doc.staleNotified = false;
+          if (doc.missing) { showPhase("missing", doc.dirty ? "磁盘上的文件已不存在；当前编辑内容保留、未写盘" : "磁盘上的文件已不存在（可能被删除或改名）"); return; }
           showPhase(doc.dirty ? "dirty" : "ready", doc.dirty ? "编辑中…" : "");
         }
 
@@ -6711,6 +6713,10 @@ const __test = {
           if (!doc.readonly || doc.dead) return;
           exitReadonly();
           await runSave({ manual: true });
+          if (!doc.readonly && doc.phase === "error") {
+            doc.readonly = true;
+            showPhase("readonly", "仍无法写入此路径；当前编辑内容保留，可另存为副本");
+          }
         }
 
         function openSaveAs() {
