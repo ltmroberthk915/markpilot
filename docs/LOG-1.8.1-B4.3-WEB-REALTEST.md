@@ -620,3 +620,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 清除只读后点「重试保存」：保存成功，状态「已保存」；
 - 测试插入 Z 已撤销，文件恢复 `# g3mirror2`，无残留；
 - 「另存为」模态本轮未完成，Web 隔离测试已覆盖。
+
+## 56. P5-G5 真实 SQLite 锁
+
+- 独立子进程对临时 rooms.sqlite 持 `BEGIN EXCLUSIVE`；
+- write guard 的 lookup 前两次 fail-open，第三次 `MP_DOC_LOOKUP_FAILED`；
+- 子进程锁释放后测试清理；测试连跑 3 次通过；
+- 全量 540/539/1。
