@@ -708,3 +708,8 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - `package/package.json` version `2.0.0`；
 - tarball 不含 `test/`；
 - SHA256 与 SHA256SUMS 一致。
+
+## 68. Draft PR
+
+- 已创建 Draft PR：https://github.com/ltmroberthk915/markpilot/pull/14
+- 标题 MarkPilot 2.0.0；未合并，未发布 npm/Release。
