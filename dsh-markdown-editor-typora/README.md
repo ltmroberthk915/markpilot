@@ -142,7 +142,11 @@ The editor engine is the same accepted build that ships with MarkPilot 3.6.17. S
 
 ## Install
 
-### 2.0.0 candidate
+### 2.0.0
+
+- 文件生命周期：missing/改名候选/只读逃生/另存为/恢复中心。
+- P5 安全切片：state 快照、写守卫、磁盘 AI 写归档、真实 SQLite 锁 fail-closed。
+- 2.0.0 已打包，Desktop 已安装；完整重启验收待做。
 
 Install the exact tarball, not a package-name/latest lookup:
 
