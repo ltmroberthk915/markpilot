@@ -668,6 +668,26 @@ test('P5-API documents.state cache notices a draft-index mirror', async () => {
   } finally { w.restore(); }
 });
 
+test('P5-API documents.state cache notices discarded recovery copies', async () => {
+  const w = await makeWorld('state-recovery', 'body\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const joined = await liveDocs.join(w.file, 'body\n');
+    await liveDocs.append(w.file, { epoch: joined.epoch, baseVersion: 0, baseText: 'body\n', actor: 'agent', changes: [{ from: 4, to: 4, insert: 'R' }] });
+    const room = await liveDocs.readRoom(w.file);
+    await liveDocs.append(w.file, { epoch: room.epoch, baseVersion: room.version, baseText: room.text, actor: 'agent', changes: [{ from: room.text.length, to: room.text.length, insert: 'S' }] });
+    const first = await host.dispatch('documents.state', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(first.ok, true);
+    assert.equal(first.value.recovery.length >= 1, true);
+    for (const entry of first.value.recovery) await liveDocs.discardAppendRecovery(w.file, entry.recoveryPath);
+    const second = await host.dispatch('documents.state', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(second.ok, true);
+    assert.equal(second.value.recovery.length, 0);
+    host.close();
+  } finally { w.restore(); }
+});
+
 test('B3-API5 a sandboxed session cannot apply a buffer edit outside its workspace', async () => {
   const w = await makeWorld('policy', 'hello\n');
   try {
