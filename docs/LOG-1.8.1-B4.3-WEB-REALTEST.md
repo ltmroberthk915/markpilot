@@ -666,3 +666,11 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - P1 已有 66 场景 0 差异、11 状态动作表、TTL/cap、MODEL_TOOL 拒绝；
 - P1 影子闸门可视为完成；P1 客户端接线仍不在本轮范围。
 - 全量 542/541/1。
+
+## 62. 2.0.0 打包与 Desktop 更新
+
+- 包 `dsh-markdown-editor-typora-2.0.0.tgz`，150 files，SHA256 `A4CAF71165A75B95A8C0581ECAD83A112AA1E07F28C9B29A62E056A7C1C2D31A`。
+- 隔离 profile 安装成功；Desktop 从 2.0.0-rc.1 更新到 `file:...2.0.0.tgz`，实体目录，version 2.0.0，Markdown 工具可调用。
+- 更新前备份 `D:\BuyKey\desktop-profile-backup-20261112-0530`；未重启 Desktop。
+- 全量 542/541/1。
+- 明确限制见 RELEASE-2.0.0：read/applyEdits 直连权威；P1 客户端接线未完成。
