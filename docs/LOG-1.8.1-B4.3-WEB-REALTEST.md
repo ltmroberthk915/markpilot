@@ -326,3 +326,16 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
   - Web 显示 `⚠ 文件只读或被占用；当前编辑内容保留、未写盘，可另存为副本`
   - 按钮「重试保存」「另存为…」「复制我的内容」
 - 测试文件已恢复权限并删除；headless Edge/测试服务器已停止。
+
+## 18. P4 恢复中心（host + 客户端）
+
+- 新增 editor-only：
+  - `documents.recoveryList`（metadata only）
+  - `documents.recoveryRead`（4 MiB 上限，超出 `MP_RECOVERY_TOO_LARGE`）
+  - `documents.recoveryDiscard`
+- 客户端 missing/readonly 横幅新增「历史副本」：
+  - 覆盖层列出时间/version/bytes
+  - 查看预览（20k 截断提示）、复制路径
+  - 空列表、加载中、错误分离；Escape 关闭；窄侧栏按钮有 data-icon/title
+- 测试：host list/read/discard/MODEL_TOOL、客户端列表/预览；全量 517/516/1。
+- 未接 discard 确认/恢复写入；恢复中心尚未打包。
