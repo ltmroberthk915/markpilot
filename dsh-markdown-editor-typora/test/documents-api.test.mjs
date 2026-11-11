@@ -688,6 +688,19 @@ test('P5-API documents.state cache notices discarded recovery copies', async () 
   } finally { w.restore(); }
 });
 
+test('P1-API documents.session never creates a room or writes disk', async () => {
+  const w = await makeWorld('session-readonly', 'body\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const snapshot = await host.dispatch('documents.session', { path: w.file });
+    assert.equal(snapshot.ok, true);
+    assert.equal(await liveDocs.readRoom(w.file), null);
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'body\n');
+    host.close();
+  } finally { w.restore(); }
+});
+
 test('B3-API5 a sandboxed session cannot apply a buffer edit outside its workspace', async () => {
   const w = await makeWorld('policy', 'hello\n');
   try {
