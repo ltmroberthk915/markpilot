@@ -297,3 +297,12 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - `scheduleSave`/`runSave` 在 readonly 期间停写；另存为成功保留 readonly 提示。
 - 新增 client 测试：EACCES → readonly、modal 可提交 saveAs、autosave 停止。
 - 未做真实 Web 只读文件真机（仅单测）；全量 514/513/1。
+
+## 15. P4 改名横幅真机（通过）
+
+- 新建/保存 `p4-rename-real.md`，外部改名为 `p4-rename-real-renamed.md`；
+- 3.5s 后 Web 显示：
+  - `⚠ 检测到可能已改名为：p4-rename-real-renamed.md；可重试或另存为副本`
+  - 按钮「重试」「另存为…」「复制我的内容」
+- 文件改回原名后测试结束；旧路径未被静默重建，测试文件已清理。
+- 之前记录“headless 挂起”是脚本输出缓冲导致，实际通过。
