@@ -371,3 +371,8 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 打包 `files` 已收为 `lib`，`document-sessions.js` 确认进包。
 - 新增测试：save 后 session 版本刷新、rename 后 missing、调用不建 rooms.sqlite/不改正文。
 - 全量 523/522/1；30 场景 G1 对比未做。
+
+## 22. Desktop rc.9 更新（2026-11-11）
+
+- 更新前备份 `package.json`/`pnpm-lock.yaml`/`cordis.patch.yml` 到 `D:\BuyKey\desktop-profile-backup-20261111-1340`。
+- Desktop 更新到 `file:...rc.9.tgz`，version `1.9.0-rc.9`，node_modules 实体目录，`lib/document-sessions.js` 已存在；Markdown 工具可调用。未重启 Desktop。
