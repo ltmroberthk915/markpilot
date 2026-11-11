@@ -523,3 +523,9 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - `b43-keepmine2.md` 测试文档内容与属性未变；
 - Desktop node_modules 确认 version 1.9.3；
 - 未在本次重启后重复删除/改名/只读 UI 用例。
+
+## 42. P5 write guard 错误文案
+
+- `MP_DOC_LOOKUP_FAILED` 不再说“文件正在打开”，改为“连续无法读取未保存状态，已拒绝写入”。
+- mirror 场景错误消息明确“存在草稿镜像”，不再误导为当前窗口打开。
+- 测试覆盖两种消息；全量 535/534/1。
