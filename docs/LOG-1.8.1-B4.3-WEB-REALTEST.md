@@ -477,3 +477,12 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 合计 **65 场景 0 差异**（30 磁盘/保存/改名 + 35 live）。
 - 仍未覆盖 owned-elsewhere / readonly / locked 与完整 11 状态表。
 - 全量 531/530/1。
+
+## 36. Desktop P5 磁盘归档真机（通过）
+
+- 对未打开的磁盘文件 `facadetest.md` 用 Markdown 模型工具 `edit`：
+  - 成功写盘：`AIARCH# facadetest`
+  - 返回 `checkpointPath`：
+    `C:\Users\Ming\AppData\Local\.markpilot\draft-archive\facadetest.md.agent-before.4cddcf72a9247aab.md`
+  - 归档内容为改前 `FACADEREAL# facadetest`，SHA256 `1382A202…`
+- 改后测试文件已恢复原文；Desktop 1.9.2 上实际验证了 disk-authority AI 写归档。
