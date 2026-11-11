@@ -320,7 +320,7 @@ const MODEL_TOOL = Symbol('markdown model tool');
 export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'diag']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/saveAs', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'diag']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
 
@@ -595,6 +595,26 @@ export function isSandboxWriteDenied(error) {
   if (errorCode(error) === 'FS_SANDBOX_DENIED') return true;
   const message = String(error?.message ?? error ?? '');
   return /file access denied under (workspace-write|read-only) mode/i.test(message);
+}
+
+function validSaveAsPath(raw) {
+  if (typeof raw !== 'string' || !raw || raw.includes('\0')) return false;
+  if (!/^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+)/.test(raw)) return false;
+  if (raw.startsWith('\\\\?') || raw.startsWith('\\\\.')) return false;
+  const parts = raw.split(/[\\/]+/);
+  if (/^[A-Za-z]:$/.test(parts[0])) {
+    if (parts.slice(1).some((part) => part.includes(':'))) return false;
+  } else if (parts.some((part) => part.includes(':'))) {
+    return false;
+  }
+  if (parts.some((part) => part === '..' || part === '.')) return false;
+  const base = parts[parts.length - 1] || '';
+  if (!/\.md$/i.test(base)) return false;
+  if (/[<>:"|?*\u0000-\u001f]/.test(base)) return false;
+  if (/[. ]$/.test(base)) return false;
+  const stem = base.split('.')[0].toUpperCase();
+  if (/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/.test(stem)) return false;
+  return true;
 }
 
 function codedError(code, message, extra) {
@@ -1224,6 +1244,36 @@ export function createHost(options = {}) {
 
   // First-save drafts use a fixed UUID name. A retry never chooses another file.
   const draftReceipts = new Map();
+  // P4 escape hatch. The write must go through ctx.fs so sandbox policy,
+  // staging and encoding stay identical to normal saves; never use bare node fs.
+  // Contract: {path: source, targetPath: new file, text}. `path` is accepted as
+  // the target for the legacy test-only shape.
+  async function apiSaveAs(payload, authority) {
+    if (authority === MODEL_TOOL) return badRequest('saveAs is editor-only');
+    const raw = payload?.targetPath !== undefined ? payload.targetPath : payload?.path;
+    const text = payload?.text;
+    if (!validSaveAsPath(raw)) return badRequest('save-as path must be an absolute .md path (no ADS/reserved names)');
+    if (typeof text !== 'string') return badRequest('text is required');
+    const target = await fs.resolve(raw);
+    if (await fs.stat(target) !== undefined) throw codedError('FS_EXISTS','save-as target already exists');
+    let receipt;
+    try {
+      receipt = await fs.writeText(target, text, { kind: 'createIfAbsent' });
+    } catch (error) {
+      if (['FS_NOT_OBSERVED', 'FS_EXISTS', 'EEXIST'].includes(error?.code)) throw codedError('FS_EXISTS','save-as target already exists');
+      throw error;
+    }
+    const info = await fs.stat(target);
+    if (info && info.type !== 'file') throw codedError('FS_STALE_VERSION','save-as target is not a regular file');
+    const version = String(receipt?.version ?? info?.version ?? '');
+    broadcastChange(target, version);
+    return { ok: true, value: {
+      path: target.displayPath || raw,
+      version,
+      size: Buffer.byteLength(text, 'utf8'),
+    } };
+  }
+
   async function createExactDraft(payload) {
     const draftId = payload?.draftId;
     if (typeof draftId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(draftId)
@@ -1686,6 +1736,7 @@ export function createHost(options = {}) {
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           return await documents.merge3(payload, invocation, invocation?.policy);
         case 'docs/create': return await apiDocsCreate(payload);
+        case 'docs/saveAs': return await apiSaveAs(payload, authority);
         case 'docs/recent': return await apiDocsRecent(payload);
         case 'docs/archive':
           if (payload?.tag === 'agent-before' && authority !== MODEL_TOOL) return badRequest('model tool authority required');

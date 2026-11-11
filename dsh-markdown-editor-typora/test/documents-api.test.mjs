@@ -877,6 +877,66 @@ test('B4.4-API3 stat reports missing after external deletion', async () => {
   } finally { w.restore(); }
 });
 
+test('B4.4-API4 saveAs uses provider createIfAbsent and rejects unsafe names', async () => {
+  const w = await makeWorld('save-as', 'old\n');
+  const target = w.file + '.copy.md';
+  await fs.unlink(target).catch(() => {});
+  let createCalls = 0;
+  const tiny = {
+    async resolve(value) { return { targetKey: value, displayPath: value }; },
+    async stat(value) {
+      const p = typeof value === 'string' ? value : value?.targetKey;
+      try { const info = await fs.stat(p); return { type: info.isFile() ? 'file' : 'directory', size: info.size, version: 'v' + info.mtimeMs }; }
+      catch (error) { if (error.code === 'ENOENT') return undefined; throw error; }
+    },
+    async readText(value) { return fs.readFile(typeof value === 'string' ? value : value?.targetKey, 'utf8'); },
+    async writeText(value, text, options) {
+      if (options?.kind !== 'createIfAbsent') throw Object.assign(new Error('unexpected write mode'), { code: 'FS_IO_ERROR' });
+      createCalls += 1;
+      const p = typeof value === 'string' ? value : value?.targetKey;
+      const handle = await fs.open(p, 'wx', 0o600);
+      try { await handle.writeFile(text, 'utf8'); await handle.sync(); } finally { await handle.close(); }
+      return { version: 'v-created' };
+    },
+    async editText() { throw new Error('not used'); },
+    async watch() { return async () => {}; },
+  };
+  try {
+    const host = createHost({ fs: tiny, log: { warn() {} } });
+    const first = await host.dispatch('docs/saveAs', { path: w.file, targetPath: target, text: 'copy\n' });
+    assert.equal(first.ok, true);
+    assert.equal(first.value.version, 'v-created');
+    assert.equal(createCalls, 1, 'saveAs must call the provider createIfAbsent, never bare fs');
+    assert.equal(await fs.readFile(target, 'utf8'), 'copy\n');
+    const second = await host.dispatch('docs/saveAs', { path: w.file, targetPath: target, text: 'overwrite\n' });
+    assert.equal(second.ok, false);
+    assert.equal(second.error.code, 'FS_EXISTS');
+    assert.equal(createCalls, 1, 'existing target must not reach the writer');
+    assert.equal(await fs.readFile(target, 'utf8'), 'copy\n');
+    for (const unsafe of [
+      'relative.md',
+      target + ':ads',
+      path.join(path.dirname(target), 'CON.md'),
+      path.join(path.dirname(target), 'name.md.'),
+      path.join(path.dirname(target), 'name.space.md '),
+      '\\rooted.md',
+      '\\\\?/C:/tmp/x.md',
+      '\\\\server\\share\\dir:ads\\x.md',
+    ]) {
+      const result = await host.dispatch('docs/saveAs', { path: w.file, targetPath: unsafe, text: 'x' });
+      assert.equal(result.ok, false, 'must reject ' + unsafe);
+    }
+    const model = await host.dispatch('docs/saveAs', { path: w.file, targetPath: target + '.2.md', text: 'x' }, MODEL_TOOL, { agent: { session: { header: { cwd: path.dirname(target) } } } });
+    assert.equal(model.ok, false, 'model tool must not call saveAs');
+    assert.equal(createCalls, 1);
+    host.close();
+  } finally {
+    await fs.unlink(target).catch(() => {});
+    await fs.unlink(target + '.2.md').catch(() => {});
+    w.restore();
+  }
+});
+
 test('B4.3-ADV2b theirs and both choices resolve without writing disk', async () => {
   const w = await makeWorld('conflict-choices', 'base\n');
   try {
