@@ -500,3 +500,11 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - true 时包装 `ctx.fs.writeText/editText/patchText/deleteFile/moveFile`，dirty session 拒绝 `MP_DOC_DIRTY`，disposer 还原；
 - 修复 `apply` 的 free `options` 引用（否则整个 write guard 不安装）；
 - 测试 dirty 拒绝/clean 放行；全量 532/531/1。
+
+## 39. P5 fsSessionIntents 审查修复
+
+- 修复 `apply` 引用未定义 `options`（会导致整个 B2 guard 不安装）；改为 `apply(ctx, config={})`。
+- `moveFile` 同时检查 source 与 destination，dirty 目的地拒绝。
+- 包装 disposer：record own property、identity 检查、必要时 delete；赋值失败回滚已安装 wrapper。
+- 新增 apply 级测试：默认关闭不包装、flag=true 包装、字符串 "true" 不包装；moveFile 目的地测试。
+- 全量 534/533/1；默认关闭行为不变。
