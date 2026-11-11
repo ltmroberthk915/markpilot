@@ -679,3 +679,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 
 - 安装 2.0.0 后未重启宿主，点击 Markdown；工作台正常打开 `g3mirror2`，状态「就绪」，无插件加载错误；
 - 这是热加载冒烟，不替代完整重启验收。
+
+## 64. 2.0.0 磁盘归档真机
+
+- 对未打开的 `facadetest.md` 用 Markdown 工具 edit；
+- 返回 `checkpointPath`：`facadetest.md.agent-before.36a7071d0fdd581e.md`；
+- 归档正文为改前 `FACADEREAL# facadetest`；
+- 测试文件已恢复原文，测试归档已删除。
