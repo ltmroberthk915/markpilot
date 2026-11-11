@@ -368,7 +368,7 @@ Session {
 
 #### P4 · 文件生命周期完善（4–6 人日）
 
-> **状态（2026-11-11）**：host 最小切片已落（commit `cdaba73`）：watch `missing:true` latch/恢复帧/首挂流补帧、save `reason:'missing'` 透传、4 条测试；全量 503/502/1。客户端 missing 横幅、fileState/locate/saveAs、恢复中心未接。
+> **状态（2026-11-11）**：host 切片 `cdaba73` + 客户端 missing 横幅 `60aee5b`：watch `missing:true` latch/恢复帧/首挂流补帧、save `reason:'missing'`、客户端 missing latch（打字/apply/live 不顶横幅）、重试/复制、自动保存停写与错误分类；7 条新测试；全量 507/506/1。fileState/locate/saveAs、恢复中心未接。
 
 - `host/index.js` watch：**`tickWatch` 已有 missing 分支**（`fs.stat` undefined → `missing=true`、version=''、不更新 lastVersion，`index.js:839-861`）；真正缺的是**没有把 missing 传给客户端**：`broadcastChange` 只发 `version:''`（`index.js:823-837`）。2.0 在 SSE `change` 里增加 `missing:true`（保持 version 兼容），并 **latch missing 状态**：只在“存在→missing”或“missing→存在”的跃迁时广播一次，避免 missing 期间每轮 tick 重播；文件重新出现时清 latch。
 - `lib/client.js` 外部事件：`onExternalEvent`（约 6402-6436）现在把 missing 当通用外部变更——干净文档会 `loadFromDisk({silent:true})` **静默失败**（旧内容仍显示、无提示；非 silent 路径才显示“打开失败”）；脏文档会显示泛化的“文件已在磁盘上更新”冲突横幅。2.0 必须在最前面分支 `data.missing`：干净 → “文件已不存在（可能被删除或改名）”，给 `另存为/重试/关闭`；脏 → “文件已不存在；草稿保留”，给 `另存为/复制内容/关闭并保留草稿`；**不调用 `loadFromDisk` 冒充冲突**。
