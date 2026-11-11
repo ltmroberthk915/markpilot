@@ -627,3 +627,9 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - write guard 的 lookup 前两次 fail-open，第三次 `MP_DOC_LOOKUP_FAILED`；
 - 子进程锁释放后测试清理；测试连跑 3 次通过；
 - 全量 540/539/1。
+
+## 57. P5 fsSessionIntents 默认关矩阵
+
+- 默认 false：dirty 文档的 direct ctx.fs.writeText 仍放行，证明 flag 关闭无行为变化；
+- true：dirty 拒绝（已有测试）；moveFile 目的地检查（已有测试）。
+- 全量 541/540/1。
