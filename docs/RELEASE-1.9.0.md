@@ -47,7 +47,7 @@
 - `dsh-markdown-editor-typora-1.9.0-rc.3.tgz`
 - 149 files / 2.8 MB
 - SHA256 `36DC88823A00FD50F857815BECC77038174242921B6D458857636C55E5E36A06`
-- 修复 GA 清理项：移除 `#mpdebug` 调试钩子、补 clean-close/removed:0 测试、更新 README/SHA256SUMS
+- 源码冻结提交 `25f569b`（GA cleanup：移除 debug hooks、补 lifecycle 测试、README/SHA）
 
 **注意**：rc.1 与更早的 1.9.0 包在 B3.3b 之前构建，不包含 `draft_index`/mirror 代码；rc.2 为 B4.3+B3.3b 的新候选，不能与 rc.1 混用。
 
