@@ -554,3 +554,9 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 隔离 profile 安装成功；Desktop 从 1.9.3 更新到 `file:...1.9.4.tgz`，实体目录，version 1.9.4，Markdown 工具可调用。
 - 更新前备份 `D:\BuyKey\desktop-profile-backup-20261112-0330`；未重启 Desktop。
 - 全量 537/536/1。
+
+## 46. P5 state/session 缓存按 authority 分离
+
+- `apiSession(payload, invocation, authority)`；cache key 增加 authority 与 policy mode/workspaceRoot；
+- model `documents.state` 与 editor `documents.session` 不再共享同一缓存项，P1 对比不再是同项自证；
+- 全量 537/536/1。
