@@ -195,6 +195,7 @@ const APPEND_BUSY_TIMEOUT_MS = 10000;
 // parked recovery files below `recovery/`.
 const APPEND_RECOVERY_KEEP = 20;
 const APPEND_RECOVERY_MAX_BYTES = 64 * 1024 * 1024;
+const APPEND_RECOVERY_READ_MAX = 4 * 1024 * 1024;
 function safeStem(file) {
   return path.basename(file).replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 64) || 'document';
 }
@@ -290,6 +291,8 @@ function listAppendRecoveryRows(db, key) {
   const out = [];
   for (const row of appendRecoveryRows(db, key)) {
     try {
+      const size = fs.statSync(row.recoveryPath).size;
+      if (size !== row.bytes || size > APPEND_RECOVERY_READ_MAX) continue;
       const bytes = fs.readFileSync(row.recoveryPath);
       if (bytes.length !== row.bytes || digest(bytes) !== row.sha256) continue;
       out.push({ recoveryPath: row.recoveryPath, sha256: row.sha256, at: Number(row.at) || 0,
@@ -1119,6 +1122,8 @@ class LiveDocuments {
         throw fault('MP_RECOVERY_INVALID', '恢复索引不属于本宿主');
       const row = db.prepare('SELECT recoveryPath,sha256,bytes,epoch,version,at FROM append_recovery WHERE source=? AND recoveryPath=?').get(key, resolved);
       if (!row) throw fault('MP_RECOVERY_NOT_FOUND', '恢复副本已不存在');
+      const size = fs.statSync(resolved).size;
+      if (size > APPEND_RECOVERY_READ_MAX) throw fault('MP_RECOVERY_TOO_LARGE', '恢复副本过大，无法预览');
       const bytes = fs.readFileSync(resolved);
       if (bytes.length !== row.bytes || digest(bytes) !== row.sha256)
         throw fault('MP_RECOVERY_CORRUPT', '恢复副本内容校验失败');

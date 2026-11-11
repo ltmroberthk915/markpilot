@@ -5384,7 +5384,7 @@ const __test = {
           saveAsBusy: false,
         };
         st.doc = doc;
-        setUi((prev) => ({ ...prev, phase: "loading", detail: "", notice: "", recovery: null, railOpen: false, notices: [], saveAsOpen: false, saveAsValue: "", saveAsError: "", saveAsBusy: false }));
+        setUi((prev) => ({ ...prev, phase: "loading", detail: "", notice: "", recovery: null, railOpen: false, notices: [], saveAsOpen: false, saveAsValue: "", saveAsError: "", saveAsBusy: false, recoveryCenterOpen: false, recoveryCenterLoading: false, recoveryCenterItems: [], recoveryCenterError: "", recoveryPreview: "" }));
         setUi((prev) => (prev.recovered || prev.saveStatus ? { ...prev, recovered: null, saveStatus: "" } : prev));   // 新文档代际不继承恢复提示或保存回执
 
         const ticket = ticketOf(doc.sessionId, doc.absPath, doc.gen);
@@ -6787,6 +6787,41 @@ const __test = {
           else showPhase(doc.dirty ? "dirty" : "ready", doc.dirty ? "编辑中…" : "");
         }
 
+        async function openRecoveryCenter() {
+          if (!doc.absPath || doc.dead) return;
+          setUi((prev) => ({ ...prev, recoveryCenterOpen: true, recoveryCenterLoading: true, recoveryCenterError: "", recoveryCenterItems: [], recoveryPreview: "" }));
+          try {
+            const result = await api("documents.recoveryList", { path: doc.absPath, cwd: doc.workspace });
+            if (!alive()) return;
+            if (result.ok !== true) {
+              setUi((prev) => ({ ...prev, recoveryCenterLoading: false, recoveryCenterError: String(result.error?.message || result.error?.code || "读取恢复索引失败") }));
+              return;
+            }
+            setUi((prev) => ({ ...prev, recoveryCenterLoading: false, recoveryCenterItems: Array.isArray(result.value?.items) ? result.value.items : [] }));
+          } catch (error) {
+            if (alive()) setUi((prev) => ({ ...prev, recoveryCenterLoading: false, recoveryCenterError: String(error?.message || error) }));
+          }
+        }
+
+        function closeRecoveryCenter() {
+          setUi((prev) => ({ ...prev, recoveryCenterOpen: false, recoveryCenterLoading: false, recoveryCenterItems: [], recoveryCenterError: "", recoveryPreview: "" }));
+        }
+
+        async function readRecoveryItem(item) {
+          if (!item?.recoveryPath || !doc.absPath) return;
+          try {
+            const result = await api("documents.recoveryRead", { path: doc.absPath, recoveryPath: item.recoveryPath });
+            if (!alive()) return;
+            if (result.ok !== true) {
+              setUi((prev) => ({ ...prev, recoveryPreview: "", recoveryCenterError: String(result.error?.message || result.error?.code || "读取恢复副本失败") }));
+              return;
+            }
+            setUi((prev) => ({ ...prev, recoveryCenterError: "", recoveryPreview: String(result.value?.text || "").slice(0, 20000) + (String(result.value?.text || "").length > 20000 ? "\n…（已截断）" : "") }));
+          } catch (error) {
+            if (alive()) setUi((prev) => ({ ...prev, recoveryPreview: "", recoveryCenterError: String(error?.message || error) }));
+          }
+        }
+
         function onExternalEvent(event) {
           let data = {};
           try { data = JSON.parse(event.data) || {}; } catch (e) { data = {}; }
@@ -7425,6 +7460,9 @@ const __test = {
           retryMissing,
           retryReadonly,
           openSaveAs,
+          openRecoveryCenter,
+          closeRecoveryCenter,
+          readRecoveryItem,
           closeSaveAs,
           submitSaveAs,
           openConflict,
@@ -7701,12 +7739,14 @@ const __test = {
         primaryTone = "warn";
         actions.push({ label: "重试保存", icon: "⟳", run: () => st.actions.retryReadonly && st.actions.retryReadonly() });
         actions.push({ label: "另存为…", icon: "⤓", run: () => st.actions.openSaveAs && st.actions.openSaveAs() });
+        actions.push({ label: "历史副本", icon: "🕘", run: () => st.actions.openRecoveryCenter && st.actions.openRecoveryCenter() });
         actions.push({ label: "复制我的内容", icon: "⧉", run: () => st.actions.copyMine && st.actions.copyMine() });
       } else if (ui.phase === "missing") {
         primaryText = "⚠ " + ui.detail;
         primaryTone = "warn";
         actions.push({ label: "重试", icon: "⟳", run: () => st.actions.retryMissing && st.actions.retryMissing() });
         actions.push({ label: "另存为…", icon: "⤓", run: () => st.actions.openSaveAs && st.actions.openSaveAs() });
+        actions.push({ label: "历史副本", icon: "🕘", run: () => st.actions.openRecoveryCenter && st.actions.openRecoveryCenter() });
         actions.push({ label: "复制我的内容", icon: "⧉", run: () => st.actions.copyMine && st.actions.copyMine() });
       } else if (ui.phase === "conflict") {
         primaryText = "⚠ " + ui.detail;
@@ -7797,6 +7837,40 @@ const __test = {
           ));
       };
 
+      const recoveryCenterPanel = () => {
+        if (!ui.recoveryCenterOpen) return null;
+        const items = Array.isArray(ui.recoveryCenterItems) ? ui.recoveryCenterItems : [];
+        return h('div', {
+          key: 'recovery-center-panel', role: 'dialog', 'aria-label': '历史恢复副本',
+          style: {
+            position: 'absolute', top: 48, left: 16 + railInsetLeft, right: 16 + railInsetRight, bottom: 16,
+            zIndex: 70, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', minHeight: 0,
+            padding: 12, borderRadius: 8, border: '1px solid color-mix(in srgb, currentColor 22%, transparent)',
+            background: 'color-mix(in srgb, currentColor 8%, transparent)', backdropFilter: 'blur(12px)',
+            boxShadow: '0 8px 24px color-mix(in srgb, black 30%, transparent)', color: 'inherit', fontSize: 12,
+          },
+        },
+          h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 } },
+            h('strong', { style: { flex: '1 1 auto' } }, '历史恢复副本（' + items.length + '）'),
+            h('button', { type: 'button', className: 'mp-rail-btn', 'data-icon': '⌫', title: '关闭恢复中心', 'aria-label': '关闭恢复中心', onClick: () => st.actions.closeRecoveryCenter?.() }, '关闭')),
+          ui.recoveryCenterError ? h('div', { style: { color: '#d86', marginBottom: 6 } }, ui.recoveryCenterError) : null,
+          h('div', { style: { flex: '1 1 auto', minHeight: 0, overflow: 'auto' } },
+            ui.recoveryCenterLoading
+              ? h('div', { style: { opacity: 0.7, padding: 8 } }, '正在读取恢复索引…')
+              : ui.recoveryCenterError
+                ? null
+                : items.length === 0
+                  ? h('div', { style: { opacity: 0.7, padding: 8 } }, '当前文档没有可用的追加恢复副本。')
+                  : items.map((item) => h('div', { key: item.recoveryPath, style: { display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0', borderTop: '1px solid color-mix(in srgb, currentColor 12%, transparent)' } },
+                    h('div', { style: { flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+                      new Date(Number(item.at) || Date.now()).toLocaleString() + ' · v' + String(item.version || '') + ' · ' + String(item.bytes || 0) + ' bytes'),
+                    h('button', { type: 'button', className: 'mp-rail-btn', 'data-icon': '👁', title: '查看恢复副本', 'aria-label': '查看恢复副本', onClick: () => st.actions.readRecoveryItem?.(item) }, '查看'),
+                    h('button', { type: 'button', className: 'mp-rail-btn', 'data-icon': '⧉', title: '复制恢复副本路径', 'aria-label': '复制恢复副本路径', onClick: () => { try { void navigator.clipboard?.writeText?.(item.recoveryPath); } catch { /* best effort */ } } }, '复制路径')))),
+          ui.recoveryPreview ? h('pre', {
+            style: { flex: '0 1 40%', overflow: 'auto', margin: '8px 0 0', padding: 8, whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'color-mix(in srgb, currentColor 5%, transparent)', borderRadius: 5, fontSize: 11.5 },
+          }, ui.recoveryPreview) : null);
+      };
+
       const conflictPanel = () => {
         if (!conflictSession) return null;
         const hunks = Array.isArray(conflictSession.hunks) ? conflictSession.hunks : [];
@@ -7876,6 +7950,7 @@ const __test = {
             if (event.key === "Escape") { try { event.preventDefault(); } catch (e) { /* 忽略 */ } st.actions.cancelConflict(); return; }
             if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { try { event.preventDefault(); } catch (e) { /* 忽略 */ } st.actions.applyConflict(); return; }
           }
+          if (event.key === "Escape" && ui.recoveryCenterOpen) { try { event.preventDefault(); } catch (e) { /* 忽略 */ } st.actions.closeRecoveryCenter?.(); return; }
           if (event.key === "Escape" && ui.railOpen) setUi((prev) => ({ ...prev, railOpen: false }));
         },
         style: { position: "relative", width: "100%", height: "100%", display: "flex", flexDirection: "column", minHeight: 0, containerType: "inline-size", "--mp-rail-inset-left": railInsetLeft + "px", "--mp-rail-inset-right": railInsetRight + "px" },
@@ -7955,6 +8030,7 @@ const __test = {
         }),
         conflictPanel(),
         saveAsPanel(),
+        recoveryCenterPanel(),
         hasPopover ? h("div", {
           key: "rail-popover",
           className: "mp-rail-popover",

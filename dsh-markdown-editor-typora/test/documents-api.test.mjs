@@ -482,6 +482,32 @@ test('B3-API8 UI recovery restores an append copy through disk CAS and discard r
   } finally { w.restore(); }
 });
 
+test('B4.4-API6 recovery center lists/reads/discards append recovery, editor-only', async () => {
+  const w = await makeWorld('recovery-center', 'hello\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const joined = await liveDocs.join(w.file, 'hello\n');
+    const appended = await liveDocs.append(w.file, {
+      epoch: joined.epoch, baseVersion: 0, baseText: 'hello\n', actor: 'agent',
+      changes: [{ from: 5, to: 5, insert: ' world' }],
+    });
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const listed = await host.dispatch('documents.recoveryList', { path: w.file });
+    assert.equal(listed.ok, true);
+    assert.equal(listed.value.items.some((item) => item.recoveryPath === appended.recoveryPath), true);
+    assert.equal('text' in listed.value.items[0], false);
+    const read = await host.dispatch('documents.recoveryRead', { path: w.file, recoveryPath: appended.recoveryPath });
+    assert.equal(read.ok, true);
+    assert.equal(read.value.text, 'hello world\n');
+    const model = await host.dispatch('documents.recoveryRead', { path: w.file, recoveryPath: appended.recoveryPath }, MODEL_TOOL, execution(w.root));
+    assert.equal(model.ok, false);
+    const discarded = await host.dispatch('documents.recoveryDiscard', { path: w.file, recoveryPath: appended.recoveryPath });
+    assert.equal(discarded.ok, true);
+    assert.equal((await liveDocs.listAppendRecovery(w.file)).length, 0);
+    host.close();
+  } finally { w.restore(); }
+});
+
 test('B3-API5 a sandboxed session cannot apply a buffer edit outside its workspace', async () => {
   const w = await makeWorld('policy', 'hello\n');
   try {

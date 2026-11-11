@@ -157,3 +157,24 @@ test('P4 client readonly save error surfaces a save-as escape', async () => {
   assert.equal(h.ui().saveAsOpen, false);
   h.cleanup();
 });
+
+test('P4 client recovery center lists and previews append recovery', async () => {
+  const h = make();
+  h.setFetch((req) => {
+    if (req.endpoint === 'open') return opened('base', 'v1');
+    if (req.endpoint === 'documents.recoveryList') return { ok: true, value: { items: [{ recoveryPath: 'D:/probe/recovery/a.md', sha256: 'a'.repeat(64), at: 1, version: 2, bytes: 5 }] } };
+    if (req.endpoint === 'documents.recoveryRead') return { ok: true, value: { text: 'hello', recoveryPath: 'D:/probe/recovery/a.md' } };
+    return { ok: true, value: {} };
+  });
+  await h.boot();
+  await h.st.actions.openRecoveryCenter();
+  await drain();
+  assert.equal(h.ui().recoveryCenterOpen, true);
+  assert.equal(h.ui().recoveryCenterItems.length, 1);
+  await h.st.actions.readRecoveryItem(h.ui().recoveryCenterItems[0]);
+  await drain();
+  assert.equal(h.ui().recoveryPreview, 'hello');
+  h.st.actions.closeRecoveryCenter();
+  assert.equal(h.ui().recoveryCenterOpen, false);
+  h.cleanup();
+});

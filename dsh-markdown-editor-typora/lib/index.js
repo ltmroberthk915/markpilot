@@ -320,7 +320,7 @@ const MODEL_TOOL = Symbol('markdown model tool');
 export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'diag']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'documents.recoveryList', 'documents.recoveryRead', 'documents.recoveryDiscard', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'diag']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
 
@@ -1174,6 +1174,34 @@ export function createHost(options = {}) {
     } catch { /* identity is an optimization for locate, never a read blocker */ }
   }
 
+  async function apiRecoveryList(payload) {
+    const path = typeof payload?.path === 'string' ? payload.path : '';
+    if (!path) return badRequest('path is required');
+    const target = await fs.resolve(path, resolveOptions(payload));
+    if (typeof live.listAppendRecovery !== 'function') return { ok: true, value: { items: [] } };
+    const items = await live.listAppendRecovery(nativeTargetPath(target));
+    return { ok: true, value: { items: items.map(({ recoveryPath, sha256, at, version, bytes }) => ({ recoveryPath, sha256, at, version, bytes })) } };
+  }
+
+  async function apiRecoveryRead(payload) {
+    const path = typeof payload?.path === 'string' ? payload.path : '';
+    const recoveryPath = typeof payload?.recoveryPath === 'string' ? payload.recoveryPath : '';
+    if (!path || !recoveryPath) return badRequest('path and recoveryPath are required');
+    const target = await fs.resolve(path, resolveOptions(payload));
+    const value = await live.readAppendRecovery(nativeTargetPath(target), recoveryPath);
+    return { ok: true, value };
+  }
+
+  async function apiRecoveryDiscard(payload) {
+    const path = typeof payload?.path === 'string' ? payload.path : '';
+    const recoveryPath = typeof payload?.recoveryPath === 'string' ? payload.recoveryPath : '';
+    if (!path || !recoveryPath) return badRequest('path and recoveryPath are required');
+    const target = await fs.resolve(path, resolveOptions(payload));
+    if (typeof live.discardAppendRecovery !== 'function') return badRequest('recovery discard unsupported');
+    await live.discardAppendRecovery(nativeTargetPath(target), recoveryPath);
+    return { ok: true, value: { removed: true } };
+  }
+
   async function apiFileState(payload) {
     const path = typeof payload?.path === 'string' ? payload.path : '';
     if (!path) return badRequest('path is required');
@@ -1799,6 +1827,9 @@ export function createHost(options = {}) {
         case 'docs/saveAs': return await apiSaveAs(payload, authority);
         case 'documents.fileState': if (authority === MODEL_TOOL) return badRequest('fileState is editor-only'); return await apiFileState(payload);
         case 'documents.locate': if (authority === MODEL_TOOL) return badRequest('locate is editor-only'); return await apiLocate(payload);
+        case 'documents.recoveryList': if (authority === MODEL_TOOL) return badRequest('recoveryList is editor-only'); return await apiRecoveryList(payload);
+        case 'documents.recoveryRead': if (authority === MODEL_TOOL) return badRequest('recoveryRead is editor-only'); return await apiRecoveryRead(payload);
+        case 'documents.recoveryDiscard': if (authority === MODEL_TOOL) return badRequest('recoveryDiscard is editor-only'); return await apiRecoveryDiscard(payload);
         case 'docs/recent': return await apiDocsRecent(payload);
         case 'docs/archive':
           if (payload?.tag === 'agent-before' && authority !== MODEL_TOOL) return badRequest('model tool authority required');
