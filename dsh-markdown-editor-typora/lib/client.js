@@ -6635,6 +6635,19 @@ const __test = {
           showPhase("missing", doc.dirty
             ? "磁盘上的文件已不存在；当前编辑内容保留、未写盘"
             : "磁盘上的文件已不存在（可能被删除或改名）");
+          void locateMissing();
+        }
+
+        async function locateMissing() {
+          if (!doc.missing || !doc.absPath || doc.dead) return;
+          try {
+            const result = await api("documents.locate", { path: doc.absPath, cwd: doc.workspace });
+            if (!alive() || !doc.missing || result.ok !== true) return;
+            const candidates = Array.isArray(result.value?.candidates) ? result.value.candidates : [];
+            if (!candidates.length) return;
+            const names = candidates.slice(0, 3).map((item) => String(item.path).split(/[\\/]/).pop()).join("、");
+            showPhase("missing", "检测到可能已改名为：" + names + "；可重试或另存为副本");
+          } catch { /* locate is best-effort; the missing latch stays */ }
         }
 
         function exitMissing() {

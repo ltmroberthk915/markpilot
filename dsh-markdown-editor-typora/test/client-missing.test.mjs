@@ -110,3 +110,21 @@ test('P4 client saveAs refuses a stale editor text instead of copying the old mi
   assert.match(h.ui().saveAsError, /完整正文/);
   h.cleanup();
 });
+
+test('P4 client missing banner reports a rename candidate', async () => {
+  const h = make();
+  h.setFetch((req) => {
+    if (req.endpoint === 'open') return opened('base', 'v1');
+    if (req.endpoint === 'save') return { ok: false, error: { code: 'FS_STALE_VERSION', reason: 'missing', message: 'gone' } };
+    if (req.endpoint === 'documents.locate') return { ok: true, value: { missing: true, candidates: [{ path: 'D:/probe/renamed.md', version: 'v2', size: 4 }] } };
+    return { ok: true, value: {} };
+  });
+  await h.boot();
+  h.edit('dirty');
+  h.message('manual-save', { source: 'ctrl-s' });
+  await drain();
+  assert.equal(h.ui().phase, 'missing');
+  assert.match(h.ui().detail, /可能已改名/);
+  assert.match(h.ui().detail, /renamed\.md/);
+  h.cleanup();
+});
