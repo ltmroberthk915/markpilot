@@ -339,3 +339,14 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
   - 空列表、加载中、错误分离；Escape 关闭；窄侧栏按钮有 data-icon/title
 - 测试：host list/read/discard/MODEL_TOOL、客户端列表/预览；全量 517/516/1。
 - 未接 discard 确认/恢复写入；恢复中心尚未打包。
+
+## 19. Desktop rc.8 更新（2026-11-11）
+
+- 更新前备份 `package.json`/`pnpm-lock.yaml`/`cordis.patch.yml` 到 `D:\BuyKey\desktop-profile-backup-20261111-1320`。
+- 应用内插件管理器从 `...rc.8.tgz` 更新：
+  - Desktop 依赖 `file:...rc.8.tgz`
+  - node_modules 实体目录
+  - version `1.9.0-rc.8`
+  - TEMP disable 不存在
+  - Markdown 模型工具可调用并读到磁盘正文
+- 未重启 Desktop；客户端 UI 需正常重启验收。
