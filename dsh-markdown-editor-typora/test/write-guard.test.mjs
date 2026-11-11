@@ -190,3 +190,12 @@ test('write guard error messages distinguish lookup failure and mirror', async (
     return true;
   });
 });
+
+test('fsSessionIntents default off leaves direct ctx.fs writes untouched', async () => {
+  const h = makeCtx();
+  let calls = 0;
+  h.ctx.fs = { writeText: async () => { calls += 1; return 'wrote'; } };
+  makeGuard({ lookup: async () => ({ dirty: true, path: 'D:/probe/a.md' }) }).install(h.ctx);
+  assert.equal(await h.ctx.fs.writeText(TARGET, 'x'), 'wrote');
+  assert.equal(calls, 1);
+});
