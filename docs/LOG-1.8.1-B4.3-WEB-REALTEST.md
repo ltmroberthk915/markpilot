@@ -363,3 +363,11 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 测试：TTL/cap、allowedActions、missing→创建刷新、MODEL_TOOL、包文件清单。
 - 全量 522/521/1。
 - 尚未接客户端/P5；30 场景对比未做。
+
+## 21. P1 影子缓存修正
+
+- session cache key 加 provider version/missing，保存后/改名后不再 30 分钟 stale。
+- 错误不缓存；`documents.state` 把 FS_NOT_FOUND 归一为 `state:'missing'`。
+- 打包 `files` 已收为 `lib`，`document-sessions.js` 确认进包。
+- 新增测试：save 后 session 版本刷新、rename 后 missing、调用不建 rooms.sqlite/不改正文。
+- 全量 523/522/1；30 场景 G1 对比未做。
