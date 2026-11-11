@@ -376,3 +376,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 
 - 更新前备份 `package.json`/`pnpm-lock.yaml`/`cordis.patch.yml` 到 `D:\BuyKey\desktop-profile-backup-20261111-1340`。
 - Desktop 更新到 `file:...rc.9.tgz`，version `1.9.0-rc.9`，node_modules 实体目录，`lib/document-sessions.js` 已存在；Markdown 工具可调用。未重启 Desktop。
+
+## 23. P1 G1 30 场景影子对比（第一版）
+
+- `p1-shadow.test.mjs`：10 个文件 × 磁盘 / 保存后 / 改名后 = 30 场景；
+- 对比 `documents.session` 与 `documents.state` 的 state/source/dirty/conflict/version/revisionId/orphanDraft/external/unsavedElsewhere，0 差异；
+- 覆盖保存后 cache 刷新、改名后 missing；尚未覆盖 dirty/conflict/orphan/mirror/review/recovery 组合，故不能宣称 G1 全绿。
+- 全量 525/524/1。
