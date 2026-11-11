@@ -566,3 +566,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - `broadcastChange` 不再按 base path 清一个不存在的 key，改为 `invalidateSessions()` 全量失效；
 - 外部变更/SSE 事件后，`documents.state` 不会命中旧快照。
 - 全量 537/536/1。
+
+## 48. 1.9.5 打包与 Desktop 更新
+
+- 包 `dsh-markdown-editor-typora-1.9.5.tgz`，150 files，SHA256 `44FBA5540672C6D7629C16136C6438A7A32973B5EF928C53013A04341B8F44DD`。
+- 隔离 profile 安装成功；Desktop 从 1.9.4 更新到 `file:...1.9.5.tgz`，实体目录，version 1.9.5，Markdown 工具可调用。
+- 更新前备份 `D:\BuyKey\desktop-profile-backup-20261112-0400`；未重启 Desktop。
+- 全量 537/536/1。
