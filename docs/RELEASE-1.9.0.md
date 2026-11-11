@@ -1,4 +1,4 @@
-# MarkPilot 1.9.0-rc.6 发布候选（B4.3 + B3.3b 草稿镜像）
+# MarkPilot 1.9.0-rc.7 发布候选（B4.3 + B3.3b 草稿镜像）
 
 日期：2026-11-11
 
@@ -45,15 +45,15 @@
 
 ## 产物
 
-- `dsh-markdown-editor-typora-1.9.0-rc.6.tgz`
+- `dsh-markdown-editor-typora-1.9.0-rc.7.tgz`
 - 149 files / 2.8 MB
-- SHA256 `71A305D3A77B9D85337A0A300BE6924867E42E5E8BD278627755146C66DE4F79`
+- SHA256 `C539C82DA8F61BFFA9A042EE9CE76CD94F38CB21AFD4C8FB3DB2397989EF73F7`
 - 源码冻结提交 `a3b2085`（GA cleanup：移除 debug hooks、补 lifecycle 测试、README/SHA）
 
 **注意**：rc.1 与更早的 1.9.0 包在 B3.3b 之前构建，不包含 `draft_index`/mirror 代码；rc.2 为 B4.3+B3.3b 的新候选，不能与 rc.1 混用。
 
 ## 包安装验证
 
-- rc.6 已在隔离 profile `~/.dsh/profiles/mp-pkg-test` 中从 tarball 安装成功（pnpm `file:` 包，版本 1.9.0-rc.6）；
+- rc.6 已在隔离 profile `~/.dsh/profiles/mp-pkg-test` 中从 tarball 安装成功（pnpm `file:` 包，版本 1.9.0-rc.7）；
 - rc.2 的 Markdown 面板/编辑器加载已通过；rc.3 移除 debug hooks、补测试；rc.4/rc.5 仅 README/版本/hash 清理，包结构一致；
 - 未在 DSH Desktop 安装；正式实装前需用户明确确认。

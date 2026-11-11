@@ -6,7 +6,7 @@
 > 基线：`main` @ `edb8b05`，插件 1.8.1，CM6 3.6.17，449 测试 / 448 通过 / 1 skip / 0 失败（详见 §1）。
 > 执行状态（2026-11-11）：**P0 blocking 已修**（CRLF/BOM 修订 sha 归一、`undoGroups` 内容身份、断链/缺 revision/epoch 用例）；**B4.3 host/API + 客户端冲突面板已落**；独立对抗审查后修了 B1–B4：撤销冲突解决用 `room_resolved` 空哨兵撤销写授权、`markResolved` 记录“用我的”零正文解决、`live.save` 校验解决标记、join 票带 `resolvedDisk`、`startLive` 去 firstOpen 门、`handleLiveError` 先 unbind、首次保存后 clean 重载 join（不回退正文）；`npm test 511/510 pass/1 skip/0 fail`，coreHash 未变。Web 实机（独立 `mp-web-test`，未碰 Desktop）已确认 MarkPilot 加载、冲突横幅→面板→「用我的」→ `room_resolved` 写入；发现并修复 no-op resolve 后 `doc.dirty` 为 false、review phase 丢失，以及 live 保存误用父镜像（`mpEngine.setValue` 的 `_o` 旁路不发 delta）导致永久 `MP_LIVE_STALE` 三个客户端问题；修复后 `b43-keepmine2.md` Web 复测通过：Ctrl+S 后磁盘写入 `mine`、`rooms.saved=1`、`room_resolved` 清空、UI 就绪。剩余 Web 复测：仅「手动编辑」textarea 端到端（host resolve 已有 API1）；「用磁盘」「两边保留」Web UI 已通过（磁盘分别写 `theirs`、`ours2\ndisk2`，`rooms.saved` 2/4）。详见 [LOG-1.8.1 · B4.3 Web 实机测试记录](LOG-1.8.1-B4.3-WEB-REALTEST.md)。
 > **B3.3b 第一切片**：`draft_index` 数据层已落并 sync-host；host 读门已接：mirror 不再被 clean room 遮蔽，fresh+dirty 返回 `source:'mirror'`/`writable:false`，base 不匹配 `draftStale`，读失败 `draftUnknown`；`applyEdits` 对 mirror/stale/unknown 返回 `MP_DOC_MIRROR_READONLY`；`draftMirror` 与磁盘写共用 per-file queue；模型输出 schema 已补 `writable/draft/mirrorDraft/draftStale/draftUnknown`。客户端 live 模式保存/clean close 也会清残留 mirror；clear 不再重读后删新一代（mismatch 保留句柄）。`live-draft-index` 12 条 + `documents-api` mirror 5 条 + `client-draft-mirror` 8 条通过。G3 核心路径通过：真实 `MP_LIVE_FACADE_MISSING`（bridge 控制路径）+ conflict 态真实输入后 mirror 已写入；清理遗留测试 host 进程后，host `documents.read` 返回 `source='mirror'`、当前正文、`writable=false`，`applyEdits` 返回 `MP_DOC_MIRROR_READONLY`，独立进程可见。authority 在 clean room + 0 live members 时优先返回 fresh mirror。
-> **发布候选**：已生成 `dsh-markdown-editor-typora-1.9.0-rc.6.tgz`（149 files / 2.8 MB，SHA256 `71A305D3…`，B4.3+B3.3b，GA 清理：移除 debug hooks、补 clean-close/removed:0 测试、README/SHA256SUMS），已在隔离 Web profile `mp-pkg-test` 安装，并在 Desktop profile 以 file:rc.6.tgz 实装（TEMP disable 已移除，Markdown 模型工具已可调用）；Desktop 客户端 UI 重启验收待做。旧 rc.1/rc.2/rc.3/1.9.0 包不含最终清理，不能重发。详见 [RELEASE-1.9.0](RELEASE-1.9.0.md)。
+> **发布候选**：已生成 `dsh-markdown-editor-typora-1.9.0-rc.7.tgz`（149 files / 2.8 MB，SHA256 `C539C82D…`，B4.3+B3.3b，GA 清理：移除 debug hooks、补 clean-close/removed:0 测试、README/SHA256SUMS），已在隔离 Web profile `mp-pkg-test` 安装，并在 Desktop profile 以 file:rc.6.tgz 实装（TEMP disable 已移除，Markdown 模型工具已可调用）；Desktop 客户端 UI 重启验收待做。旧 rc.1/rc.2/rc.3/1.9.0 包不含最终清理，不能重发。详见 [RELEASE-1.9.0](RELEASE-1.9.0.md)。
 > 读者：主控 Agent / 后续接手的工程师。先读 §1、§2，再读 §4（计划 A）与 §6（选择）。
 
 ---
@@ -368,7 +368,7 @@ Session {
 
 #### P4 · 文件生命周期完善（4–6 人日）
 
-> **状态（2026-11-11）**：host 切片 `cdaba73` + 客户端 missing 横幅 `60aee5b`：watch `missing:true` latch/恢复帧/首挂流补帧、save `reason:'missing'`、客户端 missing latch（打字/apply/live 不顶横幅）、重试/复制、自动保存停写与错误分类；7 条新测试；全量 514/513/1。fileState/locate/saveAs、恢复中心未接。
+> **状态（2026-11-11）**：host 切片 `cdaba73` + 客户端 missing 横幅 `60aee5b`：watch `missing:true` latch/恢复帧/首挂流补帧、save `reason:'missing'`、客户端 missing latch（打字/apply/live 不顶横幅）、重试/复制、自动保存停写与错误分类；7 条新测试；全量 515/514/1。fileState/locate/saveAs、恢复中心未接。
 
 - `host/index.js` watch：**`tickWatch` 已有 missing 分支**（`fs.stat` undefined → `missing=true`、version=''、不更新 lastVersion，`index.js:839-861`）；真正缺的是**没有把 missing 传给客户端**：`broadcastChange` 只发 `version:''`（`index.js:823-837`）。2.0 在 SSE `change` 里增加 `missing:true`（保持 version 兼容），并 **latch missing 状态**：只在“存在→missing”或“missing→存在”的跃迁时广播一次，避免 missing 期间每轮 tick 重播；文件重新出现时清 latch。
 - `lib/client.js` 外部事件：`onExternalEvent`（约 6402-6436）现在把 missing 当通用外部变更——干净文档会 `loadFromDisk({silent:true})` **静默失败**（旧内容仍显示、无提示；非 silent 路径才显示“打开失败”）；脏文档会显示泛化的“文件已在磁盘上更新”冲突横幅。2.0 必须在最前面分支 `data.missing`：干净 → “文件已不存在（可能被删除或改名）”，给 `另存为/重试/关闭`；脏 → “文件已不存在；草稿保留”，给 `另存为/复制内容/关闭并保留草稿`；**不调用 `loadFromDisk` 冒充冲突**。
@@ -657,7 +657,7 @@ node scripts/sync-core.mjs --check
 
 *本文为计划稿。落码前必须先完成：① 主控对 A/B 的选择（已选 A）；② 独立子 Agent 的设计对抗（partner.md 已完成 A0–A4 审阅）；③ P0 的基线冻结与真机证据。*
 
-> **P4（2026-11-11）**：host missing latch（`cdaba73`）+ 客户端 missing 横幅（`60aee5b`）已落；headless Web 真机：新建/保存→外部删除→横幅「文件已不存在」+重试/复制→写回→横幅消失、旧路径未重建；全量 514/513/1。脏稿复制/重试分支与 saveAs/fileState 未接。
+> **P4（2026-11-11）**：host missing latch（`cdaba73`）+ 客户端 missing 横幅（`60aee5b`）已落；headless Web 真机：新建/保存→外部删除→横幅「文件已不存在」+重试/复制→写回→横幅消失、旧路径未重建；全量 515/514/1。脏稿复制/重试分支与 saveAs/fileState 未接。
 
 > **P4 真机（2026-11-11）**：干净文件删除→横幅→写回恢复；脏稿删除→「当前编辑内容保留、未写盘」→Ctrl+S 零重建→写回进入冲突；两条均用隔离 headless Edge。复制按钮剪贴板、saveAs/locate/恢复中心未测。
 
