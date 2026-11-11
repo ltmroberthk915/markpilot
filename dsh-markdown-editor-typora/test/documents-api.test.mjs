@@ -631,6 +631,25 @@ test('P5-API write guard lookup sees a mirror without a live room', async () => 
   } finally { w.restore(); }
 });
 
+test('P5-API archive failure is fail-closed with zero disk write', async () => {
+  const w = await makeWorld('archive-failure', 'before\n');
+  try {
+    const host = createHost({ fs: provider(w.file), log: { warn() {} } });
+    const read = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    const old = process.env.LOCALAPPDATA;
+    process.env.LOCALAPPDATA = w.file; // a file, so mkdir of .markpilot fails
+    try {
+      const applied = await host.dispatch('documents.applyEdits', {
+        path: w.file, baseRevisionId: read.value.version, edits: [{ from: 0, to: 6, insert: 'after' }],
+      }, MODEL_TOOL, execution(w.root));
+      assert.equal(applied.ok, false);
+      assert.equal(applied.error.code, 'MP_ARCHIVE_FAILED');
+      assert.equal(await fs.readFile(w.file, 'utf8'), 'before\n');
+    } finally { process.env.LOCALAPPDATA = old; }
+    host.close();
+  } finally { w.restore(); }
+});
+
 test('B3-API5 a sandboxed session cannot apply a buffer edit outside its workspace', async () => {
   const w = await makeWorld('policy', 'hello\n');
   try {
