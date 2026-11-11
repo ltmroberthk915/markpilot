@@ -457,3 +457,9 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - Desktop 从 1.9.0 更新到 `file:...1.9.1.tgz`，version 1.9.1，实体目录；Markdown 工具可调用。
 - 更新前备份 `D:\BuyKey\desktop-profile-backup-20261111-1430`；未重启 Desktop。
 - 全量 530/529/1。
+
+## 33. P5 archive 失败零写测试
+
+- 将 LOCALAPPDATA 指向文件使归档目录不可建；
+- disk applyEdits 返回 `MP_ARCHIVE_FAILED`，磁盘正文保持 `before`；
+- 全量 531/530/1。
