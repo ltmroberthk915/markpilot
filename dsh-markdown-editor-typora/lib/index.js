@@ -320,7 +320,7 @@ const MODEL_TOOL = Symbol('markdown model tool');
 export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/saveAs', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'diag']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'diag']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
 
@@ -767,6 +767,7 @@ export function createHost(options = {}) {
 
   /** 每个被观察文件一条 entry；refs 计数到 0 才释放（SSE 多 tab 共享）。 */
   const watchers = new Map();
+  const fileIdentities = new Map();
   const live = options.liveDocuments ?? new liveStore.LiveDocuments();
   const leases = new Map();
   let closed = false;
@@ -1145,6 +1146,7 @@ export function createHost(options = {}) {
       const after=await fs.stat(target, invocation?.signal);
       if(!after||String(after.version)!==String(info.version))continue;
       const diskSha=diskRevisionSha(text);
+      if (native) await rememberIdentity(target);
       const value={text,version:after.version,displayPath:target.displayPath,size:after.size,type:after.type,diskRevisionSha:diskSha};
       if (payload.live === true && baseline && authority !== MODEL_TOOL) {
         const canonical=await canonicalTarget(target);
@@ -1160,6 +1162,61 @@ export function createHost(options = {}) {
       return {ok:true,value};
     }
     throw codedError('FS_STALE_VERSION','file changed during read; retry after the external write finishes');
+  }
+
+  async function rememberIdentity(target) {
+    try {
+      const native = await fsStat(nativeTargetPath(target), { bigint: true });
+      if (!native || native.ino <= 0n || native.dev <= 0n) { fileIdentities.delete(pathKey(await canonicalTarget(target))); return; }
+      const canonical = await canonicalTarget(target);
+      if (fileIdentities.size >= 2048) fileIdentities.clear();
+      fileIdentities.set(pathKey(canonical), { dev: String(native.dev), ino: String(native.ino), size: Number(native.size), mtimeNs: String(native.mtimeNs) });
+    } catch { /* identity is an optimization for locate, never a read blocker */ }
+  }
+
+  async function apiFileState(payload) {
+    const path = typeof payload?.path === 'string' ? payload.path : '';
+    if (!path) return badRequest('path is required');
+    const target = await fs.resolve(path, resolveOptions(payload));
+    const info = await fs.stat(target);
+    return { ok: true, value: {
+      path: target.displayPath || path,
+      exists: info !== undefined,
+      missing: info === undefined,
+      ...(info ? { version: String(info.version), size: info.size, type: info.type } : {}),
+    } };
+  }
+
+  async function apiLocate(payload) {
+    const path = typeof payload?.path === 'string' ? payload.path : '';
+    if (!path) return badRequest('path is required');
+    const target = await fs.resolve(path, resolveOptions(payload));
+    const current = await fs.stat(target);
+    if (current !== undefined) return { ok: true, value: { missing: false, candidates: [] } };
+    const canonical = await canonicalTarget(target);
+    const key = pathKey(canonical);
+    const identity = fileIdentities.get(key);
+    if (!identity || process.platform !== 'win32' || identity.ino === '0' || identity.dev === '0')
+      return { ok: true, value: { missing: true, candidates: [] } };
+    const parent = dirname(nativeTargetPath(target));
+    let entries = [];
+    try { entries = await readdir(parent, { withFileTypes: true }); }
+    catch { return { ok: true, value: { missing: true, candidates: [] } }; }
+    const truncated = entries.length > 4096;
+    entries = entries.slice(0, 4096);
+    const candidates = [];
+    for (const entry of entries) {
+      if (!entry.isFile() || !/\.md$/i.test(entry.name) || entry.name.startsWith('.mp-tmp-')) continue;
+      const candidate = join(parent, entry.name);
+      try {
+        const native = await fsStat(candidate, { bigint: true });
+        if (!native || native.ino <= 0n || String(native.dev) !== identity.dev || String(native.ino) !== identity.ino) continue;
+        if (Number(native.size) !== identity.size) continue;
+        if (identity.mtimeNs && String(native.mtimeNs) !== identity.mtimeNs) continue;
+        candidates.push({ path: candidate, version: versionOfBigInt(native), size: Number(native.size) });
+      } catch { /* unreadable candidate is not a rename proof */ }
+    }
+    return { ok: true, value: { missing: true, candidates, truncated } };
   }
 
   async function rejectDraftMirrorBeforeWrite(current) {
@@ -1210,6 +1267,7 @@ export function createHost(options = {}) {
       else try {result=await fs.writeText(current,text,{kind:'replaceIfVersion',version:baseVersion});}
       catch(error){if(!isSandboxWriteDenied(error))throw error;result=await directWriteText(fs,current,text,baseVersion);}
       const version=result?.version;broadcastChange(current,version);
+      await rememberIdentity(current);
       const value={version,displayPath:current.displayPath,size:result.size??Buffer.byteLength(text,'utf8'),diskRevisionSha:diskRevisionSha(text)};
       if(payload.live&&result&&typeof result==='object'){
         // 已授权 live 保存专属：按客户端 applyLiveReceipt 约定透传最小 live 元数据
@@ -1265,6 +1323,7 @@ export function createHost(options = {}) {
     }
     const info = await fs.stat(target);
     if (info && info.type !== 'file') throw codedError('FS_STALE_VERSION','save-as target is not a regular file');
+    await rememberIdentity(target);
     const version = String(receipt?.version ?? info?.version ?? '');
     broadcastChange(target, version);
     return { ok: true, value: {
@@ -1669,6 +1728,7 @@ export function createHost(options = {}) {
       const result=native && versionOfBigInt(native)===String(value.version)
         ? await live.external(nativeTargetPath(current),write) : await write();
       broadcastChange(current,result.version,{oldString,newString});
+      await rememberIdentity(current);
       return {ok:true,value:{version:result.version,displayPath:current.displayPath,changed:newString!==oldString}};
     });
   }
@@ -1737,6 +1797,8 @@ export function createHost(options = {}) {
           return await documents.merge3(payload, invocation, invocation?.policy);
         case 'docs/create': return await apiDocsCreate(payload);
         case 'docs/saveAs': return await apiSaveAs(payload, authority);
+        case 'documents.fileState': if (authority === MODEL_TOOL) return badRequest('fileState is editor-only'); return await apiFileState(payload);
+        case 'documents.locate': if (authority === MODEL_TOOL) return badRequest('locate is editor-only'); return await apiLocate(payload);
         case 'docs/recent': return await apiDocsRecent(payload);
         case 'docs/archive':
           if (payload?.tag === 'agent-before' && authority !== MODEL_TOOL) return badRequest('model tool authority required');
@@ -1923,7 +1985,7 @@ export function createHost(options = {}) {
 
   const hostToken = {};
   registerHost(hostToken);
-  return { route, dispatch, close, broadcastChange, _internals: { watchers, liveStreams, lookupDocument, documents } };
+  return { route, dispatch, close, broadcastChange, _internals: { watchers, liveStreams, lookupDocument, documents, fileIdentities } };
 }
 
 const WRITE_GUARD_DIRTY = 'MP_DOC_DIRTY';

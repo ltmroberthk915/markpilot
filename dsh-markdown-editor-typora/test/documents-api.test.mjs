@@ -26,7 +26,11 @@ function provider(file) {
     async readText() { return fs.readFile(file, 'utf8'); },
     async writeText(_target, text, expected) {
       if (expected?.version && expected.version !== v()) throw Object.assign(new Error('stale'), { code: 'FS_STALE_VERSION' });
-      await fs.writeFile(file, text, 'utf8'); version += 1; return { version: v() };
+      const temp = file + '.replace-' + process.pid + '-' + (++version);
+      await fs.writeFile(temp, text, 'utf8');
+      await fs.rename(temp, file);
+      version += 1;
+      return { version: v() };
     },
     async editText(_target, edit, expected) {
       if (expected?.version && expected.version !== v()) throw Object.assign(new Error('stale'), { code: 'FS_STALE_VERSION' });
@@ -937,6 +941,31 @@ test('B4.4-API4 saveAs uses provider createIfAbsent and rejects unsafe names', a
   }
 });
 
+test('B4.4-API5 fileState and locate find a renamed file by identity', async () => {
+  const w = await makeWorld('locate', 'body\n');
+  const renamed = w.file + '-renamed.md';
+  try {
+    const host = createHost({ fs: provider(w.file), log: { warn() {} } });
+    const opened = await host.dispatch('open', { path: w.file });
+    const saved = await host.dispatch('save', { path: w.file, text: 'saved\n', baseVersion: opened.value.version });
+    assert.equal(saved.ok, true);
+    await fs.rename(w.file, renamed);
+    const state = await host.dispatch('documents.fileState', { path: w.file });
+    assert.equal(state.ok, true);
+    assert.equal(state.value.missing, true);
+    const located = await host.dispatch('documents.locate', { path: w.file });
+    assert.equal(located.ok, true);
+    assert.equal(located.value.missing, true);
+    assert.equal(located.value.candidates.some((item) => String(item.path).endsWith('-renamed.md')), true);
+    const model = await host.dispatch('documents.locate', { path: w.file }, MODEL_TOOL, { agent: { session: { header: { cwd: path.dirname(w.file) } } } });
+    assert.equal(model.ok, false);
+    host.close();
+  } finally {
+    await fs.rename(renamed, w.file).catch(() => {});
+    w.restore();
+  }
+});
+
 test('B4.3-ADV2b theirs and both choices resolve without writing disk', async () => {
   const w = await makeWorld('conflict-choices', 'base\n');
   try {
@@ -1098,4 +1127,3 @@ test('B4.3-API4 a second external change after resolve re-enters conflict and re
     host.close();
   } finally { w.restore(); }
 });
-
