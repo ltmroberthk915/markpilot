@@ -658,3 +658,5 @@ node scripts/sync-core.mjs --check
 *本文为计划稿。落码前必须先完成：① 主控对 A/B 的选择（已选 A）；② 独立子 Agent 的设计对抗（partner.md 已完成 A0–A4 审阅）；③ P0 的基线冻结与真机证据。*
 
 > **P4（2026-11-11）**：host missing latch（`cdaba73`）+ 客户端 missing 横幅（`60aee5b`）已落；headless Web 真机：新建/保存→外部删除→横幅「文件已不存在」+重试/复制→写回→横幅消失、旧路径未重建；全量 507/506/1。脏稿复制/重试分支与 saveAs/fileState 未接。
+
+> **P4 真机（2026-11-11）**：干净文件删除→横幅→写回恢复；脏稿删除→「当前编辑内容保留、未写盘」→Ctrl+S 零重建→写回进入冲突；两条均用隔离 headless Edge。复制按钮剪贴板、saveAs/locate/恢复中心未测。
