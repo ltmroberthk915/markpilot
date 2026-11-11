@@ -470,3 +470,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 隔离 profile 安装成功；Desktop 从 1.9.1 更新到 `file:...1.9.2.tgz`，实体目录，version 1.9.2，Markdown 工具可调用。
 - 更新前备份 `D:\BuyKey\desktop-profile-backup-20261111-1500`；未重启 Desktop。
 - 全量 531/530/1。
+
+## 35. P1 G1 扩展到 external
+
+- 5 文件 × external = 5 场景；`documents.session` 与 `documents.state` 0 差异；
+- 合计 **65 场景 0 差异**（30 磁盘/保存/改名 + 35 live）。
+- 仍未覆盖 owned-elsewhere / readonly / locked 与完整 11 状态表。
+- 全量 531/530/1。
