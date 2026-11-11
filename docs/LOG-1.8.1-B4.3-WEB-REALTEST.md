@@ -442,3 +442,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 新增测试：无 room 的 mirror 被 guard 看见；
 - 全量 529/528/1。
 - 仍未做 lookup 连续失败 fail-closed / fsSessionIntents / fsArchiveAll。
+
+## 31. P5 write guard lookup 有界 fail-closed
+
+- `createWriteGuard` 增加 `lookupFailures` 计数与阈值（默认 3）；连续失败第 3 次抛 `MP_DOC_LOOKUP_FAILED`，成功一次清零；
+- 单次失败仍 fail-open，保持临时 DB 锁可用性；
+- 新增测试：3 次失败拒绝、随后成功恢复；
+- 全量 530/529/1。
