@@ -737,7 +737,21 @@ export function createDocumentsService(deps) {
   async function state(payload, invocation) {
     let a;
     try { a = await authority(payload, invocation); }
-    catch (error) { return fail(error, null); }
+    catch (error) {
+      if (error?.code === 'FS_NOT_FOUND' || error?.code === 'ENOENT') {
+        return {
+          ok: true,
+          value: {
+            path: payload?.path ?? '', displayPath: payload?.path ?? '', canonical: null,
+            state: 'missing', source: 'disk', dirty: false, diskChanged: null,
+            conflict: false, orphanDraft: false, external: false,
+            bufferOwnedElsewhere: false, unsavedElsewhere: false,
+            version: null, revisionId: null, head: null, recovery: [], recommended: 'none',
+          },
+        };
+      }
+      return fail(error, null);
+    }
     if (a.error) {
       const code = a.error?.error?.code;
       if (code === 'FS_NOT_FOUND' || code === 'ENOENT') {

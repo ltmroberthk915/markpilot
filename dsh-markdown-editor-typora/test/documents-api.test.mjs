@@ -508,6 +508,50 @@ test('B4.4-API6 recovery center lists/reads/discards append recovery, editor-onl
   } finally { w.restore(); }
 });
 
+test('P1-API documents.session is a read-only editor snapshot', async () => {
+  const w = await makeWorld('session-shadow', 'body\n');
+  try {
+    const host = createHost({ fs: provider(w.file), log: { warn() {} } });
+    const session = await host.dispatch('documents.session', { path: w.file });
+    assert.equal(session.ok, true);
+    assert.equal(session.value.state, 'disk');
+    assert.equal(Array.isArray(session.value.allowedActions), true);
+    assert.equal(session.value.allowedActions.includes('save'), false);
+    const model = await host.dispatch('documents.session', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(model.ok, false);
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('P1-API documents.session normalizes missing and refreshes after creation', async () => {
+  const w = await makeWorld('session-missing', 'body\n');
+  const missingPath = path.join(w.root, 'later.md');
+  const tiny = {
+    async resolve(value) { return { targetKey: value, displayPath: value }; },
+    async stat(value) {
+      const p = typeof value === 'string' ? value : value?.targetKey;
+      try { const info = await fs.stat(p); return { type: info.isFile() ? 'file' : 'directory', size: info.size, version: 'v' + info.mtimeMs }; }
+      catch (error) { if (error.code === 'ENOENT') return undefined; throw error; }
+    },
+    async readText(value) { return fs.readFile(typeof value === 'string' ? value : value?.targetKey, 'utf8'); },
+    async writeText() { throw new Error('not used'); },
+    async editText() { throw new Error('not used'); },
+    async watch() { return async () => {}; },
+  };
+  try {
+    const host = createHost({ fs: tiny, log: { warn() {} } });
+    const first = await host.dispatch('documents.session', { path: missingPath });
+    assert.equal(first.ok, true);
+    assert.equal(first.value.state, 'missing');
+    assert.equal(first.value.allowedActions.includes('retry'), true);
+    await fs.writeFile(missingPath, 'now\n', 'utf8');
+    const second = await host.dispatch('documents.session', { path: missingPath });
+    assert.equal(second.ok, true);
+    assert.equal(second.value.state, 'disk');
+    host.close();
+  } finally { w.restore(); }
+});
+
 test('B3-API5 a sandboxed session cannot apply a buffer edit outside its workspace', async () => {
   const w = await makeWorld('policy', 'hello\n');
   try {

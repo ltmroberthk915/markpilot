@@ -19,9 +19,7 @@
     "core.json",
     "host.json",
     "host",
-    "lib/index.js",
-    "lib/client.js",
-    "lib/documents-service.js",
+    "lib",
     "renderer-cm6",
     "README.md"
   ],

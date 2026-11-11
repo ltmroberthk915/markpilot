@@ -34,6 +34,7 @@ import rawDiskStore from '../host/document-store.js';
 import rawLiveStore from '../host/live-documents.js';
 import rawTextCodec from '../host/text-codec.js';
 import { createDocumentsService, parseDocumentBlocks } from './documents-service.js';
+import { createSessionManager, allowedActions } from './document-sessions.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize, sep, extname, basename, resolve as pathResolve, isAbsolute, relative as pathRelative }  from 'node:path';
 
@@ -320,7 +321,7 @@ const MODEL_TOOL = Symbol('markdown model tool');
 export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'documents.recoveryList', 'documents.recoveryRead', 'documents.recoveryDiscard', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'diag']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'documents.session', 'documents.recoveryList', 'documents.recoveryRead', 'documents.recoveryDiscard', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'diag']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
 
@@ -841,6 +842,7 @@ export function createHost(options = {}) {
     sandboxMode: fs.sandboxMode,
     log,
   });
+  const documentSessions = createSessionManager();
   /** Persisted-file notifications are scoped to the watched target. Unsaved edits use independent document leases. */
   const liveStreams = new Set();
 
@@ -849,6 +851,7 @@ export function createHost(options = {}) {
   }
 
   function broadcastChange(target, version, delta, flags) {
+    try { documentSessions.clear(pathKey(target?.targetKey || target?.displayPath || '')); } catch { /* shadow cache only */ }
     const data = {
       path: target?.displayPath,
       targetKey: target?.targetKey,
@@ -1172,6 +1175,37 @@ export function createHost(options = {}) {
       if (fileIdentities.size >= 2048) fileIdentities.clear();
       fileIdentities.set(pathKey(canonical), { dev: String(native.dev), ino: String(native.ino), size: Number(native.size), mtimeNs: String(native.mtimeNs) });
     } catch { /* identity is an optimization for locate, never a read blocker */ }
+  }
+
+  async function apiSession(payload, invocation) {
+    const path = typeof payload?.path === 'string' ? payload.path : '';
+    if (!path) return badRequest('path is required');
+    let key;
+    try {
+      const target = await fs.resolve(path, resolveOptions(payload, invocation));
+      const info = await fs.stat(target);
+      let base;
+      try { base = pathKey(await canonicalTarget(target)); }
+      catch { base = pathKey(nativeTargetPath(target) || path); }
+      key = base + ':' + String(info?.version ?? 'missing');
+    } catch {
+      key = pathKey(path) + ':missing';
+    }
+    let snapshot;
+    try {
+      snapshot = await documentSessions.resolve(key, async () => {
+        const result = await documents.state(payload, invocation);
+        if (!result || result.ok !== true) {
+          const error = result?.error || { code: 'FS_IO_ERROR', message: 'state failed' };
+          throw Object.assign(new Error(String(error.message || error.code || 'state failed')), { resultError: error });
+        }
+        return { ...result.value, allowedActions: allowedActions(result.value) };
+      });
+    } catch (error) {
+      if (error?.resultError) return { ok: false, error: error.resultError };
+      throw error;
+    }
+    return { ok: true, value: snapshot };
   }
 
   async function apiRecoveryList(payload) {
@@ -1827,6 +1861,7 @@ export function createHost(options = {}) {
         case 'docs/saveAs': return await apiSaveAs(payload, authority);
         case 'documents.fileState': if (authority === MODEL_TOOL) return badRequest('fileState is editor-only'); return await apiFileState(payload);
         case 'documents.locate': if (authority === MODEL_TOOL) return badRequest('locate is editor-only'); return await apiLocate(payload);
+        case 'documents.session': if (authority === MODEL_TOOL) return badRequest('session is editor-only'); return await apiSession(payload, invocation);
         case 'documents.recoveryList': if (authority === MODEL_TOOL) return badRequest('recoveryList is editor-only'); return await apiRecoveryList(payload);
         case 'documents.recoveryRead': if (authority === MODEL_TOOL) return badRequest('recoveryRead is editor-only'); return await apiRecoveryRead(payload);
         case 'documents.recoveryDiscard': if (authority === MODEL_TOOL) return badRequest('recoveryDiscard is editor-only'); return await apiRecoveryDiscard(payload);
