@@ -1,4 +1,4 @@
-> **更名（1.4.0 起）：** 本插件包名改为 **`dsh-markdown-editor-typora`**（原 `dsh-markdown-typora` 停在 1.3.x）。当前候选：**1.9.3**（B4.3 冲突解决 + B3.3b 草稿镜像）；安装：`dsh plugin --profile desktop add <绝对路径>/dsh-markdown-editor-typora-1.9.3.tgz`。历史 1.4.0 安装方式仅作参考。
+> **更名（1.4.0 起）：** 本插件包名改为 **`dsh-markdown-editor-typora`**（原 `dsh-markdown-typora` 停在 1.3.x）。当前候选：**1.9.4**（B4.3 冲突解决 + B3.3b 草稿镜像）；安装：`dsh plugin --profile desktop add <绝对路径>/dsh-markdown-editor-typora-1.9.4.tgz`。历史 1.4.0 安装方式仅作参考。
 
 # dsh-markdown-typora
 
@@ -17,7 +17,7 @@
 - **技术写作，也能赏心悦目。** Typora 式即时渲染、可编辑公式与表格、离线 Mermaid、十套主题与透明外观。
 - **保存有反馈，写作少打断。** 自动保存、版本冲突提示与草稿恢复；未保存持续显示，已保存三秒后消失。
 
-**开始使用：** 从本仓库构建的 `dsh-markdown-editor-typora-1.9.3.tgz` 安装（`dsh plugin --profile desktop add <绝对路径>/dsh-markdown-editor-typora-1.9.3.tgz`）。重启 DSH，点击左侧 **Markdown**；打开策略位于 **设置 → Markdown 编辑器 → 打开与切换**。
+**开始使用：** 从本仓库构建的 `dsh-markdown-editor-typora-1.9.4.tgz` 安装（`dsh plugin --profile desktop add <绝对路径>/dsh-markdown-editor-typora-1.9.4.tgz`）。重启 DSH，点击左侧 **Markdown**；打开策略位于 **设置 → Markdown 编辑器 → 打开与切换**。
 
 
 
@@ -142,16 +142,16 @@ The editor engine is the same accepted build that ships with MarkPilot 3.6.17. S
 
 ## Install
 
-### 1.9.3 candidate
+### 1.9.4 candidate
 
 Install the exact tarball, not a package-name/latest lookup:
 
-- Desktop: **Settings → Plugins → Add plugin**, choose the absolute path to `dsh-markdown-editor-typora-1.9.3.tgz`. Desktop profile is managed by the Electron app; `dsh plugin --profile desktop …` is rejected by the CLI.
-- Web/host profile: `dsh plugin --profile web add /absolute/path/dsh-markdown-editor-typora-1.9.3.tgz`
+- Desktop: **Settings → Plugins → Add plugin**, choose the absolute path to `dsh-markdown-editor-typora-1.9.4.tgz`. Desktop profile is managed by the Electron app; `dsh plugin --profile desktop …` is rejected by the CLI.
+- Web/host profile: `dsh plugin --profile web add /absolute/path/dsh-markdown-editor-typora-1.9.4.tgz`
 - Verify SHA256 against `SHA256SUMS.txt` before installing.
 - Restart the host afterwards; check **Plugins** and the **Markdown** entry.
 
-Older 1.9.3/rc.1/rc.2 tarballs are pre-GA and must not be installed.
+Older 1.9.4/rc.1/rc.2 tarballs are pre-GA and must not be installed.
 
 ### Manual (development checkout)
 

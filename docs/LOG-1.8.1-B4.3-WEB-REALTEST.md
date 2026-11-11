@@ -547,3 +547,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 空 path 的 `documents.state` 仍走 service 原错误码。
 - 测试：mirror/membership 缓存失效、undone 组无 review 动作；全量 537/536/1。
 - 仍未做：read/applyEdits 显式 snapshot、G5 flag 对照、真实 DB-lock。
+
+## 45. 1.9.4 打包与 Desktop 更新
+
+- 包 `dsh-markdown-editor-typora-1.9.4.tgz`，150 files，SHA256 `CAA0209E9C9AEBF511D1C9B26C3257E584EBE3FFED8E511B89BC57FB121A748D`。
+- 隔离 profile 安装成功；Desktop 从 1.9.3 更新到 `file:...1.9.4.tgz`，实体目录，version 1.9.4，Markdown 工具可调用。
+- 更新前备份 `D:\BuyKey\desktop-profile-backup-20261112-0330`；未重启 Desktop。
+- 全量 537/536/1。
