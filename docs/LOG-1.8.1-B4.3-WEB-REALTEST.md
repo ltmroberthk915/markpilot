@@ -515,3 +515,11 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 隔离 profile 安装成功；Desktop 从 1.9.2 更新到 `file:...1.9.3.tgz`，实体目录，version 1.9.3，Markdown 工具可调用。
 - 更新前备份 `D:\BuyKey\desktop-profile-backup-20261111-1530`；未重启 Desktop。
 - 全量 534/533/1。
+
+## 41. Desktop 1.9.3 重启验收
+
+- 用户重启后新宿主 pid 40324；激活 DeepSeek Harness 并点击左侧 Markdown；
+- Markdown 工作台正常打开，文档树/编辑区渲染，状态「就绪」，无插件加载错误；
+- `b43-keepmine2.md` 测试文档内容与属性未变；
+- Desktop node_modules 确认 version 1.9.3；
+- 未在本次重启后重复删除/改名/只读 UI 用例。
