@@ -395,3 +395,9 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
   - 未重启 Desktop；UI 最终验收待做
 - 更新前备份：`D:\BuyKey\desktop-profile-backup-20261111-1400`。
 - 全量 525/524/1。
+
+## 25. Desktop 1.9.0 重启验收（2026-11-11）
+
+- 用户重启 Desktop 后，实际激活 DeepSeek Harness 窗口并点击左侧 **Markdown**；
+- Markdown 工作台成功打开，左侧文件树/文档/编辑区正常渲染，无插件加载错误；
+- 未在 UI 中重复执行删除/改名/只读真机（已在隔离 Web 通过）；这些行为的 Desktop 端到端仍建议后续做一次。
