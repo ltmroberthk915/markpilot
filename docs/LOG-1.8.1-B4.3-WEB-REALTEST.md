@@ -252,3 +252,12 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 真实 Ctrl+S：磁盘未重建（文件保持不存在），未静默写回旧路径；
 - 原内容写回：missing 横幅消失，进入“文件已在磁盘上更新”的冲突态，脏稿保留；
 - 测试文件已删除，未碰用户文档；headless Edge/测试服务器已停止。
+
+## 10. P4 saveAs 初测（未通过）
+
+- host `docs/saveAs` 已落地（provider createIfAbsent，editor-only）。
+- 客户端“另存为副本”初版尝试在 missing 横幅点击；真实 Web 返回：
+  - HTTP 200 `{ok:false,error:{code:"FS_SANDBOX_DENIED"}}`
+  - 目标在 `D:\BuyKey\deepseek harness 探索任务\...-恢复-....md`
+  - 当前 Web session 的 workspace-write 不允许写该目录
+- 未生成副本，未绕过沙箱；该客户端动作为未提交草稿，需改“目标路径选择/允许目录”后再测。
