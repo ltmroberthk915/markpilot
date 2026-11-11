@@ -2071,7 +2071,7 @@ function writeGuardError(code, path, detail) {
  * and apply expected-version guards to clean open documents. Rooms are the
  * shared truth (cross-process); leases are intentionally not consulted.
  */
-export function createWriteGuard({ fs, lookup, log, pluginName = 'markpilot-write-guard', failClosedThreshold = 3 } = {}) {
+export function createWriteGuard({ fs, lookup, log, pluginName = 'markpilot-write-guard', failClosedThreshold = 3, fsSessionIntents = false } = {}) {
   const installed = new WeakSet();
   const warned = new Set();
   let lookupFailures = 0;
@@ -2108,6 +2108,18 @@ export function createWriteGuard({ fs, lookup, log, pluginName = 'markpilot-writ
     if (!ctx || typeof ctx.on !== 'function' || installed.has(ctx)) return () => {};
     installed.add(ctx);
     const disposers = [];
+    if (fsSessionIntents && ctx.fs && typeof ctx.fs === 'object') {
+      for (const method of ['writeText', 'editText', 'patchText', 'deleteFile', 'moveFile']) {
+        const original = ctx.fs[method];
+        if (typeof original !== 'function') continue;
+        ctx.fs[method] = async function guardedFsSession(target, ...args) {
+          const state = await stateOf(target);
+          if (state && state.dirty) throw writeGuardError(WRITE_GUARD_DIRTY, state.path || target?.displayPath || target?.targetKey || '');
+          return original.call(this, target, ...args);
+        };
+        disposers.push(() => { try { ctx.fs[method] = original; } catch { /* best effort */ } });
+      }
+    }
     const add = (event, handler) => {
       try {
         const dispose = ctx.on(event, handler, { prepend: true });
@@ -2166,7 +2178,7 @@ function safeLogger(ctx) {
   return console;
 }
 
-export function apply(ctx) {
+export function apply(ctx, config = {}) {
   const log = safeLogger(ctx);
   let fsService = safeGet(ctx, 'fs');
   if (!fsService) {
@@ -2202,7 +2214,7 @@ export function apply(ctx) {
   // B2 write guard: shared rooms are only read (never created) from this path;
   // listeners are fiber-scoped and must no-op on hosts whose test ctx has no ctx.on.
   try {
-    const guard = createWriteGuard({ fs: fsService, lookup: host._internals.lookupDocument, log, pluginName: name });
+    const guard = createWriteGuard({ fs: fsService, lookup: host._internals.lookupDocument, log, pluginName: name, fsSessionIntents: config?.fsSessionIntents === true });
     if (typeof ctx.effect === 'function') ctx.effect(() => guard.install(ctx), 'dsh-markdown-editor-typora: write guard');
     else guard.install(ctx);
   } catch (error) {

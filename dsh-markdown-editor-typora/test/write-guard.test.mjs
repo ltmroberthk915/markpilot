@@ -137,3 +137,20 @@ test('lookup failure becomes fail-closed after the bounded threshold', async () 
   assert.deepEqual(recovered.result, BASE);
   assert.equal(calls, 4);
 });
+
+test('fsSessionIntents wraps ctx.fs writes and refuses dirty sessions', async () => {
+  const h = makeCtx();
+  let calls = 0;
+  h.ctx.fs = {
+    writeText: async () => { calls += 1; return 'wrote'; },
+    editText: async () => { calls += 1; return 'edited'; },
+  };
+  makeGuard({ fsSessionIntents: true, lookup: async () => ({ dirty: true, path: 'D:/probe/a.md' }) }).install(h.ctx);
+  await assert.rejects(() => h.ctx.fs.writeText(TARGET, 'x'), (error) => error.code === 'MP_DOC_DIRTY');
+  assert.equal(calls, 0);
+  const clean = makeCtx();
+  clean.ctx.fs = { writeText: async () => { calls += 1; return 'wrote'; } };
+  makeGuard({ fsSessionIntents: true, lookup: async () => ({ dirty: false, path: 'D:/probe/a.md' }) }).install(clean.ctx);
+  assert.equal(await clean.ctx.fs.writeText(TARGET, 'x'), 'wrote');
+  assert.equal(calls, 1);
+});
