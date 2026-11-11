@@ -322,6 +322,7 @@ export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
 const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'documents.session', 'documents.recoveryList', 'documents.recoveryRead', 'documents.recoveryDiscard', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'diag']);
+const SESSION_MUTATING_ENDPOINTS = new Set(['save', 'edit', 'live', 'docs/create', 'docs/saveAs', 'docs/archive', 'documents.applyEdits', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftClear']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
 
@@ -1188,10 +1189,27 @@ export function createHost(options = {}) {
     try {
       const target = await fs.resolve(path, resolveOptions(payload, invocation));
       const info = await fs.stat(target);
+      let canonical = null;
       let base;
-      try { base = pathKey(await canonicalTarget(target)); }
+      try { canonical = await canonicalTarget(target); base = pathKey(canonical); }
       catch { base = pathKey(nativeTargetPath(target) || path); }
-      key = base + ':' + String(info?.version ?? 'missing');
+      let roomMarker = '';
+      let mirrorMarker = '';
+      if (canonical) {
+        if (typeof live.readRoom === 'function') {
+          try {
+            const room = await live.readRoom(canonical);
+            if (room) roomMarker = `:${room.epoch}:${room.version}:${room.savedVersion}:${room.members}:${room.localMembers}:${room.resolvedDisk ?? ''}`;
+          } catch { /* no room marker; provider version still guards disk changes */ }
+        }
+        if (typeof live.getDraft === 'function') {
+          try {
+            const mirror = await live.getDraft(canonical);
+            if (mirror) mirrorMarker = `:m:${mirror.textSha256}:${mirror.baseVersion}:${mirror.baseSha256}`;
+          } catch { mirrorMarker = ':m:error'; }
+        }
+      }
+      key = base + ':' + String(info?.version ?? 'missing') + roomMarker + mirrorMarker;
     } catch {
       key = pathKey(path) + ':missing';
     }
@@ -1825,6 +1843,8 @@ export function createHost(options = {}) {
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           return await documents.applyEdits(payload, invocation, invocation?.policy);
         case 'documents.state':
+          if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
+          return await apiSession(payload, invocation);
         case 'documents.reconcile':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           return await documents.state(payload, invocation);
@@ -1886,6 +1906,8 @@ export function createHost(options = {}) {
       try { log.warn?.('%s: %s failed (%s): %s', name, String(endpoint), code, String(error?.message ?? error)); } catch { /* 日志失败不影响响应 */ }
       const reason = error?.reason || (error?.code === 'MP_FILE_MISSING' ? 'missing' : undefined);
       return { ok: false, error: { code, message: String(error?.message ?? error), ...(reason ? { reason: String(reason) } : {}) } };
+    } finally {
+      if (SESSION_MUTATING_ENDPOINTS.has(endpoint)) documentSessions.clear();
     }
   }
 

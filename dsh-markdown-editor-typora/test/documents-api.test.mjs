@@ -650,6 +650,24 @@ test('P5-API archive failure is fail-closed with zero disk write', async () => {
   } finally { w.restore(); }
 });
 
+test('P5-API documents.state cache notices a draft-index mirror', async () => {
+  const w = await makeWorld('state-mirror', 'body\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const first = await host.dispatch('documents.state', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(first.ok, true);
+    assert.notEqual(first.value.source, 'mirror');
+    await liveDocs.putDraft(w.file, {
+      text: 'mirror\n', baseVersion: 'v0', baseSha256: sha256Text('body\n'), docToken: 'dshdoc-state-mirror',
+    });
+    const second = await host.dispatch('documents.state', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(second.ok, true);
+    assert.equal(second.value.source, 'mirror');
+    host.close();
+  } finally { w.restore(); }
+});
+
 test('B3-API5 a sandboxed session cannot apply a buffer edit outside its workspace', async () => {
   const w = await makeWorld('policy', 'hello\n');
   try {
