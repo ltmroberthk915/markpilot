@@ -419,3 +419,11 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 与之前的 30 个磁盘/保存/改名场景合计 **50 场景 0 差异**；
 - 仍未覆盖 review/recovery 组合与真正 11 状态表，不能按完整 G1 宣称。
 - 全量 526/525/1。
+
+## 28. P1 G1 扩展到 recovery/review
+
+- `p1-shadow-live.test.mjs` 增加 5 文件 × recovery / review = 10 场景；
+- 与 `documents.state` 对比核心字段 0 差异；
+- 合计：磁盘/保存/改名 30 + dirty/conflict/orphan/mirror/recovery/review 30 = **60 场景 0 差异**；
+- 仍未覆盖完整 11 状态表/客户端接线，不能按完整 G1 宣称。
+- 全量 526/525/1。
