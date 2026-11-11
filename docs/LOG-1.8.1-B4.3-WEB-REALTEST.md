@@ -486,3 +486,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
     `C:\Users\Ming\AppData\Local\.markpilot\draft-archive\facadetest.md.agent-before.4cddcf72a9247aab.md`
   - 归档内容为改前 `FACADEREAL# facadetest`，SHA256 `1382A202…`
 - 改后测试文件已恢复原文；Desktop 1.9.2 上实际验证了 disk-authority AI 写归档。
+
+## 37. P1 G1 owned-elsewhere
+
+- 用独立 Node 子进程 join 同一文件，模拟远程编辑器持有 buffer；
+- `documents.session` 与 `documents.state` 均返回 `owned-elsewhere`，核心字段 0 差异；
+- G1 合计 **66 场景 0 差异**；仍缺 readonly/locked 与完整 11 状态表。
+- 全量 531/530/1。
