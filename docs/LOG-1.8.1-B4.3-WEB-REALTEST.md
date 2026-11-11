@@ -306,3 +306,14 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
   - 按钮「重试」「另存为…」「复制我的内容」
 - 文件改回原名后测试结束；旧路径未被静默重建，测试文件已清理。
 - 之前记录“headless 挂起”是脚本输出缓冲导致，实际通过。
+
+## 16. Desktop rc.7 更新（2026-11-11）
+
+- 更新前备份 `package.json`/`pnpm-lock.yaml`/`cordis.patch.yml` 到 `D:\BuyKey\desktop-profile-backup-20261111-1300`，SHA 校验一致。
+- 应用内插件管理器从绝对路径 `...rc.7.tgz` 更新：
+  - Desktop 依赖 `file:...rc.7.tgz`
+  - node_modules 仍为实体目录
+  - version `1.9.0-rc.7`
+  - `plugin_manager` source `file:...rc.7.tgz`，enabled=true
+  - Markdown 模型工具可调用并读到磁盘正文
+- TEMP disable 已不存在；未重启 Desktop，客户端 UI 需正常重启验收。
