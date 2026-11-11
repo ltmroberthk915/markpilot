@@ -537,3 +537,13 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 写端点 finally 统一 `documentSessions.clear()`；
 - 新增 mirror 失效测试；全量 536/535/1。
 - 审查确认两个缓存 BLOCKER 已修；read/applyEdits 仍未显式走 snapshot。
+
+## 44. P5 state routing 审查修复
+
+- key 增加 recovery 列表标记；discardAppendRecovery 后缓存失效。
+- `sessionGeneration`：写端点失效后，旧 load 不再回填缓存。
+- `documents.undoGroups` 加入失效端点；`open` 也加入。
+- `allowedActions` 过滤 undoneAt/undone_at 的 review 组。
+- 空 path 的 `documents.state` 仍走 service 原错误码。
+- 测试：mirror/membership 缓存失效、undone 组无 review 动作；全量 537/536/1。
+- 仍未做：read/applyEdits 显式 snapshot、G5 flag 对照、真实 DB-lock。
