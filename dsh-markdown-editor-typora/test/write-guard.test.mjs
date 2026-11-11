@@ -123,3 +123,17 @@ test('installing twice on the same ctx is idempotent', async () => {
   guard.install(h.ctx);
   assert.equal(h.listeners.size, 3);
 });
+
+test('lookup failure becomes fail-closed after the bounded threshold', async () => {
+  const h = makeCtx();
+  let calls = 0;
+  makeGuard({ lookup: async () => { calls += 1; if (calls <= 3) throw new Error('db locked'); return null; } }).install(h.ctx);
+  const first = await call(h, 'fs/write-intent', BASE);
+  assert.deepEqual(first.result, BASE);
+  const second = await call(h, 'fs/write-intent', BASE);
+  assert.deepEqual(second.result, BASE);
+  await assert.rejects(() => call(h, 'fs/write-intent', BASE), (error) => error.code === 'MP_DOC_LOOKUP_FAILED');
+  const recovered = await call(h, 'fs/write-intent', BASE);
+  assert.deepEqual(recovered.result, BASE);
+  assert.equal(calls, 4);
+});

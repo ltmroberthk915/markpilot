@@ -2071,9 +2071,11 @@ function writeGuardError(code, path, detail) {
  * and apply expected-version guards to clean open documents. Rooms are the
  * shared truth (cross-process); leases are intentionally not consulted.
  */
-export function createWriteGuard({ fs, lookup, log, pluginName = 'markpilot-write-guard' } = {}) {
+export function createWriteGuard({ fs, lookup, log, pluginName = 'markpilot-write-guard', failClosedThreshold = 3 } = {}) {
   const installed = new WeakSet();
   const warned = new Set();
+  let lookupFailures = 0;
+  const threshold = Number.isSafeInteger(failClosedThreshold) && failClosedThreshold > 0 ? failClosedThreshold : 3;
   function warn(operation, error) {
     const key = operation + '\0' + String(error?.message ?? error);
     if (warned.has(key)) return;
@@ -2083,8 +2085,13 @@ export function createWriteGuard({ fs, lookup, log, pluginName = 'markpilot-writ
   async function stateOf(target) {
     if (!target || typeof target !== 'object') return null;
     if (typeof target.targetKey !== 'string' && typeof target.displayPath !== 'string') return null;
-    try { return await lookup(target); }
-    catch (error) { warn('lookup', error); return undefined; }
+    try { const state = await lookup(target); lookupFailures = 0; return state; }
+    catch (error) {
+      lookupFailures += 1;
+      if (lookupFailures >= threshold) throw writeGuardError('MP_DOC_LOOKUP_FAILED', target.displayPath || target.targetKey || '');
+      warn('lookup', error);
+      return undefined;
+    }
   }
   async function checked(target) {
     const state = await stateOf(target);
