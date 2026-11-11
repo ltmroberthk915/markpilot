@@ -52,3 +52,61 @@ test('P4-client retry does not overwrite a dirty missing buffer', async () => {
   assert.equal(doc.dirty, true);
   h.cleanup();
 });
+
+test('P4 client saveAs modal submits the chosen target path', async () => {
+  const h = make();
+  h.setFetch((req) => {
+    if (req.endpoint === 'open') return opened('base', 'v1');
+    if (req.endpoint === 'save') return { ok: false, error: { code: 'FS_STALE_VERSION', reason: 'missing', message: 'file no longer exists' } };
+    if (req.endpoint === 'saveAs') return { ok: true, value: { path: req.payload.targetPath, version: 'v-copy', size: 4 } };
+    return { ok: true, value: {} };
+  });
+  await h.boot();
+  const doc = h.st.doc;
+  h.edit('dirty');
+  h.message('manual-save', { source: 'ctrl-s' });
+  await drain();
+  assert.equal(doc.missing, true);
+  assert.equal(typeof h.st.actions.submitSaveAs, 'function');
+  doc.saving = false; doc.pendingApply = false; doc.applyUnknown = false;
+  h.st.actions.openSaveAs();
+  assert.equal(h.ui().saveAsOpen, true);
+  assert.match(doc.saveAsValue, /-恢复-.*\.md$/);
+  doc.saveAsValue = 'D:/probe/copy.md';
+  await h.st.actions.submitSaveAs();
+  await drain();
+  const request = h.requests.find((r) => r.endpoint === 'saveAs');
+  assert.ok(request);
+  assert.equal(request.payload.targetPath, 'D:/probe/copy.md');
+  assert.equal(request.payload.text, 'dirty');
+  assert.equal(request.payload.path, doc.absPath);
+  assert.equal(h.ui().saveAsOpen, false);
+  h.cleanup();
+});
+
+
+
+
+
+
+test('P4 client saveAs refuses a stale editor text instead of copying the old mirror', async () => {
+  const h = make();
+  h.setFetch((req) => {
+    if (req.endpoint === 'open') return opened('base', 'v1');
+    if (req.endpoint === 'save') return { ok: false, error: { code: 'FS_STALE_VERSION', reason: 'missing', message: 'file no longer exists' } };
+    return { ok: true, value: {} };
+  });
+  await h.boot();
+  const doc = h.st.doc;
+  h.edit('dirty');
+  h.message('manual-save', { source: 'ctrl-s' });
+  await drain();
+  doc.composing = true;
+  h.st.actions.openSaveAs();
+  await h.st.actions.submitSaveAs();
+  await drain();
+  assert.equal(h.requests.filter((r) => r.endpoint === 'saveAs').length, 0);
+  assert.equal(doc.saveAsBusy, false);
+  assert.match(h.ui().saveAsError, /完整正文/);
+  h.cleanup();
+});

@@ -765,6 +765,14 @@ function applyMirrorDelta(mirror,event){
       return Number(s.failures) >= 3 ? POLL_SLOW_MS : POLL_FAST_MS;
     }
 
+    function saveAsCandidate(file, now = Date.now()) {
+      const source = String(file || "");
+      if (!source) return "";
+      const stem = source.replace(/\.md$/i, "");
+      const stamp = new Date(now).toISOString().replace(/[:.]/g, "-");
+      return stem + "-恢复-" + stamp + ".md";
+    }
+
     function saveErrorKind(error) {
       if (!error) return "error";
       if (error.reason === "missing" || error.code === "MP_FILE_MISSING") return "missing";
@@ -3681,7 +3689,7 @@ const __test = {
       conflictDefaultChoices, conflictResolutionsFromChoices, conflictApplyEnabled,
       conflictChoiceLabel, conflictTruncatedNotice, liveTicketDirty,
       reviewPathKey, reviewStoreKey, normalizeReviewRecord,
-      normalizeSavedText, shouldAdoptSavedVersion, shouldVerifyExternalEvent, externalDiskVerdict, saveErrorKind,
+      normalizeSavedText, shouldAdoptSavedVersion, shouldVerifyExternalEvent, externalDiskVerdict, saveErrorKind, saveAsCandidate,
       constants: {
         TAB_TYPE_ID: TAB_TYPE_ID,
         FILE_ADDRESS_PREFIX: FILE_ADDRESS_PREFIX,
@@ -5370,9 +5378,11 @@ const __test = {
           retryMissing: null,
           missing: false,
           missingPending: false,
+          saveAsValue: "",
+          saveAsBusy: false,
         };
         st.doc = doc;
-        setUi((prev) => ({ ...prev, phase: "loading", detail: "", notice: "", recovery: null, railOpen: false, notices: [] }));
+        setUi((prev) => ({ ...prev, phase: "loading", detail: "", notice: "", recovery: null, railOpen: false, notices: [], saveAsOpen: false, saveAsValue: "", saveAsError: "", saveAsBusy: false }));
         setUi((prev) => (prev.recovered || prev.saveStatus ? { ...prev, recovered: null, saveStatus: "" } : prev));   // 新文档代际不继承恢复提示或保存回执
 
         const ticket = ticketOf(doc.sessionId, doc.absPath, doc.gen);
@@ -6652,6 +6662,73 @@ const __test = {
           }
         }
 
+        function openSaveAs() {
+          if (!doc.missing || !doc.absPath || doc.saveAsBusy) return;
+          doc.saveAsValue = saveAsCandidate(doc.absPath);
+          setUi((prev) => ({ ...prev, saveAsOpen: true, saveAsValue: doc.saveAsValue, saveAsError: "", saveAsBusy: false }));
+        }
+
+        function closeSaveAs() {
+          if (doc.dead || doc.saveAsBusy) return;
+          setUi((prev) => ({ ...prev, saveAsOpen: false, saveAsError: "", saveAsBusy: false }));
+        }
+
+        async function submitSaveAs() {
+          if (!doc.missing || !doc.absPath || doc.saving || doc.pendingApply || doc.applyUnknown || doc.saveAsBusy) return;
+          const targetPath = String(doc.saveAsValue || "").trim();
+          if (!targetPath) {
+            setUi((prev) => ({ ...prev, saveAsError: "请输入绝对路径" }));
+            return;
+          }
+          if (targetPath === doc.absPath) {
+            setUi((prev) => ({ ...prev, saveAsError: "目标不能是当前源文件；另存为不会重建原路径" }));
+            return;
+          }
+          doc.saveAsBusy = true;
+          setUi((prev) => ({ ...prev, saveAsBusy: true, saveAsError: "" }));
+          const fail = (message) => {
+            doc.saveAsBusy = false;
+            setUi((prev) => ({ ...prev, saveAsBusy: false, saveAsError: message }));
+          };
+          let pulled;
+          try {
+            pulled = await pullText();
+          } catch (error) {
+            fail("编辑器未返回完整正文，未另存：" + String(error?.message || error));
+            return;
+          }
+          if (!pulled || pulled.stale || typeof pulled.text !== "string") {
+            fail("编辑器未返回完整正文，未另存；请稍后重试");
+            return;
+          }
+          const text = pulled.text;
+          let result;
+          try {
+            result = await api("docs/saveAs", { path: doc.absPath, targetPath, text });
+          } catch (error) {
+            fail(String(error?.message || error));
+            return;
+          }
+          if (!alive()) { doc.saveAsBusy = false; return; }
+          if (result.ok !== true) {
+            const code = result.error?.code;
+            fail(code === "FS_SANDBOX_DENIED"
+              ? "当前工作区不允许写该路径，请选择 workspace 内的路径"
+              : code === "FS_EXISTS"
+                ? "目标文件已存在，另存为不会覆盖"
+                : String(result.error?.message || code || "另存为失败"));
+            return;
+          }
+          const savedPath = result.value && typeof result.value.path === "string" ? result.value.path : "";
+          if (!savedPath) { fail("另存为回执不完整，未确认副本路径"); return; }
+          doc.saveAsBusy = false;
+          recordRecentDoc({ path: savedPath, scope: "absolute" }, doc.sessionId, doc.workspace);
+          setUi((prev) => ({ ...prev, saveAsOpen: false, saveAsBusy: false }));
+          post("toast", "已另存为：" + savedPath);
+          if (doc.missing) showPhase("missing", "已另存为副本：" + savedPath + "；原文件仍不存在");
+          else showPhase(doc.dirty ? "dirty" : "ready", doc.dirty ? "编辑中…" : "");
+        }
+
         function onExternalEvent(event) {
           let data = {};
           try { data = JSON.parse(event.data) || {}; } catch (e) { data = {}; }
@@ -7287,6 +7364,9 @@ const __test = {
           reloadDisk: forceReload,
           copyMine: copyMine,
           retryMissing,
+          openSaveAs,
+          closeSaveAs,
+          submitSaveAs,
           openConflict,
           applyConflict,
           cancelConflict,
@@ -7560,6 +7640,7 @@ const __test = {
         primaryText = "⚠ " + ui.detail;
         primaryTone = "warn";
         actions.push({ label: "重试", icon: "⟳", run: () => st.actions.retryMissing && st.actions.retryMissing() });
+        actions.push({ label: "另存为…", icon: "⤓", run: () => st.actions.openSaveAs && st.actions.openSaveAs() });
         actions.push({ label: "复制我的内容", icon: "⧉", run: () => st.actions.copyMine && st.actions.copyMine() });
       } else if (ui.phase === "conflict") {
         primaryText = "⚠ " + ui.detail;
@@ -7616,6 +7697,40 @@ const __test = {
       }, item.label);
       // B1: fixed 28px rail above the iframe. The rail is always present, so
       // banners and save status never change the editor geometry.
+      const saveAsPanel = () => {
+        if (!ui.saveAsOpen) return null;
+        return h('div', {
+          key: 'save-as-panel', role: 'dialog', 'aria-label': '另存为',
+          style: {
+            position: 'absolute', top: 48, left: 16 + railInsetLeft, right: 16 + railInsetRight,
+            zIndex: 70, boxSizing: 'border-box', padding: 12, borderRadius: 8,
+            border: '1px solid color-mix(in srgb, currentColor 22%, transparent)',
+            background: 'color-mix(in srgb, currentColor 8%, transparent)', backdropFilter: 'blur(12px)',
+            boxShadow: '0 8px 24px color-mix(in srgb, black 30%, transparent)', color: 'inherit', fontSize: 12,
+          },
+        },
+          h('div', { style: { fontWeight: 600, marginBottom: 8 } }, '另存为（新路径，不覆盖）'),
+          h('input', {
+            value: ui.saveAsValue || '', autoFocus: true, spellCheck: false,
+            'aria-label': '另存为绝对路径',
+            onChange: (event) => {
+              const value = event.target.value;
+              doc.saveAsValue = value;
+              setUi((prev) => ({ ...prev, saveAsValue: value, saveAsError: '' }));
+            },
+            onKeyDown: (event) => {
+              if (event.key === 'Enter') { event.preventDefault(); void st.actions.submitSaveAs?.(); }
+              else if (event.key === 'Escape') { event.preventDefault(); st.actions.closeSaveAs?.(); }
+            },
+            style: { width: '100%', boxSizing: 'border-box', padding: '6px 7px', fontSize: 12, fontFamily: 'inherit', color: 'inherit', background: 'color-mix(in srgb, currentColor 6%, transparent)', border: '1px solid color-mix(in srgb, currentColor 22%, transparent)', borderRadius: 5 },
+          }),
+          ui.saveAsError ? h('div', { style: { color: '#d86', marginTop: 6 } }, ui.saveAsError) : null,
+          h('div', { style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 } },
+            h('button', { type: 'button', className: 'mp-rail-btn', disabled: !!ui.saveAsBusy, onClick: () => st.actions.closeSaveAs && st.actions.closeSaveAs() }, '取消'),
+            h('button', { type: 'button', className: 'mp-rail-btn', disabled: !!ui.saveAsBusy, onClick: () => st.actions.submitSaveAs && st.actions.submitSaveAs() }, ui.saveAsBusy ? '保存中…' : '保存'),
+          ));
+      };
+
       const conflictPanel = () => {
         if (!conflictSession) return null;
         const hunks = Array.isArray(conflictSession.hunks) ? conflictSession.hunks : [];
@@ -7773,6 +7888,7 @@ const __test = {
           style: { width: "100%", border: 0, background: "transparent", flex: "1 1 auto", minHeight: 0, height: "auto" },
         }),
         conflictPanel(),
+        saveAsPanel(),
         hasPopover ? h("div", {
           key: "rail-popover",
           className: "mp-rail-popover",
