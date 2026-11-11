@@ -865,6 +865,18 @@ test('B4.4-API2 normal save errors do not carry reason', async () => {
   } finally { w.restore(); }
 });
 
+test('B4.4-API3 stat reports missing after external deletion', async () => {
+  const w = await makeWorld('stat-missing', 'disk\n');
+  try {
+    const host = createHost({ fs: provider(w.file), log: { warn() {} } });
+    await fs.unlink(w.file);
+    const stat = await host.dispatch('stat', { path: w.file });
+    assert.equal(stat.ok, true);
+    assert.equal(stat.value.missing, true);
+    host.close();
+  } finally { w.restore(); }
+});
+
 test('B4.3-ADV2b theirs and both choices resolve without writing disk', async () => {
   const w = await makeWorld('conflict-choices', 'base\n');
   try {

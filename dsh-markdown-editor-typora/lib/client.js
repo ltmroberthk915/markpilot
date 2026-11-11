@@ -765,6 +765,13 @@ function applyMirrorDelta(mirror,event){
       return Number(s.failures) >= 3 ? POLL_SLOW_MS : POLL_FAST_MS;
     }
 
+    function saveErrorKind(error) {
+      if (!error) return "error";
+      if (error.reason === "missing" || error.code === "MP_FILE_MISSING") return "missing";
+      if (error.code === "FS_STALE_VERSION") return "conflict";
+      return "error";
+    }
+
     /** 外部变更能否直接覆盖编辑面：只有干净、非冲突、无保存飞行、可见且页面在前台才行。 */
     function shouldAcceptExternal(state) {
       const s = state || {};
@@ -3674,7 +3681,7 @@ const __test = {
       conflictDefaultChoices, conflictResolutionsFromChoices, conflictApplyEnabled,
       conflictChoiceLabel, conflictTruncatedNotice, liveTicketDirty,
       reviewPathKey, reviewStoreKey, normalizeReviewRecord,
-      normalizeSavedText, shouldAdoptSavedVersion, shouldVerifyExternalEvent, externalDiskVerdict,
+      normalizeSavedText, shouldAdoptSavedVersion, shouldVerifyExternalEvent, externalDiskVerdict, saveErrorKind,
       constants: {
         TAB_TYPE_ID: TAB_TYPE_ID,
         FILE_ADDRESS_PREFIX: FILE_ADDRESS_PREFIX,
@@ -5360,6 +5367,9 @@ const __test = {
           reload: null,
           reloadDisk: null,
           copyMine: null,
+          retryMissing: null,
+          missing: false,
+          missingPending: false,
         };
         st.doc = doc;
         setUi((prev) => ({ ...prev, phase: "loading", detail: "", notice: "", recovery: null, railOpen: false, notices: [] }));
@@ -5731,6 +5741,7 @@ const __test = {
         function commitApplied(pending,reply,snapshot) {
           const value=pending.value,restore=pending.kind==='restore';
           doc.opened=true;doc.text=value.text;doc.textFresh=true;doc.lastVersion=value.version;
+          doc.missing=false;doc.missingPending=false;
           if (typeof value.diskRevisionSha === "string" && /^[0-9a-f]{64}$/i.test(value.diskRevisionSha))
             doc.baseSha256 = value.diskRevisionSha.toLowerCase();
           void probeDraftMirror();
@@ -5915,6 +5926,9 @@ const __test = {
 
 
         function showPhase(phase, detail) {
+          // missing 是删/改名后的显性 latch：输入、apply、live 刷新只能把文档标脏，
+          // 不能把横幅顶掉而留下一个静默停写的 dirty 状态。
+          if (doc.missing && phase !== "missing" && phase !== "error") return;
           saveStatus.update(doc.dirty);
           doc.phase = phase;
           doc.detail = detail || "";
@@ -6041,7 +6055,7 @@ const __test = {
         }
 
         function scheduleSave(delay) {
-          if (doc.dead) return;
+          if (doc.dead || doc.missing) return;
           if (reviewSuppressesSave(doc)) return;   // AI review must reach a decision before the timer can write.
           if (doc.saveTimer) { clearTimeout(doc.saveTimer); doc.saveTimer = null; }
           doc.saveTimer = setTimeout(() => {
@@ -6107,6 +6121,11 @@ const __test = {
           const manual = !!(options && options.manual);
           if (doc.dead) return;
           if (reviewSuppressesSave(doc)) return;
+          if (doc.missing) {
+            stopSaveTimer();
+            if (manual) post("toast", "磁盘上的文件已不存在；草稿未写盘，请先重试或复制内容");
+            return;
+          }
           if (doc.conflict) {
             stopSaveTimer();
             if (manual) post("toast", "请先解决冲突，再保存");
@@ -6281,11 +6300,17 @@ const __test = {
                 if (manualThisRun) post("toast", "对端持续编辑中，请按 Ctrl+S 手动保存");
                 return;
               }
+              const saveKind = saveErrorKind(result.error);
+              if (saveKind === "missing") {
+                enterMissing();
+                if (manualThisRun) post("toast", "磁盘上的文件已不存在；草稿未写盘，请先重试或复制内容");
+                return;
+              }
               if (doc.live && result.error && liveErrorAction(result.error.code) === "conflict") {
                 handleLiveError(result.error.code, result.error.message);
                 return;
               }
-              if (result.error && result.error.code === "FS_STALE_VERSION") {
+              if (saveKind === "conflict") {
                 doc.conflict = true;
                 showPhase("conflict", "文件已在别处被修改（" + (result.error.message || "FS_STALE_VERSION") + "）；版本守卫拒绝覆盖");
                 if (manualThisRun) post("toast", "文件已在别处被修改，未覆盖；请先重载磁盘版本");
@@ -6299,11 +6324,13 @@ const __test = {
           } catch (error) {
             if (alive()) {
               const message = String(error && error.message ? error.message : error);
-              showError("保存失败：" + message);
-              if (manualThisRun) post("toast", "保存失败：" + message);
+              if (saveErrorKind(error) === "missing") enterMissing();
+              else showError("保存失败：" + message);
+              if (manualThisRun) post("toast", saveErrorKind(error) === "missing" ? "磁盘上的文件已不存在；草稿未写盘" : "保存失败：" + message);
             }
           } finally {
             doc.saving = false;
+            if (doc.missingPending) { doc.missingPending = false; enterMissing(); }
             const reload=doc.reloadAfterSave;doc.reloadAfterSave=null;
             if(reload && alive()){if(doc.editSeq===reload.editSeq)void loadFromDisk(reload.opts);else doc.externalStale=true;}
             if(alive() && doc.needLiveJoin && !doc.dirty && !doc.conflict) await joinLiveIfNeeded().catch(() => {});
@@ -6588,15 +6615,58 @@ const __test = {
           doc.externalStale = true;
           if (doc.dirty || doc.conflict) { stopSaveTimer(); showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑"); }
         }
+        function enterMissing() {
+          if (doc.missing) return;
+          doc.missing = true;
+          doc.externalStale = true;
+          doc.staleNotified = true;
+          stopSaveTimer();
+          clearPoll();
+          showPhase("missing", doc.dirty
+            ? "磁盘上的文件已不存在；当前编辑内容保留、未写盘"
+            : "磁盘上的文件已不存在（可能被删除或改名）");
+        }
+
+        function exitMissing() {
+          if (!doc.missing) return;
+          doc.missing = false;
+          doc.externalStale = false;
+          doc.staleNotified = false;
+          if (doc.conflict) showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
+          else showPhase(doc.dirty ? "dirty" : "ready", doc.dirty ? "编辑中…" : "");
+        }
+
+        async function retryMissing() {
+          if (!doc.missing || !doc.absPath || doc.dead) return;
+          try {
+            const result = await api("stat", { path: doc.absPath });
+            if (!result.ok || result.value?.missing === true) {
+              post("toast", "文件仍不存在；草稿保留在恢复日志，不会重建旧路径");
+              return;
+            }
+            if (doc.live) stopLive(true);
+            await loadFromDisk({ silent: true, reason: "retry-missing" });
+            if (!doc.missing) exitMissing();
+          } catch (error) {
+            post("toast", "重试失败：" + String(error && error.message ? error.message : error));
+          }
+        }
+
         function onExternalEvent(event) {
           let data = {};
           try { data = JSON.parse(event.data) || {}; } catch (e) { data = {}; }
           if (data.path && doc.absPath && !samePath(data.path, doc.absPath)) return;
           if (!doc.opened) return; // 握手/首次 open 之前的事件没有落点（boot 自己会读磁盘）
+          if (doc.missing && data.missing !== true) exitMissing();
           // Our own save can emit a watch event while the editor still has
           // unsaved edits. Defer that event and verify the disk text before
           // turning it into a conflict; real external edits still conflict.
-          if (doc.saving) return;
+          if (doc.saving) {
+            if (data.missing === true) doc.missingPending = true;
+            else if (doc.missing) { doc.missingPending = false; exitMissing(); }
+            return;
+          }
+          if (data.missing === true) { enterMissing(); return; }
           // live 会话：磁盘事件的采纳权在共享房间（external 写入会被 adopt 成房间更新），
           // 这里只催一次 refresh，绝不 loadFromDisk 覆盖共享草稿。
           if (doc.live) { void refreshLiveRoom(); return; }
@@ -6646,13 +6716,14 @@ const __test = {
           if (isDocumentHidden()) return;
           if (doc.tabVisible === false) { schedulePoll(POLL_SLOW_MS); return; }
           if (doc.esHealthy) { schedulePoll(POLL_SLOW_MS); return; }
-          if (doc.dirty || doc.conflict || doc.saving || !doc.opened || !doc.lastVersion) {
+          if (doc.dirty || doc.conflict || doc.saving || doc.missing || !doc.opened || !doc.lastVersion) {
             doc.pollFailures = Math.min(3, doc.pollFailures + 1);
             schedulePoll(nextPollDelay({ healthy: false, failures: doc.pollFailures, hidden: false }));
             return;
           }
           api("stat", { path: doc.absPath }).then((result) => {
             if (doc.dead) return;
+            if (result.ok === true && result.value?.missing === true) { enterMissing(); return; }
             if (result.ok === true && result.value && String(result.value.version) !== String(doc.lastVersion)) {
               void loadFromDisk({ silent: true, reason: "poll" });
             }
@@ -6996,7 +7067,8 @@ const __test = {
             if (!clipboard || typeof clipboard.writeText !== "function") throw new Error("clipboard unavailable");
             await clipboard.writeText(text);
             post("toast", "已复制当前编辑内容");
-            showPhase("conflict", "已复制当前编辑内容；磁盘版本未覆盖");
+            if (doc.missing) showPhase("missing", "已复制当前编辑内容；磁盘上的文件仍不存在");
+            else showPhase("conflict", "已复制当前编辑内容；磁盘版本未覆盖");
           } catch (error) {
             post("toast", "复制失败：" + String(error && error.message ? error.message : error));
           }
@@ -7214,6 +7286,7 @@ const __test = {
         st.actions = {
           reloadDisk: forceReload,
           copyMine: copyMine,
+          retryMissing,
           openConflict,
           applyConflict,
           cancelConflict,
@@ -7398,6 +7471,7 @@ const __test = {
 
         const onVisibilityChange = () => {
           if (doc.dead) return;
+          if (doc.missing) return;
           if (isDocumentHidden()) { clearPoll(); return; }
           // API.md §1.5：窗口重新获焦 → 立即增量交换（不是全文轮询）。
           if (doc.live) void refreshLiveRoom();
@@ -7456,7 +7530,7 @@ const __test = {
         const doc = st.doc;
         if (!doc) return;
         doc.tabVisible = tabVisible;
-        if (tabVisible && doc.externalStale && !doc.dirty && !doc.conflict && !doc.saving) {
+        if (tabVisible && !doc.missing && doc.externalStale && !doc.dirty && !doc.conflict && !doc.saving) {
           doc.externalStale = false;
           if (typeof doc.reload === "function") void doc.reload({ silent: true, reason: "visible" });
         }
@@ -7482,7 +7556,12 @@ const __test = {
       const toggleRail = () => setUi((prev) => ({ ...prev, railOpen: !prev.railOpen }));
       const actions = [];
       let primaryText = "", primaryTone = "info";
-      if (ui.phase === "conflict") {
+      if (ui.phase === "missing") {
+        primaryText = "⚠ " + ui.detail;
+        primaryTone = "warn";
+        actions.push({ label: "重试", icon: "⟳", run: () => st.actions.retryMissing && st.actions.retryMissing() });
+        actions.push({ label: "复制我的内容", icon: "⧉", run: () => st.actions.copyMine && st.actions.copyMine() });
+      } else if (ui.phase === "conflict") {
         primaryText = "⚠ " + ui.detail;
         primaryTone = "warn";
         actions.push({ label: "查看冲突", icon: "⇄", run: () => st.actions.openConflict && st.actions.openConflict() });

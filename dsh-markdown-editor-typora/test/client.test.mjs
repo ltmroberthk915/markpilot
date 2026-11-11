@@ -423,3 +423,12 @@ test('冲突面板纯函数：默认选择、resolution 形状、应用门槛与
   assert.equal(second.count, 5);
   assert.equal(JSON.stringify(second.groups), JSON.stringify([g1, g2]));
 });
+
+test('P4 client saveErrorKind: missing/conflict/error 三分支', async () => {
+  const { test: T } = await loadClientFactory();
+  assert.equal(T.saveErrorKind({ code: 'FS_STALE_VERSION', reason: 'missing' }), 'missing');
+  assert.equal(T.saveErrorKind({ code: 'MP_FILE_MISSING', message: 'file no longer exists' }), 'missing');
+  assert.equal(T.saveErrorKind({ code: 'FS_STALE_VERSION', message: 'changed' }), 'conflict');
+  assert.equal(T.saveErrorKind({ code: 'FS_IO_ERROR' }), 'error');
+  assert.equal(T.saveErrorKind(null), 'error');
+});
