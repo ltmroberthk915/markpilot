@@ -1184,9 +1184,8 @@ export function createHost(options = {}) {
     } catch { /* identity is an optimization for locate, never a read blocker */ }
   }
 
-  async function apiSession(payload, invocation, authority = 'editor') {
+  async function sessionKeyFor(payload, invocation, authority) {
     const path = typeof payload?.path === 'string' ? payload.path : '';
-    if (!path) return badRequest('path is required');
     let key;
     try {
       const target = await fs.resolve(path, resolveOptions(payload, invocation));
@@ -1223,17 +1222,35 @@ export function createHost(options = {}) {
     } catch {
       key = pathKey(path) + ':missing';
     }
+    return key;
+  }
+
+  async function apiSession(payload, invocation, authority = 'editor') {
+    const path = typeof payload?.path === 'string' ? payload.path : '';
+    if (!path) return badRequest('path is required');
+    let key = await sessionKeyFor(payload, invocation, authority);
     const generation = sessionGeneration;
+    let loaded = false;
+    const load = async () => {
+      loaded = true;
+      const result = await documents.state(payload, invocation);
+      if (!result || result.ok !== true) {
+        const error = result?.error || { code: 'FS_IO_ERROR', message: 'state failed' };
+        throw Object.assign(new Error(String(error.message || error.code || 'state failed')), { resultError: error });
+      }
+      return { ...result.value, allowedActions: allowedActions(result.value) };
+    };
     let snapshot;
     try {
-      snapshot = await documentSessions.resolve(key, async () => {
-        const result = await documents.state(payload, invocation);
-        if (!result || result.ok !== true) {
-          const error = result?.error || { code: 'FS_IO_ERROR', message: 'state failed' };
-          throw Object.assign(new Error(String(error.message || error.code || 'state failed')), { resultError: error });
+      snapshot = await documentSessions.resolve(key, load);
+      if (loaded) {
+        const after = await sessionKeyFor(payload, invocation, authority);
+        if (after !== key) {
+          documentSessions.clear(key);
+          key = after;
+          snapshot = await documentSessions.resolve(key, load);
         }
-        return { ...result.value, allowedActions: allowedActions(result.value) };
-      });
+      }
     } catch (error) {
       if (error?.resultError) return { ok: false, error: error.resultError };
       throw error;
