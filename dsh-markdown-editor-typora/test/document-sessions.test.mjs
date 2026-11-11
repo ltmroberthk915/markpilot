@@ -45,3 +45,11 @@ test('P1 allowedActions includes recovery and review capabilities from the snaps
   const orphan = allowedActions({ state: 'orphan' });
   assert.equal(orphan.includes('recover'), false);
 });
+
+test('P1 allowedActions ignores undone review groups', () => {
+  const active = allowedActions({ state: 'dirty', groups: [{ groupId: 'g1' }] });
+  assert.equal(active.includes('reviewUndo'), true);
+  const undone = allowedActions({ state: 'dirty', groups: [{ groupId: 'g1', undoneAt: 123 }] });
+  assert.equal(undone.includes('reviewUndo'), false);
+  assert.deepEqual(undone, ['save', 'saveAs', 'copy']);
+});
