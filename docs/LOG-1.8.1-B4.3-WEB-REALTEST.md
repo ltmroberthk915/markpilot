@@ -701,3 +701,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - sync-host/sync-core 绿；
 - coreHash 未变；
 - 仍缺 Desktop 重启后的 UI 矩阵。
+
+## 67. 2.0.0 产物完整性
+
+- `tar -tf`：150 项；
+- `package/package.json` version `2.0.0`；
+- tarball 不含 `test/`；
+- SHA256 与 SHA256SUMS 一致。
