@@ -1184,7 +1184,7 @@ export function createHost(options = {}) {
     } catch { /* identity is an optimization for locate, never a read blocker */ }
   }
 
-  async function apiSession(payload, invocation) {
+  async function apiSession(payload, invocation, authority = 'editor') {
     const path = typeof payload?.path === 'string' ? payload.path : '';
     if (!path) return badRequest('path is required');
     let key;
@@ -1218,7 +1218,8 @@ export function createHost(options = {}) {
           } catch { recoveryMarker = ':r:error'; }
         }
       }
-      key = base + ':' + String(info?.version ?? 'missing') + roomMarker + mirrorMarker + recoveryMarker;
+      const policyMarker = `:a:${String(authority)}:${invocation?.policy?.mode ?? ''}:${invocation?.policy?.workspaceRoot ?? ''}`;
+      key = base + ':' + String(info?.version ?? 'missing') + roomMarker + mirrorMarker + recoveryMarker + policyMarker;
     } catch {
       key = pathKey(path) + ':missing';
     }
@@ -1856,7 +1857,7 @@ export function createHost(options = {}) {
         case 'documents.state':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           if (typeof payload?.path !== 'string' || !payload.path) return await documents.state(payload, invocation);
-          return await apiSession(payload, invocation);
+          return await apiSession(payload, invocation, authority);
         case 'documents.reconcile':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           return await documents.state(payload, invocation);
@@ -1897,7 +1898,7 @@ export function createHost(options = {}) {
         case 'docs/saveAs': return await apiSaveAs(payload, authority);
         case 'documents.fileState': if (authority === MODEL_TOOL) return badRequest('fileState is editor-only'); return await apiFileState(payload);
         case 'documents.locate': if (authority === MODEL_TOOL) return badRequest('locate is editor-only'); return await apiLocate(payload);
-        case 'documents.session': if (authority === MODEL_TOOL) return badRequest('session is editor-only'); return await apiSession(payload, invocation);
+        case 'documents.session': if (authority === MODEL_TOOL) return badRequest('session is editor-only'); return await apiSession(payload, invocation, 'editor');
         case 'documents.recoveryList': if (authority === MODEL_TOOL) return badRequest('recoveryList is editor-only'); return await apiRecoveryList(payload);
         case 'documents.recoveryRead': if (authority === MODEL_TOOL) return badRequest('recoveryRead is editor-only'); return await apiRecoveryRead(payload);
         case 'documents.recoveryDiscard': if (authority === MODEL_TOOL) return badRequest('recoveryDiscard is editor-only'); return await apiRecoveryDiscard(payload);
