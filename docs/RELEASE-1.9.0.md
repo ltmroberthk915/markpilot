@@ -1,4 +1,4 @@
-# MarkPilot 1.9.0-rc.3 发布候选（B4.3 + B3.3b 草稿镜像）
+# MarkPilot 1.9.0-rc.4 发布候选（B4.3 + B3.3b 草稿镜像）
 
 日期：2026-11-11
 
@@ -39,20 +39,21 @@
 - 双客户端 `resolvedDisk`/R1 未在 Web 双窗口验证。
 - 超过约 3000 行文档的冲突面板会返回 `MP_MERGE_LIMIT`（fail-closed，提示重载/复制），尚未做友好 UI 提示。
 - `room_resolved` 旧 root 不认识该表；混合版本宿主不要共用同一文档。
-- 新测试 `test/client-conflict-ui.test.mjs` 与本文档尚未提交。
+- 新测试 `test/client-conflict-ui.test.mjs`、`client-draft-mirror.test.mjs`、`live-draft-index.test.mjs` 与本文档均已随 25f569b 提交。
+- 旧 `1.9.0.tgz`、`1.9.0-rc.1.tgz`、`1.9.0-rc.2.tgz` 为 GA 前产物，不得按文件名安装或重发。
 - B3.3b mirror 仍可能被 stale client / PID 复用误判为活房间；不自动删除未知归属的新一代 mirror。
 
 ## 产物
 
-- `dsh-markdown-editor-typora-1.9.0-rc.3.tgz`
+- `dsh-markdown-editor-typora-1.9.0-rc.4.tgz`
 - 149 files / 2.8 MB
-- SHA256 `36DC88823A00FD50F857815BECC77038174242921B6D458857636C55E5E36A06`
+- SHA256 `7566ACBACA5777A29FBA75AF558C1E30242BB7B6BA03C53013226289E5F13192`
 - 源码冻结提交 `25f569b`（GA cleanup：移除 debug hooks、补 lifecycle 测试、README/SHA）
 
 **注意**：rc.1 与更早的 1.9.0 包在 B3.3b 之前构建，不包含 `draft_index`/mirror 代码；rc.2 为 B4.3+B3.3b 的新候选，不能与 rc.1 混用。
 
 ## 包安装验证
 
-- rc.3 已在隔离 profile `~/.dsh/profiles/mp-pkg-test` 中从 tarball 安装成功（pnpm `file:` 包，版本 1.9.0-rc.3）；
-- rc.2 的 Markdown 面板/编辑器加载已通过；rc.3 变更仅为移除 debug hooks、补测试、README/SHA，包结构一致；
+- rc.4 已在隔离 profile `~/.dsh/profiles/mp-pkg-test` 中从 tarball 安装成功（pnpm `file:` 包，版本 1.9.0-rc.4）；
+- rc.2 的 Markdown 面板/编辑器加载已通过；rc.3 移除 debug hooks、补测试；rc.4 仅 README/版本/hash 清理，包结构一致；
 - 未在 DSH Desktop 安装；正式实装前需用户明确确认。
