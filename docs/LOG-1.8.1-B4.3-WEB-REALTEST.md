@@ -596,3 +596,9 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 隔离 profile 安装成功；Desktop 从 1.9.5 更新到 `file:...1.9.6.tgz`，实体目录，version 1.9.6，Markdown 工具可调用。
 - 更新前备份 `D:\BuyKey\desktop-profile-backup-20261112-0430`；未重启 Desktop。
 - 全量 539/538/1。
+
+## 53. P1 G1 改为对照未缓存 reconcile
+
+- `p1-shadow-live` 每次同时取 `documents.reconcile`（直连）与 `documents.state`（缓存）；
+- session/state 核心字段都与 reconcile 对比，不再只是两个缓存项自证；
+- 全量 539/538/1。
