@@ -281,3 +281,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
   - `plugin_manager list_bundles` source=`file:...rc.6.tgz`，enabled=true
   - Markdown 模型工具在 Desktop 会话中可调用并读到 mirror 正文
 - 未重启 Desktop；插件管理器已热应用。建议用户正常重启做最终 UI 验收。
+
+## 13. P4 改名检测（host + 提示）
+
+- `documents.fileState` / `documents.locate` 已落（`c007884`）：open/save/edit 后刷新 dev/ino/size/mtime identity；missing 时父目录扫描同 inode + size + mtime，只返回 `.md`，拒绝 `.mp-tmp-`；`ino=0` 不扫描。
+- missing 横幅会异步调用 locate，候选显示「检测到可能已改名为：…；可重试或另存为副本」（`0cf670b`）。
+- 测试：save→rename 真替换语义、open→rename、MODEL_TOOL 拒绝；全量 513/512/1。
+- 未完成：真实 Web 改名横幅测试（headless 脚本挂起，无结论）；候选只提示，不自动重绑。
