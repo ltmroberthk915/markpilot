@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { randomUUID, createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { spawn } from 'node:child_process';
 import { createHost, MODEL_TOOL } from '../lib/index.js';
 
 const require = createRequire(import.meta.url);
@@ -43,6 +44,23 @@ async function compareShadow(host, file, scenario) {
   assert.equal(session.ok, state.ok, `${scenario} ok`);
   if (state.ok) for (const key of CORE) assert.deepEqual(session.value[key], state.value[key], `${scenario} ${key}`);
   return state;
+}
+
+function remoteJoin(liveDir, file, base) {
+  const modulePath = require.resolve('../host/live-documents.js');
+  const script = `const {LiveDocuments}=require(${JSON.stringify(modulePath)});(async()=>{const l=new LiveDocuments({directory:${JSON.stringify(liveDir)}});await l.join(${JSON.stringify(file)},${JSON.stringify(base)});process.stdout.write('ready\\n');setInterval(()=>{},1000);})().catch(e=>{console.error(e);process.exit(1)});`;
+  const child = spawn(process.execPath, ['-e', script], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => { if (!settled) { settled = true; child.kill(); reject(new Error('remote join timeout')); } }, 10000);
+    child.stdout.on('data', (chunk) => {
+      if (settled) return;
+      if (String(chunk).includes('ready')) {
+        settled = true; clearTimeout(timer); resolve(child);
+      }
+    });
+    child.on('exit', (code) => { if (!settled) { settled = true; clearTimeout(timer); reject(new Error('remote join exited ' + code)); } });
+  });
 }
 
 test('P1-G1 live room states: dirty, conflict, orphan, mirror match state', async () => {
@@ -113,7 +131,18 @@ test('P1-G1 live room states: dirty, conflict, orphan, mirror match state', asyn
       assert.equal(external.value.state, 'external');
       scenarios += 1;
     }
-    assert.equal(scenarios, 35);
+    const ownedFile = path.join(root, 'owned-remote.md');
+    await fs.writeFile(ownedFile, 'remote base\n', 'utf8');
+    const remote = await remoteJoin(path.join(root, 'live'), ownedFile, 'remote base\n');
+    try {
+      const owned = await compareShadow(host, ownedFile, 'owned-remote');
+      assert.equal(owned.value.state, 'owned-elsewhere');
+      scenarios += 1;
+    } finally {
+      remote.kill();
+    }
+
+    assert.equal(scenarios, 36);
     host.close();
   } finally {
     host.close();
