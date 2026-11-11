@@ -463,3 +463,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 将 LOCALAPPDATA 指向文件使归档目录不可建；
 - disk applyEdits 返回 `MP_ARCHIVE_FAILED`，磁盘正文保持 `before`；
 - 全量 531/530/1。
+
+## 34. 1.9.2 补丁与 Desktop 更新
+
+- 包 `dsh-markdown-editor-typora-1.9.2.tgz`，150 files，SHA256 `E2CDA2D392D369CAC335B36FFBFD84BB89309B818C153DB1A97E641C0D21F570`。
+- 隔离 profile 安装成功；Desktop 从 1.9.1 更新到 `file:...1.9.2.tgz`，实体目录，version 1.9.2，Markdown 工具可调用。
+- 更新前备份 `D:\BuyKey\desktop-profile-backup-20261111-1500`；未重启 Desktop。
+- 全量 531/530/1。
