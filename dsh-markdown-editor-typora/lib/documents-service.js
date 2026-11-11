@@ -987,6 +987,7 @@ export function createDocumentsService(deps) {
     const code = (/SQLITE_BUSY|ERR_SQLITE/i.test(String(rawCode)) || /database is locked/i.test(message))
       ? 'MP_LIVE_BUSY' : rawCode;
     const value = { code, message };
+    if (error?.reason) value.reason = String(error.reason);
     if (a && (code === 'MP_DOC_STALE' || code === 'MP_DOC_MIRROR_READONLY')) {
       value.currentRevisionId = a.revisionId;
       value.source = a.source;

@@ -597,9 +597,10 @@ export function isSandboxWriteDenied(error) {
   return /file access denied under (workspace-write|read-only) mode/i.test(message);
 }
 
-function codedError(code, message) {
+function codedError(code, message, extra) {
   const error = new Error(String(message));
   error.code = code;
+  if (extra && typeof extra === 'object') Object.assign(error, extra);
   return error;
 }
 
@@ -637,7 +638,13 @@ async function directWriteText(fs, target, text, baseVersion, diskHash) {
     if(before!==after||saved.baseline.sha256!==expectedHash)throw codedError('FS_STALE_VERSION','file changed after save; draft retained');
     return {version:after,displayPath:target.displayPath,size:saved.bytes.length};
   } catch(error) {
-    if(['MP_FILE_CONFLICT','MP_FILE_MISSING'].includes(error.code))error.code='FS_STALE_VERSION';
+    if(['MP_FILE_CONFLICT','MP_FILE_MISSING'].includes(error.code)) {
+      if (error.code === 'MP_FILE_MISSING') error.reason = 'missing';
+      error.code='FS_STALE_VERSION';
+    } else if (error.code === 'FS_NOT_FOUND') {
+      error.code = 'FS_STALE_VERSION';
+      error.reason = 'missing';
+    }
     throw error;
   }
 }
@@ -820,11 +827,12 @@ export function createHost(options = {}) {
     return String(target?.targetKey ?? target?.displayPath ?? '');
   }
 
-  function broadcastChange(target, version, delta) {
+  function broadcastChange(target, version, delta, flags) {
     const data = {
       path: target?.displayPath,
       targetKey: target?.targetKey,
       version: String(version ?? ''),
+      ...(flags?.missing === true ? { missing: true } : {}),
       ...(delta ? { delta: { oldString: String(delta.oldString ?? '').slice(0, 400), newString: String(delta.newString ?? '').slice(0, 400) } } : {}),
     };
     const frame = `event: change\ndata: ${JSON.stringify(data)}\n\n`;
@@ -834,6 +842,11 @@ export function createHost(options = {}) {
         stream.res.write(frame);
       } catch { /* 连接已断，close 事件会清理 */ }
     }
+  }
+
+  async function confirmMissing(entry) {
+    try { return (await fs.stat(entry.target)) === undefined; }
+    catch { return false; }
   }
 
   async function tickWatch(entry, baseline = false) {
@@ -848,15 +861,41 @@ export function createHost(options = {}) {
       return;
     }
     if (entry.disposed) return;
-    const changed = entry.lastVersion !== undefined && (missing || version !== entry.lastVersion);
+    const notifiedMissing = entry.missing === true;
+    const seen = entry.lastVersion !== undefined || notifiedMissing;
+    const becameMissing = missing && !notifiedMissing;
+    const becamePresent = !missing && notifiedMissing;
+    const versionChanged = !missing && !notifiedMissing && entry.lastVersion !== undefined && version !== entry.lastVersion;
+    const changed = seen && (becameMissing || becamePresent || versionChanged);
     if (changed && !baseline) {
+      const pendingMissing = missing;
+      if (pendingMissing && entry.missingCommitPending === true) return;
       if (entry.debounce) clearTimeout(entry.debounce);
+      if (pendingMissing) entry.missingCommitPending = true;
       entry.debounce = setTimeout(() => {
         entry.debounce = null;
-        if (!entry.disposed) broadcastChange(entry.target, version);
+        if (entry.disposed) return;
+        void (async () => {
+          let present = !pendingMissing;
+          if (pendingMissing) {
+            // A missing latch is committed only after a second stat confirms it.
+            // A transient/recreated file must not freeze the stream in missing.
+            if (!await confirmMissing(entry)) present = true;
+          }
+          if (entry.disposed) return;
+          if (present) {
+            try { const info = await fs.stat(entry.target); if (info !== undefined) { entry.lastVersion = String(info.version ?? ''); entry.missing = false; broadcastChange(entry.target, entry.lastVersion); } }
+            catch { /* next tick retries */ }
+          } else {
+            entry.missing = true;
+            broadcastChange(entry.target, '', undefined, { missing: true });
+          }
+          entry.missingCommitPending = false;
+        })().catch(() => { entry.missingCommitPending = false; });
       }, watchDebounceMs);
       entry.debounce.unref?.();
     }
+    if (baseline) entry.missing = missing;
     if (!missing) entry.lastVersion = version;
   }
 
@@ -892,6 +931,8 @@ export function createHost(options = {}) {
       refs: 1,
       target,
       lastVersion: undefined,
+      missing: false,
+      baselineReady: null,
       controller: new AbortController(),
       close: null,
       timer: null,
@@ -900,7 +941,7 @@ export function createHost(options = {}) {
       started: false,
     };
     watchers.set(key, entry);
-    void startWatch(entry);
+    entry.baselineReady = startWatch(entry);
     return entry;
   }
 
@@ -1048,6 +1089,12 @@ export function createHost(options = {}) {
     try {
       res.write(`event: ready\ndata: ${JSON.stringify({ path: target.displayPath, version: String(entry.lastVersion ?? '') })}\n\n`);
     } catch { /* 已断 */ }
+    Promise.resolve(entry.baselineReady).then(() => {
+      if (closed || entry.disposed || entry.missing !== true) return;
+      try {
+        res.write(`event: change\ndata: ${JSON.stringify({ path: target.displayPath, targetKey: target.targetKey, version: '', missing: true })}\n\n`);
+      } catch { /* 已断 */ }
+    }).catch(() => { /* baseline 失败，下一次 tick 会补 */ });
   }
 
   function resolveOptions(payload, invocation) {
@@ -1113,7 +1160,7 @@ export function createHost(options = {}) {
       const current=await fs.resolve(path,resolveOptions(payload));
       if(pathKey(await canonicalTarget(current))!==key)throw codedError('FS_STALE_VERSION','save target changed while queued');
       const before=await fs.stat(current);
-      if(!before)throw codedError('FS_STALE_VERSION','file no longer exists');
+      if(!before)throw codedError('FS_STALE_VERSION','file no longer exists',{reason:'missing'});
       if (payload.rejectIfMirror) await rejectDraftMirrorBeforeWrite(current);
       let result;
       const native=await fsStat(nativeTargetPath(current),{bigint:true}).catch(e=>{if(e.code!=='ENOENT')throw e;return null;});
@@ -1125,7 +1172,8 @@ export function createHost(options = {}) {
         result=await live.save(ticket.client,{epoch:ticket.epoch,version:ticket.version,text},async({diskHash})=>{
           const version=await fs.stat(current);
           const identity=await fsStat(nativeTargetPath(current),{bigint:true});
-          if (!version || versionOfBigInt(identity)!==String(version.version) || pathKey(await canonicalTarget(await fs.resolve(path,resolveOptions(payload))))!==key)
+          if (!version) throw codedError('FS_STALE_VERSION','file no longer exists',{reason:'missing'});
+          if (versionOfBigInt(identity)!==String(version.version) || pathKey(await canonicalTarget(await fs.resolve(path,resolveOptions(payload))))!==key)
             throw codedError('FS_STALE_VERSION','file identity changed while waiting to save');
           const receipt=await directWriteText(fs,current,text,String(version.version),diskHash);
           writerVersion=receipt.version;
@@ -1653,7 +1701,8 @@ export function createHost(options = {}) {
     } catch (error) {
       const code = errorCode(error);
       try { log.warn?.('%s: %s failed (%s): %s', name, String(endpoint), code, String(error?.message ?? error)); } catch { /* 日志失败不影响响应 */ }
-      return { ok: false, error: { code, message: String(error?.message ?? error) } };
+      const reason = error?.reason || (error?.code === 'MP_FILE_MISSING' ? 'missing' : undefined);
+      return { ok: false, error: { code, message: String(error?.message ?? error), ...(reason ? { reason: String(reason) } : {}) } };
     }
   }
 
@@ -2123,6 +2172,7 @@ export function createMarkdownToolDefinition(dispatch) {
               checkpointPath: { type: 'string' },
               draftStale: { type: 'boolean' },
               draftUnknown: { type: 'boolean' },
+              reason: { type: 'string' },
             },
           },
         },
@@ -2282,7 +2332,7 @@ export function createMarkdownToolDefinition(dispatch) {
           ...(typeof value.recoveryPath === 'string' && value.recoveryPath ? { recoveryPath: value.recoveryPath } : {}),
         };
       } catch (error) {
-        return { ok: false, action, error: { code: errorCode(error), message: String(error?.message ?? error) } };
+        return { ok: false, action, error: { code: errorCode(error), message: String(error?.message ?? error), ...(error?.reason ? { reason: String(error.reason) } : {}) } };
       }
     },
   };

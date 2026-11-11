@@ -837,6 +837,34 @@ test('B3.3b-API5 a corrupt mirror is unknown, not clean', async () => {
   } finally { w.restore(); }
 });
 
+test('B4.4-API1 save of a deleted file keeps FS_STALE_VERSION and adds reason=missing', async () => {
+  const w = await makeWorld('save-missing', 'disk\n');
+  try {
+    const host = createHost({ fs: provider(w.file), log: { warn() {} } });
+    const opened = await host.dispatch('open', { path: w.file });
+    await fs.unlink(w.file);
+    const saved = await host.dispatch('save', { path: w.file, text: 'draft\n', baseVersion: opened.value.version });
+    assert.equal(saved.ok, false);
+    assert.equal(saved.error.code, 'FS_STALE_VERSION');
+    assert.equal(saved.error.reason, 'missing');
+    assert.equal(await fs.readFile(w.file, 'utf8').catch(() => null), null, 'must not recreate the deleted file');
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('B4.4-API2 normal save errors do not carry reason', async () => {
+  const w = await makeWorld('save-normal', 'disk\n');
+  try {
+    const host = createHost({ fs: provider(w.file), log: { warn() {} } });
+    const opened = await host.dispatch('open', { path: w.file });
+    const saved = await host.dispatch('save', { path: w.file, text: 'draft\n', baseVersion: opened.value.version + '-stale' });
+    assert.equal(saved.ok, false);
+    assert.equal(saved.error.code, 'FS_STALE_VERSION');
+    assert.equal('reason' in saved.error, false);
+    host.close();
+  } finally { w.restore(); }
+});
+
 test('B4.3-ADV2b theirs and both choices resolve without writing disk', async () => {
   const w = await makeWorld('conflict-choices', 'base\n');
   try {
