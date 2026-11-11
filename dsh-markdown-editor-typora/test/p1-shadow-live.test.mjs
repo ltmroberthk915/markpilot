@@ -104,8 +104,16 @@ test('P1-G1 live room states: dirty, conflict, orphan, mirror match state', asyn
       const review = await compareShadow(host, reviewFile, `review-${index}`);
       assert.equal(review.value.groups.length >= 1, true);
       scenarios += 1;
+
+      const externalFile = path.join(root, `external-${index}.md`);
+      await fs.writeFile(externalFile, base, 'utf8');
+      await live.join(externalFile, base);
+      await fs.writeFile(externalFile, `changed ${index}\n`, 'utf8');
+      const external = await compareShadow(host, externalFile, `external-${index}`);
+      assert.equal(external.value.state, 'external');
+      scenarios += 1;
     }
-    assert.equal(scenarios, 30);
+    assert.equal(scenarios, 35);
     host.close();
   } finally {
     host.close();
