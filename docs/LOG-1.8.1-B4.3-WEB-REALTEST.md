@@ -229,3 +229,15 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 2. Web 测试前确认目标 room 只有本次 Web client；有残留 pid 时先清理/换新文件。
 3. 冲突面板动作后要看 host 的 `rooms`/`room_resolved` 与磁盘字节，不能只看 UI 文案。
 4. 不在生产 `desktop` profile 上做 DevTools reload、批量插件开关或冲突实验。
+
+## 8. P4 missing 文件真机（隔离 headless Edge）
+
+- 新建并真实 Ctrl+S 保存 `D:\BuyKey\deepseek harness 探索任务\p4-missing-real.md`；
+- 外部删除该文件，2.5s 后 Web 出现：
+  - `⚠ 磁盘上的文件已不存在（可能被删除或改名）`
+  - 按钮「重试」「复制我的内容」
+  - 旧路径未被重建；
+- 原内容写回同一路径后，横幅自动消失，状态回到「就绪」；
+- 测试文件已删除，未碰用户文档；headless Edge 与测试服务器已停止。
+
+这验证了 P4 host missing latch + 客户端横幅的干净文件路径；脏稿/复制内容分支仍需补测。
