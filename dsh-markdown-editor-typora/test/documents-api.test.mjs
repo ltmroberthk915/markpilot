@@ -574,6 +574,48 @@ test('P1-API session cache refreshes after save and rename', async () => {
   } finally { await fs.rename(renamed, w.file).catch(() => {}); w.restore(); }
 });
 
+test('P5-API disk-authority applyEdits creates an agent-before archive', async () => {
+  const w = await makeWorld('disk-archive', 'before\n');
+  try {
+    const host = createHost({ fs: provider(w.file), log: { warn() {} } });
+    const read = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));
+    assert.equal(read.ok, true);
+    const applied = await host.dispatch('documents.applyEdits', {
+      path: w.file, baseRevisionId: read.value.version, edits: [{ from: 0, to: 6, insert: 'after' }],
+    }, MODEL_TOOL, execution(w.root));
+    assert.equal(applied.ok, true, JSON.stringify(applied));
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'after\n');
+    const archivePath = applied.value.checkpoint?.archivePath;
+    assert.equal(typeof archivePath, 'string');
+    assert.equal(await fs.readFile(archivePath, 'utf8'), 'before\n');
+    host.close();
+  } finally { w.restore(); }
+});
+
+test('P5-API virtual provider disk writes archive through a stable synthetic path', async () => {
+  const w = await makeWorld('virtual-archive', 'before\n');
+  const providerForVirtual = {
+    async resolve() { return { targetKey: 'dsh://vault/note.md', displayPath: 'dsh://vault/note.md' }; },
+    async stat() { const text = await fs.readFile(w.file, 'utf8'); return { type: 'file', size: Buffer.byteLength(text), version: 'v1' }; },
+    async readText() { return fs.readFile(w.file, 'utf8'); },
+    async writeText(_target, text) { await fs.writeFile(w.file, text, 'utf8'); return { version: 'v2' }; },
+    async editText(_target, edit) { const text = await fs.readFile(w.file, 'utf8'); await fs.writeFile(w.file, text.replace(edit.oldString, edit.newString), 'utf8'); return { version: 'v2' }; },
+    async watch() { return async () => {}; },
+  };
+  try {
+    const host = createHost({ fs: providerForVirtual, log: { warn() {} } });
+    const read = await host.dispatch('documents.read', { path: 'dsh://vault/note.md' }, MODEL_TOOL, execution(w.root));
+    assert.equal(read.ok, true);
+    const applied = await host.dispatch('documents.applyEdits', {
+      path: 'dsh://vault/note.md', baseRevisionId: read.value.version, edits: [{ from: 0, to: 6, insert: 'after' }],
+    }, MODEL_TOOL, execution(w.root));
+    assert.equal(applied.ok, true, JSON.stringify(applied));
+    assert.equal(await fs.readFile(w.file, 'utf8'), 'after\n');
+    assert.equal(typeof applied.value.checkpoint?.archivePath, 'string');
+    host.close();
+  } finally { w.restore(); }
+});
+
 test('B3-API5 a sandboxed session cannot apply a buffer edit outside its workspace', async () => {
   const w = await makeWorld('policy', 'hello\n');
   try {

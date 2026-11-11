@@ -9,7 +9,8 @@
 // service); the editor applies it as a remote change and its normal save path
 // persists it. A disk edit delegates to the existing guarded endpoints.
 import { createHash, randomUUID } from 'node:crypto';
-import { isAbsolute, sep } from 'node:path';
+import { isAbsolute, join, sep } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const LIVE_REVISION = /^rev1:live:([^:]+):(\d+):([0-9a-f]{64})$/;
 const DISK_PREFIX = 'rev1:disk:';
@@ -623,14 +624,20 @@ export function createDocumentsService(deps) {
   }
 
   async function checkpoint(a) {
-    // Every buffer edit is checkpointed, including a clean buffer: the editor's
-    // normal auto-save follows a remote change and overwrites the disk copy, so
-    // the disk is NOT a durable "pre-edit" copy by the time the user notices.
-    // Deliberately no off switch: the model tool must never be able to disable it.
-    if (a.source !== 'buffer') return null;
+    // Every AI edit is checkpointed, including a clean buffer and disk-authority
+    // writes. The editor's normal auto-save can overwrite the disk copy after a
+    // remote change, so the disk is not a durable "pre-edit" copy by the time the
+    // user notices. Deliberately no off switch.
     if (typeof archive !== 'function') throw coded('MP_ARCHIVE_FAILED', 'checkpoint is unavailable');
+    let archivePath = a.canonical;
+    if (!archivePath) {
+      const display = a.opened?.value?.displayPath || payloadPath(a);
+      archivePath = display && isAbsolute(display)
+        ? display
+        : join(tmpdir(), 'markpilot-archive', sha256Text(String(display || 'virtual')) + '.md');
+    }
     let result;
-    try { result = await archive({ path: a.canonical || a.opened.value.displayPath || payloadPath(a), text: a.text, tag: 'agent-before', baseVersion: a.providerVersion }); }
+    try { result = await archive({ path: archivePath, text: a.text, tag: 'agent-before', baseVersion: a.providerVersion }); }
     catch (error) { throw coded('MP_ARCHIVE_FAILED', 'checkpoint failed: ' + String(error?.message || error), { cause: error }); }
     if (!result || result.ok !== true) throw coded('MP_ARCHIVE_FAILED', 'checkpoint failed');
     return result.value || null;
@@ -928,6 +935,9 @@ export function createDocumentsService(deps) {
       // apiEdit carries the policy itself; apiSave does not for the local native
       // branch, so enforce the same policy once here for both shapes.
       if (invocation) await checkWritePolicy(a, policy);
+      let archived = null;
+      try { archived = await checkpoint(a); }
+      catch (error) { return fail(error, a); }
       if (isOldString) {
         const result = await edit({
           path: payload.path, cwd: payload.cwd, oldString: payload.oldString,
@@ -944,6 +954,7 @@ export function createDocumentsService(deps) {
           value.previousBlockId = block.id;
         }
         value.groupId = groupId;
+        value.checkpoint = archived;
         await recordGroup(value.revisionId, auditChanges);
         return { ok: true, value };
       }
@@ -957,6 +968,7 @@ export function createDocumentsService(deps) {
         value.previousBlockId = block.id;
       }
       value.groupId = groupId;
+      value.checkpoint = archived;
       await recordGroup(value.revisionId, auditChanges);
       return { ok: true, value };
     } catch (error) {
