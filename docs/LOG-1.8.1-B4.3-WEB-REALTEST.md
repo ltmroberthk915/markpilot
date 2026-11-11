@@ -578,3 +578,8 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 
 - 覆盖 missing/conflict/orphan/owned-elsewhere/unsaved-elsewhere/external/dirty/readonly/clean/disk；
 - 确认 no-state 返回空、clean 无 save；全量 538/537/1。
+
+## 50. P5 recovery discard 缓存失效测试
+
+- 先缓存 state（recovery>=1），再 discard 所有 append recovery，第二次 state recovery=0；
+- 验证 recovery marker 进入缓存 key；全量 539/538/1。
