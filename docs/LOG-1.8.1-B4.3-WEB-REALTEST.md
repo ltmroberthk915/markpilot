@@ -268,3 +268,16 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 点击「另存为…」打开路径输入模态，改目标为 `D:\BuyKey\Typora-Editor-App\p4-modal-copy.md`；
 - 点击保存：副本创建成功，正文 `# p4-modal-real`，原路径未重建；
 - 目标在允许 workspace 内，未绕过沙箱；测试文件已清理。
+
+## 12. Desktop rc.6 实装（2026-11-11）
+
+- 安装前备份 `cordis.patch.yml`/`package.json`/`pnpm-lock.yaml` 到 `D:\BuyKey\desktop-profile-backup-20261111-1207`，SHA256 校验一致；`backup-core.ps1` 已跑。
+- 桌面 profile 原为 `link:D:\BuyKey\markpilot-public\dsh-markdown-editor-typora`，node_modules 是 junction；插件管理器 install 后 junction 残留，pnpm 仍判 linked。
+- 将旧 junction 改名为 `dsh-markdown-editor-typora.link-bak-20261111`（未删除），再用应用内插件管理器从绝对路径 tarball 安装。
+- 结果：
+  - `package.json` spec=`file:...rc.6.tgz`
+  - node_modules 为实体目录，version `1.9.0-rc.6`
+  - `cordis.patch.yml` 的 TEMP `disabled: true` 已移除
+  - `plugin_manager list_bundles` source=`file:...rc.6.tgz`，enabled=true
+  - Markdown 模型工具在 Desktop 会话中可调用并读到 mirror 正文
+- 未重启 Desktop；插件管理器已热应用。建议用户正常重启做最终 UI 验收。
