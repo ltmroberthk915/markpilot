@@ -616,6 +616,21 @@ test('P5-API virtual provider disk writes archive through a stable synthetic pat
   } finally { w.restore(); }
 });
 
+test('P5-API write guard lookup sees a mirror without a live room', async () => {
+  const w = await makeWorld('guard-mirror', 'body\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: w.live });
+    await liveDocs.putDraft(w.file, {
+      text: 'draft\n', baseVersion: 'v0', baseSha256: sha256Text('body\n'), docToken: 'dshdoc-guard-test',
+    });
+    const host = createHost({ fs: provider(w.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const state = await host._internals.lookupDocument({ targetKey: w.file, displayPath: w.file });
+    assert.equal(state.dirty, true);
+    assert.equal(state.source, 'mirror');
+    host.close();
+  } finally { w.restore(); }
+});
+
 test('B3-API5 a sandboxed session cannot apply a buffer edit outside its workspace', async () => {
   const w = await makeWorld('policy', 'hello\n');
   try {

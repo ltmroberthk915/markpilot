@@ -793,6 +793,10 @@ export function createHost(options = {}) {
     if (closed) return null;
     const key = pathKey(canonical);
     try {
+      // A read-only draft mirror has no room; it is still an unsaved editor
+      // buffer and must block generic fs writes exactly like a dirty room.
+      const mirror = await live.getDraft?.(canonical, {});
+      if (mirror) return { path: canonical, file: key, dirty: true, source: 'mirror', mirror: true };
       if (!roomsSqlite) roomsSqlite = await import('node:sqlite');
       const db = new roomsSqlite.DatabaseSync(dbFile, { readOnly: true });
       try {
