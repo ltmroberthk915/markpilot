@@ -39,11 +39,14 @@ function dynamicProvider() {
 }
 
 async function compareShadow(host, file, scenario) {
+  const direct = await host.dispatch('documents.reconcile', { path: file }, MODEL_TOOL, execution(path.dirname(file)));
   const state = await host.dispatch('documents.state', { path: file }, MODEL_TOOL, execution(path.dirname(file)));
   const session = await host.dispatch('documents.session', { path: file });
-  assert.equal(session.ok, state.ok, `${scenario} ok`);
-  if (state.ok) for (const key of CORE) assert.deepEqual(session.value[key], state.value[key], `${scenario} ${key}`);
-  return state;
+  assert.equal(session.ok, direct.ok, `${scenario} ok`);
+  if (direct.ok) for (const key of CORE) assert.deepEqual(session.value[key], direct.value[key], `${scenario} session/${key}`);
+  assert.equal(state.ok, direct.ok, `${scenario} state ok`);
+  if (direct.ok) for (const key of CORE) assert.deepEqual(state.value[key], direct.value[key], `${scenario} state/${key}`);
+  return direct;
 }
 
 function remoteJoin(liveDir, file, base) {
