@@ -322,7 +322,7 @@ export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
 const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'documents.session', 'documents.recoveryList', 'documents.recoveryRead', 'documents.recoveryDiscard', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'diag']);
-const SESSION_MUTATING_ENDPOINTS = new Set(['save', 'edit', 'live', 'docs/create', 'docs/saveAs', 'docs/archive', 'documents.applyEdits', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftClear']);
+const SESSION_MUTATING_ENDPOINTS = new Set(['open', 'save', 'edit', 'live', 'docs/create', 'docs/saveAs', 'docs/archive', 'documents.applyEdits', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.undoGroups', 'documents.merge3', 'documents.reviewGroup', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftClear']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
 
@@ -848,6 +848,8 @@ export function createHost(options = {}) {
     log,
   });
   const documentSessions = createSessionManager();
+  let sessionGeneration = 0;
+  function invalidateSessions() { sessionGeneration += 1; documentSessions.clear(); }
   /** Persisted-file notifications are scoped to the watched target. Unsaved edits use independent document leases. */
   const liveStreams = new Set();
 
@@ -1195,6 +1197,7 @@ export function createHost(options = {}) {
       catch { base = pathKey(nativeTargetPath(target) || path); }
       let roomMarker = '';
       let mirrorMarker = '';
+      let recoveryMarker = '';
       if (canonical) {
         if (typeof live.readRoom === 'function') {
           try {
@@ -1208,11 +1211,18 @@ export function createHost(options = {}) {
             if (mirror) mirrorMarker = `:m:${mirror.textSha256}:${mirror.baseVersion}:${mirror.baseSha256}`;
           } catch { mirrorMarker = ':m:error'; }
         }
+        if (typeof live.listAppendRecovery === 'function') {
+          try {
+            const items = await live.listAppendRecovery(canonical);
+            recoveryMarker = `:r:${items.length}:${items[0]?.sha256 ?? ''}`;
+          } catch { recoveryMarker = ':r:error'; }
+        }
       }
-      key = base + ':' + String(info?.version ?? 'missing') + roomMarker + mirrorMarker;
+      key = base + ':' + String(info?.version ?? 'missing') + roomMarker + mirrorMarker + recoveryMarker;
     } catch {
       key = pathKey(path) + ':missing';
     }
+    const generation = sessionGeneration;
     let snapshot;
     try {
       snapshot = await documentSessions.resolve(key, async () => {
@@ -1227,6 +1237,7 @@ export function createHost(options = {}) {
       if (error?.resultError) return { ok: false, error: error.resultError };
       throw error;
     }
+    if (generation !== sessionGeneration) documentSessions.clear(key);
     return { ok: true, value: snapshot };
   }
 
@@ -1844,6 +1855,7 @@ export function createHost(options = {}) {
           return await documents.applyEdits(payload, invocation, invocation?.policy);
         case 'documents.state':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
+          if (typeof payload?.path !== 'string' || !payload.path) return await documents.state(payload, invocation);
           return await apiSession(payload, invocation);
         case 'documents.reconcile':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
@@ -1907,7 +1919,7 @@ export function createHost(options = {}) {
       const reason = error?.reason || (error?.code === 'MP_FILE_MISSING' ? 'missing' : undefined);
       return { ok: false, error: { code, message: String(error?.message ?? error), ...(reason ? { reason: String(reason) } : {}) } };
     } finally {
-      if (SESSION_MUTATING_ENDPOINTS.has(endpoint)) documentSessions.clear();
+      if (SESSION_MUTATING_ENDPOINTS.has(endpoint)) invalidateSessions();
     }
   }
 

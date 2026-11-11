@@ -17,7 +17,8 @@ export function allowedActions(snapshot) {
   else if (state === "readonly") actions.push("retry", "saveAs", "copy");
   else if (state === "clean" || state === "disk") actions.push("saveAs");
   if (Array.isArray(snapshot?.recovery) && snapshot.recovery.length && !actions.includes("recover")) actions.push("recover", "discardRecovery");
-  if (Array.isArray(snapshot?.groups) && snapshot.groups.length && !actions.includes("reviewUndo")) actions.push("reviewUndo", "reviewKeep", "reviewDiff");
+  const groups = Array.isArray(snapshot?.groups) ? snapshot.groups.filter((group) => !group?.undoneAt && !group?.undone_at) : [];
+  if (groups.length && !actions.includes("reviewUndo")) actions.push("reviewUndo", "reviewKeep", "reviewDiff");
   return actions;
 }
 
