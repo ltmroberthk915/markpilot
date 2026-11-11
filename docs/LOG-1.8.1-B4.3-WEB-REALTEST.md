@@ -633,3 +633,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 默认 false：dirty 文档的 direct ctx.fs.writeText 仍放行，证明 flag 关闭无行为变化；
 - true：dirty 拒绝（已有测试）；moveFile 目的地检查（已有测试）。
 - 全量 541/540/1。
+
+## 58. Desktop 回滚演练（1.9.6 → 1.9.5 → 1.9.6）
+
+- 通过 plugin_manager 从 1.9.6 安装 1.9.5：包版本 1.9.5，实体目录，Markdown 工具可读；
+- 再安装 1.9.6：包版本 1.9.6，实体目录，Markdown 工具可读；
+- 未重启 Desktop；rooms/recovery/archive 未被删除；
+- 这是 P6 回滚门槛证据之一，不代表 2.0 已可发布。
