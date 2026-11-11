@@ -858,7 +858,7 @@ export function createHost(options = {}) {
   }
 
   function broadcastChange(target, version, delta, flags) {
-    try { documentSessions.clear(pathKey(target?.targetKey || target?.displayPath || '')); } catch { /* shadow cache only */ }
+    try { invalidateSessions(); } catch { /* shadow cache only */ }
     const data = {
       path: target?.displayPath,
       targetKey: target?.targetKey,
