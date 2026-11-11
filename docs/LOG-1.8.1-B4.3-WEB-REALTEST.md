@@ -317,3 +317,12 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
   - `plugin_manager` source `file:...rc.7.tgz`，enabled=true
   - Markdown 模型工具可调用并读到磁盘正文
 - TEMP disable 已不存在；未重启 Desktop，客户端 UI 需正常重启验收。
+
+## 17. P4 只读/占用真机（通过）
+
+- 新建/保存 `p4-readonly-real.md`，外部设置只读；
+- 真实输入 `RO` 后 Ctrl+S：
+  - 文件内容仍为 `# p4-readonly-real`（未写盘）
+  - Web 显示 `⚠ 文件只读或被占用；当前编辑内容保留、未写盘，可另存为副本`
+  - 按钮「重试保存」「另存为…」「复制我的内容」
+- 测试文件已恢复权限并删除；headless Edge/测试服务器已停止。
