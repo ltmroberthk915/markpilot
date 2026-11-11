@@ -350,3 +350,16 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
   - TEMP disable 不存在
   - Markdown 模型工具可调用并读到磁盘正文
 - 未重启 Desktop；客户端 UI 需正常重启验收。
+
+## 20. P1 DocumentSession 影子第一切片（未打包）
+
+- 新增 `lib/document-sessions.js`：只读 SessionManager（TTL 30m、cap 256）、allowedActions。
+- 新增 `documents.session`（editor-only）：
+  - 复用 `documents.state`
+  - 返回快照 + allowedActions
+  - 错误不缓存；FS_NOT_FOUND 归一为 `state:'missing'`
+  - cache key = canonical + provider version/missing
+- 打包 `files` 收为 `lib`，修复 `document-sessions.js` 漏打包。
+- 测试：TTL/cap、allowedActions、missing→创建刷新、MODEL_TOOL、包文件清单。
+- 全量 522/521/1。
+- 尚未接客户端/P5；30 场景对比未做。
