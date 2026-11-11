@@ -640,3 +640,14 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 再安装 1.9.6：包版本 1.9.6，实体目录，Markdown 工具可读；
 - 未重启 Desktop；rooms/recovery/archive 未被删除；
 - 这是 P6 回滚门槛证据之一，不代表 2.0 已可发布。
+
+## 59. P5 收尾决策：read/applyEdits 保持权威直连
+
+- 严格把 `documents.read/applyEdits` 放进 SessionManager 需要缓存完整正文/authority；
+- 单文档上限 64MB、SessionManager 256 项，最坏内存不可接受；
+- 采用推荐 A：
+  - `documents.state` 走 SessionManager 快照；
+  - `read/applyEdits` 继续直接走 documents-service 的实时权威；
+  - write guard、磁盘归档、真实 DB-lock fail-closed 已完成；
+- 这是与 P5 原文“全部经 snapshot”的**明确偏差**，不是遗漏；
+- 下一步进入 P6 2.0.0-rc.1 发布准备，不再为形式缓存整份正文。
