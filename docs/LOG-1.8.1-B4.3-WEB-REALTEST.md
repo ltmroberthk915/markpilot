@@ -508,3 +508,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 包装 disposer：record own property、identity 检查、必要时 delete；赋值失败回滚已安装 wrapper。
 - 新增 apply 级测试：默认关闭不包装、flag=true 包装、字符串 "true" 不包装；moveFile 目的地测试。
 - 全量 534/533/1；默认关闭行为不变。
+
+## 40. 1.9.3 打包与 Desktop 更新
+
+- 包 `dsh-markdown-editor-typora-1.9.3.tgz`，150 files，SHA256 `4FBCF046870C80E2A72E3377E152FBA2A209C2A993E116C50E6CB71D7A5EC866`。
+- 隔离 profile 安装成功；Desktop 从 1.9.2 更新到 `file:...1.9.3.tgz`，实体目录，version 1.9.3，Markdown 工具可调用。
+- 更新前备份 `D:\BuyKey\desktop-profile-backup-20261111-1530`；未重启 Desktop。
+- 全量 534/533/1。
