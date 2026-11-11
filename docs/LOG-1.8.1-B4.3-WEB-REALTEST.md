@@ -411,3 +411,11 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - **改名**：保存刷新 identity 后外部改名，出现 `⚠ 检测到可能已改名为：b43-keepmine2-ui-renamed.md；可重试或另存为副本`；改回后横幅消失。
 - 截图：`C:\Users\Ming\.dsh\data\computer-use\shots\shot-2026-11-11_05-58-45-388-*.jpg`（删除）、`..._06-00-18-798-*.jpg`（只读）、`..._06-01-24-413-*.jpg`（改名）。
 - 未在 Desktop 测恢复中心/另存为模态；这两项已在隔离 Web 真机通过。
+
+## 27. P1 G1 扩展到 live room 状态
+
+- 新增 `p1-shadow-live.test.mjs`：5 文件 × dirty / conflict / orphan / mirror = 20 场景；
+- 与 `documents.state` 对比 state/source/dirty/conflict/version/revisionId/orphanDraft/external/unsavedElsewhere，0 差异；
+- 与之前的 30 个磁盘/保存/改名场景合计 **50 场景 0 差异**；
+- 仍未覆盖 review/recovery 组合与真正 11 状态表，不能按完整 G1 宣称。
+- 全量 526/525/1。
