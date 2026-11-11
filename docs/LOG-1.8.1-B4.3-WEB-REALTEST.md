@@ -651,3 +651,11 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
   - write guard、磁盘归档、真实 DB-lock fail-closed 已完成；
 - 这是与 P5 原文“全部经 snapshot”的**明确偏差**，不是遗漏；
 - 下一步进入 P6 2.0.0-rc.1 发布准备，不再为形式缓存整份正文。
+
+## 60. 2.0.0-rc.1 打包与 Desktop 更新
+
+- 包 `dsh-markdown-editor-typora-2.0.0-rc.1.tgz`，150 files，SHA256 `8BA49D0A7A772BB1E63D3CAB25D74BBCEE916B1D723350663E42100D738D9938`。
+- 隔离 profile 安装成功；Desktop 从 1.9.6 更新到 `file:...2.0.0-rc.1.tgz`，实体目录，version 2.0.0-rc.1，Markdown 工具可调用。
+- 更新前备份 `D:\BuyKey\desktop-profile-backup-20261112-0500`；未重启 Desktop。
+- 全量 541/540/1。
+- 明确限制：read/applyEdits 仍直连实时权威；P1 完整 11 状态/客户端接线未完成；不是 2.0 正式版。
