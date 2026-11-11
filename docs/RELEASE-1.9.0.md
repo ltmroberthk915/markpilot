@@ -23,7 +23,7 @@
 
 ## 验证
 
-- `npm test`：511 / 510 pass / 1 skip / 0 fail。
+- `npm test`：515 / 514 pass / 1 skip / 0 fail。
 - `sync-host --check`：9 files；`sync-core --check`：124 files / 7,351,676 bytes；coreHash `4499e09378a8743fd1ec985c11bf8046f33b55350688dd9d996b839fe0d589ba`。
 - Web 独立 `mp-web-test` 真机（未操作 Desktop）：
   - 「用我的」→ 写盘 `mine`，`rooms.saved=1`，`room_resolved` 清空；
@@ -54,6 +54,6 @@
 
 ## 包安装验证
 
-- rc.6 已在隔离 profile `~/.dsh/profiles/mp-pkg-test` 中从 tarball 安装成功（pnpm `file:` 包，版本 1.9.0-rc.7）；
+- rc.7 已在隔离 profile `~/.dsh/profiles/mp-pkg-test` 中从 tarball 安装成功（pnpm `file:` 包，版本 1.9.0-rc.7）；
 - rc.2 的 Markdown 面板/编辑器加载已通过；rc.3 移除 debug hooks、补测试；rc.4/rc.5 仅 README/版本/hash 清理，包结构一致；
 - 未在 DSH Desktop 安装；正式实装前需用户明确确认。
