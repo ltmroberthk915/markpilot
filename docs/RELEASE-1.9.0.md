@@ -23,7 +23,7 @@
 
 ## 验证
 
-- `npm test`：498 / 497 pass / 1 skip / 0 fail。
+- `npm test`：511 / 510 pass / 1 skip / 0 fail。
 - `sync-host --check`：9 files；`sync-core --check`：124 files / 7,351,676 bytes；coreHash `4499e09378a8743fd1ec985c11bf8046f33b55350688dd9d996b839fe0d589ba`。
 - Web 独立 `mp-web-test` 真机（未操作 Desktop）：
   - 「用我的」→ 写盘 `mine`，`rooms.saved=1`，`room_resolved` 清空；
