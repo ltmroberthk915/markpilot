@@ -589,3 +589,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 抽出 `sessionKeyFor`；state 加载后重新计算 key，若成员/mirror/recovery 在加载期间变化，清旧项并用新 key 重载一次。
 - 仍不能完全消除两阶段竞态，但覆盖 join/leave、putDraft、discard recovery 在单次 state 调用内发生的情况。
 - 全量 539/538/1。
+
+## 52. 1.9.6 打包与 Desktop 更新
+
+- 包 `dsh-markdown-editor-typora-1.9.6.tgz`，150 files，SHA256 `4F9573986960C233A25259E49884C495D8ABA2DB00EB8A1ABC17F787B29E2C85`。
+- 隔离 profile 安装成功；Desktop 从 1.9.5 更新到 `file:...1.9.6.tgz`，实体目录，version 1.9.6，Markdown 工具可调用。
+- 更新前备份 `D:\BuyKey\desktop-profile-backup-20261112-0430`；未重启 Desktop。
+- 全量 539/538/1。
