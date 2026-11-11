@@ -674,3 +674,8 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 更新前备份 `D:\BuyKey\desktop-profile-backup-20261112-0530`；未重启 Desktop。
 - 全量 542/541/1。
 - 明确限制见 RELEASE-2.0.0：read/applyEdits 直连权威；P1 客户端接线未完成。
+
+## 63. Desktop 2.0.0 热加载面板冒烟
+
+- 安装 2.0.0 后未重启宿主，点击 Markdown；工作台正常打开 `g3mirror2`，状态「就绪」，无插件加载错误；
+- 这是热加载冒烟，不替代完整重启验收。
