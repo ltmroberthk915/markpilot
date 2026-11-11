@@ -583,3 +583,9 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 
 - 先缓存 state（recovery>=1），再 discard 所有 append recovery，第二次 state recovery=0；
 - 验证 recovery marker 进入缓存 key；全量 539/538/1。
+
+## 51. P5 跨进程 key 重检
+
+- 抽出 `sessionKeyFor`；state 加载后重新计算 key，若成员/mirror/recovery 在加载期间变化，清旧项并用新 key 重载一次。
+- 仍不能完全消除两阶段竞态，但覆盖 join/leave、putDraft、discard recovery 在单次 state 调用内发生的情况。
+- 全量 539/538/1。
