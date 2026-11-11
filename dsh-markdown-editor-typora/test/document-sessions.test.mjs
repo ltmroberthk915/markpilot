@@ -33,3 +33,15 @@ test('P1 session module is included in the published package files list', async 
   const files = Array.isArray(pkg.files) ? pkg.files : [];
   assert.equal(files.some((entry) => entry === 'lib' || entry === 'lib/document-sessions.js'), true);
 });
+
+test('P1 allowedActions includes recovery and review capabilities from the snapshot', () => {
+  const recovery = allowedActions({ state: 'clean', recovery: [{ recoveryPath: 'x' }] });
+  assert.equal(recovery.includes('recover'), true);
+  assert.equal(recovery.includes('discardRecovery'), true);
+  const review = allowedActions({ state: 'dirty', groups: [{ groupId: 'g' }] });
+  assert.equal(review.includes('reviewUndo'), true);
+  assert.equal(review.includes('reviewKeep'), true);
+  assert.equal(review.includes('reviewDiff'), true);
+  const orphan = allowedActions({ state: 'orphan' });
+  assert.equal(orphan.includes('recover'), false);
+});

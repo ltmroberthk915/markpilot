@@ -7,14 +7,18 @@ export const SESSION_LIMIT = 256;
 
 export function allowedActions(snapshot) {
   const state = String(snapshot?.state || "");
-  if (state === "missing") return ["retry", "saveAs", "locate"];
-  if (state === "conflict") return ["openConflict", "resolveConflict", "cancelConflict", "copy", "saveAs"];
-  if (state === "orphan") return ["recover", "discardRecovery", "copy", "saveAs"];
-  if (state === "owned-elsewhere" || state === "unsaved-elsewhere") return ["resolve", "copy", "saveAs"];
-  if (state === "external") return ["reload", "copy", "saveAs"];
-  if (state === "dirty") return ["save", "saveAs", "copy"];
-  if (state === "clean" || state === "disk") return ["saveAs"];
-  return [];
+  const actions = [];
+  if (state === "missing") actions.push("retry", "saveAs", "locate");
+  else if (state === "conflict") actions.push("openConflict", "resolveConflict", "cancelConflict", "copy", "saveAs");
+  else if (state === "orphan") actions.push("open", "resolve", "copy", "saveAs");
+  else if (state === "owned-elsewhere" || state === "unsaved-elsewhere") actions.push("openConflict", "resolve", "copy", "saveAs");
+  else if (state === "external") actions.push("reload", "copy", "saveAs");
+  else if (state === "dirty") actions.push("save", "saveAs", "copy");
+  else if (state === "readonly") actions.push("retry", "saveAs", "copy");
+  else if (state === "clean" || state === "disk") actions.push("saveAs");
+  if (Array.isArray(snapshot?.recovery) && snapshot.recovery.length && !actions.includes("recover")) actions.push("recover", "discardRecovery");
+  if (Array.isArray(snapshot?.groups) && snapshot.groups.length && !actions.includes("reviewUndo")) actions.push("reviewUndo", "reviewKeep", "reviewDiff");
+  return actions;
 }
 
 export function createSessionManager({ ttlMs = SESSION_TTL_MS, now = Date.now, limit = SESSION_LIMIT } = {}) {
