@@ -53,3 +53,21 @@ test('P1 allowedActions ignores undone review groups', () => {
   assert.equal(undone.includes('reviewUndo'), false);
   assert.deepEqual(undone, ['save', 'saveAs', 'copy']);
 });
+
+test('P1 allowedActions covers the supported state table', () => {
+  const table = {
+    missing: ['retry', 'saveAs', 'locate'],
+    conflict: ['openConflict', 'resolveConflict', 'cancelConflict', 'copy', 'saveAs'],
+    orphan: ['open', 'resolve', 'copy', 'saveAs'],
+    'owned-elsewhere': ['openConflict', 'resolve', 'copy', 'saveAs'],
+    'unsaved-elsewhere': ['openConflict', 'resolve', 'copy', 'saveAs'],
+    external: ['reload', 'copy', 'saveAs'],
+    dirty: ['save', 'saveAs', 'copy'],
+    readonly: ['retry', 'saveAs', 'copy'],
+    clean: ['saveAs'],
+    disk: ['saveAs'],
+  };
+  for (const [state, expected] of Object.entries(table)) {
+    assert.deepEqual(allowedActions({ state }), expected, state);
+  }
+});
