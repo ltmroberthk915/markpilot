@@ -560,3 +560,9 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - `apiSession(payload, invocation, authority)`；cache key 增加 authority 与 policy mode/workspaceRoot；
 - model `documents.state` 与 editor `documents.session` 不再共享同一缓存项，P1 对比不再是同项自证；
 - 全量 537/536/1。
+
+## 47. P5 broadcastChange 缓存失效
+
+- `broadcastChange` 不再按 base path 清一个不存在的 key，改为 `invalidateSessions()` 全量失效；
+- 外部变更/SSE 事件后，`documents.state` 不会命中旧快照。
+- 全量 537/536/1。
