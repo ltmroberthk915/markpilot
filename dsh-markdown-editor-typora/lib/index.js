@@ -2062,7 +2062,12 @@ const WRITE_GUARD_DIRTY = 'MP_DOC_DIRTY';
 
 function writeGuardError(code, path, detail) {
   const where = path ? `：${path}` : '';
-  const message = `[${code}] 文件正在 MarkPilot 中打开且有未保存修改${where}。请先在编辑器中保存或丢弃，然后重试。`;
+  let message;
+  if (code === 'MP_DOC_LOOKUP_FAILED') {
+    message = `[${code}] MarkPilot 连续无法读取未保存状态，已拒绝写入以防覆盖${where}。请稍后重试；若持续失败，先保存并关闭编辑器。`;
+  } else {
+    message = `[${code}] 文件正在 MarkPilot 中打开且有未保存修改${where}。请先在编辑器中保存或丢弃，然后重试。`;
+  }
   return Object.assign(new Error(detail || message), { code, path: String(path || '') });
 }
 
@@ -2096,7 +2101,12 @@ export function createWriteGuard({ fs, lookup, log, pluginName = 'markpilot-writ
   async function checked(target) {
     const state = await stateOf(target);
     if (!state) return { state: null, base: undefined };
-    if (state.dirty) throw writeGuardError(WRITE_GUARD_DIRTY, state.path || target.displayPath || '');
+    if (state.dirty) {
+      const detail = state.mirror
+        ? `[${WRITE_GUARD_DIRTY}] 文件存在 MarkPilot 草稿镜像（可能来自已关闭的编辑器）${state.path ? '：' + state.path : ''}。请先在编辑器中打开并处理该草稿，或清除镜像后再写。`
+        : undefined;
+      throw writeGuardError(WRITE_GUARD_DIRTY, state.path || target.displayPath || '', detail);
+    }
     return { state, base: undefined };
   }
   async function currentVersion(state, target) {

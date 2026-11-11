@@ -171,3 +171,22 @@ test('fsSessionIntents checks moveFile destination too', async () => {
   );
   assert.equal(calls, 0);
 });
+
+test('write guard error messages distinguish lookup failure and mirror', async () => {
+  const h = makeCtx();
+  makeGuard({ lookup: async () => { throw new Error('db locked'); } }).install(h.ctx);
+  await call(h, 'fs/write-intent', BASE);
+  await call(h, 'fs/write-intent', BASE);
+  await assert.rejects(() => call(h, 'fs/write-intent', BASE), (error) => {
+    assert.equal(error.code, 'MP_DOC_LOOKUP_FAILED');
+    assert.match(error.message, /连续无法读取未保存状态/);
+    return true;
+  });
+  const mirror = makeCtx();
+  makeGuard({ lookup: async () => ({ dirty: true, mirror: true, path: 'D:/probe/m.md' }) }).install(mirror.ctx);
+  await assert.rejects(() => call(mirror, 'fs/write-intent', BASE), (error) => {
+    assert.equal(error.code, 'MP_DOC_DIRTY');
+    assert.match(error.message, /草稿镜像/);
+    return true;
+  });
+});
