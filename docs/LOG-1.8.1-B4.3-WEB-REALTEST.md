@@ -694,3 +694,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 远端提示可创建 PR：
   `https://github.com/ltmroberthk915/markpilot/pull/new/b4.2b-review-chain`
 - 未发布 npm、未创建 GitHub Release、未做市场条目。
+
+## 66. 2.0.0 全量测试三连
+
+- `npm test` 连续 3 次：542/541/1/0；
+- sync-host/sync-core 绿；
+- coreHash 未变；
+- 仍缺 Desktop 重启后的 UI 矩阵。
