@@ -602,3 +602,14 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - `p1-shadow-live` 每次同时取 `documents.reconcile`（直连）与 `documents.state`（缓存）；
 - session/state 核心字段都与 reconcile 对比，不再只是两个缓存项自证；
 - 全量 539/538/1。
+
+## 54. Desktop 恢复中心真机验收（通过）
+
+- 对当前打开的 `g3mirror2.md` 制造 2 条 append recovery，再外部删除磁盘文件；
+- Markdown 顶部出现 missing 横幅「磁盘上的文件已不存在」；
+- 点击「历史副本」打开恢复中心：标题「历史恢复副本 (2)」，列出时间/v2/v1/bytes，含「查看」「复制路径」「关闭」；
+- 点击第一条「查看」，预览显示 `RECOVERYUI # g3mirror2` 与 `R2`；
+- Escape 关闭恢复中心，正常；
+- 恢复磁盘文件后点击「重载磁盘版本」，编辑器回到 `# g3mirror2`，旧草稿另存为 pre-reload 归档；该测试归档已删除；
+- 测试 recovery/room 已清理，`g3mirror2.md` 恢复原文。
+- 截图：`shot-2026-11-11_19-35-35-391-*`（missing）、`..._19-35-46-159-*`（列表）、`..._19-35-54-906-*`（查看内容）。
