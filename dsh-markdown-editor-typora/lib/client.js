@@ -776,6 +776,7 @@ function applyMirrorDelta(mirror,event){
     function saveErrorKind(error) {
       if (!error) return "error";
       if (error.reason === "missing" || error.code === "MP_FILE_MISSING") return "missing";
+      if (["EACCES", "EPERM", "EBUSY", "EROFS"].includes(error.code)) return "readonly";
       if (error.code === "FS_STALE_VERSION") return "conflict";
       return "error";
     }
@@ -5378,6 +5379,7 @@ const __test = {
           retryMissing: null,
           missing: false,
           missingPending: false,
+          readonly: false,
           saveAsValue: "",
           saveAsBusy: false,
         };
@@ -5751,7 +5753,7 @@ const __test = {
         function commitApplied(pending,reply,snapshot) {
           const value=pending.value,restore=pending.kind==='restore';
           doc.opened=true;doc.text=value.text;doc.textFresh=true;doc.lastVersion=value.version;
-          doc.missing=false;doc.missingPending=false;
+          doc.missing=false;doc.missingPending=false;doc.readonly=false;
           if (typeof value.diskRevisionSha === "string" && /^[0-9a-f]{64}$/i.test(value.diskRevisionSha))
             doc.baseSha256 = value.diskRevisionSha.toLowerCase();
           void probeDraftMirror();
@@ -5939,6 +5941,7 @@ const __test = {
           // missing 是删/改名后的显性 latch：输入、apply、live 刷新只能把文档标脏，
           // 不能把横幅顶掉而留下一个静默停写的 dirty 状态。
           if (doc.missing && phase !== "missing" && phase !== "error") return;
+          if (doc.readonly && phase !== "readonly" && phase !== "error") return;
           saveStatus.update(doc.dirty);
           doc.phase = phase;
           doc.detail = detail || "";
@@ -6065,7 +6068,7 @@ const __test = {
         }
 
         function scheduleSave(delay) {
-          if (doc.dead || doc.missing) return;
+          if (doc.dead || doc.missing || doc.readonly) return;
           if (reviewSuppressesSave(doc)) return;   // AI review must reach a decision before the timer can write.
           if (doc.saveTimer) { clearTimeout(doc.saveTimer); doc.saveTimer = null; }
           doc.saveTimer = setTimeout(() => {
@@ -6134,6 +6137,11 @@ const __test = {
           if (doc.missing) {
             stopSaveTimer();
             if (manual) post("toast", "磁盘上的文件已不存在；草稿未写盘，请先重试或复制内容");
+            return;
+          }
+          if (doc.readonly) {
+            stopSaveTimer();
+            if (manual) post("toast", "文件只读或被占用；草稿未写盘，请用另存为副本");
             return;
           }
           if (doc.conflict) {
@@ -6316,6 +6324,11 @@ const __test = {
                 if (manualThisRun) post("toast", "磁盘上的文件已不存在；草稿未写盘，请先重试或复制内容");
                 return;
               }
+              if (saveKind === "readonly") {
+                enterReadonly();
+                if (manualThisRun) post("toast", "文件只读或被占用；草稿未写盘，请用另存为副本");
+                return;
+              }
               if (doc.live && result.error && liveErrorAction(result.error.code) === "conflict") {
                 handleLiveError(result.error.code, result.error.message);
                 return;
@@ -6334,9 +6347,11 @@ const __test = {
           } catch (error) {
             if (alive()) {
               const message = String(error && error.message ? error.message : error);
-              if (saveErrorKind(error) === "missing") enterMissing();
+              const kind = saveErrorKind(error);
+              if (kind === "missing") enterMissing();
+              else if (kind === "readonly") enterReadonly();
               else showError("保存失败：" + message);
-              if (manualThisRun) post("toast", saveErrorKind(error) === "missing" ? "磁盘上的文件已不存在；草稿未写盘" : "保存失败：" + message);
+              if (manualThisRun) post("toast", kind === "missing" ? "磁盘上的文件已不存在；草稿未写盘" : kind === "readonly" ? "文件只读或被占用；草稿未写盘" : "保存失败：" + message);
             }
           } finally {
             doc.saving = false;
@@ -6659,6 +6674,23 @@ const __test = {
           else showPhase(doc.dirty ? "dirty" : "ready", doc.dirty ? "编辑中…" : "");
         }
 
+        function enterReadonly() {
+          if (doc.readonly) return;
+          doc.readonly = true;
+          doc.externalStale = true;
+          doc.staleNotified = true;
+          stopSaveTimer();
+          showPhase("readonly", "文件只读或被占用；当前编辑内容保留、未写盘，可另存为副本");
+        }
+
+        function exitReadonly() {
+          if (!doc.readonly) return;
+          doc.readonly = false;
+          doc.externalStale = false;
+          doc.staleNotified = false;
+          showPhase(doc.dirty ? "dirty" : "ready", doc.dirty ? "编辑中…" : "");
+        }
+
         async function retryMissing() {
           if (!doc.missing || !doc.absPath || doc.dead) return;
           try {
@@ -6675,8 +6707,14 @@ const __test = {
           }
         }
 
+        async function retryReadonly() {
+          if (!doc.readonly || doc.dead) return;
+          exitReadonly();
+          await runSave({ manual: true });
+        }
+
         function openSaveAs() {
-          if (!doc.missing || !doc.absPath || doc.saveAsBusy) return;
+          if ((!doc.missing && !doc.readonly) || !doc.absPath || doc.saveAsBusy) return;
           doc.saveAsValue = saveAsCandidate(doc.absPath);
           setUi((prev) => ({ ...prev, saveAsOpen: true, saveAsValue: doc.saveAsValue, saveAsError: "", saveAsBusy: false }));
         }
@@ -6687,7 +6725,7 @@ const __test = {
         }
 
         async function submitSaveAs() {
-          if (!doc.missing || !doc.absPath || doc.saving || doc.pendingApply || doc.applyUnknown || doc.saveAsBusy) return;
+          if ((!doc.missing && !doc.readonly) || !doc.absPath || doc.saving || doc.pendingApply || doc.applyUnknown || doc.saveAsBusy) return;
           const targetPath = String(doc.saveAsValue || "").trim();
           if (!targetPath) {
             setUi((prev) => ({ ...prev, saveAsError: "请输入绝对路径" }));
@@ -6739,6 +6777,7 @@ const __test = {
           setUi((prev) => ({ ...prev, saveAsOpen: false, saveAsBusy: false }));
           post("toast", "已另存为：" + savedPath);
           if (doc.missing) showPhase("missing", "已另存为副本：" + savedPath + "；原文件仍不存在");
+          else if (doc.readonly) showPhase("readonly", "已另存为副本：" + savedPath + "；原文件仍只读或被占用");
           else showPhase(doc.dirty ? "dirty" : "ready", doc.dirty ? "编辑中…" : "");
         }
 
@@ -7158,6 +7197,7 @@ const __test = {
             await clipboard.writeText(text);
             post("toast", "已复制当前编辑内容");
             if (doc.missing) showPhase("missing", "已复制当前编辑内容；磁盘上的文件仍不存在");
+            else if (doc.readonly) showPhase("readonly", "已复制当前编辑内容；原文件仍只读或被占用");
             else showPhase("conflict", "已复制当前编辑内容；磁盘版本未覆盖");
           } catch (error) {
             post("toast", "复制失败：" + String(error && error.message ? error.message : error));
@@ -7377,6 +7417,7 @@ const __test = {
           reloadDisk: forceReload,
           copyMine: copyMine,
           retryMissing,
+          retryReadonly,
           openSaveAs,
           closeSaveAs,
           submitSaveAs,
@@ -7649,7 +7690,13 @@ const __test = {
       const toggleRail = () => setUi((prev) => ({ ...prev, railOpen: !prev.railOpen }));
       const actions = [];
       let primaryText = "", primaryTone = "info";
-      if (ui.phase === "missing") {
+      if (ui.phase === "readonly") {
+        primaryText = "⚠ " + ui.detail;
+        primaryTone = "warn";
+        actions.push({ label: "重试保存", icon: "⟳", run: () => st.actions.retryReadonly && st.actions.retryReadonly() });
+        actions.push({ label: "另存为…", icon: "⤓", run: () => st.actions.openSaveAs && st.actions.openSaveAs() });
+        actions.push({ label: "复制我的内容", icon: "⧉", run: () => st.actions.copyMine && st.actions.copyMine() });
+      } else if (ui.phase === "missing") {
         primaryText = "⚠ " + ui.detail;
         primaryTone = "warn";
         actions.push({ label: "重试", icon: "⟳", run: () => st.actions.retryMissing && st.actions.retryMissing() });

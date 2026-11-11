@@ -128,3 +128,28 @@ test('P4 client missing banner reports a rename candidate', async () => {
   assert.match(h.ui().detail, /renamed\.md/);
   h.cleanup();
 });
+
+test('P4 client readonly save error surfaces a save-as escape', async () => {
+  const h = make();
+  let saved = 0;
+  h.setFetch((req) => {
+    if (req.endpoint === 'open') return opened('base', 'v1');
+    if (req.endpoint === 'save') return { ok: false, error: { code: 'EACCES', message: 'denied' } };
+    if (req.endpoint === 'saveAs') { saved += 1; return { ok: true, value: { path: 'D:/probe/copy.md', version: 'v-copy', size: 4 } }; }
+    return { ok: true, value: {} };
+  });
+  await h.boot();
+  h.edit('dirty');
+  h.message('manual-save', { source: 'ctrl-s' });
+  await drain();
+  assert.equal(h.st.doc.readonly, true);
+  assert.equal(h.ui().phase, 'readonly');
+  h.st.actions.openSaveAs();
+  assert.equal(h.ui().saveAsOpen, true);
+  h.st.doc.saveAsValue = 'D:/probe/copy.md';
+  await h.st.actions.submitSaveAs();
+  await drain();
+  assert.equal(saved, 1);
+  assert.equal(h.ui().saveAsOpen, false);
+  h.cleanup();
+});
