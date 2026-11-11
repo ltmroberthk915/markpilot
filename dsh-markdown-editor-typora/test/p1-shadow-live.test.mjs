@@ -133,6 +133,8 @@ test('P1-G1 live room states: dirty, conflict, orphan, mirror match state', asyn
     }
     const ownedFile = path.join(root, 'owned-remote.md');
     await fs.writeFile(ownedFile, 'remote base\n', 'utf8');
+    const beforeOwned = await compareShadow(host, ownedFile, 'owned-before');
+    assert.equal(beforeOwned.value.state, 'disk');
     const remote = await remoteJoin(path.join(root, 'live'), ownedFile, 'remote base\n');
     try {
       const owned = await compareShadow(host, ownedFile, 'owned-remote');
