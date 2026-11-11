@@ -529,3 +529,11 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - `MP_DOC_LOOKUP_FAILED` 不再说“文件正在打开”，改为“连续无法读取未保存状态，已拒绝写入”。
 - mirror 场景错误消息明确“存在草稿镜像”，不再误导为当前窗口打开。
 - 测试覆盖两种消息；全量 535/534/1。
+
+## 43. P5 documents.state 走 SessionManager
+
+- `documents.state` 改走 `apiSession`，使用 SessionManager 缓存；
+- key 加入 room epoch/version/savedVersion、members/localMembers、resolvedDisk、draft mirror 的 sha/base，避免 owned-elsewhere/mirror/keep-mine 被旧快照掩盖；
+- 写端点 finally 统一 `documentSessions.clear()`；
+- 新增 mirror 失效测试；全量 536/535/1。
+- 审查确认两个缓存 BLOCKER 已修；read/applyEdits 仍未显式走 snapshot。
