@@ -493,3 +493,10 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - `documents.session` 与 `documents.state` 均返回 `owned-elsewhere`，核心字段 0 差异；
 - G1 合计 **66 场景 0 差异**；仍缺 readonly/locked 与完整 11 状态表。
 - 全量 531/530/1。
+
+## 38. P5 可选 fsSessionIntents
+
+- `apply(ctx, config)` 读取 `config.fsSessionIntents`，默认 false；
+- true 时包装 `ctx.fs.writeText/editText/patchText/deleteFile/moveFile`，dirty session 拒绝 `MP_DOC_DIRTY`，disposer 还原；
+- 修复 `apply` 的 free `options` 引用（否则整个 write guard 不安装）；
+- 测试 dirty 拒绝/clean 放行；全量 532/531/1。
