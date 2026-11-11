@@ -288,3 +288,12 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - missing 横幅会异步调用 locate，候选显示「检测到可能已改名为：…；可重试或另存为副本」（`0cf670b`）。
 - 测试：save→rename 真替换语义、open→rename、MODEL_TOOL 拒绝；全量 513/512/1。
 - 未完成：真实 Web 改名横幅测试（headless 脚本挂起，无结论）；候选只提示，不自动重绑。
+
+## 14. P4 只读/占用逃生（客户端，单测）
+
+- save 返回 `EACCES/EPERM/EBUSY/EROFS` 时进入 `readonly` 横幅：
+  - 「文件只读或被占用；当前编辑内容保留、未写盘」
+  - 重试保存 / 另存为… / 复制我的内容
+- `scheduleSave`/`runSave` 在 readonly 期间停写；另存为成功保留 readonly 提示。
+- 新增 client 测试：EACCES → readonly、modal 可提交 saveAs、autosave 停止。
+- 未做真实 Web 只读文件真机（仅单测）；全量 514/513/1。
