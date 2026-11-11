@@ -449,3 +449,11 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 单次失败仍 fail-open，保持临时 DB 锁可用性；
 - 新增测试：3 次失败拒绝、随后成功恢复；
 - 全量 530/529/1。
+
+## 32. 1.9.1 打包与 Desktop 更新
+
+- 包 `dsh-markdown-editor-typora-1.9.1.tgz`，150 files，SHA256 `92DC1DCCE378848F894F916BA023FABCE592AA27517123F1699D75BA7E3720AE`。
+- 隔离 profile 安装成功。
+- Desktop 从 1.9.0 更新到 `file:...1.9.1.tgz`，version 1.9.1，实体目录；Markdown 工具可调用。
+- 更新前备份 `D:\BuyKey\desktop-profile-backup-20261111-1430`；未重启 Desktop。
+- 全量 530/529/1。
