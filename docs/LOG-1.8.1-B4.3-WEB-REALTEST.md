@@ -731,3 +731,18 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - **recovery center**：此前已通过（历史恢复副本/查看/关闭/重载）。
 - **另存为模态**：仍未完成。
 - 文件最终 `# g3mirror2`，room saved=version=1，无残留归档。
+
+## 71. 2.0.0 另存为真实 bug 与 2.0.1 修复
+
+- 2.0.0 Desktop 实测：只读文档点「另存为…」，任意本地绝对 `.md` 路径均返回 `FS_SANDBOX_DENIED`，客户端显示“当前工作区不允许写该路径”。
+- 根因：`apiSaveAs` 的 editor HTTP 请求没有 session；`dsh-fs-sandbox.writeText` 省略第 5 个 sandboxPolicy 时用 deployment fallback（workspace-write），目标不在 workspace root，直接拒绝。
+- 2.0.1 修复：
+  - `apiSaveAs` 先尝试解析 deployment policy 并传入 `writeText`；
+  - 若仍 `FS_SANDBOX_DENIED`，对本地 native 路径改用 `writeFile(..., {flag:'wx'})` 排他创建，EEXIST 映射 `FS_EXISTS`；
+  - 虚拟 provider 仍保留原错误。
+- 真实复测（Desktop 2.0.1）：
+  - 只读源 `g3mirror2.md` 另存为 `g3mirror2-copy.md` 成功；
+  - 副本内容为当时编辑器正文 `# g3mSirror2`；
+  - 源文件保持 `# g3mirror2`、只读未变；
+  - 测试副本/只读/临时修改已清理。
+- 该修复仍在对抗审查中，审查通过前不按最终发布口径。
