@@ -1194,7 +1194,7 @@ test('B4.4-API4b saveAs falls back to safeFile after a sandbox denial', async ()
 });
 test('B4.4-API4c saveAs does not fall back when the policy is read-only', async () => {
   const w = await makeWorld('save-as-readonly', 'old\n');
-  const target = w.file + '.readonly copy.md';
+  const target = path.join(path.dirname(w.file), 'read-only', 'copy.md');
   await fs.unlink(target).catch(() => {});
   const tiny = {
     async resolve(value) { return { targetKey: value, displayPath: value }; },
@@ -1204,7 +1204,7 @@ test('B4.4-API4c saveAs does not fall back when the policy is read-only', async 
       catch (error) { if (error.code === 'ENOENT') return undefined; throw error; }
     },
     async readText(value) { return fs.readFile(typeof value === 'string' ? value : value?.targetKey, 'utf8'); },
-    async writeText() { throw Object.assign(new Error('file access denied under read-only mode'), { code: 'FS_SANDBOX_DENIED' }); },
+    async writeText(value) { throw Object.assign(new Error('cannot write "' + (value?.targetKey ?? value) + '": file access denied under read-only mode'), { code: 'FS_SANDBOX_DENIED' }); },
     async editText() { throw new Error('not used'); },
     async watch() { return async () => {}; },
   };

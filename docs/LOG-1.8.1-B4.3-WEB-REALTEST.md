@@ -763,3 +763,16 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
   - 成功后无 `.mp-tmp-*` 残留；
   - 测试副本/只读/临时修改已清理，room saved=version=2，正文 `# g3mirror2`。
 - 单测：544 / 543 pass / 1 skip / 0 fail；新增 sandbox 拒绝 fallback 与 read-only 不 fallback 两支。
+
+## 73. 2.0.5 review 后修正（未真机复测）
+
+- 独立审查结论（HEAD e293b3b/2.0.4）：**无 BLOCKER**；P1 两项、P2 若干建议。
+- 2.0.5 修正：
+  - read-only 判定改为 `fs.sandboxMode === 'read-only'` 或精确 `/under read-only mode\b/`，避免路径含 `read-only` 的误拒；
+  - 仅 `primaryFailure?.preserveTemp !== true` 才 unlink `.mp-tmp-*`，保住 safeFile 的 recovery 临时副本；
+  - 新副本编码改用 `textCodec.encodeDocument`，孤立代理不再静默替换为 U+FFFD；
+  - provider 写成功但 stat 暂不可见时，有 receipt.version 仍成功；
+  - 注释改为“provider 优先，仅 workspace-write containment 拒绝时 native fallback”。
+- 单测：544 / 543 pass / 1 skip / 0 fail；read-only 测试改成真实带路径消息。
+- **未完成 2.0.5 真机 saveAs**：Desktop 热加载后当前 Markdown 面板切到另一会话的《Windows computer use》测试文档；发现后立即停止，没有对该文档输入 S。`g3mirror2.md` 已恢复可写、内容 `# g3mirror2`。
+- 最后一次真机通过仍是 2.0.4：只读→另存为副本成功、无 temp、源不变。

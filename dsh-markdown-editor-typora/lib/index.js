@@ -1415,8 +1415,9 @@ export function createHost(options = {}) {
 
   // First-save drafts use a fixed UUID name. A retry never chooses another file.
   const draftReceipts = new Map();
-  // P4 escape hatch. The write must go through ctx.fs so sandbox policy,
-  // staging and encoding stay identical to normal saves; never use bare node fs.
+  // P4 escape hatch. Try ctx.fs first so sandbox policy, staging and encoding
+  // match normal saves. Only a workspace-write containment refusal falls back to
+  // the editor's staged native create; read-only and virtual providers stay fenced.
   // Contract: {path: source, targetPath: new file, text}. `path` is accepted as
   // the target for the legacy test-only shape.
   async function apiSaveAs(payload, authority) {
@@ -1438,11 +1439,11 @@ export function createHost(options = {}) {
       if (error?.code !== 'FS_SANDBOX_DENIED') throw error;
       // read-only must stay read-only; only the workspace-write containment
       // refusal falls back to the editor's native create path.
-      if (/read-only/i.test(String(error?.message || ''))) throw error;
+      if (fs.sandboxMode === 'read-only' || /under read-only mode\b/i.test(String(error?.message || ''))) throw error;
       if (!native || !isAbsolute(native)) throw error;
       fallback = true;
     }
-    const bytes = Buffer.from(text, 'utf8');
+    const bytes = textCodec.encodeDocument(text);
     if (fallback) {
       const dir = dirname(native);
       await mkdir(dir, { recursive: true });
@@ -1472,15 +1473,17 @@ export function createHost(options = {}) {
         try {
           await handle?.close();
           await stage?.abort();
-          await fsUnlink(temp).catch((error) => { if (error.code !== 'ENOENT') throw error; });
+          if (primaryFailure?.preserveTemp !== true)
+            await fsUnlink(temp).catch((error) => { if (error.code !== 'ENOENT') throw error; });
         } catch (error) {
           if (primaryFailure) primaryFailure.cleanupError = String(error?.message || error);
           else throw error;
         }
       }
     }
-    const info = await fs.stat(target);
-    if (!info || info.type !== 'file') throw codedError('FS_STALE_VERSION','save-as target is not a regular file');
+    const info = await fs.stat(target).catch(() => undefined);
+    if (info && info.type !== 'file') throw codedError('FS_STALE_VERSION','save-as target is not a regular file');
+    if (!info && !receipt?.version) throw codedError('FS_STALE_VERSION','save-as target is not visible after write');
     await rememberIdentity(target);
     const version = String(receipt?.version ?? info.version);
     broadcastChange(target, version);
@@ -1551,7 +1554,7 @@ export function createHost(options = {}) {
         }
       } catch(error) {primaryFailure=error;throw error;}
       finally {
-        try {await handle?.close();await stage?.abort();await fsUnlink(temp).catch(error=>{if(error.code!=='ENOENT')throw error;});}
+        try {await handle?.close();await stage?.abort();if(primaryFailure?.preserveTemp!==true)await fsUnlink(temp).catch(error=>{if(error.code!=='ENOENT')throw error;});}
         catch(error){if(primaryFailure)primaryFailure.cleanupError=String(error?.message||error);else throw error;}
       }
       const result=await receipt(false);broadcastChange({targetKey:candidate,displayPath:candidate},result.value.version);return result;
