@@ -1,5 +1,12 @@
 # MarkPilot 2.0.5
 
+## 发布状态
+
+- GitHub Release：[dsh-markdown-editor-typora-v2.0.5](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-editor-typora-v2.0.5)（Latest，非 draft/prerelease）
+- npm：`dsh-markdown-editor-typora@2.0.5`，`dist-tags.latest = 2.0.5`
+- 两处 tarball 均为 2,827,024 bytes，SHA256 `D2F3468FD3724264EB0617D36C57CF0BD5ADA19AB3A647275B522CE8978106BA`
+- GitHub Release 资产 digest 与 npm 下载包逐字节一致
+
 ## 主题
 
 另存为在 Desktop 真机被 `FS_SANDBOX_DENIED` 误拒的修复，以及配套的原子创建、read-only 边界和临时文件清理。

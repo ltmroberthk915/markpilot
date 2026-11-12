@@ -786,3 +786,11 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
   - 测试副本/只读/临时修改已清理，最终无 `.mp-tmp-*`。
 - 观察：正常保存失败（只读触发）仍会留下一个 `.mp-tmp-*`，时间点在 saveAs 之前，属于既有普通保存路径，不是 2.0.5 另存路径；已清理，记录待查。
 - 单测：544 / 543 pass / 1 skip / 0 fail。
+
+## 75. 2.0.5 GitHub Release + npm 上架
+
+- GitHub Release：`dsh-markdown-editor-typora-v2.0.5`，Latest，非 draft/prerelease；资产 `dsh-markdown-editor-typora-2.0.5.tgz`，2,827,024 B，SHA256 `D2F3468FD3724264EB0617D36C57CF0BD5ADA19AB3A647275B522CE8978106BA`。
+- npm：`dsh-markdown-editor-typora@2.0.5` 已发布，`dist-tags.latest = 2.0.5`；从 registry 重新下载的包 SHA256 与 GitHub 资产完全一致；dist shasum `5090026e4155fccef154da80d7b96b7fe9989cf4`。
+- npm 发布经过 WebAuthn：终端触发 Windows 安全中心指纹确认后 PUT 成功；发布日志 `+ dsh-markdown-editor-typora@2.0.5`。
+- PR #14 已改为 MarkPilot 2.0.5 标题/说明，仍是 Draft。
+- 未做官方/开放插件市场条目；本轮用户口径为 GitHub + npm 两个市场。
