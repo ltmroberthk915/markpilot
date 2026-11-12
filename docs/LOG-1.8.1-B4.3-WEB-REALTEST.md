@@ -776,3 +776,13 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - 单测：544 / 543 pass / 1 skip / 0 fail；read-only 测试改成真实带路径消息。
 - **未完成 2.0.5 真机 saveAs**：Desktop 热加载后当前 Markdown 面板切到另一会话的《Windows computer use》测试文档；发现后立即停止，没有对该文档输入 S。`g3mirror2.md` 已恢复可写、内容 `# g3mirror2`。
 - 最后一次真机通过仍是 2.0.4：只读→另存为副本成功、无 temp、源不变。
+
+## 74. 2.0.5 另存为真机通过
+
+- Desktop 2.0.5，Markdown 面板确认 `g3mirror2` 后复测：
+  - 只读源，输入 S，Ctrl+S → 只读横幅；
+  - 「另存为…」→ `g3mirror2-copy.md` → 成功提示；
+  - 副本 `# g3mSirror2`，源 `# g3mirror2` 未变；
+  - 测试副本/只读/临时修改已清理，最终无 `.mp-tmp-*`。
+- 观察：正常保存失败（只读触发）仍会留下一个 `.mp-tmp-*`，时间点在 saveAs 之前，属于既有普通保存路径，不是 2.0.5 另存路径；已清理，记录待查。
+- 单测：544 / 543 pass / 1 skip / 0 fail。
