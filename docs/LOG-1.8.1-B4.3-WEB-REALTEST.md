@@ -713,3 +713,11 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 
 - 已创建 Draft PR：https://github.com/ltmroberthk915/markpilot/pull/14
 - 标题 MarkPilot 2.0.0；未合并，未发布 npm/Release。
+
+## 69. 2.0.0 重启后测试（进行中）
+
+- 新宿主 pid 40744，插件 2.0.0，Markdown 面板正常打开，`g3mirror2` 状态「就绪」。
+- **missing**：外部删除后出现「磁盘上的文件已不存在」横幅；恢复文件后横幅消失。
+- **rename**：删除→恢复后再改名，只出现通用 missing 横幅，未出现“可能已改名”候选；判定为测试序列使 identity 过期，不计入 rename 候选通过。
+- 仍未在本轮重跑：只读、冲突、恢复中心、另存为模态。
+- 文件已恢复 `# g3mirror2`，无临时文件。
