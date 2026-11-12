@@ -746,3 +746,20 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
   - 源文件保持 `# g3mirror2`、只读未变；
   - 测试副本/只读/临时修改已清理。
 - 该修复仍在对抗审查中，审查通过前不按最终发布口径。
+
+## 72. 2.0.4 另存为真机通过（修正 §71）
+
+- §71 的 2.0.1 裸 `writeFile(wx)` 被对抗审查判定 BLOCKER（吞 sandbox、非原子、空 version），不能作为最终修复；2.0.1 真机结果只证明“路径可达”，不证明安全。
+- 2.0.2 先把执行器改为 native safeFile；2.0.3 恢复 `ctx.fs` 优先：
+  - `fs.writeText(createIfAbsent)` 成功走 provider；
+  - 仅 `FS_SANDBOX_DENIED` 且非 read-only 才 fallback；
+  - 本地 native 用 staged `.mp-tmp-*`：Windows safeFile.prepareFile/commit，POSIX open/sync/link；
+  - `MP_FILE_CONFLICT/EEXIST/FS_NOT_OBSERVED` → `FS_EXISTS`；
+  - 返回 `fs.stat` 的真实 version。
+- 2.0.4 修掉 Windows 临时文件残留：finally 在所有平台 unlink `.mp-tmp-*`（EEXIST 忽略）。
+- 真机（Desktop 2.0.4，只读源 `g3mirror2.md`）：
+  - 另存为 `g3mirror2-copy.md` 成功；
+  - 副本 `# g3mSirror2`，源 `# g3mirror2` 未变；
+  - 成功后无 `.mp-tmp-*` 残留；
+  - 测试副本/只读/临时修改已清理，room saved=version=2，正文 `# g3mirror2`。
+- 单测：544 / 543 pass / 1 skip / 0 fail；新增 sandbox 拒绝 fallback 与 read-only 不 fallback 两支。

@@ -1129,7 +1129,7 @@ test('B4.4-API4 saveAs uses provider createIfAbsent and rejects unsafe names', a
     const first = await host.dispatch('docs/saveAs', { path: w.file, targetPath: target, text: 'copy\n' });
     assert.equal(first.ok, true);
     assert.equal(first.value.version, 'v-created');
-    assert.equal(createCalls, 1, 'saveAs must call the provider createIfAbsent, never bare fs');
+    assert.equal(createCalls, 1, 'saveAs must call the provider createIfAbsent first');
     assert.equal(await fs.readFile(target, 'utf8'), 'copy\n');
     const second = await host.dispatch('docs/saveAs', { path: w.file, targetPath: target, text: 'overwrite\n' });
     assert.equal(second.ok, false);
@@ -1160,6 +1160,66 @@ test('B4.4-API4 saveAs uses provider createIfAbsent and rejects unsafe names', a
   }
 });
 
+test('B4.4-API4b saveAs falls back to safeFile after a sandbox denial', async () => {
+  const w = await makeWorld('save-as-fallback', 'old\n');
+  const target = w.file + '.sandbox-copy.md';
+  await fs.unlink(target).catch(() => {});
+  let attempts = 0;
+  const tiny = {
+    async resolve(value) { return { targetKey: value, displayPath: value }; },
+    async stat(value) {
+      const p = typeof value === 'string' ? value : value?.targetKey;
+      try { const info = await fs.stat(p); return { type: info.isFile() ? 'file' : 'directory', size: info.size, version: 'v' + info.mtimeMs }; }
+      catch (error) { if (error.code === 'ENOENT') return undefined; throw error; }
+    },
+    async readText(value) { return fs.readFile(typeof value === 'string' ? value : value?.targetKey, 'utf8'); },
+    async writeText() { attempts += 1; throw Object.assign(new Error('denied by sandbox'), { code: 'FS_SANDBOX_DENIED' }); },
+    async editText() { throw new Error('not used'); },
+    async watch() { return async () => {}; },
+  };
+  try {
+    const host = createHost({ fs: tiny, log: { warn() {} } });
+    const result = await host.dispatch('docs/saveAs', { path: w.file, targetPath: target, text: 'copy\n' });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(attempts, 1);
+    assert.notEqual(result.value.version, '');
+    assert.equal(await fs.readFile(target, 'utf8'), 'copy\n');
+    const leftovers = (await fs.readdir(path.dirname(target))).filter((name) => name.startsWith('.mp-tmp-'));
+    assert.deepEqual(leftovers, []);
+    host.close();
+  } finally {
+    await fs.unlink(target).catch(() => {});
+    w.restore();
+  }
+});
+test('B4.4-API4c saveAs does not fall back when the policy is read-only', async () => {
+  const w = await makeWorld('save-as-readonly', 'old\n');
+  const target = w.file + '.readonly copy.md';
+  await fs.unlink(target).catch(() => {});
+  const tiny = {
+    async resolve(value) { return { targetKey: value, displayPath: value }; },
+    async stat(value) {
+      const p = typeof value === 'string' ? value : value?.targetKey;
+      try { const info = await fs.stat(p); return { type: info.isFile() ? 'file' : 'directory', size: info.size, version: 'v' + info.mtimeMs }; }
+      catch (error) { if (error.code === 'ENOENT') return undefined; throw error; }
+    },
+    async readText(value) { return fs.readFile(typeof value === 'string' ? value : value?.targetKey, 'utf8'); },
+    async writeText() { throw Object.assign(new Error('file access denied under read-only mode'), { code: 'FS_SANDBOX_DENIED' }); },
+    async editText() { throw new Error('not used'); },
+    async watch() { return async () => {}; },
+  };
+  try {
+    const host = createHost({ fs: tiny, log: { warn() {} } });
+    const result = await host.dispatch('docs/saveAs', { path: w.file, targetPath: target, text: 'copy\n' });
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, 'FS_SANDBOX_DENIED');
+    await assert.rejects(fs.stat(target), (error) => error.code === 'ENOENT');
+    host.close();
+  } finally {
+    await fs.unlink(target).catch(() => {});
+    w.restore();
+  }
+});
 test('B4.4-API5 fileState and locate find a renamed file by identity', async () => {
   const w = await makeWorld('locate', 'body\n');
   const renamed = w.file + '-renamed.md';

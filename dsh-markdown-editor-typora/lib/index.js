@@ -1427,22 +1427,67 @@ export function createHost(options = {}) {
     if (typeof text !== 'string') return badRequest('text is required');
     const target = await fs.resolve(raw);
     if (await fs.stat(target) !== undefined) throw codedError('FS_EXISTS','save-as target already exists');
+    const native = nativeTargetPath(target);
     let receipt;
+    let fallback = false;
     try {
       receipt = await fs.writeText(target, text, { kind: 'createIfAbsent' });
     } catch (error) {
-      if (['FS_NOT_OBSERVED', 'FS_EXISTS', 'EEXIST'].includes(error?.code)) throw codedError('FS_EXISTS','save-as target already exists');
-      throw error;
+      if (['FS_NOT_OBSERVED', 'FS_EXISTS', 'EEXIST', 'MP_FILE_CONFLICT'].includes(error?.code))
+        throw codedError('FS_EXISTS','save-as target already exists');
+      if (error?.code !== 'FS_SANDBOX_DENIED') throw error;
+      // read-only must stay read-only; only the workspace-write containment
+      // refusal falls back to the editor's native create path.
+      if (/read-only/i.test(String(error?.message || ''))) throw error;
+      if (!native || !isAbsolute(native)) throw error;
+      fallback = true;
+    }
+    const bytes = Buffer.from(text, 'utf8');
+    if (fallback) {
+      const dir = dirname(native);
+      await mkdir(dir, { recursive: true });
+      const sha = createHash('sha256').update(bytes).digest('hex');
+      const temp = join(dir, '.mp-tmp-' + process.pid + '-' + randomUUID());
+      let stage, handle, primaryFailure;
+      try {
+        if (process.platform === 'win32') {
+          const safeFile = hostModules.safeFile;
+          if (typeof safeFile?.prepareFile !== 'function') throw codedError('MP_SAFE_FILE_UNAVAILABLE', 'safe file creation unavailable');
+          stage = await safeFile.prepareFile(native, temp, { baseline: null, output: { bytes: bytes.length, sha256: sha } });
+          await writeFile(temp, bytes, { flag: 'r+' });
+          await stage.commit();
+        } else {
+          handle = await fsOpen(temp, 'wx', 0o600);
+          await handle.writeFile(bytes);
+          await handle.sync();
+          await handle.close();
+          handle = null;
+          await fsLink(temp, native);
+        }
+      } catch (error) {
+        primaryFailure = error;
+        if (['EEXIST', 'MP_FILE_CONFLICT'].includes(error?.code)) throw codedError('FS_EXISTS','save-as target already exists');
+        throw error;
+      } finally {
+        try {
+          await handle?.close();
+          await stage?.abort();
+          await fsUnlink(temp).catch((error) => { if (error.code !== 'ENOENT') throw error; });
+        } catch (error) {
+          if (primaryFailure) primaryFailure.cleanupError = String(error?.message || error);
+          else throw error;
+        }
+      }
     }
     const info = await fs.stat(target);
-    if (info && info.type !== 'file') throw codedError('FS_STALE_VERSION','save-as target is not a regular file');
+    if (!info || info.type !== 'file') throw codedError('FS_STALE_VERSION','save-as target is not a regular file');
     await rememberIdentity(target);
-    const version = String(receipt?.version ?? info?.version ?? '');
+    const version = String(receipt?.version ?? info.version);
     broadcastChange(target, version);
     return { ok: true, value: {
       path: target.displayPath || raw,
       version,
-      size: Buffer.byteLength(text, 'utf8'),
+      size: bytes.length,
     } };
   }
 
@@ -1506,7 +1551,7 @@ export function createHost(options = {}) {
         }
       } catch(error) {primaryFailure=error;throw error;}
       finally {
-        try {await handle?.close();await stage?.abort();if(process.platform!=='win32')await fsUnlink(temp).catch(error=>{if(error.code!=='ENOENT')throw error;});}
+        try {await handle?.close();await stage?.abort();await fsUnlink(temp).catch(error=>{if(error.code!=='ENOENT')throw error;});}
         catch(error){if(primaryFailure)primaryFailure.cleanupError=String(error?.message||error);else throw error;}
       }
       const result=await receipt(false);broadcastChange({targetKey:candidate,displayPath:candidate},result.value.version);return result;
