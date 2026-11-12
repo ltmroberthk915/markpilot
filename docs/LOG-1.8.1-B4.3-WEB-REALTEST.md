@@ -794,3 +794,9 @@ D:\BuyKey\Typora-Editor-App\conflict-ui-web2.md
 - npm 发布经过 WebAuthn：终端触发 Windows 安全中心指纹确认后 PUT 成功；发布日志 `+ dsh-markdown-editor-typora@2.0.5`。
 - PR #14 已改为 MarkPilot 2.0.5 标题/说明，仍是 Draft。
 - 未做官方/开放插件市场条目；本轮用户口径为 GitHub + npm 两个市场。
+
+## 76. 两个插件市场上架动作
+
+- 官方市场 `awesome-dsh-plugin/awesome-dsh-plugin`：PR #14521 `Update MarkPilot to 2.0.5`，MERGEABLE、非 Draft，CI pending；只改 `data/plugins/ltmroberthk915__markpilot--dsh-markdown-editor-typora.yml`，tarball 指向 `dsh-markdown-editor-typora-v2.0.5`，描述补 2.0 文件生命周期/恢复中心/另存为，测试数改 544。
+- 开放市场 `polang233/dsh-plugin-index`：Issue #437 `[plugin-add] dsh-markdown-editor-typora — MarkPilot 2.0.5（已有条目更新）`，OPEN；保留前次 #325/#213/#407 引用，要求更新现有条目而不新增重复条目。
+- 两市场均指向 GitHub Release tarball，不直接指 npm。
