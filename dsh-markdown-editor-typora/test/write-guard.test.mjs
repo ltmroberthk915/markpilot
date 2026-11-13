@@ -123,3 +123,79 @@ test('installing twice on the same ctx is idempotent', async () => {
   guard.install(h.ctx);
   assert.equal(h.listeners.size, 3);
 });
+
+test('lookup failure becomes fail-closed after the bounded threshold', async () => {
+  const h = makeCtx();
+  let calls = 0;
+  makeGuard({ lookup: async () => { calls += 1; if (calls <= 3) throw new Error('db locked'); return null; } }).install(h.ctx);
+  const first = await call(h, 'fs/write-intent', BASE);
+  assert.deepEqual(first.result, BASE);
+  const second = await call(h, 'fs/write-intent', BASE);
+  assert.deepEqual(second.result, BASE);
+  await assert.rejects(() => call(h, 'fs/write-intent', BASE), (error) => error.code === 'MP_DOC_LOOKUP_FAILED');
+  const recovered = await call(h, 'fs/write-intent', BASE);
+  assert.deepEqual(recovered.result, BASE);
+  assert.equal(calls, 4);
+});
+
+test('fsSessionIntents wraps ctx.fs writes and refuses dirty sessions', async () => {
+  const h = makeCtx();
+  let calls = 0;
+  h.ctx.fs = {
+    writeText: async () => { calls += 1; return 'wrote'; },
+    editText: async () => { calls += 1; return 'edited'; },
+    moveFile: async () => { calls += 1; return 'moved'; },
+  };
+  makeGuard({ fsSessionIntents: true, lookup: async () => ({ dirty: true, path: 'D:/probe/a.md' }) }).install(h.ctx);
+  await assert.rejects(() => h.ctx.fs.writeText(TARGET, 'x'), (error) => error.code === 'MP_DOC_DIRTY');
+  assert.equal(calls, 0);
+  const clean = makeCtx();
+  clean.ctx.fs = { writeText: async () => { calls += 1; return 'wrote'; } };
+  makeGuard({ fsSessionIntents: true, lookup: async () => ({ dirty: false, path: 'D:/probe/a.md' }) }).install(clean.ctx);
+  assert.equal(await clean.ctx.fs.writeText(TARGET, 'x'), 'wrote');
+  assert.equal(calls, 1);
+});
+
+
+test('fsSessionIntents checks moveFile destination too', async () => {
+  const h = makeCtx();
+  let calls = 0;
+  h.ctx.fs = { moveFile: async () => { calls += 1; return 'moved'; } };
+  makeGuard({
+    fsSessionIntents: true,
+    lookup: async (target) => (target?.displayPath === 'D:/probe/dest.md' ? { dirty: true, path: 'D:/probe/dest.md' } : null),
+  }).install(h.ctx);
+  await assert.rejects(
+    () => h.ctx.fs.moveFile({ targetKey: 'D:/probe/src.md', displayPath: 'D:/probe/src.md' }, { targetKey: 'D:/probe/dest.md', displayPath: 'D:/probe/dest.md' }),
+    (error) => error.code === 'MP_DOC_DIRTY' && error.path === 'D:/probe/dest.md',
+  );
+  assert.equal(calls, 0);
+});
+
+test('write guard error messages distinguish lookup failure and mirror', async () => {
+  const h = makeCtx();
+  makeGuard({ lookup: async () => { throw new Error('db locked'); } }).install(h.ctx);
+  await call(h, 'fs/write-intent', BASE);
+  await call(h, 'fs/write-intent', BASE);
+  await assert.rejects(() => call(h, 'fs/write-intent', BASE), (error) => {
+    assert.equal(error.code, 'MP_DOC_LOOKUP_FAILED');
+    assert.match(error.message, /连续无法读取未保存状态/);
+    return true;
+  });
+  const mirror = makeCtx();
+  makeGuard({ lookup: async () => ({ dirty: true, mirror: true, path: 'D:/probe/m.md' }) }).install(mirror.ctx);
+  await assert.rejects(() => call(mirror, 'fs/write-intent', BASE), (error) => {
+    assert.equal(error.code, 'MP_DOC_DIRTY');
+    assert.match(error.message, /草稿镜像/);
+    return true;
+  });
+});
+
+test('fsSessionIntents default off leaves direct ctx.fs writes untouched', async () => {
+  const h = makeCtx();
+  let calls = 0;
+  h.ctx.fs = { writeText: async () => { calls += 1; return 'wrote'; } };
+  makeGuard({ lookup: async () => ({ dirty: true, path: 'D:/probe/a.md' }) }).install(h.ctx);
+  assert.equal(await h.ctx.fs.writeText(TARGET, 'x'), 'wrote');
+  assert.equal(calls, 1);
+});

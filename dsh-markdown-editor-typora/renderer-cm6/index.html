@@ -19,6 +19,7 @@
   <!-- 桥必须先于引擎加载：引擎在脚本尾部调用 window.handler.on(...) 注册下行处理。 -->
   <script src="dsh-bridge.js"></script>
   <!-- 选区浮按钮在 app.js 之后执行（defer 保证正文脚本先跑完）；它只读引擎 state，不改。 -->
+  <script src="mp208-core.js"></script>
   <script src="dsh-selection.js" defer></script>
   <script src="dsh-interaction.js" defer></script>
   <!-- 数学推导 + AI 交互工具层（外壳）：defer 保证在 cm6/app.js 之后执行；
@@ -171,6 +172,68 @@
       background: #e8f7ee;
       border-color: rgba(16, 122, 66, .4);
       color: #146c3d;
+    }
+
+    #dsh-md-edit {
+      position: fixed;
+      left: 0;
+      top: 0;
+      z-index: 100000;
+      display: none;
+      align-items: center;
+      gap: 5px;
+      height: 30px;
+      padding: 0 11px;
+      border-radius: 8px;
+      border: 1px solid rgba(120, 180, 255, .32);
+      background: #232a36;
+      color: #dbe8ff;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, .32);
+      font: 500 12.5px/1 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+      letter-spacing: .01em;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      will-change: transform;
+    }
+
+    #dsh-md-edit[data-on="1"] {
+      display: inline-flex;
+    }
+
+    #dsh-md-edit:hover {
+      border-color: rgba(120, 180, 255, .7);
+      background: #2b3547;
+    }
+
+    #dsh-md-edit:focus-visible {
+      outline: 2px solid #4c9aff;
+      outline-offset: 2px;
+    }
+
+    #dsh-md-edit[data-state="done"] {
+      background: #1f5a46;
+      border-color: rgba(74, 222, 128, .5);
+      color: #eafff2;
+    }
+
+    html[data-dsh-theme="light"] #dsh-md-edit {
+      background: #ffffff;
+      color: #1f2328;
+      border-color: rgba(16, 24, 40, .18);
+      box-shadow: 0 6px 18px rgba(16, 24, 40, .16);
+    }
+
+    html[data-dsh-theme="light"] #dsh-md-edit:hover {
+      background: #f3f5f8;
+      border-color: rgba(16, 24, 40, .32);
+    }
+
+    #dsh-md-insert[data-state="done"] {
+      background: #1f6f43;
+      border-color: rgba(74, 222, 128, .55);
+      color: #eafff2;
     }
 
     /* ── 轻提示 ───────────────────────────────────────────────────────

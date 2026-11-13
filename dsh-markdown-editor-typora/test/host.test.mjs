@@ -335,6 +335,25 @@ test('错误码原样透传（含 cause.code / AbortError）', () => {
 
 /* ───────────────────────── 宿主 API（apply + mock ctx + 真实 HTTP） ───────────────────────── */
 
+test('apply honors fsSessionIntents config strictly', async () => {
+  const makeCtxWithEvents = () => {
+    const fs = createMockFs({ 'D:/docs/a.md': 'a\n' });
+    const { ctx } = createMockContext(fs);
+    ctx.on = () => () => {};
+    return { ctx, before: ctx.fs.writeText };
+  };
+  const off = makeCtxWithEvents();
+  apply(off.ctx, {});
+  assert.equal(off.ctx.fs.writeText, off.before, 'default off must not wrap ctx.fs');
+
+  const on = makeCtxWithEvents();
+  apply(on.ctx, { fsSessionIntents: true });
+  assert.notEqual(on.ctx.fs.writeText, on.before, 'flag on must wrap ctx.fs');
+  const notBoolean = makeCtxWithEvents();
+  apply(notBoolean.ctx, { fsSessionIntents: 'true' });
+  assert.equal(notBoolean.ctx.fs.writeText, notBoolean.before, 'only strict boolean enables the wrapper');
+});
+
 test('apply(ctx) 挂 prefix 路由；open/save/stat/edit 走 mock ctx.fs 与真实 HTTP', async () => {
   const fs = createMockFs({ 'D:/docs/a.md': '# A\n' });
   const { ctx, routes } = createMockContext(fs);
@@ -387,7 +406,8 @@ test('apply(ctx) 挂 prefix 路由；open/save/stat/edit 走 mock ctx.fs 与真�
     // 其他文件的正文/版本信息不跨订阅者泄漏；客户端也不再需要按 path 过滤别人的内容。
     // 同文件正例已在上一断言（sseMain 收到 change）；此处只等一个短静默窗再判无。
     await new Promise((resolve) => setTimeout(resolve, 250));
-    assert.equal(sseOther.countChangeEvents(), 0, 'other.md 订阅者不得收到 a.md 的 change（scoped SSE）');
+    const otherChanges = sseOther.events.filter((raw) => raw.includes('event: change')).map(eventData).filter((data) => data.missing !== true);
+    assert.equal(otherChanges.length, 0, 'other.md 订阅者不得收到 a.md 的 change（scoped SSE）；missing 初始帧除外');
 
     // stat 返回新版本
     const stat = await postJson(port, '/dsh-markdown-editor-typora/api/stat', { path: 'D:/docs/a.md' });
@@ -728,6 +748,89 @@ test('SSE watch：fs.watch 不可用时降级为探测（2s 默认档在测试�
   }
 });
 
+test('SSE watch：missing 只广播一次，文件同版本恢复时再广播一次', async () => {
+  const fs = createMockFs({ 'D:/d/m.md': 'one' });
+  const host = createHost({ fs, log: SILENT_LOG, watchDebounceMs: 25, watchProbeMs: 30, heartbeatMs: 5000, connectionProvider: ALLOW_PROVIDER });
+  const { server, port } = await startServer(host.route);
+  const sse = await openSse(port, '/dsh-markdown-editor-typora/api/watch?path=' + encodeURIComponent('D:/d/m.md'));
+  try {
+    await waitUntil(() => fs.watchers.length >= 1);
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    const key = [...fs.files.keys()].find((item) => item.endsWith('m.md'));
+    const saved = fs.files.get(key);
+    fs.files.delete(key);
+    fs.trigger('D:/d/m.md');
+    const missing = eventData(await sse.waitFor((raw) => raw.includes('event: change')));
+    assert.equal(missing.missing, true);
+    assert.equal(missing.version, '');
+    fs.trigger('D:/d/m.md');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(sse.countChangeEvents(), 1, 'missing latch must not replay every tick');
+
+    // Same version bytes: restore is a state transition, not a version change.
+    fs.files.set(key, saved);
+    fs.trigger('D:/d/m.md');
+    const restored = eventData(await sse.waitFor((raw) => /event: change/.test(raw) && !/"missing":true/.test(raw)));
+    assert.equal(restored.version, saved.version);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(sse.countChangeEvents(), 2);
+  } finally {
+    destroySse(sse);
+    await stopServer(server);
+    host.close();
+  }
+});
+
+test('SSE watch：第一条流 baseline 已 missing 时也补一帧', async () => {
+  const fs = createMockFs({});
+  const host = createHost({ fs, log: SILENT_LOG, watchDebounceMs: 10, watchProbeMs: 30, heartbeatMs: 5000, connectionProvider: ALLOW_PROVIDER });
+  const { server, port } = await startServer(host.route);
+  const sse = await openSse(port, '/dsh-markdown-editor-typora/api/watch?path=' + encodeURIComponent('D:/d/absent.md'));
+  try {
+    const frame = eventData(await sse.waitFor((raw) => raw.includes('event: change')));
+    assert.equal(frame.missing, true);
+    assert.equal(frame.version, '');
+    const readyIndex = sse.events.findIndex((raw) => raw.includes('event: ready'));
+    const changeIndex = sse.events.findIndex((raw) => raw.includes('event: change'));
+    assert.ok(readyIndex >= 0 && changeIndex > readyIndex, 'ready must precede the synthesized missing change');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(sse.countChangeEvents(), 1, 'only one synthesized frame per stream');
+  } finally {
+    destroySse(sse);
+    await stopServer(server);
+    host.close();
+  }
+});
+
+
+test('SSE watch：降级探测档 missing 不重播，新挂流补一帧', async () => {
+  const fs = createMockFs({ 'D:/d/pm.md': 'a' });
+  fs.watchMode = 'reject';
+  const host = createHost({ fs, log: SILENT_LOG, watchDebounceMs: 10, watchProbeMs: 30, heartbeatMs: 5000, connectionProvider: ALLOW_PROVIDER });
+  const { server, port } = await startServer(host.route);
+  const first = await openSse(port, '/dsh-markdown-editor-typora/api/watch?path=' + encodeURIComponent('D:/d/pm.md'));
+  try {
+    await waitUntil(() => host._internals.watchers.size >= 1);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    const key = [...fs.files.keys()].find((item) => item.endsWith('pm.md'));
+    fs.files.delete(key);
+    await first.waitFor((raw) => raw.includes('event: change'));
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    assert.equal(first.countChangeEvents(), 1, 'probe tier must honor the missing latch');
+
+    const second = await openSse(port, '/dsh-markdown-editor-typora/api/watch?path=' + encodeURIComponent('D:/d/pm.md'));
+    try {
+      const frame = eventData(await second.waitFor((raw) => raw.includes('event: change')));
+      assert.equal(frame.missing, true);
+    } finally { destroySse(second); }
+  } finally {
+    destroySse(first);
+    await stopServer(server);
+    host.close();
+  }
+});
+
+
 test('body 上限：超过配置即 413，不静默截断', async () => {
   const fs = createMockFs({ 'D:/d/big.md': 'small' });
   const host = createHost({ fs, log: SILENT_LOG, bodyLimit: 128, connectionProvider: ALLOW_PROVIDER });
@@ -767,7 +870,10 @@ test('markdown 工具定义：0.2.1 defineTool 形态（output.schema/render）+
   assert.ok(spec.output && spec.output.schema && typeof spec.output.render === 'function');
 
   const read = await spec.execute({ action: 'read', path: 'D:/a.md' });
-  assert.deepEqual(plain(read), { ok: true, action: 'read', text: '# hi', version: rev, revisionId: rev, readToken: rev, displayPath: 'D:/a.md', source: 'disk', dirty: false });
+  assert.deepEqual(plain(read), { ok: true, action: 'read', text: '# hi', version: rev, revisionId: rev, readToken: rev, displayPath: 'D:/a.md', source: 'disk', dirty: false, writable: true });
+  for (const key of Object.keys(plain(read))) assert.ok(spec.output.schema.properties[key], `read output ${key} must be declared in output.schema`);
+  for (const key of ['writable', 'draft', 'mirrorDraft', 'draftStale', 'draftUnknown'])
+    assert.ok(spec.output.schema.properties[key], `output.schema must declare ${key}`);
   assert.equal(calls[0].endpoint, 'documents.read');
 
   const edited = await spec.execute({ action: 'edit', path: 'D:/a.md', oldString: 'a', newString: 'b', baseVersion: rev });

@@ -368,9 +368,10 @@ test('审阅态持久化：严格校验路径、基准版本、组 ID 和计数'
   const { test: T } = await loadClientFactory();
   const g1 = '11111111-1111-4111-8111-111111111111';
   const g2 = '22222222-2222-4222-8222-222222222222';
-  const raw = JSON.stringify({ v: 1, pathKey: T.reviewPathKey('D:\\Docs\\A.md'), baseVersion: 'v1', groups: [g1, g2], count: 3, at: 12 });
+  const raw = JSON.stringify({ v: 2, pathKey: T.reviewPathKey('D:\\Docs\\A.md'), baseVersion: 'v1', groups: [g1, g2], count: 3, at: 12 });
   const ok = T.normalizeReviewRecord(raw, 'd:/docs/a.md', 'v1');
-  assert.equal(JSON.stringify(ok), JSON.stringify({ v: 1, pathKey: 'd:/docs/a.md', baseVersion: 'v1', groups: [g1, g2], count: 3, at: 12 }));
+  assert.equal(JSON.stringify(ok), JSON.stringify({ v: 2, pathKey: 'd:/docs/a.md', baseVersion: 'v1', groups: [g1, g2], count: 3, at: 12 }));
+  assert.equal(T.normalizeReviewRecord(JSON.stringify({ ...JSON.parse(raw), v: 1 }), 'D:\\Docs\\A.md', 'v1'), null);
   assert.equal(T.normalizeReviewRecord(raw, 'D:\\Docs\\B.md', 'v1'), null);
   assert.equal(T.normalizeReviewRecord(raw, 'D:\\Docs\\A.md', 'v2'), null);
   assert.equal(T.normalizeReviewRecord('not json', 'D:\\Docs\\A.md', 'v1'), null);
@@ -378,4 +379,65 @@ test('审阅态持久化：严格校验路径、基准版本、组 ID 和计数'
   assert.equal(T.normalizeReviewRecord({ ...JSON.parse(raw), groups: [g1, g1] }, 'D:\\Docs\\A.md', 'v1'), null);
   assert.equal(T.normalizeReviewRecord({ ...JSON.parse(raw), count: 1 }, 'D:\\Docs\\A.md', 'v1'), null);
   assert.equal(T.reviewStoreKey('D:\\Docs\\A.md'), T.reviewStoreKey('d:/docs/a.md'));
+});
+
+test('冲突面板纯函数：默认选择、resolution 形状、应用门槛与审查组去重', async () => {
+  const { test: T } = await loadClientFactory();
+  const session = {
+    hunks: [
+      { baseFrom: 1, baseTo: 2, base: 'b', ours: 'o', other: 't' },
+      { baseFrom: 4, baseTo: 5, base: 'd', ours: 'p', other: 'u' },
+    ],
+    clean: false, truncated: true,
+  };
+  assert.equal(JSON.stringify(T.conflictDefaultChoices(session)), JSON.stringify([
+    { index: 0, choice: 'ours', text: '' },
+    { index: 1, choice: 'ours', text: '' },
+  ]));
+  assert.equal(JSON.stringify(T.conflictResolutionsFromChoices([
+    { index: 0, choice: 'ours', text: '' },
+    { index: 1, choice: 'manual', text: 'M' },
+  ])), JSON.stringify([{ choice: 'ours' }, { choice: 'manual', text: 'M' }]));
+  assert.equal(T.conflictApplyEnabled(session, T.conflictDefaultChoices(session), false), true);
+  assert.equal(T.conflictApplyEnabled(session, T.conflictDefaultChoices(session), true), false);
+  assert.equal(T.conflictApplyEnabled(session, [{ index: 0, choice: 'ours', text: '' }], false), false);
+  assert.equal(T.conflictApplyEnabled(session, [
+    { index: 0, choice: 'manual', text: '' },
+    { index: 1, choice: 'ours', text: '' },
+  ], false), false);
+  assert.equal(T.conflictChoiceLabel('ours'), '用我的');
+  assert.equal(T.conflictChoiceLabel('theirs'), '用磁盘');
+  assert.equal(T.conflictChoiceLabel('both'), '两边保留');
+  assert.equal(T.conflictChoiceLabel('manual'), '手动编辑');
+  assert.match(T.conflictTruncatedNotice(session), /较大/);
+  assert.equal(T.liveTicketDirty({ version: 3, savedVersion: 1, dirty: false }), true);
+  assert.equal(T.liveTicketDirty({ version: 3, savedVersion: 3, dirty: true }), true);
+  assert.equal(T.liveTicketDirty({ version: 3, savedVersion: 3, dirty: false }), false);
+  const g1 = '11111111-1111-4111-8111-111111111111';
+  const g2 = '22222222-2222-4222-8222-222222222222';
+  const once = T.mergeReviewGroup(null, g1, 3);
+  assert.equal(once.count, 3);
+  const duplicate = T.mergeReviewGroup(once, g1, 3);
+  assert.equal(duplicate.count, 3, 'the same group must not double-count');
+  const second = T.mergeReviewGroup(duplicate, g2, 2);
+  assert.equal(second.count, 5);
+  assert.equal(JSON.stringify(second.groups), JSON.stringify([g1, g2]));
+});
+
+test('P4 client saveErrorKind: missing/conflict/error 三分支', async () => {
+  const { test: T } = await loadClientFactory();
+  assert.equal(T.saveErrorKind({ code: 'FS_STALE_VERSION', reason: 'missing' }), 'missing');
+  assert.equal(T.saveErrorKind({ code: 'MP_FILE_MISSING', message: 'file no longer exists' }), 'missing');
+  assert.equal(T.saveErrorKind({ code: 'FS_STALE_VERSION', message: 'changed' }), 'conflict');
+  assert.equal(T.saveErrorKind({ code: 'FS_IO_ERROR' }), 'error');
+  assert.equal(T.saveErrorKind({ code: 'EACCES' }), 'readonly');
+  assert.equal(T.saveErrorKind({ code: 'FS_PERMISSION_DENIED' }), 'readonly');
+  assert.equal(T.saveErrorKind({ code: 'MP_FILE_LINKED' }), 'readonly');
+  assert.equal(T.saveErrorKind(null), 'error');
+});
+
+test('P4 saveAsCandidate preserves .md casing and rejects empty input', async () => {
+  const { test: T } = await loadClientFactory();
+  assert.match(T.saveAsCandidate('D:/docs/a.MD', 0), /^D:\/docs\/a-恢复-1970-01-01T00-00-00-000Z\.md$/);
+  assert.equal(T.saveAsCandidate(''), '');
 });

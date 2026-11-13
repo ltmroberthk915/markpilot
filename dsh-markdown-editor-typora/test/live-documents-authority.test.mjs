@@ -190,3 +190,20 @@ test('B3-A6 two instances append the same base: exactly one wins', async () => {
   assert.equal(rejected[0].reason.code, 'MP_LIVE_STALE');
   assert.equal((await roomRows(w.dir))[0].version, 1);
 });
+
+test('B4.3-A1 rooms schema stays 8 columns; old positional INSERT still works', async () => {
+  const w = await world('hello\n');
+  const live = new LiveDocuments({ directory: w.dir });
+  await live.join(w.file, 'hello\n');
+  const { DatabaseSync } = await import('node:sqlite');
+  const db = new DatabaseSync(path.join(w.dir, 'rooms.sqlite'));
+  try {
+    const columns = db.prepare('PRAGMA table_info(rooms)').all().map((column) => column.name);
+    assert.deepEqual(columns, ['file', 'epoch', 'version', 'saved', 'disk', 'length', 'floor', 'checkpoint']);
+    const otherFile = path.join(w.root, 'other.md');
+    const otherEpoch = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    assert.doesNotThrow(() => db.prepare('INSERT INTO rooms VALUES(?,?,0,0,?,?,0,?)')
+      .run(otherFile, otherEpoch, 'disk-hash', 0, Buffer.alloc(0)));
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM rooms').get().n, 2);
+  } finally { db.close(); }
+});

@@ -33,7 +33,10 @@ import { createRequire } from 'node:module';
 import rawDiskStore from '../host/document-store.js';
 import rawLiveStore from '../host/live-documents.js';
 import rawTextCodec from '../host/text-codec.js';
-import { createDocumentsService, parseDocumentBlocks } from './documents-service.js';
+import {
+  createDocumentsService, parseDocumentBlocks, countDocumentLines, findDocumentLine, MAX_LINE_READ_BYTES_CAP,
+} from './documents-service.js';
+import { createSessionManager, allowedActions } from './document-sessions.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize, sep, extname, basename, resolve as pathResolve, isAbsolute, relative as pathRelative }  from 'node:path';
 
@@ -320,7 +323,8 @@ const MODEL_TOOL = Symbol('markdown model tool');
 export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'diag']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'documents.session', 'documents.recoveryList', 'documents.recoveryRead', 'documents.recoveryDiscard', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'documents.captureSelection', 'documents.readSelection', 'documents.editSelection', 'diag']);
+const SESSION_MUTATING_ENDPOINTS = new Set(['open', 'save', 'edit', 'live', 'docs/create', 'docs/saveAs', 'docs/archive', 'documents.applyEdits', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.undoGroups', 'documents.merge3', 'documents.reviewGroup', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftClear']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
 
@@ -589,17 +593,47 @@ export function errorCode(error) {
 
 /**
  * DSH 文件策略拒绝这次写入（workspace-write 只允许会话工作区内的路径）。
- * 只在这个明确码/文案上走原生 fs 回退；OS 的 EACCES/EPERM 仍然照常失败。
+ * 只在这个明确码/文案上走原生 fs 回退；read-only、OS 的 EACCES/EPERM 仍然照常失败。
  */
-export function isSandboxWriteDenied(error) {
-  if (errorCode(error) === 'FS_SANDBOX_DENIED') return true;
+export function isExplicitReadOnlyDenial(error) {
   const message = String(error?.message ?? error ?? '');
-  return /file access denied under (workspace-write|read-only) mode/i.test(message);
+  return /file access denied under read-only mode/i.test(message);
 }
 
-function codedError(code, message) {
+export function isSandboxWriteDenied(error) {
+  // An explicit read-only message outranks a generic FS_SANDBOX_DENIED code:
+  // providers are not required to expose fs.sandboxMode, and read-only must
+  // never fall through to the native writer.
+  if (isExplicitReadOnlyDenial(error)) return false;
+  if (errorCode(error) === 'FS_SANDBOX_DENIED') return true;
+  const message = String(error?.message ?? error ?? '');
+  return /file access denied under workspace-write mode/i.test(message);
+}
+
+function validSaveAsPath(raw) {
+  if (typeof raw !== 'string' || !raw || raw.includes('\0')) return false;
+  if (!/^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+)/.test(raw)) return false;
+  if (raw.startsWith('\\\\?') || raw.startsWith('\\\\.')) return false;
+  const parts = raw.split(/[\\/]+/);
+  if (/^[A-Za-z]:$/.test(parts[0])) {
+    if (parts.slice(1).some((part) => part.includes(':'))) return false;
+  } else if (parts.some((part) => part.includes(':'))) {
+    return false;
+  }
+  if (parts.some((part) => part === '..' || part === '.')) return false;
+  const base = parts[parts.length - 1] || '';
+  if (!/\.md$/i.test(base)) return false;
+  if (/[<>:"|?*\u0000-\u001f]/.test(base)) return false;
+  if (/[. ]$/.test(base)) return false;
+  const stem = base.split('.')[0].toUpperCase();
+  if (/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/.test(stem)) return false;
+  return true;
+}
+
+function codedError(code, message, extra) {
   const error = new Error(String(message));
   error.code = code;
+  if (extra && typeof extra === 'object') Object.assign(error, extra);
   return error;
 }
 
@@ -637,7 +671,13 @@ async function directWriteText(fs, target, text, baseVersion, diskHash) {
     if(before!==after||saved.baseline.sha256!==expectedHash)throw codedError('FS_STALE_VERSION','file changed after save; draft retained');
     return {version:after,displayPath:target.displayPath,size:saved.bytes.length};
   } catch(error) {
-    if(['MP_FILE_CONFLICT','MP_FILE_MISSING'].includes(error.code))error.code='FS_STALE_VERSION';
+    if(['MP_FILE_CONFLICT','MP_FILE_MISSING'].includes(error.code)) {
+      if (error.code === 'MP_FILE_MISSING') error.reason = 'missing';
+      error.code='FS_STALE_VERSION';
+    } else if (error.code === 'FS_NOT_FOUND') {
+      error.code = 'FS_STALE_VERSION';
+      error.reason = 'missing';
+    }
     throw error;
   }
 }
@@ -740,6 +780,7 @@ export function createHost(options = {}) {
 
   /** 每个被观察文件一条 entry；refs 计数到 0 才释放（SSE 多 tab 共享）。 */
   const watchers = new Map();
+  const fileIdentities = new Map();
   const live = options.liveDocuments ?? new liveStore.LiveDocuments();
   const leases = new Map();
   let closed = false;
@@ -759,28 +800,42 @@ export function createHost(options = {}) {
   async function lookupDocument(target) {
     if (closed) return null;
     const dbFile = join(live.directory, 'rooms.sqlite');
-    if (!existsSync(dbFile)) return null;
+    try {
+      await fsStat(dbFile);
+    } catch (error) {
+      // Only an explicitly absent store is "no sessions". existsSync would
+      // collapse EACCES/EIO/unknown failures to false and let a write through
+      // while the draft state is still unknown; those must fail closed.
+      if (error?.code === 'ENOENT' || error?.code === 'ENOTDIR') return null;
+      throw error;
+    }
     const canonical = await canonicalTarget(target);
     if (closed) return null;
     const key = pathKey(canonical);
+    // A read-only draft mirror has no room; it is still an unsaved editor
+    // buffer and must block generic fs writes exactly like a dirty room.
+    const mirror = await live.getDraft?.(canonical, {});
+    if (mirror) return { path: canonical, file: key, dirty: true, source: 'mirror', mirror: true };
+    if (!roomsSqlite) roomsSqlite = await import('node:sqlite');
+    // The store was present at the probe above. If opening it now fails —
+    // even with ENOENT — do not downgrade to "no sessions": a dirty room
+    // may have vanished in the race. Refuse this write; the next lookup
+    // re-probes and can allow once the store is confirmed absent.
+    const db = new roomsSqlite.DatabaseSync(dbFile, { readOnly: true });
     try {
-      if (!roomsSqlite) roomsSqlite = await import('node:sqlite');
-      const db = new roomsSqlite.DatabaseSync(dbFile, { readOnly: true });
-      try {
-        try { db.exec('PRAGMA busy_timeout=2000'); } catch { /* 尽力而为 */ }
-        const room = db.prepare('SELECT file,epoch,version,saved,disk FROM rooms WHERE file=?').get(key);
-        if (!room) return null;
-        return {
-          path: canonical,
-          file: room.file,
-          epoch: room.epoch,
-          version: room.version,
-          savedVersion: room.saved,
-          dirty: room.version !== room.saved,
-          diskHash: room.disk,
-        };
-      } finally { try { db.close(); } catch { /* 已关闭 */ } }
-    } catch (error) { throw error; }
+      try { db.exec('PRAGMA busy_timeout=2000'); } catch { /* 尽力而为 */ }
+      const room = db.prepare('SELECT file,epoch,version,saved,disk FROM rooms WHERE file=?').get(key);
+      if (!room) return null;
+      return {
+        path: canonical,
+        file: room.file,
+        epoch: room.epoch,
+        version: room.version,
+        savedVersion: room.saved,
+        dirty: room.version !== room.saved,
+        diskHash: room.disk,
+      };
+    } finally { try { db.close(); } catch { /* 已关闭 */ } }
   }
   function liveEndpoint(payload) {
     leaseOf(payload.client);
@@ -813,6 +868,9 @@ export function createHost(options = {}) {
     sandboxMode: fs.sandboxMode,
     log,
   });
+  const documentSessions = createSessionManager();
+  let sessionGeneration = 0;
+  function invalidateSessions() { sessionGeneration += 1; documentSessions.clear(); }
   /** Persisted-file notifications are scoped to the watched target. Unsaved edits use independent document leases. */
   const liveStreams = new Set();
 
@@ -820,11 +878,13 @@ export function createHost(options = {}) {
     return String(target?.targetKey ?? target?.displayPath ?? '');
   }
 
-  function broadcastChange(target, version, delta) {
+  function broadcastChange(target, version, delta, flags) {
+    try { invalidateSessions(); } catch { /* shadow cache only */ }
     const data = {
       path: target?.displayPath,
       targetKey: target?.targetKey,
       version: String(version ?? ''),
+      ...(flags?.missing === true ? { missing: true } : {}),
       ...(delta ? { delta: { oldString: String(delta.oldString ?? '').slice(0, 400), newString: String(delta.newString ?? '').slice(0, 400) } } : {}),
     };
     const frame = `event: change\ndata: ${JSON.stringify(data)}\n\n`;
@@ -834,6 +894,11 @@ export function createHost(options = {}) {
         stream.res.write(frame);
       } catch { /* 连接已断，close 事件会清理 */ }
     }
+  }
+
+  async function confirmMissing(entry) {
+    try { return (await fs.stat(entry.target)) === undefined; }
+    catch { return false; }
   }
 
   async function tickWatch(entry, baseline = false) {
@@ -848,15 +913,41 @@ export function createHost(options = {}) {
       return;
     }
     if (entry.disposed) return;
-    const changed = entry.lastVersion !== undefined && (missing || version !== entry.lastVersion);
+    const notifiedMissing = entry.missing === true;
+    const seen = entry.lastVersion !== undefined || notifiedMissing;
+    const becameMissing = missing && !notifiedMissing;
+    const becamePresent = !missing && notifiedMissing;
+    const versionChanged = !missing && !notifiedMissing && entry.lastVersion !== undefined && version !== entry.lastVersion;
+    const changed = seen && (becameMissing || becamePresent || versionChanged);
     if (changed && !baseline) {
+      const pendingMissing = missing;
+      if (pendingMissing && entry.missingCommitPending === true) return;
       if (entry.debounce) clearTimeout(entry.debounce);
+      if (pendingMissing) entry.missingCommitPending = true;
       entry.debounce = setTimeout(() => {
         entry.debounce = null;
-        if (!entry.disposed) broadcastChange(entry.target, version);
+        if (entry.disposed) return;
+        void (async () => {
+          let present = !pendingMissing;
+          if (pendingMissing) {
+            // A missing latch is committed only after a second stat confirms it.
+            // A transient/recreated file must not freeze the stream in missing.
+            if (!await confirmMissing(entry)) present = true;
+          }
+          if (entry.disposed) return;
+          if (present) {
+            try { const info = await fs.stat(entry.target); if (info !== undefined) { entry.lastVersion = String(info.version ?? ''); entry.missing = false; broadcastChange(entry.target, entry.lastVersion); } }
+            catch { /* next tick retries */ }
+          } else {
+            entry.missing = true;
+            broadcastChange(entry.target, '', undefined, { missing: true });
+          }
+          entry.missingCommitPending = false;
+        })().catch(() => { entry.missingCommitPending = false; });
       }, watchDebounceMs);
       entry.debounce.unref?.();
     }
+    if (baseline) entry.missing = missing;
     if (!missing) entry.lastVersion = version;
   }
 
@@ -892,6 +983,8 @@ export function createHost(options = {}) {
       refs: 1,
       target,
       lastVersion: undefined,
+      missing: false,
+      baselineReady: null,
       controller: new AbortController(),
       close: null,
       timer: null,
@@ -900,7 +993,7 @@ export function createHost(options = {}) {
       started: false,
     };
     watchers.set(key, entry);
-    void startWatch(entry);
+    entry.baselineReady = startWatch(entry);
     return entry;
   }
 
@@ -1048,11 +1141,21 @@ export function createHost(options = {}) {
     try {
       res.write(`event: ready\ndata: ${JSON.stringify({ path: target.displayPath, version: String(entry.lastVersion ?? '') })}\n\n`);
     } catch { /* 已断 */ }
+    Promise.resolve(entry.baselineReady).then(() => {
+      if (closed || entry.disposed || entry.missing !== true) return;
+      try {
+        res.write(`event: change\ndata: ${JSON.stringify({ path: target.displayPath, targetKey: target.targetKey, version: '', missing: true })}\n\n`);
+      } catch { /* 已断 */ }
+    }).catch(() => { /* baseline 失败，下一次 tick 会补 */ });
   }
 
   function resolveOptions(payload, invocation) {
     const cwd = invocation?.cwd ?? payload?.cwd;
     return { ...(typeof cwd === 'string' && cwd ? {cwd} : {}), ...(invocation?.signal ? {signal:invocation.signal} : {}) };
+  }
+
+  function diskRevisionSha(text) {
+    return createHash('sha256').update(String(text).replace(/\r\n?/g, '\n').replace(/^\uFEFF/, '')).digest('hex');
   }
 
   async function apiOpen(payload, authority, resolvedTarget, invocation) {
@@ -1073,7 +1176,9 @@ export function createHost(options = {}) {
       } else text=await fs.readText(target, invocation?.signal);
       const after=await fs.stat(target, invocation?.signal);
       if(!after||String(after.version)!==String(info.version))continue;
-      const value={text,version:after.version,displayPath:target.displayPath,size:after.size,type:after.type};
+      const diskSha=diskRevisionSha(text);
+      if (native) await rememberIdentity(target);
+      const value={text,version:after.version,displayPath:target.displayPath,size:after.size,type:after.type,diskRevisionSha:diskSha};
       if (payload.live === true && baseline && authority !== MODEL_TOOL) {
         const canonical=await canonicalTarget(target);
         const seed=text.replace(/\r\n?/g,'\n');
@@ -1081,12 +1186,177 @@ export function createHost(options = {}) {
         if (closed) { live.leave(joined.client);throw codedError('MP_LIVE_CLOSED','editor host stopped'); }
         leases.set(joined.client,{canonical:pathKey(canonical)});
         value.live={client:joined.client,epoch:joined.epoch,version:joined.version,diskHash:joined.diskHash,dirty:joined.text!==seed,savedVersion:joined.savedVersion,
+          ...(typeof joined.resolvedDisk==='string'&&joined.resolvedDisk?{resolvedDisk:joined.resolvedDisk}:{}),
           ...(Array.isArray(joined.recovered)?{recovered:joined.recovered}:{})};
         value.text=joined.text;
       }
       return {ok:true,value};
     }
     throw codedError('FS_STALE_VERSION','file changed during read; retry after the external write finishes');
+  }
+
+  async function rememberIdentity(target) {
+    try {
+      const native = await fsStat(nativeTargetPath(target), { bigint: true });
+      if (!native || native.ino <= 0n || native.dev <= 0n) { fileIdentities.delete(pathKey(await canonicalTarget(target))); return; }
+      const canonical = await canonicalTarget(target);
+      if (fileIdentities.size >= 2048) fileIdentities.clear();
+      fileIdentities.set(pathKey(canonical), { dev: String(native.dev), ino: String(native.ino), size: Number(native.size), mtimeNs: String(native.mtimeNs) });
+    } catch { /* identity is an optimization for locate, never a read blocker */ }
+  }
+
+  async function sessionKeyFor(payload, invocation, authority) {
+    const path = typeof payload?.path === 'string' ? payload.path : '';
+    let key;
+    try {
+      const target = await fs.resolve(path, resolveOptions(payload, invocation));
+      const info = await fs.stat(target);
+      let canonical = null;
+      let base;
+      try { canonical = await canonicalTarget(target); base = pathKey(canonical); }
+      catch { base = pathKey(nativeTargetPath(target) || path); }
+      let roomMarker = '';
+      let mirrorMarker = '';
+      let recoveryMarker = '';
+      if (canonical) {
+        if (typeof live.readRoom === 'function') {
+          try {
+            const room = await live.readRoom(canonical);
+            if (room) roomMarker = `:${room.epoch}:${room.version}:${room.savedVersion}:${room.members}:${room.localMembers}:${room.resolvedDisk ?? ''}`;
+          } catch { /* no room marker; provider version still guards disk changes */ }
+        }
+        if (typeof live.getDraft === 'function') {
+          try {
+            const mirror = await live.getDraft(canonical);
+            if (mirror) mirrorMarker = `:m:${mirror.textSha256}:${mirror.baseVersion}:${mirror.baseSha256}`;
+          } catch { mirrorMarker = ':m:error'; }
+        }
+        if (typeof live.listAppendRecovery === 'function') {
+          try {
+            const items = await live.listAppendRecovery(canonical);
+            recoveryMarker = `:r:${items.length}:${items[0]?.sha256 ?? ''}`;
+          } catch { recoveryMarker = ':r:error'; }
+        }
+      }
+      const policyMarker = `:a:${String(authority)}:${invocation?.policy?.mode ?? ''}:${invocation?.policy?.workspaceRoot ?? ''}`;
+      key = base + ':' + String(info?.version ?? 'missing') + roomMarker + mirrorMarker + recoveryMarker + policyMarker;
+    } catch {
+      key = pathKey(path) + ':missing';
+    }
+    return key;
+  }
+
+  async function apiSession(payload, invocation, authority = 'editor') {
+    const path = typeof payload?.path === 'string' ? payload.path : '';
+    if (!path) return badRequest('path is required');
+    let key = await sessionKeyFor(payload, invocation, authority);
+    const generation = sessionGeneration;
+    let loaded = false;
+    const load = async () => {
+      loaded = true;
+      const result = await documents.state(payload, invocation);
+      if (!result || result.ok !== true) {
+        const error = result?.error || { code: 'FS_IO_ERROR', message: 'state failed' };
+        throw Object.assign(new Error(String(error.message || error.code || 'state failed')), { resultError: error });
+      }
+      return { ...result.value, allowedActions: allowedActions(result.value) };
+    };
+    let snapshot;
+    try {
+      snapshot = await documentSessions.resolve(key, load);
+      if (loaded) {
+        const after = await sessionKeyFor(payload, invocation, authority);
+        if (after !== key) {
+          documentSessions.clear(key);
+          key = after;
+          snapshot = await documentSessions.resolve(key, load);
+        }
+      }
+    } catch (error) {
+      if (error?.resultError) return { ok: false, error: error.resultError };
+      throw error;
+    }
+    if (generation !== sessionGeneration) documentSessions.clear(key);
+    return { ok: true, value: snapshot };
+  }
+
+  async function apiRecoveryList(payload) {
+    const path = typeof payload?.path === 'string' ? payload.path : '';
+    if (!path) return badRequest('path is required');
+    const target = await fs.resolve(path, resolveOptions(payload));
+    if (typeof live.listAppendRecovery !== 'function') return { ok: true, value: { items: [] } };
+    const items = await live.listAppendRecovery(nativeTargetPath(target));
+    return { ok: true, value: { items: items.map(({ recoveryPath, sha256, at, version, bytes }) => ({ recoveryPath, sha256, at, version, bytes })) } };
+  }
+
+  async function apiRecoveryRead(payload) {
+    const path = typeof payload?.path === 'string' ? payload.path : '';
+    const recoveryPath = typeof payload?.recoveryPath === 'string' ? payload.recoveryPath : '';
+    if (!path || !recoveryPath) return badRequest('path and recoveryPath are required');
+    const target = await fs.resolve(path, resolveOptions(payload));
+    const value = await live.readAppendRecovery(nativeTargetPath(target), recoveryPath);
+    return { ok: true, value };
+  }
+
+  async function apiRecoveryDiscard(payload) {
+    const path = typeof payload?.path === 'string' ? payload.path : '';
+    const recoveryPath = typeof payload?.recoveryPath === 'string' ? payload.recoveryPath : '';
+    if (!path || !recoveryPath) return badRequest('path and recoveryPath are required');
+    const target = await fs.resolve(path, resolveOptions(payload));
+    if (typeof live.discardAppendRecovery !== 'function') return badRequest('recovery discard unsupported');
+    await live.discardAppendRecovery(nativeTargetPath(target), recoveryPath);
+    return { ok: true, value: { removed: true } };
+  }
+
+  async function apiFileState(payload) {
+    const path = typeof payload?.path === 'string' ? payload.path : '';
+    if (!path) return badRequest('path is required');
+    const target = await fs.resolve(path, resolveOptions(payload));
+    const info = await fs.stat(target);
+    return { ok: true, value: {
+      path: target.displayPath || path,
+      exists: info !== undefined,
+      missing: info === undefined,
+      ...(info ? { version: String(info.version), size: info.size, type: info.type } : {}),
+    } };
+  }
+
+  async function apiLocate(payload) {
+    const path = typeof payload?.path === 'string' ? payload.path : '';
+    if (!path) return badRequest('path is required');
+    const target = await fs.resolve(path, resolveOptions(payload));
+    const current = await fs.stat(target);
+    if (current !== undefined) return { ok: true, value: { missing: false, candidates: [] } };
+    const canonical = await canonicalTarget(target);
+    const key = pathKey(canonical);
+    const identity = fileIdentities.get(key);
+    if (!identity || process.platform !== 'win32' || identity.ino === '0' || identity.dev === '0')
+      return { ok: true, value: { missing: true, candidates: [] } };
+    const parent = dirname(nativeTargetPath(target));
+    let entries = [];
+    try { entries = await readdir(parent, { withFileTypes: true }); }
+    catch { return { ok: true, value: { missing: true, candidates: [] } }; }
+    const truncated = entries.length > 4096;
+    entries = entries.slice(0, 4096);
+    const candidates = [];
+    for (const entry of entries) {
+      if (!entry.isFile() || !/\.md$/i.test(entry.name) || entry.name.startsWith('.mp-tmp-')) continue;
+      const candidate = join(parent, entry.name);
+      try {
+        const native = await fsStat(candidate, { bigint: true });
+        if (!native || native.ino <= 0n || String(native.dev) !== identity.dev || String(native.ino) !== identity.ino) continue;
+        if (Number(native.size) !== identity.size) continue;
+        if (identity.mtimeNs && String(native.mtimeNs) !== identity.mtimeNs) continue;
+        candidates.push({ path: candidate, version: versionOfBigInt(native), size: Number(native.size) });
+      } catch { /* unreadable candidate is not a rename proof */ }
+    }
+    return { ok: true, value: { missing: true, candidates, truncated } };
+  }
+
+  async function rejectDraftMirrorBeforeWrite(current) {
+    if (typeof live.getDraft !== 'function') return;
+    const mirror = await live.getDraft(nativeTargetPath(current), {});
+    if (mirror) throw codedError('MP_DOC_MIRROR_READONLY', 'an unsaved draft mirror exists for this document; refusing to overwrite it');
   }
 
   async function apiSave(payload) {
@@ -1096,12 +1366,16 @@ export function createHost(options = {}) {
     if (!path) return badRequest('path is required');
     if (text === null) return badRequest('text is required');
     if (!baseVersion) return badRequest('baseVersion is required — refusing to overwrite without a version guard');
+    // Explicit read-only policy is not an OS permission glitch: refuse before
+    // any native fallback so the current buffer stays dirty and no write is attempted.
+    if (fs.sandboxMode === 'read-only') throw codedError('FS_PERMISSION_DENIED', 'cannot save: file access denied under read-only mode; current draft is preserved');
     const target = await fs.resolve(path, resolveOptions(payload)),key=pathKey(await canonicalTarget(target));
     return queueSave(key,async()=>{
       const current=await fs.resolve(path,resolveOptions(payload));
       if(pathKey(await canonicalTarget(current))!==key)throw codedError('FS_STALE_VERSION','save target changed while queued');
       const before=await fs.stat(current);
-      if(!before)throw codedError('FS_STALE_VERSION','file no longer exists');
+      if(!before)throw codedError('FS_STALE_VERSION','file no longer exists',{reason:'missing'});
+      if (payload.rejectIfMirror) await rejectDraftMirrorBeforeWrite(current);
       let result;
       const native=await fsStat(nativeTargetPath(current),{bigint:true}).catch(e=>{if(e.code!=='ENOENT')throw e;return null;});
       const local=!!native && versionOfBigInt(native)===String(before.version);
@@ -1112,7 +1386,8 @@ export function createHost(options = {}) {
         result=await live.save(ticket.client,{epoch:ticket.epoch,version:ticket.version,text},async({diskHash})=>{
           const version=await fs.stat(current);
           const identity=await fsStat(nativeTargetPath(current),{bigint:true});
-          if (!version || versionOfBigInt(identity)!==String(version.version) || pathKey(await canonicalTarget(await fs.resolve(path,resolveOptions(payload))))!==key)
+          if (!version) throw codedError('FS_STALE_VERSION','file no longer exists',{reason:'missing'});
+          if (versionOfBigInt(identity)!==String(version.version) || pathKey(await canonicalTarget(await fs.resolve(path,resolveOptions(payload))))!==key)
             throw codedError('FS_STALE_VERSION','file identity changed while waiting to save');
           const receipt=await directWriteText(fs,current,text,String(version.version),diskHash);
           writerVersion=receipt.version;
@@ -1127,9 +1402,15 @@ export function createHost(options = {}) {
       }else if(String(before.version)!==baseVersion)throw codedError('FS_STALE_VERSION','file changed since read');
       else if(local)result=await live.external(nativeTargetPath(current),()=>directWriteText(fs,current,text,baseVersion));
       else try {result=await fs.writeText(current,text,{kind:'replaceIfVersion',version:baseVersion});}
-      catch(error){if(!isSandboxWriteDenied(error))throw error;result=await directWriteText(fs,current,text,baseVersion);}
+      catch(error){
+        if (isExplicitReadOnlyDenial(error))
+          throw codedError('FS_PERMISSION_DENIED','cannot save: file access denied under read-only mode; current draft is preserved',{cause:error});
+        if(!isSandboxWriteDenied(error))throw error;
+        result=await directWriteText(fs,current,text,baseVersion);
+      }
       const version=result?.version;broadcastChange(current,version);
-      const value={version,displayPath:current.displayPath,size:result.size??Buffer.byteLength(text,'utf8')};
+      await rememberIdentity(current);
+      const value={version,displayPath:current.displayPath,size:result.size??Buffer.byteLength(text,'utf8'),diskRevisionSha:diskRevisionSha(text)};
       if(payload.live&&result&&typeof result==='object'){
         // 已授权 live 保存专属：按客户端 applyLiveReceipt 约定透传最小 live 元数据
         // （savedVersion/liveVersion/epoch/diskHash；provider version 保持权威）。
@@ -1163,6 +1444,85 @@ export function createHost(options = {}) {
 
   // First-save drafts use a fixed UUID name. A retry never chooses another file.
   const draftReceipts = new Map();
+  // P4 escape hatch. Try ctx.fs first so sandbox policy, staging and encoding
+  // match normal saves. Only a workspace-write containment refusal falls back to
+  // the editor's staged native create; read-only and virtual providers stay fenced.
+  // Contract: {path: source, targetPath: new file, text}. `path` is accepted as
+  // the target for the legacy test-only shape.
+  async function apiSaveAs(payload, authority) {
+    if (authority === MODEL_TOOL) return badRequest('saveAs is editor-only');
+    const raw = payload?.targetPath !== undefined ? payload.targetPath : payload?.path;
+    const text = payload?.text;
+    if (!validSaveAsPath(raw)) return badRequest('save-as path must be an absolute .md path (no ADS/reserved names)');
+    if (typeof text !== 'string') return badRequest('text is required');
+    const target = await fs.resolve(raw);
+    if (await fs.stat(target) !== undefined) throw codedError('FS_EXISTS','save-as target already exists');
+    const native = nativeTargetPath(target);
+    let receipt;
+    let fallback = false;
+    try {
+      receipt = await fs.writeText(target, text, { kind: 'createIfAbsent' });
+    } catch (error) {
+      if (['FS_NOT_OBSERVED', 'FS_EXISTS', 'EEXIST', 'MP_FILE_CONFLICT'].includes(error?.code))
+        throw codedError('FS_EXISTS','save-as target already exists');
+      if (error?.code !== 'FS_SANDBOX_DENIED') throw error;
+      // read-only must stay read-only; only the workspace-write containment
+      // refusal falls back to the editor's native create path.
+      if (fs.sandboxMode === 'read-only' || /under read-only mode\b/i.test(String(error?.message || ''))) throw error;
+      if (!native || !isAbsolute(native)) throw error;
+      fallback = true;
+    }
+    const bytes = textCodec.encodeDocument(text);
+    if (fallback) {
+      const dir = dirname(native);
+      await mkdir(dir, { recursive: true });
+      const sha = createHash('sha256').update(bytes).digest('hex');
+      const temp = join(dir, '.mp-tmp-' + process.pid + '-' + randomUUID());
+      let stage, handle, primaryFailure;
+      try {
+        if (process.platform === 'win32') {
+          const safeFile = hostModules.safeFile;
+          if (typeof safeFile?.prepareFile !== 'function') throw codedError('MP_SAFE_FILE_UNAVAILABLE', 'safe file creation unavailable');
+          stage = await safeFile.prepareFile(native, temp, { baseline: null, output: { bytes: bytes.length, sha256: sha } });
+          await writeFile(temp, bytes, { flag: 'r+' });
+          await stage.commit();
+        } else {
+          handle = await fsOpen(temp, 'wx', 0o600);
+          await handle.writeFile(bytes);
+          await handle.sync();
+          await handle.close();
+          handle = null;
+          await fsLink(temp, native);
+        }
+      } catch (error) {
+        primaryFailure = error;
+        if (['EEXIST', 'MP_FILE_CONFLICT'].includes(error?.code)) throw codedError('FS_EXISTS','save-as target already exists');
+        throw error;
+      } finally {
+        try {
+          await handle?.close();
+          await stage?.abort();
+          if (primaryFailure?.preserveTemp !== true)
+            await fsUnlink(temp).catch((error) => { if (error.code !== 'ENOENT') throw error; });
+        } catch (error) {
+          if (primaryFailure) primaryFailure.cleanupError = String(error?.message || error);
+          else throw error;
+        }
+      }
+    }
+    const info = await fs.stat(target).catch(() => undefined);
+    if (info && info.type !== 'file') throw codedError('FS_STALE_VERSION','save-as target is not a regular file');
+    if (!info && !receipt?.version) throw codedError('FS_STALE_VERSION','save-as target is not visible after write');
+    await rememberIdentity(target);
+    const version = String(receipt?.version ?? info.version);
+    broadcastChange(target, version);
+    return { ok: true, value: {
+      path: target.displayPath || raw,
+      version,
+      size: bytes.length,
+    } };
+  }
+
   async function createExactDraft(payload) {
     const draftId = payload?.draftId;
     if (typeof draftId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(draftId)
@@ -1202,7 +1562,7 @@ export function createHost(options = {}) {
         if(record.version!==null && record.version!==String(info.version))
           throw codedError('FS_STALE_VERSION','draft target changed after its initial save');
         record.version=String(info.version);
-        return {ok:true,value:{path:candidate,requestedPath:join(rawDir,fileName),displayPath:target.displayPath||candidate,version:info.version,size:bytes.length,safe:true,draftId:id,idempotent:reused}};
+        return {ok:true,value:{path:candidate,requestedPath:join(rawDir,fileName),displayPath:target.displayPath||candidate,version:info.version,size:bytes.length,safe:true,draftId:id,idempotent:reused,diskRevisionSha:diskRevisionSha(payload.exactText)}};
       };
       const exists=await fsStat(candidate).then(()=>true,error=>{if(error.code==='ENOENT')return false;throw error;});
       if(exists)return receipt(true); // Exact-byte reconciliation also covers a lost reply / host restart.
@@ -1223,7 +1583,7 @@ export function createHost(options = {}) {
         }
       } catch(error) {primaryFailure=error;throw error;}
       finally {
-        try {await handle?.close();await stage?.abort();if(process.platform!=='win32')await fsUnlink(temp).catch(error=>{if(error.code!=='ENOENT')throw error;});}
+        try {await handle?.close();await stage?.abort();if(primaryFailure?.preserveTemp!==true)await fsUnlink(temp).catch(error=>{if(error.code!=='ENOENT')throw error;});}
         catch(error){if(primaryFailure)primaryFailure.cleanupError=String(error?.message||error);else throw error;}
       }
       const result=await receipt(false);broadcastChange({targetKey:candidate,displayPath:candidate},result.value.version);return result;
@@ -1237,19 +1597,20 @@ export function createHost(options = {}) {
     const text = String(value || '');
     return process.platform === 'win32' ? text.replace(/\//g, '\\').toLowerCase() : text;
   }
-  // Only removes automatic `agent-before` copies that have a parseable sidecar.
+  // Only removes automatic copies for one tag that have a parseable sidecar.
   // Parked recovery files (`recovery/`) and user/other-tag archives are never in
   // this directory match set. A failed/missing sidecar means "leave it alone".
-  async function pruneAgentBeforeArchives(dir, currentArchivePath) {
+  async function pruneTaggedArchives(dir, currentArchivePath, tag = 'agent-before') {
+    const pattern = new RegExp('\\.' + tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\.[0-9a-f]{16}\\.md$');
     let names;
     try { names = await readdir(dir); } catch { return; }
     const entries = [];
     for (const name of names) {
-      if (!/\.agent-before\.[0-9a-f]{16}\.md$/.test(name)) continue;
+      if (!pattern.test(name)) continue;
       const archivePath = join(dir, name), metaPath = archivePath + '.json';
       try {
         const meta = JSON.parse(await readFile(metaPath, 'utf8'));
-        if (meta?.schema !== 1 || meta?.tag !== 'agent-before' || typeof meta?.sourcePath !== 'string' || !isAbsolute(meta.sourcePath)) continue;
+        if (meta?.schema !== 1 || meta?.tag !== tag || typeof meta?.sourcePath !== 'string' || !isAbsolute(meta.sourcePath)) continue;
         if (typeof meta?.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(meta.sha256)) continue;
         const expectedKey = createHash('sha256').update(meta.sourcePath + '\0' + meta.tag + '\0' + meta.sha256).digest('hex').slice(0, 16);
         if (!name.endsWith('.' + expectedKey + '.md')) continue; // not the deterministic auto-copy name
@@ -1315,7 +1676,7 @@ export function createHost(options = {}) {
         docToken: typeof payload?.docToken === 'string' ? payload.docToken : null };
       try { await readFile(metaPath); }
       catch { await writeFile(metaPath, JSON.stringify(meta, null, 2), { encoding: 'utf8', flag: 'wx' }).catch(() => { /* concurrent writer */ }); }
-      if (options.prune === true) try { await pruneAgentBeforeArchives(dir, target); } catch { /* retention is best effort */ }
+      if (options.prune === true) try { await pruneTaggedArchives(dir, target, tag); } catch { /* retention is best effort */ }
       return { ok: true, value: { archivePath: target, metaPath, sha256: sha, bytes: bytes.length, idempotent: true } };
     }
     const temp = join(dir, `.mp-archive-${process.pid}-${randomUUID()}`);
@@ -1335,7 +1696,7 @@ export function createHost(options = {}) {
       baseVersion: typeof payload?.baseVersion === 'string' ? payload.baseVersion : null,
       docToken: typeof payload?.docToken === 'string' ? payload.docToken : null };
     await writeFile(target + '.json', JSON.stringify(meta, null, 2), { encoding: 'utf8', flag: 'wx' }).catch(() => { /* metadata is best effort */ });
-    if (options.prune === true) try { await pruneAgentBeforeArchives(dir, target); } catch { /* retention is best effort */ }
+    if (options.prune === true) try { await pruneTaggedArchives(dir, target, tag); } catch { /* retention is best effort */ }
     return { ok: true, value: { archivePath: target, metaPath: target + '.json', sha256: sha, bytes: bytes.length } };
   }
 
@@ -1544,8 +1905,10 @@ export function createHost(options = {}) {
       invocation?.signal?.throwIfAborted();
       const current=await fs.resolve(path,resolution);
       if(pathKey(await canonicalTarget(current))!==key)throw codedError('FS_STALE_VERSION','edit target changed while queued');
+      if (payload.rejectIfMirror) await rejectDraftMirrorBeforeWrite(current);
       const opened=await apiOpen(payload,MODEL_TOOL,current,invocation),value=opened.value;
       if(!opened.ok)return opened;
+      if (payload.rejectIfMirror) await rejectDraftMirrorBeforeWrite(current);
       if(payload.baseVersion&&payload.baseVersion!==value.version)throw codedError('FS_STALE_VERSION','file changed since read');
       const first=value.text.indexOf(oldString);
       if(first<0)throw codedError('FS_EDIT_NOT_FOUND','old_string was not found');
@@ -1555,6 +1918,7 @@ export function createHost(options = {}) {
       const result=native && versionOfBigInt(native)===String(value.version)
         ? await live.external(nativeTargetPath(current),write) : await write();
       broadcastChange(current,result.version,{oldString,newString});
+      await rememberIdentity(current);
       return {ok:true,value:{version:result.version,displayPath:current.displayPath,changed:newString!==oldString}};
     });
   }
@@ -1565,7 +1929,8 @@ export function createHost(options = {}) {
       if (authority === MODEL_TOOL) {
         const session = execution?.agent?.session;
         let policy;
-        if ((endpoint === 'edit' || endpoint === 'documents.applyEdits' || endpoint === 'documents.undoGroup' || endpoint === 'documents.merge3') && fs.sandboxMode !== undefined) {
+        if ((endpoint === 'edit' || endpoint === 'documents.applyEdits' || endpoint === 'documents.undoGroup'
+          || endpoint === 'documents.merge3' || endpoint === 'documents.editSelection') && fs.sandboxMode !== undefined) {
           policy = await options.sandboxPolicy?.()?.resolve(session ? {session} : {});
           if (!policy?.mode) throw codedError('FS_SANDBOX_DENIED', 'Cannot resolve filesystem policy for this tool call');
         }
@@ -1578,6 +1943,15 @@ export function createHost(options = {}) {
         case 'stat': return await apiStat(payload);
         case 'live': return authority === MODEL_TOOL ? badRequest('editor lease required') : await liveEndpoint(payload);
         case 'edit': return await apiEdit(payload, invocation);
+        case 'documents.captureSelection':
+          if (authority === MODEL_TOOL) return badRequest('captureSelection is editor-only');
+          return await documents.captureSelection(payload);
+        case 'documents.readSelection':
+          if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
+          return await documents.readSelection(payload, invocation, execution);
+        case 'documents.editSelection':
+          if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
+          return await documents.editSelection(payload, invocation, invocation?.policy, execution);
         case 'documents.read':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           return await documents.read(payload, invocation);
@@ -1585,6 +1959,9 @@ export function createHost(options = {}) {
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           return await documents.applyEdits(payload, invocation, invocation?.policy);
         case 'documents.state':
+          if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
+          if (typeof payload?.path !== 'string' || !payload.path) return await documents.state(payload, invocation);
+          return await apiSession(payload, invocation, authority);
         case 'documents.reconcile':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           return await documents.state(payload, invocation);
@@ -1600,10 +1977,35 @@ export function createHost(options = {}) {
           return await documents.reviewGroups(payload);
         case 'documents.undoGroups':
           return await documents.undoGroups(payload, invocation, invocation?.policy);
+        case 'documents.conflictOpen':
+          if (authority === MODEL_TOOL) return badRequest('editor UI authority required');
+          return await documents.conflictOpen(payload, invocation);
+        case 'documents.conflictResolve':
+          if (authority === MODEL_TOOL) return badRequest('editor UI authority required');
+          return await documents.conflictResolve(payload, invocation, invocation?.policy);
+        case 'documents.conflictCancel':
+          if (authority === MODEL_TOOL) return badRequest('editor UI authority required');
+          return await documents.conflictCancel(payload);
+        case 'documents.draftMirror':
+          if (authority === MODEL_TOOL) return badRequest('editor UI authority required');
+          return await documents.draftMirror(payload, invocation);
+        case 'documents.draftRead':
+          if (authority === MODEL_TOOL) return badRequest('editor UI authority required');
+          return await documents.draftRead(payload, invocation);
+        case 'documents.draftClear':
+          if (authority === MODEL_TOOL) return badRequest('editor UI authority required');
+          return await documents.draftClear(payload, invocation);
         case 'documents.merge3':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           return await documents.merge3(payload, invocation, invocation?.policy);
         case 'docs/create': return await apiDocsCreate(payload);
+        case 'docs/saveAs': return await apiSaveAs(payload, authority);
+        case 'documents.fileState': if (authority === MODEL_TOOL) return badRequest('fileState is editor-only'); return await apiFileState(payload);
+        case 'documents.locate': if (authority === MODEL_TOOL) return badRequest('locate is editor-only'); return await apiLocate(payload);
+        case 'documents.session': if (authority === MODEL_TOOL) return badRequest('session is editor-only'); return await apiSession(payload, invocation, 'editor');
+        case 'documents.recoveryList': if (authority === MODEL_TOOL) return badRequest('recoveryList is editor-only'); return await apiRecoveryList(payload);
+        case 'documents.recoveryRead': if (authority === MODEL_TOOL) return badRequest('recoveryRead is editor-only'); return await apiRecoveryRead(payload);
+        case 'documents.recoveryDiscard': if (authority === MODEL_TOOL) return badRequest('recoveryDiscard is editor-only'); return await apiRecoveryDiscard(payload);
         case 'docs/recent': return await apiDocsRecent(payload);
         case 'docs/archive':
           if (payload?.tag === 'agent-before' && authority !== MODEL_TOOL) return badRequest('model tool authority required');
@@ -1619,7 +2021,21 @@ export function createHost(options = {}) {
     } catch (error) {
       const code = errorCode(error);
       try { log.warn?.('%s: %s failed (%s): %s', name, String(endpoint), code, String(error?.message ?? error)); } catch { /* 日志失败不影响响应 */ }
-      return { ok: false, error: { code, message: String(error?.message ?? error) } };
+      const reason = error?.reason || (error?.code === 'MP_FILE_MISSING' ? 'missing' : undefined);
+      const recoveryPaths = error?.recoveryPaths;
+      const recoveryPath = typeof recoveryPaths?.temp === 'string' ? recoveryPaths.temp : undefined;
+      const recoveryBackup = typeof recoveryPaths?.backup === 'string' ? recoveryPaths.backup : undefined;
+      const suffix = recoveryPath ? `；恢复副本：${recoveryPath}` : '';
+      return { ok: false, error: {
+        code,
+        message: String(error?.message ?? error) + suffix,
+        ...(reason ? { reason: String(reason) } : {}),
+        ...(recoveryPath ? { recoveryPath } : {}),
+        ...(recoveryBackup ? { recoveryBackup } : {}),
+        ...(error?.preserveTemp === true ? { preserveTemp: true } : {}),
+      } };
+    } finally {
+      if (SESSION_MUTATING_ENDPOINTS.has(endpoint)) invalidateSessions();
     }
   }
 
@@ -1789,14 +2205,19 @@ export function createHost(options = {}) {
 
   const hostToken = {};
   registerHost(hostToken);
-  return { route, dispatch, close, broadcastChange, _internals: { watchers, liveStreams, lookupDocument, documents } };
+  return { route, dispatch, close, broadcastChange, _internals: { watchers, liveStreams, lookupDocument, documents, fileIdentities } };
 }
 
 const WRITE_GUARD_DIRTY = 'MP_DOC_DIRTY';
 
 function writeGuardError(code, path, detail) {
   const where = path ? `：${path}` : '';
-  const message = `[${code}] 文件正在 MarkPilot 中打开且有未保存修改${where}。请先在编辑器中保存或丢弃，然后重试。`;
+  let message;
+  if (code === 'MP_DOC_LOOKUP_FAILED') {
+    message = `[${code}] MarkPilot 无法读取未保存状态，已拒绝写入以防覆盖${where}。请稍后重试；若持续失败，先保存并关闭编辑器。`;
+  } else {
+    message = `[${code}] 文件正在 MarkPilot 中打开且有未保存修改${where}。请先在编辑器中保存或丢弃，然后重试。`;
+  }
   return Object.assign(new Error(detail || message), { code, path: String(path || '') });
 }
 
@@ -1804,26 +2225,53 @@ function writeGuardError(code, path, detail) {
  * B2: refuse file-tool writes to documents with an unsaved MarkPilot draft,
  * and apply expected-version guards to clean open documents. Rooms are the
  * shared truth (cross-process); leases are intentionally not consulted.
+ *
+ * A lookup error means the draft state is unknown. The very first such write
+ * is refused: a stale fail-open would overwrite an unsaved draft. No failure
+ * counter is kept, so a later readable state releases the next write at once.
  */
-export function createWriteGuard({ fs, lookup, log, pluginName = 'markpilot-write-guard' } = {}) {
+export function createWriteGuard({ fs, lookup, log, pluginName = 'markpilot-write-guard', fsSessionIntents = false } = {}) {
   const installed = new WeakSet();
   const warned = new Set();
   function warn(operation, error) {
     const key = operation + '\0' + String(error?.message ?? error);
     if (warned.has(key)) return;
     warned.add(key);
-    try { log?.warn?.('%s: %s guard fail-open: %s', pluginName, operation, String(error?.message ?? error)); } catch { /* 日志失败不影响 */ }
+    try { log?.warn?.('%s: %s guard fail-closed: %s', pluginName, operation, String(error?.message ?? error)); } catch { /* 日志失败不影响 */ }
+  }
+  function lookupFailure(target, error) {
+    warn('lookup', error);
+    const failure = writeGuardError('MP_DOC_LOOKUP_FAILED', target.displayPath || target.targetKey || '');
+    if (error !== undefined) failure.cause = error;
+    return failure;
   }
   async function stateOf(target) {
+    // A target without a provider path cannot address a file; leave it to the
+    // fs tool's own validation. Never turn a legitimate create into a guard
+    // failure merely because the path does not exist yet.
     if (!target || typeof target !== 'object') return null;
     if (typeof target.targetKey !== 'string' && typeof target.displayPath !== 'string') return null;
-    try { return await lookup(target); }
-    catch (error) { warn('lookup', error); return undefined; }
+    let state;
+    try { state = await lookup(target); }
+    catch (error) { throw lookupFailure(target, error); }
+    // Only an explicit null means "no room / no draft". undefined or any other
+    // non-state value is not proof that the file is unowned: fail closed.
+    if (state === null) return null;
+    if (!state || typeof state !== 'object') throw lookupFailure(target, new TypeError('lookup returned an invalid document state'));
+    let dirty;
+    try { dirty = state.dirty; } catch (error) { throw lookupFailure(target, error); }
+    if (typeof dirty !== 'boolean') throw lookupFailure(target, new TypeError('lookup state must carry a boolean dirty flag'));
+    return state;
   }
   async function checked(target) {
     const state = await stateOf(target);
     if (!state) return { state: null, base: undefined };
-    if (state.dirty) throw writeGuardError(WRITE_GUARD_DIRTY, state.path || target.displayPath || '');
+    if (state.dirty) {
+      const detail = state.mirror
+        ? `[${WRITE_GUARD_DIRTY}] 文件存在 MarkPilot 草稿镜像（可能来自已关闭的编辑器）${state.path ? '：' + state.path : ''}。请先在编辑器中打开并处理该草稿，或清除镜像后再写。`
+        : undefined;
+      throw writeGuardError(WRITE_GUARD_DIRTY, state.path || target.displayPath || '', detail);
+    }
     return { state, base: undefined };
   }
   async function currentVersion(state, target) {
@@ -1835,6 +2283,36 @@ export function createWriteGuard({ fs, lookup, log, pluginName = 'markpilot-writ
     if (!ctx || typeof ctx.on !== 'function' || installed.has(ctx)) return () => {};
     installed.add(ctx);
     const disposers = [];
+    if (fsSessionIntents && ctx.fs && typeof ctx.fs === 'object') {
+      for (const method of ['writeText', 'editText', 'patchText', 'deleteFile', 'moveFile']) {
+        const original = ctx.fs[method];
+        if (typeof original !== 'function') continue;
+        const hadOwn = Object.prototype.hasOwnProperty.call(ctx.fs, method);
+        const wrapper = async function guardedFsSession(target, ...args) {
+          const checked = method === 'moveFile' ? [target, args[0]] : [target];
+          for (const candidate of checked) {
+            // A lookup error propagates and refuses the whole move; both ends
+            // are checked before the original method runs.
+            const state = await stateOf(candidate);
+            if (state && state.dirty) throw writeGuardError(WRITE_GUARD_DIRTY, state.path || candidate?.displayPath || candidate?.targetKey || '');
+          }
+          return original.call(this, target, ...args);
+        };
+        try { ctx.fs[method] = wrapper; }
+        catch (error) {
+          for (const dispose of disposers.splice(0).reverse()) { try { dispose(); } catch { /* best effort */ } }
+          installed.delete(ctx);
+          throw error;
+        }
+        disposers.push(() => {
+          try {
+            if (ctx.fs[method] !== wrapper) return;
+            if (hadOwn) ctx.fs[method] = original;
+            else delete ctx.fs[method];
+          } catch { /* best effort */ }
+        });
+      }
+    }
     const add = (event, handler) => {
       try {
         const dispose = ctx.on(event, handler, { prepend: true });
@@ -1893,7 +2371,7 @@ function safeLogger(ctx) {
   return console;
 }
 
-export function apply(ctx) {
+export function apply(ctx, config = {}) {
   const log = safeLogger(ctx);
   let fsService = safeGet(ctx, 'fs');
   if (!fsService) {
@@ -1929,7 +2407,7 @@ export function apply(ctx) {
   // B2 write guard: shared rooms are only read (never created) from this path;
   // listeners are fiber-scoped and must no-op on hosts whose test ctx has no ctx.on.
   try {
-    const guard = createWriteGuard({ fs: fsService, lookup: host._internals.lookupDocument, log, pluginName: name });
+    const guard = createWriteGuard({ fs: fsService, lookup: host._internals.lookupDocument, log, pluginName: name, fsSessionIntents: config?.fsSessionIntents === true });
     if (typeof ctx.effect === 'function') ctx.effect(() => guard.install(ctx), 'dsh-markdown-editor-typora: write guard');
     else guard.install(ctx);
   } catch (error) {
@@ -1959,6 +2437,342 @@ export function apply(ctx) {
   registerMarkdownTool(ctx, { dispatch: host.dispatch, log });
 }
 
+// ── model-visible read paging (MP208-PAGE) ──────────────────────────────────
+// One tool result reaches the model as one text block. Paging scalars are only
+// honest when every line they promise was actually rendered, so a read may only
+// return a window whose whole rendered block fits MODEL_READ_TEXT_BUDGET.
+// Historical baseline: 201 lines × 94 chars, read(fromLine:1, lineCount:200)
+// rendered 77 lines while nextLine said 201 — 124 lines were never delivered.
+export const MODEL_READ_TEXT_BUDGET = 8000;
+
+// Probe width for "the default read has to page": every row costs at least one
+// character plus the 8-char line prefix, so this covers a whole budget even for
+// single-character lines (8000 / 9 ≈ 889 lines).
+const READ_PAGE_PROBE_LINES = 1000;
+// Estimate reserved for the header/footer before the exact rendered length is
+// measured; the measured length is what decides whether a page is returned.
+const READ_PARTIAL_HEADER_RESERVE = 480;
+
+function lineRowPrefix(number) { return `${String(number).padStart(5, ' ')} | `; }
+
+function readWhereLabel(value) {
+  return value.source === 'buffer' ? '编辑器缓冲区'
+    : value.source === 'mirror' ? '未保存草稿镜像（只读）' : '磁盘';
+}
+
+function lineWindowBody(value) {
+  const rows = Array.isArray(value.lines) ? value.lines : [];
+  const text = String(value.text ?? '');
+  const base = rows.length ? rows[0].from : 0;
+  return rows.map((line) => lineRowPrefix(line.number) + text.slice(line.from - base, line.to - base)).join('\n');
+}
+
+// Header/footer of a line page. Kept separate from the body so the fit loop can
+// measure the exact header length for a candidate row count without rebuilding
+// the body (a linear budget pass, not O(n²) re-formatting).
+function readLineHeader(value, rowCount) {
+  const rows = Array.isArray(value.lines) ? value.lines : [];
+  const count = rowCount === undefined ? rows.length : rowCount;
+  const where = readWhereLabel(value);
+  const dirty = value.dirty === true ? '，含未保存修改' : '';
+  const flags = [];
+  if (value.truncated === true) {
+    const why = [
+      value.truncatedByLines === true ? '行数上限' : '',
+      value.truncatedByBytes === true ? '字节上限' : '',
+      value.truncatedByBudget === true ? `显示预算 ${MODEL_READ_TEXT_BUDGET} 字符` : '',
+    ].filter(Boolean).join('/');
+    flags.push(`已截断（${why || '上限'}）`);
+  }
+  if (value.beyondEnd === true) flags.push('请求超出文档末尾');
+  if (Number.isSafeInteger(value.nextLine)) {
+    flags.push(Number.isSafeInteger(value.nextColumn)
+      ? `下次从第 ${value.nextLine} 行第 ${value.nextColumn} 列继续`
+      : `下次从第 ${value.nextLine} 行继续`);
+  }
+  const range = value.partialLine === true
+    ? `行 ${value.startLine} 第 ${value.startColumn}–${value.endColumn} 列`
+    : count ? `行 ${value.startLine}–${value.endLine}` : `空窗口（起始第 ${value.startLine} 行）`;
+  const size = value.partialLine === true
+    ? ` / 共 ${value.totalLines} 行；本页 ${String(value.text ?? '').length} 字符`
+    : ` / 共 ${value.totalLines} 行；返回 ${count} 行`;
+  const bind = value.hasMore === true
+    ? `\n续读绑定：baseVersion = ${String(value.version ?? '')}（续读时回传；正文变化后旧续读点失效）` : '';
+  return `${value.displayPath ?? ''}（${where}${dirty}）\nversion: ${String(value.version ?? '')}\n${range}${size}${flags.length ? '；' + flags.join('；') : ''}${bind}\n行号只对上面的 version 有效；正文变化后需重新 read。`;
+}
+
+// The single formatter for everything a successful `read` shows the model. Both
+// output.render and the paging loop measure this exact string, so "fits the
+// budget" means the real displayed text, not an estimate of the body alone.
+function formatReadValue(value) {
+  if (value.lineMode === true) return `${readLineHeader(value)}\n\n${lineWindowBody(value)}`;
+  const where = readWhereLabel(value);
+  const dirty = value.dirty === true ? '，含未保存修改' : '';
+  return `${value.displayPath ?? ''}（${where}${dirty}）\nversion: ${String(value.version ?? '')}\n\n${String(value.text ?? '')}`;
+}
+
+function readError(code, message, extra = {}) {
+  return { ok: false, action: 'read', error: { code, message, ...extra } };
+}
+
+function readStale(currentVersion) {
+  return readError('MP_DOC_STALE', 'the document changed after the previous page; re-read to get a fresh version and continuation point', {
+    currentRevisionId: currentVersion,
+  });
+}
+
+// Exactly the historical full-read projection: a short document still returns
+// the same keys, so non-model callers and existing tests keep their contract.
+function projectFullRead(value) {
+  return {
+    ok: true, action: 'read', text: value.text, version: value.version, revisionId: value.revisionId,
+    readToken: value.readToken || value.version, displayPath: value.displayPath, source: value.source,
+    dirty: value.dirty === true, writable: value.writable !== false,
+    ...(value.draft === true ? { draft: true } : {}),
+    ...(value.mirrorDraft === true ? { mirrorDraft: true } : {}),
+    ...(value.draftStale === true ? { draftStale: true } : {}),
+    ...(value.draftUnknown === true ? { draftUnknown: true } : {}),
+    ...(typeof value.diskChanged === 'boolean' ? { diskChanged: value.diskChanged } : {}),
+    ...(value.bufferOwnedElsewhere === true ? { bufferOwnedElsewhere: true } : {}),
+    ...(value.unsavedElsewhere === true ? { unsavedElsewhere: true } : {}),
+  };
+}
+
+function projectLineRead(value, extra = {}) {
+  return {
+    ok: true, action: 'read', lineMode: true, text: value.text, version: value.version,
+    revisionId: value.revisionId, readToken: value.readToken || value.version,
+    lineNumbersValidFor: value.lineNumbersValidFor || value.version,
+    displayPath: value.displayPath, source: value.source, dirty: value.dirty === true,
+    writable: value.writable !== false,
+    lines: Array.isArray(value.lines) ? value.lines : [], startLine: value.startLine, endLine: value.endLine,
+    totalLines: value.totalLines, requestedToLine: value.requestedToLine,
+    lineLimit: value.lineLimit, byteLimit: value.byteLimit, bytes: value.bytes,
+    eol: value.eol, bom: value.bom === true,
+    truncated: value.truncated === true,
+    truncatedByLines: value.truncatedByLines === true,
+    truncatedByBytes: value.truncatedByBytes === true,
+    hasMore: value.hasMore === true,
+    beyondEnd: value.beyondEnd === true,
+    ...(Number.isSafeInteger(value.nextLine) ? { nextLine: value.nextLine } : {}),
+    ...(Number.isSafeInteger(value.nextColumn) ? { nextColumn: value.nextColumn } : {}),
+    ...(Number.isSafeInteger(value.nextOffset) ? { nextOffset: value.nextOffset } : {}),
+    ...(Number.isSafeInteger(value.startColumn) ? { startColumn: value.startColumn } : {}),
+    ...(Number.isSafeInteger(value.endColumn) ? { endColumn: value.endColumn } : {}),
+    ...(value.partialLine === true ? { partialLine: true } : {}),
+    ...(value.truncatedByBudget === true ? { truncatedByBudget: true } : {}),
+    ...(value.draft === true ? { draft: true } : {}),
+    ...(value.mirrorDraft === true ? { mirrorDraft: true } : {}),
+    ...(value.draftStale === true ? { draftStale: true } : {}),
+    ...(value.draftUnknown === true ? { draftUnknown: true } : {}),
+    ...(typeof value.diskChanged === 'boolean' ? { diskChanged: value.diskChanged } : {}),
+    ...(value.bufferOwnedElsewhere === true ? { bufferOwnedElsewhere: true } : {}),
+    ...(value.unsavedElsewhere === true ? { unsavedElsewhere: true } : {}),
+    ...extra,
+  };
+}
+
+// Linear budget fit: one pass over the rows, measuring the exact header for
+// each candidate and accumulating the body length. O(n) even for thousands of
+// one-character lines (measuring every prefix through the full formatter was
+// O(n²)); the caller still re-dispatches the chosen count so every offset and
+// nextLine stays authoritative.
+function fitLinePage(value) {
+  const rows = Array.isArray(value.lines) ? value.lines : [];
+  let bodyLength = 0;
+  let fit = 0;
+  for (let index = 0; index < rows.length; index += 1) {
+    const line = rows[index];
+    const rowLength = lineRowPrefix(line.number).length + (line.to - line.from);
+    const hasMore = line.number < value.totalLines;
+    const candidate = {
+      lineMode: true, displayPath: value.displayPath, source: value.source, dirty: value.dirty === true,
+      version: value.version, startLine: value.startLine, endLine: line.number, totalLines: value.totalLines,
+      truncated: true, truncatedByLines: false, truncatedByBytes: false, truncatedByBudget: true,
+      beyondEnd: false, hasMore, ...(hasMore ? { nextLine: line.number + 1 } : {}),
+    };
+    const candidateTotal = readLineHeader(candidate, index + 1).length + 2 + bodyLength + (index ? 1 : 0) + rowLength;
+    if (candidateTotal > MODEL_READ_TEXT_BUDGET) break;
+    bodyLength += (index ? 1 : 0) + rowLength;
+    fit = index + 1;
+  }
+  return fit;
+}
+
+// Never cut a UTF-16 surrogate pair in half: the next page starts on a real
+// code point boundary, so paging cannot inject a lone surrogate.
+function safeColumnCut(content, startColumn, endColumn) {
+  const length = content.length;
+  if (endColumn >= length) return length;
+  const last = content.charCodeAt(endColumn - 1);
+  const next = content.charCodeAt(endColumn);
+  if (last >= 0xd800 && last <= 0xdbff && next >= 0xdc00 && next <= 0xdfff)
+    return endColumn - 1 >= startColumn ? endColumn - 1 : Math.min(length, endColumn + 1);
+  return endColumn;
+}
+
+// A single line longer than the model budget is served in column pages. Every
+// page carries the revision it belongs to plus nextLine/nextColumn, so the
+// caller can keep reading without skipping or repeating a code unit.
+function buildPartialLinePage(value, line, requestedColumn, extra = {}) {
+  // `value.text` may be a line window (starts at its first row) or the whole
+  // document (the >1 MiB fallback). The caller states where its text starts;
+  // assuming "first row" once made a long line far from the document head slice
+  // from the document start, showing earlier content and losing the line tail.
+  const rows = Array.isArray(value.lines) ? value.lines : [];
+  const base = Number.isSafeInteger(value.textBase) ? value.textBase : (rows.length ? rows[0].from : 0);
+  const content = String(value.text ?? '').slice(line.from - base, line.to - base);
+  const total = content.length;
+  let startColumn = requestedColumn;
+  if (startColumn > 1 && startColumn - 1 < total) {
+    const at = content.charCodeAt(startColumn - 1);
+    const previous = content.charCodeAt(startColumn - 2);
+    if (at >= 0xdc00 && at <= 0xdfff && previous >= 0xd800 && previous <= 0xdbff) startColumn -= 1;
+  }
+  if (startColumn > total + 1)
+    return readError('MP_LINE_RANGE', `fromColumn ${requestedColumn} is beyond line ${line.number} (${total} columns)`);
+  const prefixLength = lineRowPrefix(line.number).length;
+  const capacity = Math.max(1, MODEL_READ_TEXT_BUDGET - READ_PARTIAL_HEADER_RESERVE - prefixLength);
+  let endColumn = safeColumnCut(content, startColumn, Math.min(total, startColumn - 1 + capacity));
+  if (endColumn < startColumn) endColumn = Math.min(total, startColumn);
+  const build = (end) => {
+    const final = end >= total;
+    const segmentStart = line.from + (startColumn - 1);
+    const segmentEnd = final ? line.end : line.from + end;
+    const text = String(value.text).slice(segmentStart - base, segmentEnd - base);
+    const hasMore = final ? line.number < value.totalLines : true;
+    const nextLine = final ? (line.number < value.totalLines ? line.number + 1 : undefined) : line.number;
+    const nextColumn = final ? undefined : end + 1;
+    const nextOffset = final ? (line.number < value.totalLines ? line.end : undefined) : line.from + end;
+    return {
+      ok: true, action: 'read', lineMode: true, partialLine: true,
+      text, lines: [{ number: line.number, from: segmentStart, to: final ? line.to : segmentEnd, end: final ? line.end : segmentEnd }],
+      startLine: line.number, endLine: line.number, totalLines: value.totalLines,
+      startColumn, endColumn: end, version: value.version, revisionId: value.revisionId,
+      readToken: value.readToken || value.version, lineNumbersValidFor: value.lineNumbersValidFor || value.version,
+      displayPath: value.displayPath, source: value.source, dirty: value.dirty === true,
+      writable: value.writable !== false, requestedToLine: line.number,
+      lineLimit: value.lineLimit, byteLimit: value.byteLimit,
+      bytes: Buffer.byteLength(text), eol: final ? line.eol : '', bom: value.bom === true,
+      truncated: !final, truncatedByLines: false, truncatedByBytes: false, truncatedByBudget: !final,
+      beyondEnd: false, hasMore,
+      ...(nextLine !== undefined ? { nextLine } : {}),
+      ...(nextColumn !== undefined ? { nextColumn } : {}),
+      ...(nextOffset !== undefined ? { nextOffset } : {}),
+      ...extra,
+    };
+  };
+  let page = build(endColumn);
+  for (let guard = 0; guard < 4 && formatReadValue(page).length > MODEL_READ_TEXT_BUDGET; guard += 1) {
+    const excess = formatReadValue(page).length - MODEL_READ_TEXT_BUDGET;
+    const span = endColumn - (startColumn - 1);
+    if (span <= 1) break;
+    endColumn = safeColumnCut(content, startColumn, Math.max(startColumn, startColumn - 1 + span - excess));
+    page = build(endColumn);
+  }
+  return page;
+}
+
+// Last resort for a line above the 1 MiB line-read cap: keep the line-read API
+// contract intact (it still throws MP_LINE_TOO_LONG), but the model can page
+// through the same line because the full read carries the authoritative text.
+async function readOversizeLineFromFullText(dispatch, args, execution, options) {
+  const result = await dispatch('documents.read', { path: args?.path, cwd: args?.cwd }, MODEL_TOOL, execution);
+  if (result.ok !== true) return null;
+  const value = result.value;
+  if (options.baseVersion && options.baseVersion !== value.version) return readStale(value.version);
+  const text = String(value.text ?? '');
+  const fromLine = args?.fromLine === undefined ? 1 : args.fromLine;
+  const entry = findDocumentLine(text, fromLine);
+  if (!entry) return null;
+  return buildPartialLinePage({
+    ...value, text, textBase: 0,
+    lines: [{ number: entry.number, from: entry.from, to: entry.to, end: entry.end }],
+    startLine: entry.number, endLine: entry.number, totalLines: countDocumentLines(text),
+    lineLimit: 0, byteLimit: 0, bytes: 0, eol: entry.eol, bom: text.charCodeAt(0) === 0xfeff,
+  }, { number: entry.number, from: entry.from, to: entry.to, end: entry.end, eol: entry.eol }, args?.fromColumn ?? 1, {
+    ...(options.paged === true ? { paged: true } : {}),
+    ...(Number.isSafeInteger(options.totalChars) ? { totalChars: options.totalChars } : {}),
+  });
+}
+
+async function readPage(dispatch, args, execution, options = {}) {
+  const fromLine = args?.fromLine === undefined ? 1 : args.fromLine;
+  const fromColumn = args?.fromColumn === undefined ? 1 : args.fromColumn;
+  if (!Number.isSafeInteger(fromColumn) || fromColumn < 1)
+    return readError('MP_LINE_RANGE', 'fromColumn must be a 1-based integer');
+  const continuation = fromColumn > 1;
+  const params = continuation
+    ? { fromLine, lineCount: 1 }
+    : {
+        ...(args?.fromLine !== undefined ? { fromLine: args.fromLine } : {}),
+        ...(args?.toLine !== undefined ? { toLine: args.toLine } : {}),
+        ...(args?.lineCount !== undefined ? { lineCount: args.lineCount } : {}),
+        ...(args?.maxBytes !== undefined ? { maxBytes: args.maxBytes } : {}),
+      };
+  let result = await dispatch('documents.read', { path: args?.path, cwd: args?.cwd, ...params }, MODEL_TOOL, execution);
+  if (result.ok !== true && result.error?.code === 'MP_LINE_TOO_LONG' && args?.maxBytes === undefined) {
+    if (Number.isFinite(result.error.requiredBytes) && result.error.requiredBytes <= MAX_LINE_READ_BYTES_CAP) {
+      result = await dispatch('documents.read', {
+        path: args?.path, cwd: args?.cwd, ...params, maxBytes: MAX_LINE_READ_BYTES_CAP,
+      }, MODEL_TOOL, execution);
+    } else {
+      const fallback = await readOversizeLineFromFullText(dispatch, args, execution, options);
+      if (fallback) return fallback;
+    }
+  }
+  if (result.ok !== true) return { ok: false, action: 'read', error: result.error };
+  const value = result.value;
+  if (options.baseVersion && options.baseVersion !== value.version) return readStale(value.version);
+  const extra = {
+    ...(options.paged === true ? { paged: true } : {}),
+    ...(Number.isSafeInteger(options.totalChars) ? { totalChars: options.totalChars } : {}),
+  };
+  const rows = Array.isArray(value.lines) ? value.lines : [];
+  if (!rows.length || value.beyondEnd === true) return projectLineRead(value, extra);
+  if (continuation) return buildPartialLinePage(value, rows[0], fromColumn, extra);
+  const fit = fitLinePage(value);
+  if (fit >= rows.length) {
+    const projection = projectLineRead(value, extra);
+    if (formatReadValue(projection).length <= MODEL_READ_TEXT_BUDGET) return projection;
+  }
+  if (fit === 0) return buildPartialLinePage(value, rows[0], 1, extra);
+  // Re-dispatch the reduced window so every offset, version and nextLine is
+  // authoritative rather than locally recomputed.
+  for (let count = Math.min(fit, rows.length - 1); count >= 1; count -= 1) {
+    const pageResult = await dispatch('documents.read', {
+      path: args?.path, cwd: args?.cwd, fromLine: rows[0].number, lineCount: count,
+    }, MODEL_TOOL, execution);
+    if (pageResult.ok !== true) return { ok: false, action: 'read', error: pageResult.error };
+    const page = pageResult.value;
+    if (page.version !== value.version) return readStale(page.version);
+    const projection = projectLineRead(page, { ...extra, truncated: true, truncatedByBudget: true });
+    if (formatReadValue(projection).length <= MODEL_READ_TEXT_BUDGET) return projection;
+  }
+  return readError('MP_LINE_RANGE', 'no readable page fits the model text budget');
+}
+
+async function executeReadTool(dispatch, args, execution) {
+  const baseVersion = typeof args?.baseVersion === 'string' ? args.baseVersion
+    : (typeof args?.baseRevisionId === 'string' ? args.baseRevisionId : '');
+  const hasLineParameter = ['fromLine', 'toLine', 'lineCount', 'maxBytes', 'fromColumn']
+    .some((key) => args?.[key] !== undefined);
+  if (hasLineParameter) return await readPage(dispatch, args, execution, { baseVersion });
+  const result = await dispatch('documents.read', { path: args?.path, cwd: args?.cwd }, MODEL_TOOL, execution);
+  if (result.ok !== true) return { ok: false, action: 'read', error: result.error };
+  const value = result.value;
+  if (baseVersion && baseVersion !== value.version) return readStale(value.version);
+  const full = projectFullRead(value);
+  if (formatReadValue(full).length <= MODEL_READ_TEXT_BUDGET) return full;
+  // The default full read used to be clipped at 8000 chars with no way to ask
+  // for the rest. It is now the first page of a bound continuation; the page
+  // probe re-reads the source, so it must be bound to the revision the full
+  // read just returned instead of silently mixing two revisions.
+  return await readPage(dispatch, { ...args, fromLine: 1, lineCount: READ_PAGE_PROBE_LINES }, execution, {
+    baseVersion: value.version, paged: true, totalChars: String(value.text ?? '').length,
+  });
+}
+
 /**
  * markdown 工具定义（纯数据 + execute，不触达宿主）：便于测试/外部校验 defineTool 形态。
  * DSH 0.2.1 的 defineTool 需要 output.schema + output.render；0.2.0 的旧形态（顶层 render）会抛。
@@ -1968,16 +2782,24 @@ export function createMarkdownToolDefinition(dispatch) {
     name: 'markdown',
     description: [
       '读写 Markdown（及任意文本）文件。read 返回“当前正文”——包含用户在 MarkPilot 编辑器里尚未保存的修改；',
-      'edit 在“当前正文”上做字面 oldString→newString 原子替换。',
+      'read 可带 fromLine/toLine/lineCount/maxBytes 做有界按行读取：1-based、含首尾行，返回 totalLines、窗口原文 text、每行绝对行号与 from/to/end 数值偏移、truncated/nextLine；不带这些参数时返回全文（全文超过单次显示预算时分页，见下）。',
+      '每次 read 的可见文本总量有预算（8000 字符）：默认全文、行窗口和超长单行都切成能完整显示的分页，绝不会出现 nextLine 承诺了却没显示的行。续读时带 fromLine（行窗口）或 fromLine+fromColumn（超长单行），并回传上一页的 nextLine/nextColumn；续读建议同时传 baseVersion，正文已变化时返回 MP_DOC_STALE，避免把两版正文拼成一篇。',
+      '显式把 maxBytes 设得比某行还小时仍返回 MP_LINE_TOO_LONG（带 requiredBytes/byteLimit/maxBytesCap）；不传 maxBytes 的超长单行会自动按列分页。行号只对本次 read 的 version 有效。',
+      'edit 在“当前正文”上做字面 oldString→newString 原子替换；也可带 fromLine/toLine（1-based、含首尾整行）做整行区间替换，二者互斥。区间末尾原有分隔符保留；newString 里显式写的换行/空行原样保留，末行原本没有换行时不会偷偷加，也不会删掉你写的空行。',
+      '行号只对这次 read 返回的 version 有效；edit 必须回传该 baseVersion/baseRevisionId。行号过期时整笔 MP_DOC_STALE，绝不把旧行号挪到新位置或钳到文件末尾；行号越界是 MP_LINE_RANGE。',
+      '不带行号的 oldString 必须在当前正文里唯一：出现多次返回 FS_AMBIGUOUS_EDIT，不会猜一处；要改多处请用 replaceAll 或先 read 行号。',
+      'readToken 与 version 同源，是正文 revision，不是行号锚点；正文一变旧行号即失效。',
       '如果 edit 返回 saved:false，说明修改只进入编辑器缓冲区、还没有写到磁盘；不要声称文件已保存，用户会看到并决定何时保存。',
       '冲突纪律：MP_DOC_STALE 表示读取后正文又被改过——必须重新 read 拿新的 version（revision token）再重试，绝不沿用旧值；',
       'MP_DOC_EXTERNAL_CONFLICT / MP_DOC_ORPHAN_DRAFT 必须让用户先在编辑器里处理冲突或恢复草稿。',
       'MP_DOC_UNSAVED_ELSEWHERE 表示另一窗口有未保存修改，AI 不能改；请让用户先在那里保存。',
       'MP_BLOCK_NOT_FOUND 表示块 ID 已因正文变化失效——重新调用 blocks，绝不猜 ID。',
       '共享会话失效（MP_LIVE_*）或归档失败（MP_ARCHIVE_FAILED）时不要改用其它写工具，重新 read 或让用户重试。',
+      'editSelection 只改编辑器 UI 捕获的 selections（selectionId 来自 documents.captureSelection）：单段用 newString，多段用与捕获顺序一致的 replacements；引用短期、一次性、绑定会话和版本，文本变化时只在可验证的版本链上重定位，冲突/过期/越界一律拒写，不会全文猜唯一或自动替换全部。',
+      'readSelection 只读取该捕获引用（有界 32 KiB），不消费引用；需要最新原文仍用 read。',
     ].join(' '),
     parameters: {
-      action: { type: 'string', required: true, description: 'read = 读当前正文；edit = 字面/整块替换；blocks = 列块 ID；batch = 原子多处编辑；merge3 = 三方合并；undo = 撤销最近一组 AI 编辑。', enum: ['read', 'edit', 'blocks', 'batch', 'merge3', 'undo'] },
+      action: { type: 'string', required: true, description: 'read = 读当前正文；edit = 字面/整块替换；blocks = 列块 ID；batch = 原子多处编辑；merge3 = 三方合并；undo = 撤销最近一组 AI 编辑；editSelection = 替换 UI 捕获的选区；readSelection = 有界读取捕获选区。', enum: ['read', 'edit', 'blocks', 'batch', 'merge3', 'undo', 'editSelection', 'readSelection'] },
       path: { type: 'string', required: true, description: '文件的绝对路径。' },
       cwd: { type: 'string', description: '可选：相对路径的解析基准目录。' },
       blockId: { type: 'string', description: 'action=edit 可选：从 blocks 结果拿到的 section ID；与 oldString 二选一。' },
@@ -1996,11 +2818,18 @@ export function createMarkdownToolDefinition(dispatch) {
           },
         },
       },
-      oldString: { type: 'string', description: 'action=edit 必填：要替换的原文字面量（须唯一，除非 replaceAll）。' },
-      newString: { type: 'string', description: 'action=edit 必填：替换后的文字面量。' },
-      replaceAll: { type: 'boolean', description: 'action=edit 可选：替换所有出现（默认 false，最多 1000 处）。' },
-      baseVersion: { type: 'string', description: '上次 read 返回的 version（revision token）；edit 应回传，过期则 MP_DOC_STALE。' },
+      oldString: { type: 'string', description: 'action=edit 必填（与 fromLine/toLine 二选一）：要替换的原文字面量；不带行号时须在当前正文唯一，重复则 FS_AMBIGUOUS_EDIT。' },
+      newString: { type: 'string', description: 'action=edit 必填：替换后的文字面量。行区间替换时表示整段新内容，可多行；服务端按原段 EOL 归一。' },
+      replaceAll: { type: 'boolean', description: 'action=edit 可选：替换所有出现（默认 false，最多 1000 处）；不能与 fromLine/toLine 同用。' },
+      fromLine: { type: 'number', description: 'read：1-based 起始行；edit：1-based 第一行（含）。行号只对同一次 read 的 version 有效。' },
+      toLine: { type: 'number', description: 'read：1-based 结束行（含）；edit：1-based 最后一行（含，默认等于 fromLine）。' },
+      lineCount: { type: 'number', description: 'read 可选：最多返回行数（默认 200，上限 2000）。' },
+      maxBytes: { type: 'number', description: 'read 可选：窗口原文的 UTF-8 字节上限（默认 256KiB，上限 1MiB）；显式设置且单行超过它时整次读取返回 MP_LINE_TOO_LONG（带 requiredBytes），按提示提高 maxBytes 重试。' },
+      fromColumn: { type: 'number', description: 'read 可选：超长单行分页续读的起始列（1-based，按 UTF-16 代码单元，不能拆开代理对）；与 fromLine 同用，取上一页的 nextColumn。' },
+      baseVersion: { type: 'string', description: '上次 read 返回的 version（revision token）；edit 应回传，过期则 MP_DOC_STALE。行区间编辑必须回传，且不接受裸 provider version。' },
       baseRevisionId: { type: 'string', description: '可选：与 baseVersion 等价的显式 revision token。' },
+      selectionId: { type: 'string', description: 'action=editSelection/readSelection：documents.captureSelection 返回的短期引用 ID。' },
+      replacements: { type: 'array', description: 'action=editSelection 多段选区：与捕获 ranges 顺序一致的替换字符串数组；单段请用 newString。', items: { type: 'string' } },
     },
     output: {
       schema: {
@@ -2012,9 +2841,70 @@ export function createMarkdownToolDefinition(dispatch) {
           readToken: { type: 'string' },
           blockId: { type: 'string' },
           groupId: { type: 'string' },
+          groupPersisted: { type: 'boolean' },
+          groupError: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              code: { type: 'string', required: true },
+              message: { type: 'string', required: true },
+            },
+          },
           undoOf: { type: 'string' },
+          selective: { type: 'boolean' },
+          undoMarkPending: { type: 'array', items: { type: 'string' } },
+          undoMarked: { type: 'array', items: { type: 'string' } },
+          undoMarkState: { type: 'string' },
           totalBlocks: { type: 'number' },
           truncated: { type: 'boolean' },
+          lineMode: { type: 'boolean' },
+          paged: { type: 'boolean' },
+          partialLine: { type: 'boolean' },
+          startColumn: { type: 'number' },
+          endColumn: { type: 'number' },
+          nextColumn: { type: 'number' },
+          nextOffset: { type: 'number' },
+          totalChars: { type: 'number' },
+          lineEdit: { type: 'boolean' },
+          fromLine: { type: 'number' },
+          toLine: { type: 'number' },
+          newFromLine: { type: 'number' },
+          newToLine: { type: 'number' },
+          startLine: { type: 'number' },
+          endLine: { type: 'number' },
+          totalLines: { type: 'number' },
+          requestedToLine: { type: 'number' },
+          lineLimit: { type: 'number' },
+          byteLimit: { type: 'number' },
+          bytes: { type: 'number' },
+          nextLine: { type: 'number' },
+          removedLineCount: { type: 'number' },
+          insertedLineCount: { type: 'number' },
+          newTotalLines: { type: 'number' },
+          removedLength: { type: 'number' },
+          insertedLength: { type: 'number' },
+          eol: { type: 'string' },
+          trailingEol: { type: 'string' },
+          lineNumbersValidFor: { type: 'string' },
+          removedPreview: { type: 'string' },
+          truncatedByLines: { type: 'boolean' },
+          truncatedByBytes: { type: 'boolean' },
+          truncatedByBudget: { type: 'boolean' },
+          hasMore: { type: 'boolean' },
+          beyondEnd: { type: 'boolean' },
+          bom: { type: 'boolean' },
+          lines: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                number: { type: 'number', required: true },
+                from: { type: 'number' },
+                to: { type: 'number' },
+                end: { type: 'number' },
+              },
+            },
+          },
           clean: { type: 'boolean' },
           merged: { type: 'boolean' },
           conflicts: {
@@ -2058,6 +2948,27 @@ export function createMarkdownToolDefinition(dispatch) {
               },
             },
           },
+          selectionId: { type: 'string' },
+          replayed: { type: 'boolean' },
+          stale: { type: 'boolean' },
+          expiresAt: { type: 'number' },
+          bytes: { type: 'number' },
+          maxBytes: { type: 'number' },
+          ranges: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                from: { type: 'number' },
+                to: { type: 'number' },
+                text: { type: 'string' },
+                originFrom: { type: 'number' },
+                originTo: { type: 'number' },
+                removedLength: { type: 'number' },
+                insertedLength: { type: 'number' },
+              },
+            },
+          },
           text: { type: 'string' },
           version: { type: 'string' },
           revisionId: { type: 'string' },
@@ -2069,6 +2980,11 @@ export function createMarkdownToolDefinition(dispatch) {
           diskChanged: { type: 'boolean' },
           bufferOwnedElsewhere: { type: 'boolean' },
           unsavedElsewhere: { type: 'boolean' },
+          writable: { type: 'boolean' },
+          draft: { type: 'boolean' },
+          mirrorDraft: { type: 'boolean' },
+          draftStale: { type: 'boolean' },
+          draftUnknown: { type: 'boolean' },
           checkpointPath: { type: 'string' },
           recoveryPath: { type: 'string' },
           error: {
@@ -2082,6 +2998,13 @@ export function createMarkdownToolDefinition(dispatch) {
               dirty: { type: 'boolean' },
               diskChanged: { type: 'boolean' },
               checkpointPath: { type: 'string' },
+              draftStale: { type: 'boolean' },
+              draftUnknown: { type: 'boolean' },
+              reason: { type: 'string' },
+              lineNumber: { type: 'number' },
+              requiredBytes: { type: 'number' },
+              byteLimit: { type: 'number' },
+              maxBytesCap: { type: 'number' },
             },
           },
         },
@@ -2090,13 +3013,23 @@ export function createMarkdownToolDefinition(dispatch) {
         if (value?.ok !== true) {
           return textBlock(`markdown ${String(args?.action ?? '')} 失败：${value?.error?.code ?? 'error'} — ${value?.error?.message ?? ''}`);
         }
-        if (value.action === 'read') {
-          const text = String(value.text ?? '');
-          const head = text.length > 8000 ? `${text.slice(0, 8000)}\n…（共 ${text.length} 字符，已截断）` : text;
-          const where = value.source === 'buffer' ? '编辑器缓冲区' : '磁盘';
-          const dirty = value.dirty === true ? '，含未保存修改' : '';
-          return textBlock(`${value.displayPath ?? ''}（${where}${dirty}）\nversion: ${String(value.version ?? '')}\n\n${head}`);
+        // A successful write whose audit group could not be persisted has no
+        // undo id. Say so instead of leaving the caller to try a dead id.
+        const groupWarning = value.groupPersisted === false
+          ? `；本次修改已生效，但编辑组未能保存（无法撤销）${value.groupError?.code ? '（' + value.groupError.code + '）' : ''}`
+          : '';
+        if (value.action === 'readSelection') {
+          const ranges = Array.isArray(value.ranges) ? value.ranges : [];
+          // The service already enforces the 32 KiB hard budget. Never truncate
+          // the model-visible text again here: a partial payload would look like
+          // a successful read and invite a blind edit.
+          const body = ranges.map((range) => `- [${range.originFrom ?? range.from}, ${range.originTo ?? range.to}) → [${range.from}, ${range.to})\n${String(range.text ?? '')}`).join('\n');
+          return textBlock(`选区读取：${value.selectionId}；${ranges.length} 段；version: ${String(value.version ?? '')}；${Number(value.bytes) || 0}/${Number(value.maxBytes) || 32768} bytes\n${body}`);
         }
+        if (value.action === 'editSelection') {
+          return textBlock(`已替换捕获选区：${value.selectionId}；${Array.isArray(value.ranges) ? value.ranges.length : 0} 段；${value.replayed === true ? '重试回执，未重复写' : (value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘')}；新版本：${String(value.version ?? '')}${value.groupId ? '；groupId：' + value.groupId : ''}${groupWarning}`);
+        }
+        if (value.action === 'read') return textBlock(formatReadValue(value));
         if (value.action === 'blocks') {
           const blocks = Array.isArray(value.blocks) ? value.blocks : [];
           const total = Number.isFinite(Number(value.totalBlocks)) ? Number(value.totalBlocks) : blocks.length;
@@ -2108,53 +3041,90 @@ export function createMarkdownToolDefinition(dispatch) {
             const conflicts = Array.isArray(value.conflicts) ? value.conflicts : [];
             return textBlock(`未写入：三方合并发现 ${conflicts.length} 处冲突，需用户/调用方决定。\n` + conflicts.map((c) => `- base ${c.baseFrom}..${c.baseTo}: ours=${JSON.stringify(String(c.ours).slice(0, 80))} other=${JSON.stringify(String(c.other).slice(0, 80))}`).join('\n'));
           }
-          return textBlock(`三方合并完成：${value.displayPath ?? ''}${value.changed === false ? '（无变化）' : ''}；${value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘'}；新版本：${String(value.version ?? '')}${value.groupId ? '；groupId：' + value.groupId : ''}`);
+          return textBlock(`三方合并完成：${value.displayPath ?? ''}${value.changed === false ? '（无变化）' : ''}；${value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘'}；新版本：${String(value.version ?? '')}${value.groupId ? '；groupId：' + value.groupId : ''}${groupWarning}`);
         }
         if (value.action === 'batch') {
           const count = Array.isArray(value.applied) ? value.applied.length : 0;
-          return textBlock(`已批量应用 ${count} 处编辑：${value.displayPath ?? ''}${value.changed === false ? '（内容未变）' : ''}；${value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘'}；新版本：${String(value.version ?? '')}${value.groupId ? '；groupId：' + value.groupId : ''}`);
+          return textBlock(`已批量应用 ${count} 处编辑：${value.displayPath ?? ''}${value.changed === false ? '（内容未变）' : ''}；${value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘'}；新版本：${String(value.version ?? '')}${value.groupId ? '；groupId：' + value.groupId : ''}${groupWarning}`);
         }
         if (value.action === 'undo') {
-          return textBlock(`已撤销 AI 编辑组：${value.undoOf ?? ''}；${value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘'}；新版本：${String(value.version ?? '')}；撤销组：${String(value.groupId ?? '')}`);
+          const preserved = value.selective === true ? '（已保留之后的用户修改）' : '';
+          const pending = Array.isArray(value.undoMarkPending) && value.undoMarkPending.length
+            ? `；正文已恢复，但有 ${value.undoMarkPending.length} 组审计标记未完成（状态已保留，不要重复撤销）` : '';
+          return textBlock(`已撤销 AI 编辑组：${value.undoOf ?? ''}${preserved}；${value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘'}；新版本：${String(value.version ?? '')}；撤销组：${String(value.groupId ?? '')}${pending}`);
         }
         const target = value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘；请让用户确认后自行保存';
         const copy = value.checkpointPath ? `；改前副本：${value.checkpointPath}` : '';
         const recovery = value.recoveryPath ? `；恢复副本：${value.recoveryPath}` : '';
         const block = value.blockId ? `；块：${value.blockId}` : '';
-        return textBlock(`已应用编辑：${value.displayPath ?? ''}${value.changed === false ? '（内容未变）' : ''}；${target}${block}${copy}${recovery}；新版本：${String(value.version ?? '')}${value.groupId ? '；groupId：' + value.groupId : ''}`);
+        if (value.lineEdit === true) {
+          const span = Number(value.insertedLineCount) > 0
+            ? `L${value.fromLine}..L${value.toLine} → L${value.newFromLine}..L${value.newToLine}`
+            : `L${value.fromLine}..L${value.toLine} → 删除`;
+          const eol = value.trailingEol ? `；保留原段末尾分隔符 ${JSON.stringify(value.trailingEol)}` : '；原段末尾无分隔符，未新增';
+          const preview = typeof value.removedPreview === 'string' && value.removedPreview
+            ? `；被替换：${JSON.stringify(value.removedPreview)}${Number(value.removedLength) > value.removedPreview.length ? '…' : ''}` : '';
+          return textBlock(`已按行替换：${value.displayPath ?? ''}${value.changed === false ? '（内容未变）' : ''}；${span}；${target}${eol}${preview}${copy}${recovery}；新版本：${String(value.version ?? '')}${value.groupId ? '；groupId：' + value.groupId : ''}${groupWarning}`);
+        }
+        return textBlock(`已应用编辑：${value.displayPath ?? ''}${value.changed === false ? '（内容未变）' : ''}；${target}${block}${copy}${recovery}；新版本：${String(value.version ?? '')}${value.groupId ? '；groupId：' + value.groupId : ''}${groupWarning}`);
       },
     },
     async execute(args, execution) {
       const action = args?.action === 'edit' ? 'edit' : args?.action === 'blocks' ? 'blocks'
         : args?.action === 'batch' ? 'batch' : args?.action === 'merge3' ? 'merge3'
-          : args?.action === 'undo' ? 'undo' : 'read';
+          : args?.action === 'undo' ? 'undo' : args?.action === 'editSelection' ? 'editSelection'
+            : args?.action === 'readSelection' ? 'readSelection' : 'read';
       try {
-        if (action === 'read' || action === 'blocks') {
+        if (action === 'readSelection') {
+          const result = await dispatch('documents.readSelection', {
+            path: args?.path, cwd: args?.cwd, selectionId: args?.selectionId,
+          }, MODEL_TOOL, execution);
+          if (result.ok !== true) return { ok: false, action, error: result.error };
+          const value = result.value;
+          return {
+            ok: true, action, selectionId: value.selectionId,
+            version: value.version, revisionId: value.revisionId, readToken: value.version,
+            displayPath: args?.path, stale: value.stale === true,
+            expiresAt: value.expiresAt,
+            bytes: value.bytes, maxBytes: value.maxBytes,
+            ranges: Array.isArray(value.ranges) ? value.ranges : [],
+          };
+        }
+        if (action === 'editSelection') {
+          const result = await dispatch('documents.editSelection', {
+            path: args?.path, cwd: args?.cwd, selectionId: args?.selectionId,
+            newString: args?.newString, replacements: args?.replacements,
+          }, MODEL_TOOL, execution);
+          if (result.ok !== true) return { ok: false, action, error: result.error };
+          const value = result.value;
+          return {
+            ok: true, action, selectionId: value.selectionId,
+            version: value.version, revisionId: value.revisionId, readToken: value.version,
+            displayPath: value.displayPath, changed: value.changed,
+            source: value.source, dirty: value.dirty === true, saved: value.saved === true,
+            replayed: value.replayed === true,
+            ranges: Array.isArray(value.ranges) ? value.ranges : [],
+            ...(value.groupId ? { groupId: value.groupId } : {}),
+            ...(value.groupPersisted === false ? { groupPersisted: false, groupError: value.groupError } : {}),
+            ...(value.checkpointPath ? { checkpointPath: value.checkpointPath } : {}),
+          };
+        }
+        if (action === 'read') return await executeReadTool(dispatch, args, execution);
+        if (action === 'blocks') {
           const result = await dispatch('documents.read', { path: args?.path, cwd: args?.cwd }, MODEL_TOOL, execution);
           if (result.ok !== true) return { ok: false, action, error: result.error };
           const value = result.value;
-          if (action === 'blocks') {
-            const all = parseDocumentBlocks(String(value.text ?? ''));
-            const blocks = all.slice(0, 200);
-            return {
-              ok: true, action, version: value.version, revisionId: value.revisionId, readToken: value.readToken || value.version,
-              displayPath: value.displayPath, source: value.source, dirty: value.dirty === true,
-              blocks, totalBlocks: all.length, truncated: all.length > blocks.length,
-            };
-          }
+          const all = parseDocumentBlocks(String(value.text ?? ''));
+          const blocks = all.slice(0, 200);
           return {
-            ok: true,
-            action,
-            text: value.text,
-            version: value.version,
-            revisionId: value.revisionId,
-            readToken: value.readToken || value.version,
-            displayPath: value.displayPath,
-            source: value.source,
-            dirty: value.dirty === true,
-            ...(typeof value.diskChanged === 'boolean' ? { diskChanged: value.diskChanged } : {}),
-            ...(value.bufferOwnedElsewhere === true ? { bufferOwnedElsewhere: true } : {}),
-            ...(value.unsavedElsewhere === true ? { unsavedElsewhere: true } : {}),
+            ok: true, action, version: value.version, revisionId: value.revisionId, readToken: value.readToken || value.version,
+            displayPath: value.displayPath, source: value.source, dirty: value.dirty === true,
+            writable: value.writable !== false,
+            ...(value.draft === true ? { draft: true } : {}),
+            ...(value.mirrorDraft === true ? { mirrorDraft: true } : {}),
+            ...(value.draftStale === true ? { draftStale: true } : {}),
+            ...(value.draftUnknown === true ? { draftUnknown: true } : {}),
+            blocks, totalBlocks: all.length, truncated: all.length > blocks.length,
           };
         }
         if (action === 'merge3') {
@@ -2171,6 +3141,8 @@ export function createMarkdownToolDefinition(dispatch) {
             dirty: value.dirty === true, saved: value.saved === true,
             ...(Array.isArray(value.conflicts) ? { conflicts: value.conflicts } : {}),
             ...(value.groupId ? { groupId: value.groupId } : {}),
+            ...(value.groupPersisted === false ? { groupPersisted: false, groupError: value.groupError } : {}),
+            ...(value.checkpoint?.archivePath ? { checkpointPath: value.checkpoint.archivePath } : {}),
           };
         }
         if (action === 'batch') {
@@ -2184,7 +3156,8 @@ export function createMarkdownToolDefinition(dispatch) {
             ok: true, action, version: value.version, revisionId: value.revisionId, readToken: value.version,
             displayPath: value.displayPath, changed: value.changed, source: value.source,
             dirty: value.dirty === true, saved: value.saved === true, applied: value.applied,
-            groupId: value.groupId,
+            ...(value.groupId ? { groupId: value.groupId } : {}),
+            ...(value.groupPersisted === false ? { groupPersisted: false, groupError: value.groupError } : {}),
             ...(value.checkpoint?.archivePath ? { checkpointPath: value.checkpoint.archivePath } : {}),
             ...(typeof value.recoveryPath === 'string' && value.recoveryPath ? { recoveryPath: value.recoveryPath } : {}),
           };
@@ -2198,17 +3171,43 @@ export function createMarkdownToolDefinition(dispatch) {
             displayPath: value.displayPath, changed: value.changed, source: value.source,
             dirty: value.dirty === true, saved: value.saved === true,
             groupId: value.groupId, undoOf: value.undoOf,
+            ...(value.selective === true ? { selective: true } : {}),
+            ...(Array.isArray(value.undoMarkPending) ? { undoMarkPending: value.undoMarkPending } : {}),
+            ...(Array.isArray(value.undoMarked) ? { undoMarked: value.undoMarked } : {}),
+            ...(typeof value.undoMarkState === 'string' ? { undoMarkState: value.undoMarkState } : {}),
             ...(value.checkpoint?.archivePath ? { checkpointPath: value.checkpoint.archivePath } : {}),
             ...(typeof value.recoveryPath === 'string' && value.recoveryPath ? { recoveryPath: value.recoveryPath } : {}),
+          };
+        }
+        const isLineEdit = args?.fromLine !== undefined || args?.toLine !== undefined;
+        // The line-mode payload below intentionally omits oldString/blockId/
+        // replaceAll so the service cannot mistake them for a literal edit.
+        // Reject the mixed call here instead of silently dropping the guard
+        // fields: an explicit replaceAll (true or false) is still an explicit
+        // request for the literal-edit mode.
+        if (isLineEdit && (args?.oldString !== undefined || args?.blockId !== undefined
+          || args?.edits !== undefined || args?.replaceAll !== undefined)) {
+          return {
+            ok: false,
+            action,
+            error: {
+              code: 'bad-request',
+              message: 'line range edits are mutually exclusive with oldString/blockId/edits/replaceAll',
+            },
           };
         }
         const result = await dispatch('documents.applyEdits', {
           path: args?.path,
           cwd: args?.cwd,
-          blockId: args?.blockId,
-          oldString: args?.oldString,
+          ...(isLineEdit ? {
+            ...(args?.fromLine !== undefined ? { fromLine: args.fromLine } : {}),
+            ...(args?.toLine !== undefined ? { toLine: args.toLine } : {}),
+          } : {
+            blockId: args?.blockId,
+            oldString: args?.oldString,
+            replaceAll: args?.replaceAll === true,
+          }),
           newString: args?.newString,
-          replaceAll: args?.replaceAll === true,
           baseVersion: args?.baseVersion,
           baseRevisionId: args?.baseRevisionId,
         }, MODEL_TOOL, execution);
@@ -2227,11 +3226,21 @@ export function createMarkdownToolDefinition(dispatch) {
           saved: value.saved === true,
           ...(value.blockId ? { blockId: value.blockId } : {}),
           ...(value.groupId ? { groupId: value.groupId } : {}),
+          ...(value.groupPersisted === false ? { groupPersisted: false, groupError: value.groupError } : {}),
+          ...(value.lineEdit === true ? {
+            lineEdit: true,
+            fromLine: value.fromLine, toLine: value.toLine,
+            newFromLine: value.newFromLine, newToLine: value.newToLine,
+            removedLineCount: value.removedLineCount, insertedLineCount: value.insertedLineCount,
+            newTotalLines: value.newTotalLines, trailingEol: value.trailingEol, eol: value.eol,
+            removedPreview: value.removedPreview, removedLength: value.removedLength,
+            insertedLength: value.insertedLength,
+          } : {}),
           ...(value.checkpoint?.archivePath ? { checkpointPath: value.checkpoint.archivePath } : {}),
           ...(typeof value.recoveryPath === 'string' && value.recoveryPath ? { recoveryPath: value.recoveryPath } : {}),
         };
       } catch (error) {
-        return { ok: false, action, error: { code: errorCode(error), message: String(error?.message ?? error) } };
+        return { ok: false, action, error: { code: errorCode(error), message: String(error?.message ?? error), ...(error?.reason ? { reason: String(error.reason) } : {}) } };
       }
     },
   };

@@ -47,7 +47,7 @@ test('rail preserves conflict actions and renders the recovered popover as a sib
   assert.ok(labels.includes('重载磁盘版本'));
   assert.ok(labels.includes('复制我的内容'));
   assert.ok(labels.includes('复制路径'));
-  assert.ok((tree.children || []).some((n) => n.props?.className === 'mp-rail-popover'));
+  assert.ok((tree.children || []).filter(Boolean).some((n) => n.props?.className === 'mp-rail-popover'));
   const popover = findByClass(tree, 'mp-rail-popover');
   assert.equal(popover.props.style.position, 'absolute');
   assert.equal(popover.props.style.top, 34);

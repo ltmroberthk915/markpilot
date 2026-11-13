@@ -12,6 +12,13 @@ const {decodeDocument} = require('./text-codec');
 const fault = (code, message) => Object.assign(new Error(message), {code});
 const conflict = message => fault('MP_FILE_CONFLICT', message);
 const uuid = () => crypto.randomUUID();
+// Capabilities a host declares for every client it creates. Members without
+// these bits are "unknown" (old EXE / old plugin): no agent append is allowed
+// into a room whose leave() could delete that edit.
+const CAP_DURABLE_APPEND = 1;   // append_recovery copy + leave() keeps unacked agent edits
+const CAP_REMOTE_REPLAY = 2;    // packaged renderer applies live deltas (live-document.js)
+const LIVE_REQUIRED_CAPS = CAP_DURABLE_APPEND | CAP_REMOTE_REPLAY;
+const LIVE_HOST_CAPS = LIVE_REQUIRED_CAPS;
 const databases = new Map();
 const reservations = new AsyncLocalStorage();
 const hosts = new Set();            // 本代（本模块实例）仍有协同成员的 host；join 成功登记，leave 清空即除名
@@ -39,6 +46,12 @@ function database(directory) {
         id TEXT PRIMARY KEY, epoch TEXT NOT NULL REFERENCES rooms(epoch) ON DELETE CASCADE,
         pid INTEGER NOT NULL, seq INTEGER NOT NULL DEFAULT 0, ack INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS room_clients ON clients(epoch);
+      CREATE TABLE IF NOT EXISTS client_caps (
+        client TEXT PRIMARY KEY,
+        epoch TEXT NOT NULL,
+        caps INTEGER NOT NULL,
+        at INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS client_caps_epoch ON client_caps(epoch);
       CREATE TABLE IF NOT EXISTS changes (
         epoch TEXT NOT NULL REFERENCES rooms(epoch) ON DELETE CASCADE, version INTEGER NOT NULL,
         client TEXT NOT NULL, seq INTEGER NOT NULL, delta TEXT NOT NULL, group_id TEXT, PRIMARY KEY(epoch,version));
@@ -55,6 +68,26 @@ function database(directory) {
         base_revision TEXT, result_revision TEXT, at INTEGER NOT NULL,
         changes TEXT, undone_at INTEGER);
       CREATE INDEX IF NOT EXISTS agent_group_source ON agent_group(source, at DESC);
+      CREATE TABLE IF NOT EXISTS room_resolved (
+        epoch TEXT PRIMARY KEY REFERENCES rooms(epoch) ON DELETE CASCADE,
+        disk TEXT NOT NULL, resolved_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS draft_index (
+        source TEXT PRIMARY KEY,
+        kind TEXT NOT NULL CHECK (kind IN ('file','untitled')),
+        text TEXT NOT NULL,
+        text_sha TEXT NOT NULL CHECK (length(text_sha)=64),
+        bytes INTEGER NOT NULL CHECK (bytes>=0 AND bytes<=8388608),
+        base_version TEXT NOT NULL,
+        base_sha256 TEXT NOT NULL CHECK (length(base_sha256)=0 OR length(base_sha256)=64),
+        doc_token TEXT NOT NULL CHECK (length(doc_token) BETWEEN 1 AND 128),
+        session TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        CHECK (length(source) BETWEEN 1 AND 8192),
+        CHECK (updated_at >= created_at),
+        CHECK ((kind='file' AND base_version<>'' AND length(base_sha256)=64)
+            OR (kind='untitled' AND base_version='' AND base_sha256='')));
+      CREATE INDEX IF NOT EXISTS draft_index_updated ON draft_index(updated_at DESC);
       CREATE TABLE IF NOT EXISTS writers (file TEXT PRIMARY KEY, owner TEXT NOT NULL, pid INTEGER NOT NULL, since INTEGER NOT NULL);`);
     // Rooms kept by an earlier draft release held leases without timestamps.
     if (!db.prepare('PRAGMA table_info(writers)').all().some(column => column.name === 'since'))
@@ -70,7 +103,7 @@ function database(directory) {
     const stamp = hostStamp(), stored = db.prepare("SELECT value FROM meta WHERE key='host'").get();
     if (stored && stored.value !== stamp)
       atomic(db, () => {
-        db.exec('DELETE FROM writers; DELETE FROM changes; DELETE FROM clients; DELETE FROM rooms; DELETE FROM append_recovery;');
+        db.exec('DELETE FROM writers; DELETE FROM client_caps; DELETE FROM changes; DELETE FROM clients; DELETE FROM rooms; DELETE FROM append_recovery; DELETE FROM draft_index;');
         db.prepare("INSERT OR REPLACE INTO meta VALUES('host',?)").run(stamp);
       });
     else if (!stored) atomic(db, () => db.prepare("INSERT OR REPLACE INTO meta VALUES('host',?)").run(stamp));
@@ -102,6 +135,95 @@ function localStoreUsable(filename) {
   finally { try { db?.close(); } catch { /* already closed */ } }
 }
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+// Agent edit groups are written in the same transaction as the change itself,
+// so a committed edit never advertises a group id that cannot be reviewed or
+// undone. The revision token must match documents-service.revisionTextSha:
+// comparison-normalized (CRLF -> LF, leading BOM dropped) text sha256.
+const GROUP_ID_RE = /^[0-9a-f-]{36}$/i;
+const GROUP_CHANGES_MAX = 4 * 1024 * 1024;
+const revisionTextSha = text => digest(Buffer.from(String(text).replace(/\r\n?/g, '\n').replace(/^\uFEFF/, ''), 'utf8'));
+const liveRevisionId = (epoch, version, text) => 'rev1:live:' + epoch + ':' + version + ':' + revisionTextSha(text);
+// `changes` may carry the removed bytes (the inverse of the edit). That text is
+// local audit data: it goes to agent_group only, never to changes.delta (which
+// every member receives) and never to a new on-disk journal.
+function groupChangesJson(changes) {
+  if (!Array.isArray(changes) || changes.length === 0) return null;
+  const raw = JSON.stringify(changes.map((change) => ({
+    from: Number(change?.from) || 0, to: Number(change?.to) || 0,
+    insert: String(change?.insert ?? ''), removed: String(change?.removed ?? ''),
+  })));
+  return raw.length <= GROUP_CHANGES_MAX ? raw : null;
+}
+function appendGroupRow(entry, groupId, resultRevision) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return { skipped: 'invalid-group-metadata' };
+  const wanted = String(entry.groupId ?? groupId ?? '');
+  if (!GROUP_ID_RE.test(wanted)) return { skipped: 'invalid-group-id' };
+  if (groupId != null && wanted !== String(groupId)) return { skipped: 'group-id-mismatch' };
+  const kind = String(entry.kind || 'edit');
+  if (!/^[a-z0-9-]{1,32}$/i.test(kind)) return { skipped: 'invalid-group-kind' };
+  const baseRevision = String(entry.baseRevision || '');
+  if (!baseRevision || baseRevision.length > 512) return { skipped: 'invalid-base-revision' };
+  const changes = groupChangesJson(entry.changes);
+  if (!changes) return { skipped: 'group-changes-unavailable' };
+  return { groupId: wanted, kind, baseRevision, resultRevision, changes };
+}
+function insertAgentGroupRow(db, key, group, now, actor = 'agent') {
+  db.prepare('INSERT OR REPLACE INTO agent_group(group_id,source,actor,kind,base_revision,result_revision,at,changes,undone_at) VALUES(?,?,?,?,?,?,?,?,NULL)')
+    .run(group.groupId, key, String(actor).slice(0, 32), group.kind, group.baseRevision, group.resultRevision, now, group.changes);
+}
+const DRAFT_LIMITS = Object.freeze({
+  maxBytes: 8 * 1024 * 1024,
+  maxRows: 512,
+  maxTotalBytes: 128 * 1024 * 1024,
+  ttlMs: 14 * 24 * 60 * 60 * 1000,
+});
+function normalizedDraftText(text) { return String(text).replace(/\r\n?/g, '\n'); }
+function validateDraftText(text) {
+  if (text.includes('\u0000')) throw fault('MP_DRAFT_INVALID', '草稿含 NUL，不能进入镜像索引');
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (c >= 0xd800 && c <= 0xdbff) {
+      const next = text.charCodeAt(++i);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) throw fault('MP_DRAFT_INVALID', '草稿含不完整 Unicode 字符');
+    } else if (c >= 0xdc00 && c <= 0xdfff) throw fault('MP_DRAFT_INVALID', '草稿含不完整 Unicode 字符');
+  }
+}
+function validateDraftLimits(limits) {
+  for (const key of ['maxBytes', 'maxRows', 'maxTotalBytes', 'ttlMs']) {
+    const value = limits[key];
+    if (!Number.isFinite(value) || value <= 0) throw fault('MP_DRAFT_INVALID', '无效的草稿索引上限：' + key);
+  }
+  for (const key of ['maxBytes', 'maxRows', 'maxTotalBytes']) if (!Number.isSafeInteger(limits[key]))
+    throw fault('MP_DRAFT_INVALID', '草稿索引上限必须是整数：' + key);
+  if (limits.maxBytes > DRAFT_LIMITS.maxBytes)
+    throw fault('MP_DRAFT_INVALID', '单条草稿上限不能超过 8 MiB');
+  return limits;
+}
+function draftSessionValue(session) {
+  if (session === null || session === undefined) return null;
+  if (typeof session === 'string') return session;
+  if (typeof session === 'object') return JSON.stringify(session);
+  throw fault('MP_DRAFT_INVALID', '无效的编辑器会话');
+}
+function draftSessionRead(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') return value;
+  try { return JSON.parse(value); } catch { return value; }
+}
+function draftSha(text) { return digest(Buffer.from(text, 'utf8')); }
+function draftBytes(text) { return Buffer.byteLength(text, 'utf8'); }
+function draftStoreFile(directory) { return path.join(path.resolve(directory), 'rooms.sqlite'); }
+function draftStoreReadable(directory) {
+  const filename = draftStoreFile(directory);
+  if (!fs.existsSync(filename) || !localStoreUsable(filename)) return null;
+  const {DatabaseSync} = require('node:sqlite');
+  const db = new DatabaseSync(filename, {readOnly:true});
+  try { db.exec('PRAGMA busy_timeout=2000'); } catch { /* best effort */ }
+  return db;
+}
+function draftTableMissing(error) {
+  return !!error && /no such table:\s*draft_index/i.test(String(error.message || ''));
+}
 
 // Abnormal exits (crash, kill, power loss) leave client rows behind and, with
 // them, rooms whose last member never said goodbye. Clean orphans are plain
@@ -122,6 +244,7 @@ const APPEND_BUSY_TIMEOUT_MS = 10000;
 // parked recovery files below `recovery/`.
 const APPEND_RECOVERY_KEEP = 20;
 const APPEND_RECOVERY_MAX_BYTES = 64 * 1024 * 1024;
+const APPEND_RECOVERY_READ_MAX = 4 * 1024 * 1024;
 function safeStem(file) {
   return path.basename(file).replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 64) || 'document';
 }
@@ -217,6 +340,8 @@ function listAppendRecoveryRows(db, key) {
   const out = [];
   for (const row of appendRecoveryRows(db, key)) {
     try {
+      const size = fs.statSync(row.recoveryPath).size;
+      if (size !== row.bytes || size > APPEND_RECOVERY_READ_MAX) continue;
       const bytes = fs.readFileSync(row.recoveryPath);
       if (bytes.length !== row.bytes || digest(bytes) !== row.sha256) continue;
       out.push({ recoveryPath: row.recoveryPath, sha256: row.sha256, at: Number(row.at) || 0,
@@ -259,6 +384,7 @@ function retireClean(db, room) {
     if (!now || now.version !== room.version || now.saved !== room.saved) return false;
     db.prepare('DELETE FROM clients WHERE epoch=?').run(room.epoch);
     db.prepare('DELETE FROM rooms WHERE epoch=?').run(room.epoch);
+    db.prepare('DELETE FROM client_caps WHERE epoch=?').run(room.epoch);
     return true;
   });
 }
@@ -286,6 +412,7 @@ async function parkRecovery(db, directory, room) {
       .run(fileKey(room.file), target, room.epoch, room.version, room.saved, Date.now(), bytes.length, digest(bytes));
     db.prepare('DELETE FROM clients WHERE epoch=?').run(room.epoch);
     db.prepare('DELETE FROM rooms WHERE epoch=?').run(room.epoch);
+    db.prepare('DELETE FROM client_caps WHERE epoch=?').run(room.epoch);
     // Cap only the index. Parked files stay on disk until the user acts.
     const rows = db.prepare('SELECT recoveryPath FROM recovery ORDER BY at DESC').all();
     for (const row of rows.slice(RECOVERY_ROWS)) db.prepare('DELETE FROM recovery WHERE recoveryPath=?').run(row.recoveryPath);
@@ -302,6 +429,7 @@ async function sweepOrphans(db, directory) {
       if (room.version === room.saved) retireClean(db, room);
       else await parkRecovery(db, directory, room);
     }
+    try { db.prepare('DELETE FROM client_caps WHERE client NOT IN (SELECT id FROM clients)').run(); } catch { /* old schema */ }
   } catch (error) { /* housekeeping must never break a join or a write */ }
 }
 
@@ -424,6 +552,28 @@ function materialize(db, room, version = room.version) {
 const roomColumns = 'file,epoch,version,saved,disk,length,floor';
 function roomFor(db, file) { return db.prepare('SELECT '+roomColumns+' FROM rooms WHERE file=?').get(file); }
 function head(room) { return {epoch:room.epoch,version:room.version,savedVersion:room.saved,diskHash:room.disk}; }
+// Alive members plus their host-declared capabilities. client_caps is a separate
+// table: old hosts ignore it, and this build never changes clients/changes
+// columns. A missing table/row means "unknown" (0), never "safe".
+function memberView(db, epoch) {
+  const rows = db.prepare('SELECT id,pid FROM clients WHERE epoch=?').all(epoch);
+  const liveRows = rows.filter(({pid}) => alive(pid));
+  const caps = new Map();
+  try {
+    for (const row of db.prepare('SELECT client,caps FROM client_caps WHERE epoch=?').all(epoch))
+      caps.set(row.client, Number(row.caps) || 0);
+  } catch { /* store created before client_caps existed */ }
+  const replaySafe = (id) => (caps.get(id) & LIVE_REQUIRED_CAPS) === LIVE_REQUIRED_CAPS;
+  const parts = liveRows.map(({id}) => id + ':' + (caps.get(id) || 0)).sort();
+  const replaySafeMembers = liveRows.filter(({id}) => replaySafe(id)).length;
+  return {
+    members: liveRows.length,
+    localMembers: liveRows.filter(({pid}) => pid === process.pid).length,
+    replaySafeMembers,
+    allReplaySafe: liveRows.length > 0 && replaySafeMembers === liveRows.length,
+    fingerprint: digest(Buffer.from(String(epoch) + '\n' + parts.join('\n'), 'utf8')),
+  };
+}
 function updateRoom(db, room, client, seq, changes) {
   const length = checkedLength(changes, room.length), version = room.version + 1;
   db.prepare('INSERT INTO changes(epoch,version,client,seq,delta,group_id) VALUES(?,?,?,?,?,NULL)').run(room.epoch, version, client, seq, JSON.stringify(changes));
@@ -459,6 +609,7 @@ function adoptDisk(db, room, disk, force = false) {
   }
   room.saved = room.version; room.disk = disk.hash;
   db.prepare('UPDATE rooms SET saved=?,disk=? WHERE epoch=?').run(room.saved,room.disk,room.epoch);
+  db.prepare('DELETE FROM room_resolved WHERE epoch=?').run(room.epoch);
 }
 
 // 已提交的本地编辑（非重发/空操作）后台预热一次安全写者：准备与输入重叠，保存仍等待同一已校验工作进程。
@@ -470,12 +621,193 @@ function warmWriterAfterEdit(accepted) {
 }
 
 class LiveDocuments {
-  constructor({directory = defaultDirectory(), busyTimeoutMs} = {}) {
+  constructor({directory = defaultDirectory(), busyTimeoutMs, draftLimits, untitledDraftIndex = false} = {}) {
     this.directory = directory; this.busyTimeoutMs = busyTimeoutMs;
+    this.draftLimits = validateDraftLimits({...DRAFT_LIMITS, ...(draftLimits || {})});
+    this.untitledDraftIndex = !!untitledDraftIndex;
     this.clients = new Map();
   }
   get db() { return database(this.directory); }
   leaseOptions() { return {busyTimeoutMs:this.busyTimeoutMs}; }
+  // B3.3b read-only mirror. The draft index is never an editing authority:
+  // callers may expose it to readers, but write paths must reject any dirty
+  // mirror before they touch the disk.
+  draftLimitsFor() { return this.draftLimits; }
+  async draftSource(filePath, {untitled=false, docToken}={}) {
+    if (untitled) {
+      if (!this.untitledDraftIndex) throw fault('MP_DRAFT_UNTITLED_DISABLED', '未命名草稿索引未启用');
+      if (typeof docToken !== 'string' || !docToken || docToken.length > 128)
+        throw fault('MP_DRAFT_INVALID', '缺少有效的文档令牌');
+      return {source:'untitled:' + docToken, kind:'untitled'};
+    }
+    if (typeof filePath !== 'string' || !filePath) throw fault('MP_DRAFT_INVALID', '缺少文档路径');
+    const file = await canonicalFile(filePath);
+    const source = fileKey(file);
+    if (source.length > 8192) throw fault('MP_DRAFT_INVALID', '文档路径过长');
+    return {source, kind:'file'};
+  }
+  draftWritableDb() {
+    const filename = draftStoreFile(this.directory);
+    if (fs.existsSync(filename) && !localStoreUsable(filename))
+      throw fault('MP_DRAFT_STORE_FOREIGN', '草稿索引属于其他宿主，拒绝写入');
+    return this.db;
+  }
+  async putDraft(...args) {
+    storageOperations++;
+    try { return await this._putDraft(...args); }
+    finally { storageOperations--; }
+  }
+  async _putDraft(filePath, {text, baseVersion='', baseSha256='', docToken, session=null, untitled=false}={}) {
+    if (typeof text !== 'string') throw fault('MP_DRAFT_INVALID', '缺少草稿正文');
+    if (typeof docToken !== 'string' || !docToken || docToken.length > 128)
+      throw fault('MP_DRAFT_INVALID', '缺少有效的文档令牌');
+    validateDraftText(text);
+    const sessionValue = draftSessionValue(session);
+    const versionValue = typeof baseVersion === 'number' && Number.isFinite(baseVersion) ? String(baseVersion) : baseVersion;
+    const {source, kind} = await this.draftSource(filePath, {untitled, docToken});
+    const normalized = normalizedDraftText(text);
+    const bytes = draftBytes(normalized);
+    if (bytes > this.draftLimits.maxBytes) throw fault('MP_DRAFT_TOO_LARGE', '草稿超过镜像大小上限');
+    if (kind === 'file') {
+      if (typeof versionValue !== 'string' || !versionValue
+        || typeof baseSha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(baseSha256))
+        throw fault('MP_DRAFT_INVALID', '文件草稿缺少磁盘基线');
+    } else if (versionValue || baseSha256) {
+      throw fault('MP_DRAFT_INVALID', '未命名草稿不能绑定磁盘基线');
+    }
+    const textSha = draftSha(normalized), now = Date.now();
+    const db = this.draftWritableDb();
+    let created = false;
+    const row = atomic(db, () => {
+      db.prepare('DELETE FROM draft_index WHERE updated_at < ?').run(now - this.draftLimits.ttlMs);
+      const prior = db.prepare('SELECT created_at FROM draft_index WHERE source=?').get(source);
+      const totals = db.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(bytes),0) AS bytes FROM draft_index WHERE source<>?').get(source);
+      if (!prior && totals.n >= this.draftLimits.maxRows) throw fault('MP_DRAFT_LIMIT', '草稿索引条数已达上限');
+      if (totals.bytes + bytes > this.draftLimits.maxTotalBytes) throw fault('MP_DRAFT_LIMIT', '草稿索引总大小已达上限');
+      created = !prior;
+      if (prior) {
+        db.prepare(`UPDATE draft_index SET kind=?,text=?,text_sha=?,bytes=?,base_version=?,base_sha256=?,
+          doc_token=?,session=?,updated_at=? WHERE source=?`)
+          .run(kind, normalized, textSha, bytes, versionValue, baseSha256.toLowerCase(), docToken,
+            sessionValue, now, source);
+      } else {
+        db.prepare(`INSERT INTO draft_index(source,kind,text,text_sha,bytes,base_version,base_sha256,
+          doc_token,session,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
+          .run(source, kind, normalized, textSha, bytes, versionValue, baseSha256.toLowerCase(), docToken,
+            sessionValue, now, now);
+      }
+      return db.prepare(`SELECT source,kind,text_sha,bytes,base_version,base_sha256,doc_token,
+        created_at,updated_at FROM draft_index WHERE source=?`).get(source);
+    });
+    return {source:row.source, kind:row.kind, textSha256:row.text_sha, bytes:row.bytes,
+      baseVersion:row.base_version, baseSha256:row.base_sha256, docToken:row.doc_token,
+      createdAt:row.created_at, updatedAt:row.updated_at, created};
+  }
+  async getDraft(filePath, {untitled=false, docToken, now=Date.now()}={}) {
+    if (untitled && !this.untitledDraftIndex) return null;
+    let source;
+    try { ({source} = await this.draftSource(filePath, {untitled, docToken})); }
+    catch (error) { if (error.code === 'MP_DRAFT_UNTITLED_DISABLED') return null; throw error; }
+    const db = draftStoreReadable(this.directory);
+    if (!db) return null;
+    try {
+      const row = db.prepare('SELECT * FROM draft_index WHERE source=?').get(source);
+      if (!row || row.updated_at < now - this.draftLimits.ttlMs) return null;
+      if (row.kind !== (untitled ? 'untitled' : 'file') || row.source !== source)
+        throw fault('MP_DRAFT_CORRUPT', '草稿索引行与请求不匹配');
+      if ((row.kind === 'file' && (!row.base_version || !/^[0-9a-f]{64}$/i.test(row.base_sha256)))
+        || (row.kind === 'untitled' && (row.base_version || row.base_sha256)))
+        throw fault('MP_DRAFT_CORRUPT', '草稿索引基线不完整');
+      if (typeof row.doc_token !== 'string' || !row.doc_token || row.doc_token.length > 128)
+        throw fault('MP_DRAFT_CORRUPT', '草稿索引令牌无效');
+      const text = String(row.text);
+      if (draftSha(text) !== row.text_sha || draftBytes(text) !== row.bytes)
+        throw fault('MP_DRAFT_CORRUPT', '草稿索引正文校验失败');
+      return {source, kind:row.kind, text, textSha256:row.text_sha, bytes:row.bytes,
+        baseVersion:row.base_version, baseSha256:row.base_sha256, docToken:row.doc_token,
+        session:draftSessionRead(row.session), createdAt:row.created_at, updatedAt:row.updated_at};
+    } catch (error) {
+      if (draftTableMissing(error)) return null;
+      throw error;
+    } finally { try { db.close(); } catch { /* already closed */ } }
+  }
+  async clearDraft(...args) {
+    storageOperations++;
+    try { return await this._clearDraft(...args); }
+    finally { storageOperations--; }
+  }
+  async _clearDraft(filePath, {docToken=null, textSha256=null, expectedTextSha256=null, exact=false, untitled=false}={}) {
+    // Legacy contracts stay intact: textSha256 alone deletes by hash, docToken
+    // alone deletes by token. The new exact contract deletes only when the row
+    // matches source+kind+doc_token+text_sha in one SQL statement, so a newer
+    // value written under the same token survives (no client read-then-delete).
+    const exactMatch = exact === true;
+    const bySha = textSha256 !== null && textSha256 !== undefined;
+    if (exactMatch) {
+      if (typeof docToken !== 'string' || !docToken)
+        throw fault('MP_DRAFT_INVALID', '缺少文档令牌');
+      if (typeof expectedTextSha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(expectedTextSha256))
+        throw fault('MP_DRAFT_INVALID', '草稿 sha 无效');
+    } else if (bySha) {
+      if (typeof textSha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(textSha256))
+        throw fault('MP_DRAFT_INVALID', '草稿 sha 无效');
+    } else if (typeof docToken !== 'string' || !docToken) {
+      throw fault('MP_DRAFT_INVALID', '缺少文档令牌');
+    }
+    if (untitled && !this.untitledDraftIndex) return {removed:0, reason:'untitled-disabled'};
+    const {source, kind} = await this.draftSource(filePath, {untitled, docToken});
+    if (!fs.existsSync(draftStoreFile(this.directory))) return {removed:0, reason:'no-store'};
+    const db = this.draftWritableDb();
+    return atomic(db, () => {
+      const result = exactMatch
+        ? db.prepare('DELETE FROM draft_index WHERE source=? AND kind=? AND doc_token=? AND text_sha=?')
+          .run(source, kind, docToken, expectedTextSha256.toLowerCase())
+        : bySha
+          ? db.prepare('DELETE FROM draft_index WHERE source=? AND kind=? AND text_sha=?')
+            .run(source, kind, textSha256.toLowerCase())
+          : db.prepare('DELETE FROM draft_index WHERE source=? AND kind=? AND doc_token=?')
+            .run(source, kind, docToken);
+      return {removed:Number(result.changes || 0), source, kind};
+    });
+  }
+  async listDrafts({limit=100, offset=0, includeUntitled=false, now=Date.now()}={}) {
+    const db = draftStoreReadable(this.directory);
+    if (!db) return [];
+    const take = Math.max(1, Math.min(500, Number.isFinite(Number(limit)) ? Math.trunc(Number(limit)) : 100));
+    const skip = Math.max(0, Number.isFinite(Number(offset)) ? Math.trunc(Number(offset)) : 0);
+    const at = Number(now);
+    if (!Number.isFinite(at)) throw fault('MP_DRAFT_INVALID', '无效的当前时间');
+    try {
+      const rows = db.prepare(`SELECT source,kind,text_sha,bytes,base_version,base_sha256,doc_token,
+        created_at,updated_at FROM draft_index WHERE updated_at>=? ${includeUntitled ? '' : "AND kind='file'"}
+        ORDER BY updated_at DESC LIMIT ? OFFSET ?`).all(at - this.draftLimits.ttlMs, take, skip);
+      return rows.map((row) => ({source:row.source, kind:row.kind, textSha256:row.text_sha,
+        bytes:row.bytes, baseVersion:row.base_version, baseSha256:row.base_sha256,
+        docToken:row.doc_token, createdAt:row.created_at, updatedAt:row.updated_at}));
+    } catch (error) {
+      if (draftTableMissing(error)) return [];
+      throw error;
+    } finally { try { db.close(); } catch { /* already closed */ } }
+  }
+  async pruneDrafts(...args) {
+    storageOperations++;
+    try { return await this._pruneDrafts(...args); }
+    finally { storageOperations--; }
+  }
+  async _pruneDrafts({now=Date.now(), ttlMs=this.draftLimits.ttlMs}={}) {
+    const ttl = ttlMs === undefined || ttlMs === null ? this.draftLimits.ttlMs : Number(ttlMs);
+    const at = Number(now);
+    if (!Number.isFinite(ttl) || ttl <= 0) throw fault('MP_DRAFT_INVALID', '无效的草稿过期时间');
+    if (!Number.isFinite(at)) throw fault('MP_DRAFT_INVALID', '无效的当前时间');
+    const filename = draftStoreFile(this.directory);
+    if (!fs.existsSync(filename)) return {removed:0, remaining:0, bytes:0};
+    const db = this.draftWritableDb();
+    return atomic(db, () => {
+      const result = db.prepare('DELETE FROM draft_index WHERE updated_at < ?').run(at - ttl);
+      const totals = db.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(bytes),0) AS bytes FROM draft_index').get();
+      return {removed:Number(result.changes || 0), remaining:totals.n, bytes:totals.bytes};
+    });
+  }
   async join(filePath, initialText, expectedDiskHash) {
     if (typeof initialText !== 'string') throw fault('MP_LIVE_JOIN','缺少已打开的正文');
     const file = await canonicalFile(filePath), key = fileKey(file);
@@ -499,9 +831,16 @@ class LiveDocuments {
         let room = roomFor(db, key);
         if (room) {
           for (const lease of db.prepare('SELECT id,pid FROM clients WHERE epoch=?').all(room.epoch))
-            if (!alive(lease.pid)) db.prepare('DELETE FROM clients WHERE id=?').run(lease.id);
+            if (!alive(lease.pid)) {
+              db.prepare('DELETE FROM clients WHERE id=?').run(lease.id);
+              db.prepare('DELETE FROM client_caps WHERE client=?').run(lease.id);
+            }
           if (!db.prepare('SELECT 1 FROM clients WHERE epoch=? LIMIT 1').get(room.epoch)) {
-            if (room.version === room.saved) { db.prepare('DELETE FROM rooms WHERE epoch=?').run(room.epoch); room = null; }
+            if (room.version === room.saved) {
+              db.prepare('DELETE FROM rooms WHERE epoch=?').run(room.epoch);
+              db.prepare('DELETE FROM client_caps WHERE epoch=?').run(room.epoch);
+              room = null;
+            }
             // A dirty room whose park failed stays: adoptDisk below conflicts
             // safely if the disk text changed, or resumes the draft if not.
           }
@@ -512,7 +851,12 @@ class LiveDocuments {
         } else adoptDisk(db, room, disk);
         const text = room.version === room.saved ? disk.text : materialize(db,room);
         db.prepare('INSERT INTO clients(id,epoch,pid,ack) VALUES(?,?,?,?)').run(client,room.epoch,process.pid,room.version);
-        return {...head(room),client,text};
+        db.prepare('INSERT OR REPLACE INTO client_caps(client,epoch,caps,at) VALUES(?,?,?,?)').run(client,room.epoch,LIVE_HOST_CAPS,Date.now());
+        db.prepare('DELETE FROM client_caps WHERE client NOT IN (SELECT id FROM clients)').run();
+        let resolvedDisk = null;
+        try { resolvedDisk = db.prepare('SELECT disk FROM room_resolved WHERE epoch=?').get(room.epoch)?.disk ?? null; }
+        catch { /* old store: no marker table */ }
+        return {...head(room),client,text,resolvedDisk,caps:LIVE_HOST_CAPS};
       });
       this.clients.set(client, {key,file,epoch:joined.epoch});
       hosts.add(this); // 首个成员入座才登记 host；从未加入/全部离开的实例不占强引用
@@ -593,17 +937,61 @@ class LiveDocuments {
       if (!room || room.epoch !== epoch || room.version !== version || materialize(db,room) !== text)
         throw fault('MP_LIVE_STALE','其他窗口刚有新编辑，请同步后保存；当前正文已保留');
       if ((await readDisk(file)).hash !== room.disk) throw conflict('磁盘已被其他程序修改，当前草稿已保留');
+      // A conflict-resolve authorization is scoped to the exact disk it was
+      // resolved against. Undo writes the empty sentinel above; a stale or
+      // revoked marker must never authorize a save over the external version.
+      let resolvedMarker = null;
+      try { resolvedMarker = db.prepare('SELECT disk FROM room_resolved WHERE epoch=?').get(epoch); }
+      catch { /* old store: no marker table */ }
+      if (resolvedMarker && resolvedMarker.disk !== room.disk)
+        throw conflict('冲突解决已撤销或磁盘版本已变化；请重新确认冲突');
       this.member(client,epoch);
       const receipt = await writer({diskHash:room.disk});
       if (!receipt || receipt.ok === false) return receipt;
       const disk = await readDisk(file);
       if (disk.text !== text || receipt.writtenDiskHash && receipt.writtenDiskHash !== disk.hash)
         throw conflict('文件已再次改变，不能把此次保存标记为成功');
-      db.prepare('UPDATE rooms SET saved=?,disk=? WHERE epoch=?').run(version,disk.hash,epoch);
+      atomic(db, () => {
+        db.prepare('UPDATE rooms SET saved=?,disk=? WHERE epoch=?').run(version,disk.hash,epoch);
+        db.prepare('DELETE FROM room_resolved WHERE epoch=?').run(epoch);
+      });
       // The provider receipt stays authoritative: live metadata is added under
       // its own names, so a provider version field is never overwritten.
       const live = roomFor(db,key);
       return {...receipt, epoch, liveVersion:(live||room).version, savedVersion:version, diskHash:disk.hash};
+    }, this.directory, this.leaseOptions());
+  }
+  // A no-op "keep mine" resolution still has to authorize a later save over
+  // the external disk. It does not change the buffer/version, but it must
+  // atomically mark the exact disk baseline as user-approved.
+  async markResolved(filePath, {epoch, baseVersion, baseText, expectedDiskHash} = {}) {
+    if (typeof baseText !== 'string') throw fault('MP_LIVE_APPEND', '缺少权威正文');
+    if (typeof epoch !== 'string' || !epoch) throw fault('MP_LIVE_APPEND', '缺少协同会话');
+    if (!Number.isSafeInteger(baseVersion) || baseVersion < 0) throw fault('MP_LIVE_APPEND', '无效的协同版本');
+    if (typeof expectedDiskHash !== 'string' || !/^[0-9a-f]{64}$/i.test(expectedDiskHash))
+      throw fault('MP_DOC_STALE', '缺少磁盘基线；请重新打开冲突');
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    const filename = path.join(path.resolve(this.directory), 'rooms.sqlite');
+    if (!localStoreUsable(filename)) throw fault('MP_LIVE_NO_ROOM', '文档没有共享会话，请重新读取后再试');
+    return withFileCommit(file, async () => {
+      const db = this.db;
+      const disk = await readDisk(file);
+      if (disk.hash !== expectedDiskHash) throw fault('MP_DOC_STALE', '磁盘在冲突解决期间又变了；请重新打开冲突');
+      return atomic(db, () => {
+        const room = roomFor(db, key);
+        if (!room) throw fault('MP_LIVE_NO_ROOM', '文档没有共享会话，请重新读取后再试');
+        if (room.epoch !== epoch) throw fault('MP_LIVE_SESSION', '文档协同会话已改变');
+        const members = db.prepare('SELECT pid FROM clients WHERE epoch=?').all(room.epoch)
+          .filter(({pid}) => alive(pid)).length;
+        if (!members) throw fault('MP_LIVE_NO_MEMBER', '没有在线的编辑器会话，请重新读取后再试');
+        if (room.version !== baseVersion || materialize(db, room) !== baseText)
+          throw fault('MP_LIVE_STALE', '文档刚有新编辑，请重新读取后再应用');
+        db.prepare('UPDATE rooms SET disk=? WHERE epoch=?').run(disk.hash, room.epoch);
+        db.prepare('INSERT OR REPLACE INTO room_resolved(epoch,disk,resolved_at) VALUES(?,?,?)')
+          .run(room.epoch, disk.hash, Date.now());
+        room.disk = disk.hash;
+        return {...head(room), text: materialize(db, room), resolvedDisk: disk.hash};
+      });
     }, this.directory, this.leaseOptions());
   }
   // Focus-time disk probe for live members: detect non-cooperating writes.
@@ -672,6 +1060,10 @@ class LiveDocuments {
             if (disk.text !== sealed.text) throw conflict('文件已再次改变，不能把此次保留标记为成功');
             room.saved = room.version; room.disk = disk.hash;
             db.prepare('UPDATE rooms SET saved=?,disk=? WHERE epoch=?').run(room.saved,room.disk,room.epoch);
+            // This write is the authorized keep-mine resolution. Its disk hash
+            // is now in rooms.disk; a stale room_resolved marker must not keep
+            // blocking later live.save calls (that would be a save dead end).
+            db.prepare('DELETE FROM room_resolved WHERE epoch=?').run(room.epoch);
             sealedHead = {...head(room),clean:true};
             return;
           }
@@ -687,6 +1079,14 @@ class LiveDocuments {
       }
       return sealedHead ? {...result, ...sealedHead, liveVersion:sealedHead.version} : result;
     }, this.directory, this.leaseOptions());
+  }
+  // Read-only disk identity for conflict resolution. Uses the same strict
+  // byte hash as save/directWriteText; never creates the rooms store and never
+  // writes. A missing file surfaces as MP_FILE_MISSING like readDisk.
+  async readDiskIdentity(filePath) {
+    const file = await canonicalFile(filePath);
+    const disk = await readDisk(file);
+    return {file, diskHash: disk.hash, text: disk.text, mtimeMs: disk.mtimeMs};
   }
   // B3: authoritative read of the shared buffer. Never creates the rooms store,
   // never joins, never sweeps, never writes. A missing/foreign database means
@@ -712,16 +1112,55 @@ class LiveDocuments {
         const savedTextAvailable = room.saved >= room.floor;
         const savedText = room.version === room.saved ? text
           : (savedTextAvailable ? materialize(db, room, room.saved) : null);
-        const pids = db.prepare('SELECT pid FROM clients WHERE epoch=?').all(room.epoch);
-        const members = pids.filter(({pid}) => alive(pid)).length;
-        const localMembers = pids.filter(({pid}) => pid === process.pid).length;
+        const view = memberView(db, room.epoch);
+        const resolved = (() => {
+          try { return db.prepare('SELECT disk FROM room_resolved WHERE epoch=?').get(room.epoch); }
+          catch { return null; } // old store created before room_resolved existed
+        })();
         return {...head(room), length:room.length, text, savedText, savedTextAvailable,
-          textSha256:digest(Buffer.from(text,'utf8')), members, localMembers};
+          textSha256:digest(Buffer.from(text,'utf8')),
+          members:view.members, localMembers:view.localMembers,
+          replaySafeMembers:view.replaySafeMembers, allReplaySafe:view.allReplaySafe,
+          memberFingerprint:view.fingerprint,
+          resolvedDisk: resolved?.disk ?? null};
       });
     } catch (error) {
       // A read-only WAL edge, a locked store or a transient SQLite failure must
       // not block a read. Fall back to the disk authority; write paths still go
       // through live.external/CAS and cannot silently overwrite a dirty room.
+      return null;
+    } finally { try { db.close(); } catch { /* already closed */ } }
+  }
+  // Read-only historical snapshot used by selective undo. Reconstructs the
+  // room text at `version` from the checkpoint plus the retained change log and
+  // returns the later change rows. Never creates the store and never writes.
+  // Returns null when the version predates the compacted floor or the store is
+  // foreign/unavailable, so the caller must keep the current draft.
+  async readRoomVersion(filePath, version) {
+    if (!Number.isSafeInteger(version) || version < 0) return null;
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    const filename = path.join(path.resolve(this.directory), 'rooms.sqlite');
+    if (!fs.existsSync(filename)) return null;
+    const {DatabaseSync} = require('node:sqlite');
+    let db;
+    try { db = new DatabaseSync(filename, {readOnly:true}); } catch (error) { return null; }
+    try {
+      try { db.exec('PRAGMA busy_timeout=2000'); } catch { /* best effort */ }
+      try {
+        const stored = db.prepare("SELECT value FROM meta WHERE key='host'").get()?.value;
+        if (stored !== hostStamp()) return null;
+      } catch { return null; }
+      return readTx(db, () => {
+        const room = db.prepare('SELECT file,epoch,version,saved,disk,length,floor FROM rooms WHERE file=?').get(key);
+        if (!room) return null;
+        if (version < room.floor || version > room.version) return null;
+        const text = materialize(db, room, version);
+        const changes = db.prepare('SELECT version,client,seq,delta,group_id AS groupId FROM changes WHERE epoch=? AND version>? AND version<=? ORDER BY version')
+          .all(room.epoch, version, room.version)
+          .map(({delta, ...row}) => ({...row, changes: JSON.parse(delta)}));
+        return {epoch: room.epoch, version, floor: room.floor, roomVersion: room.version, text, changes};
+      });
+    } catch (error) {
       return null;
     } finally { try { db.close(); } catch { /* already closed */ } }
   }
@@ -752,7 +1191,10 @@ class LiveDocuments {
       from: Number(c.from) || 0, to: Number(c.to) || 0,
       insert: String(c.insert ?? ''), removed: String(c.removed ?? ''),
     }))) : null;
-    const changes = rawChanges && rawChanges.length <= 4 * 1024 * 1024 ? rawChanges : null;
+    // A group without its inverse bytes cannot be undone. Refuse the record
+    // instead of persisting a review row that the UI can only fail on.
+    if (rawChanges && rawChanges.length > GROUP_CHANGES_MAX) return null;
+    const changes = rawChanges;
     db.prepare('INSERT OR REPLACE INTO agent_group(group_id,source,actor,kind,base_revision,result_revision,at,changes,undone_at) VALUES(?,?,?,?,?,?,?,?,NULL)')
       .run(groupId, key, String(entry.actor || 'agent').slice(0, 32), String(entry.kind || 'edit').slice(0, 32),
         String(entry.baseRevision || '').slice(0, 512), String(entry.resultRevision || '').slice(0, 512), now, changes);
@@ -778,6 +1220,35 @@ class LiveDocuments {
     const file = await canonicalFile(filePath), key = fileKey(file);
     this.db.prepare('UPDATE agent_group SET undone_at=? WHERE source=? AND group_id=?').run(Date.now(), key, String(groupId || ''));
     return true;
+  }
+  // A group that failed read-back verification must not stay visible as an
+  // undoable review row. Only remove the exact row the caller just inspected.
+  async discardAgentGroup(filePath, groupId) {
+    const id = String(groupId || '');
+    if (!GROUP_ID_RE.test(id)) return false;
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    const db = this.db;
+    return atomic(db, () => Number(db.prepare('DELETE FROM agent_group WHERE source=? AND group_id=?').run(key, id).changes || 0) > 0);
+  }
+  // Single-statement multi-group mark: an undo that restores N groups never
+  // leaves a half-marked chain. No schema change; `marked` is the ids that
+  // matched a row in this store.
+  async markAgentGroupsUndone(filePath, groupIds) {
+    const ids = Array.isArray(groupIds)
+      ? groupIds.map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id)) : [];
+    if (!ids.length) return {marked: []};
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    const now = Date.now();
+    const db = this.db;
+    const marked = [];
+    atomic(db, () => {
+      const statement = db.prepare('UPDATE agent_group SET undone_at=? WHERE source=? AND group_id=?');
+      for (const id of ids) {
+        const result = statement.run(now, key, id);
+        if (Number(result.changes || 0) > 0) marked.push(id);
+      }
+    });
+    return {marked};
   }
   async listAgentGroups(filePath, limit = 20) {
     const file = await canonicalFile(filePath), key = fileKey(file);
@@ -813,6 +1284,8 @@ class LiveDocuments {
         throw fault('MP_RECOVERY_INVALID', '恢复索引不属于本宿主');
       const row = db.prepare('SELECT recoveryPath,sha256,bytes,epoch,version,at FROM append_recovery WHERE source=? AND recoveryPath=?').get(key, resolved);
       if (!row) throw fault('MP_RECOVERY_NOT_FOUND', '恢复副本已不存在');
+      const size = fs.statSync(resolved).size;
+      if (size > APPEND_RECOVERY_READ_MAX) throw fault('MP_RECOVERY_TOO_LARGE', '恢复副本过大，无法预览');
       const bytes = fs.readFileSync(resolved);
       if (bytes.length !== row.bytes || digest(bytes) !== row.sha256)
         throw fault('MP_RECOVERY_CORRUPT', '恢复副本内容校验失败');
@@ -850,12 +1323,14 @@ class LiveDocuments {
   // the normal exchange() update stream. The transaction re-checks epoch,
   // version and the materialized base text, so a concurrent editor save or
   // peer edit can never be appended on top of a stale base.
-  async append(filePath, {epoch, baseVersion, baseText, changes, actor='agent', groupId=null} = {}) {
+  async append(filePath, {epoch, baseVersion, baseText, changes, actor='agent', groupId=null, group=null, clearResolved=false, expectedMembers=null, requireReplaySafe=false} = {}) {
     if (typeof baseText !== 'string') throw fault('MP_LIVE_APPEND', '缺少权威正文');
     if (typeof epoch !== 'string' || !epoch) throw fault('MP_LIVE_APPEND', '缺少协同会话');
     if (!Number.isSafeInteger(baseVersion) || baseVersion < 0) throw fault('MP_LIVE_APPEND', '无效的协同版本');
     if (!/^[a-z0-9-]{1,32}$/.test(String(actor))) throw fault('MP_LIVE_APPEND', '无效的追加者');
     if (groupId != null && !/^[0-9a-f-]{36}$/i.test(String(groupId))) throw fault('MP_LIVE_APPEND', '无效的编辑组');
+    if (expectedMembers != null && (typeof expectedMembers !== 'string' || !/^[0-9a-f]{64}$/.test(expectedMembers)))
+      throw fault('MP_LIVE_APPEND', '无效的成员校验值');
     const file = await canonicalFile(filePath), key = fileKey(file);
     const filename = path.join(path.resolve(this.directory), 'rooms.sqlite');
     if (!localStoreUsable(filename)) throw fault('MP_LIVE_NO_ROOM', '文档没有共享会话，请重新读取后再试');
@@ -867,15 +1342,24 @@ class LiveDocuments {
           const room = roomFor(db, key);
           if (!room) throw fault('MP_LIVE_NO_ROOM', '文档没有共享会话，请重新读取后再试');
           if (room.epoch !== epoch) throw fault('MP_LIVE_SESSION', '文档协同会话已改变');
-          const members = db.prepare('SELECT pid FROM clients WHERE epoch=?').all(room.epoch)
-            .filter(({pid}) => alive(pid)).length;
-          if (!members) throw fault('MP_LIVE_NO_MEMBER', '没有在线的编辑器会话，请重新读取后再试');
+          const view = memberView(db, room.epoch);
+          if (!view.members) throw fault('MP_LIVE_NO_MEMBER', '没有在线的编辑器会话，请重新读取后再试');
+          if (expectedMembers != null && view.fingerprint !== expectedMembers)
+            throw fault('MP_LIVE_MEMBERS_CHANGED', '在线成员在读取后发生变化，请重新读取后再编辑');
+          if (requireReplaySafe && !view.allReplaySafe)
+            throw fault('MP_LIVE_ROOM_UNSAFE', '有在线成员不支持持久恢复/远端回放，已拒绝 AI 写入');
           if (room.version !== baseVersion || materialize(db, room) !== baseText)
             throw fault('MP_LIVE_STALE', '文档刚有新编辑，请重新读取后再应用');
           const length = checkedLength(changes, room.length);
           const version = room.version + 1;
           const nextText = apply(baseText, changes);
           if (nextText.length !== length) throw fault('MP_LIVE_CHANGE', '协同编辑的长度校验失败');
+          // The audit group is validated and committed in this same transaction.
+          // A group id is advertised on changes.group_id only when its review
+          // row is guaranteed to exist after COMMIT.
+          const groupRow = group ? appendGroupRow(group, groupId, liveRevisionId(room.epoch, version, nextText)) : null;
+          const groupRecorded = !!(groupRow && !groupRow.skipped);
+          const logGroupId = groupRecorded ? groupRow.groupId : (group == null && groupId != null ? String(groupId) : null);
           // The recovery copy is post-edit and durable before COMMIT. It is the
           // independent copy used when the room is retired before the editor
           // acknowledges this change. The transaction stays open for the write,
@@ -887,13 +1371,88 @@ class LiveDocuments {
           // discovery record; the file is the payload.
           db.prepare('INSERT OR REPLACE INTO append_recovery VALUES(?,?,?,?,?,?,?)')
             .run(key, written.path, room.epoch, version, written.at || Date.now(), written.bytes, written.sha256);
+          if (groupRecorded) insertAgentGroupRow(db, key, groupRow, Date.now(), actor);
           db.prepare('INSERT INTO changes(epoch,version,client,seq,delta,group_id) VALUES(?,?,?,?,?,?)')
-            .run(room.epoch, version, actor, 0, JSON.stringify(changes), groupId ? String(groupId) : null);
+            .run(room.epoch, version, actor, 0, JSON.stringify(changes), logGroupId);
           db.prepare('UPDATE rooms SET version=?,length=? WHERE epoch=?').run(version, length, room.epoch);
+          // A revoked resolved-conflict marker must keep blocking live.save even
+          // though rooms.disk still has the external hash. Use an empty sentinel
+          // instead of deleting the row: save() checks it before writing, while
+          // authority() already treats it as "not the current disk".
+          if (clearResolved === true) db.prepare('INSERT OR REPLACE INTO room_resolved(epoch,disk,resolved_at) VALUES(?,?,?)').run(room.epoch, '', Date.now());
           room.version = version; room.length = length;
           compact(db, room);
           const text = materialize(db, room);
-          return {...head(room), text, textSha256:digest(Buffer.from(text,'utf8')), recoveryPath};
+          return {...head(room), text, textSha256:digest(Buffer.from(text,'utf8')), recoveryPath,
+            groupRecorded,
+            ...(groupRecorded ? {} : {groupSkippedReason: group ? (groupRow?.skipped || 'group-unavailable') : (groupId != null ? 'group-metadata-missing' : null)})};
+        });
+        try { pruneAppendRecoveryRows(db, key, recoveryPath); } catch { /* retention is best effort */ }
+        return result;
+      } catch (error) {
+        if (recoveryCreated && recoveryPath) {
+          try { fs.rmSync(recoveryPath, {force: true}); } catch { /* best effort */ }
+          try { fs.rmSync(recoveryPath + '.json', {force: true}); } catch { /* best effort */ }
+        }
+        throw error;
+      }
+    }, this.directory, { ...this.leaseOptions(), busyTimeoutMs: Math.min(this.leaseOptions().busyTimeoutMs ?? APPEND_BUSY_TIMEOUT_MS, APPEND_BUSY_TIMEOUT_MS) });
+  }
+  async appendResolvedConflict(filePath, {epoch, baseVersion, baseText, changes, actor='agent', groupId=null, group=null, expectedDiskHash=null, expectedMembers=null, requireReplaySafe=false} = {}) {
+    if (typeof baseText !== 'string') throw fault('MP_LIVE_APPEND', '缺少权威正文');
+    if (typeof epoch !== 'string' || !epoch) throw fault('MP_LIVE_APPEND', '缺少协同会话');
+    if (!Number.isSafeInteger(baseVersion) || baseVersion < 0) throw fault('MP_LIVE_APPEND', '无效的协同版本');
+    if (!/^[a-z0-9-]{1,32}$/.test(String(actor))) throw fault('MP_LIVE_APPEND', '无效的追加者');
+    if (groupId != null && !/^[0-9a-f-]{36}$/i.test(String(groupId))) throw fault('MP_LIVE_APPEND', '无效的编辑组');
+    if (expectedMembers != null && (typeof expectedMembers !== 'string' || !/^[0-9a-f]{64}$/.test(expectedMembers)))
+      throw fault('MP_LIVE_APPEND', '无效的成员校验值');
+    if (typeof expectedDiskHash !== 'string' || !/^[0-9a-f]{64}$/i.test(expectedDiskHash))
+      throw fault('MP_DOC_STALE', '缺少磁盘基线；请重新打开冲突');
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    const filename = path.join(path.resolve(this.directory), 'rooms.sqlite');
+    if (!localStoreUsable(filename)) throw fault('MP_LIVE_NO_ROOM', '文档没有共享会话，请重新读取后再试');
+    return withFileCommit(file, async () => {
+      const db = this.db;
+      const disk = await readDisk(file);
+      if (disk.hash !== expectedDiskHash) throw fault('MP_DOC_STALE', '磁盘在冲突解决期间又变了；请重新打开冲突');
+      let recoveryPath = null, recoveryCreated = false;
+      try {
+        const result = atomic(db, () => {
+          const room = roomFor(db, key);
+          if (!room) throw fault('MP_LIVE_NO_ROOM', '文档没有共享会话，请重新读取后再试');
+          if (room.epoch !== epoch) throw fault('MP_LIVE_SESSION', '文档协同会话已改变');
+          const view = memberView(db, room.epoch);
+          if (!view.members) throw fault('MP_LIVE_NO_MEMBER', '没有在线的编辑器会话，请重新读取后再试');
+          if (expectedMembers != null && view.fingerprint !== expectedMembers)
+            throw fault('MP_LIVE_MEMBERS_CHANGED', '在线成员在读取后发生变化，请重新读取后再编辑');
+          if (requireReplaySafe && !view.allReplaySafe)
+            throw fault('MP_LIVE_ROOM_UNSAFE', '有在线成员不支持持久恢复/远端回放，已拒绝 AI 写入');
+          if (room.version !== baseVersion || materialize(db, room) !== baseText)
+            throw fault('MP_LIVE_STALE', '文档刚有新编辑，请重新读取后再应用');
+          const length = checkedLength(changes, room.length);
+          const version = room.version + 1;
+          const nextText = apply(baseText, changes);
+          if (nextText.length !== length) throw fault('MP_LIVE_CHANGE', '协同编辑的长度校验失败');
+          const groupRow = group ? appendGroupRow(group, groupId, liveRevisionId(room.epoch, version, nextText)) : null;
+          const groupRecorded = !!(groupRow && !groupRow.skipped);
+          const logGroupId = groupRecorded ? groupRow.groupId : (group == null && groupId != null ? String(groupId) : null);
+          const written = writeAppendRecoverySync(this.directory, file, room.epoch, version, nextText);
+          recoveryPath = written.path;
+          recoveryCreated = written.created === true;
+          db.prepare('INSERT OR REPLACE INTO append_recovery VALUES(?,?,?,?,?,?,?)')
+            .run(key, written.path, room.epoch, version, written.at || Date.now(), written.bytes, written.sha256);
+          if (groupRecorded) insertAgentGroupRow(db, key, groupRow, Date.now(), actor);
+          db.prepare('INSERT INTO changes(epoch,version,client,seq,delta,group_id) VALUES(?,?,?,?,?,?)')
+            .run(room.epoch, version, actor, 0, JSON.stringify(changes), logGroupId);
+          db.prepare('UPDATE rooms SET version=?,length=?,disk=? WHERE epoch=?').run(version, length, disk.hash, room.epoch);
+          db.prepare('INSERT OR REPLACE INTO room_resolved(epoch,disk,resolved_at) VALUES(?,?,?)')
+            .run(room.epoch, disk.hash, Date.now());
+          room.version = version; room.length = length; room.disk = disk.hash;
+          compact(db, room);
+          const text = materialize(db, room);
+          return {...head(room), text, textSha256:digest(Buffer.from(text,'utf8')), recoveryPath: written.path, resolvedDisk: disk.hash,
+            groupRecorded,
+            ...(groupRecorded ? {} : {groupSkippedReason: group ? (groupRow?.skipped || 'group-unavailable') : (groupId != null ? 'group-metadata-missing' : null)})};
         });
         try { pruneAppendRecoveryRows(db, key, recoveryPath); } catch { /* retention is best effort */ }
         return result;
@@ -924,10 +1483,14 @@ class LiveDocuments {
             .get(member.epoch, room.saved)?.v
         : null;
       db.prepare('DELETE FROM clients WHERE id=? AND epoch=?').run(client,member.epoch);
+      db.prepare('DELETE FROM client_caps WHERE client=?').run(client);
       const remaining = db.prepare('SELECT COUNT(*) AS c FROM clients WHERE epoch=?').get(member.epoch).c;
       if (remaining > 0) return;
       const keep = unackedAgent != null && (maxAck == null || unackedAgent > maxAck);
-      if (!keep) db.prepare('DELETE FROM rooms WHERE epoch=?').run(member.epoch);
+      if (!keep) {
+        db.prepare('DELETE FROM rooms WHERE epoch=?').run(member.epoch);
+        db.prepare('DELETE FROM client_caps WHERE epoch=?').run(member.epoch);
+      }
     });
     this.clients.delete(client);
     if (!this.clients.size) hosts.delete(this);
