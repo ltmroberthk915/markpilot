@@ -288,6 +288,24 @@
     var ask = intent.ask != null ? intent.ask : (freeText || '');
     if (!ask.trim()) return null;
 
+    // MP208-UI: one shared pure builder. It excludes selected lines from the
+    // neighbour context, budgets the context, and refuses an oversized body
+    // instead of silently truncating it.
+    var core = window.__MP208;
+    if (core && typeof core.mathPayload === 'function') {
+      var built = core.mathPayload({
+        doc: doc,
+        from: from,
+        to: to,
+        body: body,
+        ask: ask,
+        intent: intent.key,
+        intentLabel: intent.label,
+      });
+      if (built && built.ok === false) return built;
+      if (built && built.ok === true) return { text: built.text, meta: built.meta };
+    }
+
     var head = '📐 数学请求 · ' + intent.label;
     var lines = [
       head,
@@ -322,76 +340,18 @@
     } catch (error) { warn('sendToChat', error); return false; }
   }
 
-  /* ── 对话列边界拖拽热区（在 iframe 内，父窗口收 chat-resize）────────────────
-   * 为什么放在这里：那条边界正好是 iframe 的右沿，父窗口的浮层 heat 区会被 iframe
-   * 的事件吞掉（实测：pointerdown 落在 iframe 文档里，父窗口 React 完全收不到）。
-   * 所以热区建在 iframe 自己身上，拖动量上行给父窗口去改对话宽度。 */
-  var resizeState = { active: false, startX: 0, lastDx: 0, raf: 0 };
-
-  function emitChatResize(phase, dx) {
-    try {
-      window.handler.emit('chat-resize', { phase: phase, dx: Math.round(dx) });
-    } catch (error) { /* 父窗口不在就算了 */ }
-  }
-
-  function installChatResizeHandle() {
-    if (document.getElementById('mp-chat-resize')) return;
-    var strip = document.createElement('div');
-    strip.id = 'mp-chat-resize';
-    strip.setAttribute('aria-hidden', 'true');
-    strip.style.cssText = 'position:fixed;right:0;top:0;width:14px;height:calc(100% - 90px);'
-      + 'cursor:col-resize;z-index:2147483000;touch-action:none;background:transparent';
-    strip.addEventListener('pointerdown', function (e) {
-      if (e.button !== 0) return;   // 只有左键才接管（右键/中键不挂监听，避免泄漏）
-      resizeState.active = true;
-      resizeState.startX = e.clientX;
-      resizeState.lastDx = 0;
-      try { strip.setPointerCapture(e.pointerId); } catch (error) { /* 忽略 */ }
-      e.preventDefault();
-      // 关键：move/up 挂在 window 上，而不是只挂在 14px 的热区上。
-      // 否则指针一离开热区（拖远了必然离开）就收不到后续事件 —— 实测只生效 14px 就是这么来的。
-      window.addEventListener('pointermove', onMove, true);
-      window.addEventListener('pointerup', onUp, true);
-      window.addEventListener('pointercancel', onUp, true);
-      emitChatResize('start', 0);
-    });
-    function onMove(e) {
-      if (!resizeState.active) return;
-      // Alt+Tab 切走再切回不会发 pointercancel；不检查 buttons 的话，
-      // 切回来只要鼠标划过 iframe 就会继续 emit，对话列跟着鼠标乱变（实测幽灵拖拽）。
-      if (e.buttons === 0) { onUp({ pointerId: -1 }); return; }
-      try { e.preventDefault(); } catch (error) { /* 忽略 */ }
-      var dx = e.clientX - resizeState.startX;
-      resizeState.lastDx = dx;
-      if (resizeState.raf) return;
-      resizeState.raf = window.requestAnimationFrame(function () {
-        resizeState.raf = 0;
-        if (resizeState.active) emitChatResize('move', resizeState.lastDx);
-      });
-    }
-    // 先摘监听再判断状态：否则非左键路径一进来就 return，监听永远摘不掉。
-    function onUp(e) {
-      try { window.removeEventListener('pointermove', onMove, true); } catch (error) { /* 忽略 */ }
-      try { window.removeEventListener('pointerup', onUp, true); } catch (error) { /* 忽略 */ }
-      try { window.removeEventListener('pointercancel', onUp, true); } catch (error) { /* 忽略 */ }
-      if (!resizeState.active) return;
-      if (resizeState.raf) window.cancelAnimationFrame(resizeState.raf);
-      resizeState.raf = 0;
-      if (e && e.type !== 'pointercancel' && Number.isFinite(e.clientX)) resizeState.lastDx = e.clientX - resizeState.startX;
-      resizeState.active = false;
-      try { strip.releasePointerCapture(e && e.pointerId); } catch (error) { /* 忽略 */ }
-      emitChatResize('end', resizeState.lastDx);
-    }
-    // 失焦兜底：切窗口时把可能残留的拖拽收干净
-    try {
-      window.addEventListener('blur', function () { if (resizeState.active) onUp({ pointerId: -1 }); });
-    } catch (error) { /* 忽略 */ }
-    document.body.appendChild(strip);
-  }
+  /* 对话列边界拖拽热区由父页面 #mp-chat-handle 独占（贴边界右侧 8px）。
+   * iframe 内不再建全高热区：编辑器自己的竖向滚动条就在 iframe 右沿，
+   * 14px 的条会把滚动条滑块整个盖住，拖页会被吞成改宽。
+   * 父句柄按下后捕获指针，指针越过 iframe 仍能收到 move/up。 */
 
   function runAI(intentKey, freeText) {
     var payload = buildAIPayload(intentKey, freeText);
     if (!payload) return false;
+    if (payload.ok === false) {
+      flash(String(payload.message || '数学请求不可用'));
+      return false;
+    }
     // 自由提问：给模型一个固定格式的头（选中内容仍随【内容】小节一起过去）
     if (intentKey === 'ask' && freeText) {
       payload.text = '请以提问语言回复。\n\nask: ' + String(freeText).trim()
@@ -411,6 +371,18 @@
     if (kind === 'symbol') return void insertSymbol(cmd.ch);
     if (kind === 'number') return void numberEquation();
     if (kind === 'ai') return void runAI(cmd.intent, cmd.text);
+    if (kind === 'reveal') {
+      var view = getView();
+      if (!view) return;
+      var doc = view.state.doc;
+      var from = Math.max(0, Math.min(Number(cmd.from) || 0, doc.length));
+      var to = Math.max(from, Math.min(Number(cmd.to) || from, doc.length));
+      try {
+        view.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true, userEvent: 'select.mp-reveal' });
+        view.focus();
+      } catch (error) { warn('reveal', error); }
+      return;
+    }
     if (kind === 'ping') { try { window.handler.emit('tools-ready', { version: VERSION }); } catch (e) { /* 桥未就绪 */ } }
   }
 
@@ -644,7 +616,6 @@
   }
 
   function installUi() {
-    try { installChatResizeHandle(); } catch (error) { warn('installChatResizeHandle', error); }
     if (root) return;
     injectCss();
     root = el('div', 'mp-tools');

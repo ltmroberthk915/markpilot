@@ -1,61 +1,110 @@
-// dsh-selection.js — 选中文段 → 插入 DSH 对话（换皮套壳的核心新功能）。
+// dsh-selection.js — 选中浮条：只读引用 + 显式「修改此处」。
 //
-// 设计边界（ARCHITECTURE §7 / Astra 规则）：
-//   · 单一权威：Markdown 源码只从引擎的 CM6 EditorState 读（window.mpEngine._view()），
-//     不从 DOM 反推；DOM 只用来定位浮按钮（像素位置不是内容）。
-//   · 投影只读：本文件**绝不** dispatch / 改 state / 改选区 / 改历史；只读 state.selection.ranges
-//     与 state.doc.sliceString(from, to)。选区文本是文档源码（公式/表格/代码原样保真）。
-//   · 不抢不重试：选区变化用 document.selectionchange + requestAnimationFrame 合并；
-//     没有 setInterval、没有轮询、没有 0/45/150ms 定时器。唯一的 setTimeout 是"已插入"徽标
-//     1.4s 后复位（一次性 UI 反馈，不是状态修复）。
-//   · 不新增第二份文档缓存：payload 在点击那一刻现读现发，截图/文本不落盘。
-//   · 硬上限：选区源码 > 262144 字符（256 KiB）**不发送**、不截断，改走 bridge toast
-//     「选区过大（xxx KB），请缩小范围后再插入」。上限只保护父窗口的 composer/消息通道，
-//     不改变"发送时一定与引擎选区逐字符一致"的契约（宁可拒绝，不可静默截断）。
+// MP208-UI 变更（在私有 ui 副本内）：
+//   · 普通插入不再直接把路径+全文塞进 composer，而是走 DSH 官方
+//     inputActions.insertQuote(text, summary)：只读引用节点、保留草稿、用户手动发送；
+//   · 浮条新增「修改此处」：只发一个同次引擎快照（ranges/text/docLength/行号），
+//     父窗口负责绑定路径/会话/版本并创建受限目标；它不写文档、不发消息；
+//   · 快照只从 CM6 EditorState 读；DOM 只用于定位；不轮询、不缓存文档。
 //
-// 上行协议（v1）：{ __dshmd:true, dir:'up', type:'insert-to-chat', content:{ text, meta } }
-//   text        = 选区 Markdown 源码（多选区用 "\n\n" 连接；不截断）
-//   meta.ranges = [{from,to,length}...]（CM6 文档位置，升序由引擎保证）
-//   meta.length = text.length；meta.count = 选区段数；meta.source = 'cm6'
-//
-// 交互：
-//   · 选区非空 → 选区末端附近出现 fixed 浮按钮「插入对话」；上方放不下自动落下方；
-//   · 点击（mousedown preventDefault 保选区）或 Ctrl/Cmd+Shift+Enter → 发 insert-to-chat；
-//   · 发送后按钮短暂显示「已插入」；父窗口若回 toast，由 dsh-bridge 统一显示（引擎 toast 层）；
-//   · Escape / 选区塌陷 / 点击别处 → 隐藏；滚动/缩放 → rAF 重定位（离屏则隐藏）。
+// 上行：
+//   { __dshmd:true, dir:'up', type:'insert-quote'|'edit-target',
+//     content:{ text, ranges:[{from,to,text}], docLength, lineStart, lineEnd,
+//               lines, capturedAt, nonce, source:'cm6' } }
 (function () {
   'use strict';
   if (window.__dshSelectionInstalled) return;
   window.__dshSelectionInstalled = true;
 
   var BTN_ID = 'dsh-md-insert';
-  var BTN_LABEL = '插入对话';
-  var BTN_INSERTED = '已插入';
-  var INSERTED_RESET_MS = 1400;
-  var MAX_INSERT_CHARS = 262144;   // 256 KiB：超过则拒绝并提示，绝不静默截断
+  var EDIT_ID = 'dsh-md-edit';
+  var BTN_LABEL = '引用';
+  var EDIT_LABEL = '修改此处';
+  var BTN_DONE = '已引用';
+  var EDIT_DONE = '已创建';
+  var DONE_RESET_MS = 1400;
+  var MAX_INSERT_CHARS = 262144;
 
   var btn = null;
+  var editBtn = null;
   var labelEl = null;
+  var editLabelEl = null;
   var rafId = 0;
   var resetTimer = null;
-  var lastTransform = '';
+  var lastTransform = null;
+  var hasSelection = false;
 
-  // 自证计数器（验收/性能证据从这里取；只读快照，不影响行为）。
+  function intersectsViewport(rect) {
+    return !!rect && rect.bottom > 0 && rect.top < window.innerHeight
+      && rect.right > 0 && rect.left < window.innerWidth;
+  }
+
+  function coordsVisible(view, pos) {
+    try { return view.coordsAtPos(pos, 1) || view.coordsAtPos(pos, -1) || null; }
+    catch (error) { return null; }
+  }
+
+  /**
+   * Anchor for a selection that may be much taller than the viewport.
+   * 1) Prefer a visible end/start (last.to, last.from, first.to, first.from).
+   * 2) If both ends are off-screen but the selection covers the viewport,
+   *    anchor near a visible position inside the selection. This gives a stable
+   *    entry for Ctrl+A / long single-line selections.
+   * 3) If the viewport is completely outside the selection, return null.
+   * Positions only: no text slicing, no full-document read.
+   */
+  function anchorRect(view, ranges) {
+    if (!ranges || !ranges.length) return null;
+    var last = ranges[ranges.length - 1];
+    var first = ranges[0];
+    var probes = [last.to, last.from, first.to, first.from];
+    for (var i = 0; i < probes.length; i += 1) {
+      var rect = coordsVisible(view, probes[i]);
+      if (intersectsViewport(rect)) return rect;
+    }
+    // Both endpoints are off-screen. Only show a stable entry when the visible
+    // viewport actually lies inside the selection; otherwise the user has
+    // scrolled away and the bar must stay hidden.
+    try {
+      var scroller = view.scrollDOM;
+      if (!scroller || typeof view.posAtCoords !== 'function') return null;
+      var box = scroller.getBoundingClientRect();
+      if (!box || box.height <= 0 || box.width <= 0) return null;
+      var xs = [box.left + 24, box.right - 24];
+      var ys = [box.top + Math.min(48, box.height / 2), box.top + box.height / 2, box.bottom - 24];
+      for (var xi = 0; xi < xs.length; xi += 1) {
+        for (var yi = 0; yi < ys.length; yi += 1) {
+          var pos = view.posAtCoords({ x: xs[xi], y: ys[yi] });
+          if (!Number.isSafeInteger(pos)) continue;
+          var inside = false;
+          for (var r = 0; r < ranges.length; r += 1) {
+            if (pos >= ranges[r].from && pos <= ranges[r].to) { inside = true; break; }
+          }
+          if (!inside) continue;
+          var at = coordsVisible(view, pos);
+          if (intersectsViewport(at)) return at;
+          return {
+            top: ys[yi] - 10, bottom: ys[yi] + 10,
+            left: xs[xi] - 8, right: xs[xi] + 8,
+            width: 16, height: 20,
+          };
+        }
+      }
+    } catch (error) { /* fall through */ }
+    return null;
+  }
+
   var stats = window.__dshSelStats = {
-    selectionchange: 0,   // 原始 selectionchange 次数
-    rafScheduled: 0,      // 被 rAF 合并的调度次数
-    rafRuns: 0,           // 实际执行的 rAF 次数
-    shown: 0,             // 按钮显示次数
-    hidden: 0,            // 按钮隐藏次数
-    emits: 0,             // insert-to-chat 发送次数
-    mouse: 0,             // 点击路径次数
-    keyboard: 0,          // 快捷键路径次数
-    oversize: 0,          // 因超过 256 KiB 硬上限被拒绝的次数（未发送）
-    lastOversizeLength: 0,
-    lastTextLength: 0,
-    lastRangeCount: 0,
-    viewMissing: 0,       // 取不到引擎 state 的次数（诊断用）
+    selectionchange: 0, rafScheduled: 0, rafRuns: 0,
+    shown: 0, hidden: 0,
+    quotes: 0, edits: 0, mouse: 0, keyboard: 0,
+    oversize: 0, viewMissing: 0, emits: 0,
+    positionReads: 0, textReads: 0,
+    digestRequests: 0, digestRuns: 0, digestFailures: 0, digestMs: 0,
+    lastTextLength: 0, lastRangeCount: 0, lastLineStart: 0, lastLineEnd: 0,
   };
+
+  function core() { return window.__MP208 || null; }
 
   function getView() {
     try {
@@ -69,44 +118,47 @@
     }
   }
 
-  /**
-   * 从 CM6 EditorState 读当前选区。返回 null = 没有可插入内容。
-   * 只用公开字段：state.selection.ranges / state.doc.sliceString —— 不触碰 region 内部字段，
-   * 也不做"渲染文本 vs 源码"的二次推断。
-   */
-  function readSelection() {
+  /** Positions only: used by selectionchange/scroll; never slices the document. */
+  function readPositions() {
     var view = getView();
     if (!view) return null;
     try {
-      var ranges = view.state.selection.ranges || [];
-      var parts = [];
-      var metas = [];
-      for (var i = 0; i < ranges.length; i += 1) {
-        var range = ranges[i];
-        var from = Math.min(range.from, range.to);
-        var to = Math.max(range.from, range.to);
+      var ranges = [];
+      var input = view.state.selection.ranges || [];
+      for (var i = 0; i < input.length; i += 1) {
+        var r = input[i];
+        var from = Math.min(r.from, r.to);
+        var to = Math.max(r.from, r.to);
         if (to <= from) continue;
-        var text = view.state.doc.sliceString(from, to);
-        if (!text) continue;
-        parts.push(text);
-        metas.push({ from: from, to: to, length: text.length });
+        ranges.push({ from: from, to: to });
       }
-      if (!metas.length) return null;
-      var joined = parts.join('\n\n');
-      return { view: view, text: joined, ranges: metas, length: joined.length };
-    } catch (error) {
-      return null;
-    }
+      if (!ranges.length) return null;
+      stats.positionReads += 1;
+      return { view: view, ranges: ranges };
+    } catch (error) { return null; }
   }
 
-  function ensureButton() {
-    if (btn && btn.isConnected) return btn;
+  /** Full selection only on a click/keyboard action; text is sliced here. */
+  function readSelection() {
+    var view = getView();
+    if (!view) return null;
+    var api = core();
+    var envelope = api && typeof api.envelopeFromView === 'function'
+      ? api.envelopeFromView(view, null)
+      : null;
+    if (!envelope || envelope.ok !== true) return null;
+    stats.textReads += 1;
+    return { view: view, envelope: envelope, text: envelope.text, ranges: envelope.ranges };
+  }
+
+  function ensureButtons() {
+    if (btn && btn.isConnected && editBtn && editBtn.isConnected) return btn;
     btn = document.createElement('button');
     btn.type = 'button';
     btn.id = BTN_ID;
     btn.setAttribute('data-on', '0');
-    btn.setAttribute('aria-label', '将选中的 Markdown 源码插入对话（Ctrl/Cmd+Shift+Enter）');
-    btn.title = '插入对话（Ctrl/Cmd+Shift+Enter）';
+    btn.setAttribute('aria-label', '插入只读引用（Ctrl/Cmd+Shift+Enter）。可预览或移除，需手动发送');
+    btn.title = '插入只读引用（Ctrl/Cmd+Shift+Enter）；可预览/移除，需手动发送';
     var icon = document.createElement('span');
     icon.className = 'dsh-md-insert-icon';
     icon.setAttribute('aria-hidden', 'true');
@@ -117,115 +169,121 @@
     btn.appendChild(icon);
     btn.appendChild(labelEl);
 
-    // mousedown preventDefault：不转移焦点、不塌陷选区（点击浮按钮的第一硬要求）。
-    btn.addEventListener('mousedown', function (event) {
+    editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.id = EDIT_ID;
+    editBtn.setAttribute('data-on', '0');
+    editBtn.setAttribute('aria-label', '为选中的这段创建受限修改目标，填写意图后放入输入框');
+    editBtn.title = '修改此处：只改选中的这段；填写意图后放入输入框，不自动发送';
+    editLabelEl = document.createElement('span');
+    editLabelEl.className = 'dsh-md-edit-label';
+    editLabelEl.textContent = EDIT_LABEL;
+    editBtn.appendChild(editLabelEl);
+
+    function keepSelection(event) {
       if (event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation();
-    });
+    }
+    btn.addEventListener('mousedown', keepSelection);
+    editBtn.addEventListener('mousedown', keepSelection);
     btn.addEventListener('click', function (event) {
-      event.preventDefault();
-      event.stopPropagation();
+      event.preventDefault(); event.stopPropagation();
       stats.mouse += 1;
-      emitInsert('click');
+      emitQuote('click');
+    });
+    editBtn.addEventListener('click', function (event) {
+      event.preventDefault(); event.stopPropagation();
+      stats.mouse += 1;
+      emitEdit('click');
     });
     btn.addEventListener('keydown', function (event) {
       if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      event.stopPropagation();
+      event.preventDefault(); event.stopPropagation();
       stats.keyboard += 1;
-      emitInsert('keyboard');
+      emitQuote('keyboard');
     });
-
+    editBtn.addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault(); event.stopPropagation();
+      stats.keyboard += 1;
+      emitEdit('keyboard');
+    });
     document.body.appendChild(btn);
+    document.body.appendChild(editBtn);
     return btn;
   }
 
   function hide() {
-    if (!btn) return;
-    if (btn.getAttribute('data-on') === '1') stats.hidden += 1;
-    btn.setAttribute('data-on', '0');
-    lastTransform = '';
+    if (btn && btn.getAttribute('data-on') === '1') stats.hidden += 1;
+    if (btn) btn.setAttribute('data-on', '0');
+    if (editBtn) editBtn.setAttribute('data-on', '0');
+    lastTransform = null;
   }
 
-  function restoreLabel() {
+  function restoreLabels() {
     if (resetTimer) { clearTimeout(resetTimer); resetTimer = null; }
-    if (btn) btn.setAttribute('data-state', '');
+    if (btn) { btn.setAttribute('data-state', ''); btn.setAttribute('data-on', '1'); }
+    if (editBtn) { editBtn.setAttribute('data-state', ''); editBtn.setAttribute('data-on', '1'); }
     if (labelEl) labelEl.textContent = BTN_LABEL;
+    if (editLabelEl) editLabelEl.textContent = EDIT_LABEL;
   }
 
-  function flashInserted() {
-    ensureButton();
+  function flash(kind) {
+    ensureButtons();
     if (resetTimer) clearTimeout(resetTimer);
-    btn.setAttribute('data-state', 'inserted');
-    labelEl.textContent = BTN_INSERTED;
+    if (kind === 'quote') {
+      btn.setAttribute('data-state', 'done');
+      labelEl.textContent = BTN_DONE;
+    } else {
+      editBtn.setAttribute('data-state', 'done');
+      editLabelEl.textContent = EDIT_DONE;
+    }
     resetTimer = setTimeout(function () {
       resetTimer = null;
-      if (!btn) return;
-      btn.setAttribute('data-state', '');
-      labelEl.textContent = BTN_LABEL;
-    }, INSERTED_RESET_MS);
+      if (btn) { btn.setAttribute('data-state', ''); labelEl.textContent = BTN_LABEL; }
+      if (editBtn) { editBtn.setAttribute('data-state', ''); editLabelEl.textContent = EDIT_LABEL; }
+    }, DONE_RESET_MS);
   }
 
-  /**
-   * 选区锚点：取最后一段选区的末端（用户拖选的落点）。
-   * 多行选区用末端更贴近"刚选完的位置"；末端不可见/无坐标时回落到首端。
-   */
-  function anchorRect(view, ranges) {
-    var rect = null;
-    try {
-      var last = ranges[ranges.length - 1];
-      rect = view.coordsAtPos(last.to, 1) || view.coordsAtPos(last.from, -1);
-      if (!rect) {
-        var first = ranges[0];
-        rect = view.coordsAtPos(first.from, -1) || view.coordsAtPos(first.to, 1);
-      }
-    } catch (error) {
-      rect = null;
-    }
-    return rect;
-  }
-
-  function showAt(rect) {
-    var button = ensureButton();
-    var wasVisible = button.getAttribute('data-on') === '1';
-    button.setAttribute('data-on', '1');
-    if (!wasVisible) stats.shown += 1;
-
-    var bw = button.offsetWidth || 96;
-    var bh = button.offsetHeight || 30;
-    var gap = 8;
+  function showAt(rect, view) {
+    ensureButtons();
+    var wasVisible = btn.getAttribute('data-on') === '1';
+    var bw = btn.offsetWidth || 86;
+    var ew = editBtn.offsetWidth || 92;
+    var bh = Math.max(btn.offsetHeight || 30, editBtn.offsetHeight || 30);
+    var gap = 4;
     var margin = 8;
-    var top = rect.top - bh - gap;
+    var total = bw + gap + ew;
+    var top = rect.top - bh - 8;
     if (top < margin) {
-      // 边缘避让：上方放不下 → 放到选区下方；下方也放不下 → 钳到视口内最低可用位。
-      var below = rect.bottom + gap;
+      var below = rect.bottom + 8;
       top = (below + bh <= window.innerHeight - margin) ? below : Math.max(margin, window.innerHeight - bh - margin);
     }
     var anchorX = Number.isFinite(rect.right) ? rect.right : rect.left;
-    var left = anchorX - bw;
-    left = Math.min(Math.max(margin, left), Math.max(margin, window.innerWidth - bw - margin));
-
-    var transform = 'translate3d(' + Math.round(left) + 'px,' + Math.round(top) + 'px,0)';
-    if (transform !== lastTransform) {
-      button.style.transform = transform;
-      lastTransform = transform;
+    var left = anchorX - total;
+    left = Math.min(Math.max(margin, left), Math.max(margin, window.innerWidth - total - margin));
+    var p = 'translate3d(' + Math.round(left) + 'px,' + Math.round(top) + 'px,0)';
+    var e = 'translate3d(' + Math.round(left + bw + gap) + 'px,' + Math.round(top) + 'px,0)';
+    if (!lastTransform || lastTransform.p !== p || lastTransform.e !== e) {
+      btn.style.transform = p;
+      editBtn.style.transform = e;
+      lastTransform = { p: p, e: e };
     }
+    btn.setAttribute('data-on', '1');
+    editBtn.setAttribute('data-on', '1');
+    if (!wasVisible) stats.shown += 1;
   }
 
   function update() {
-    var selection = readSelection();
-    if (!selection) { hide(); return; }
-    // IME 组字期间 DOM 选区与 CM6 state 可能不同步：不弹按钮，避免抢组字。
-    try { if (selection.view.composing) { hide(); return; } } catch (error) { /* 字段不存在 */ }
-    var rect = anchorRect(selection.view, selection.ranges);
+    var positions = readPositions();
+    hasSelection = !!positions;
+    if (!positions) { hide(); return; }
+    try { if (positions.view.composing) { hide(); return; } } catch (error) { /* 字段不存在 */ }
+    var rect = anchorRect(positions.view, positions.ranges);
     if (!rect) { hide(); return; }
-    // 锚点完全在视口外（滚走了）→ 先隐藏；滚回来时 scroll 事件会重新调度。
-    if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
-      hide();
-      return;
-    }
-    showAt(rect);
+    if (!intersectsViewport(rect)) { hide(); return; }
+    showAt(rect, positions.view);
   }
 
   function schedule() {
@@ -238,108 +296,132 @@
     });
   }
 
-  /**
-   * 超过 256 KiB 硬上限：拒绝发送，走桥的 toast（不静默截断、不闪"已插入"）。
-   * 为什么拒绝而不是截断：插入到 DSH composer 的文本必须就是用户选中的源码；
-   * 截断会让"选区"与"插入内容"失去同一性，比拒绝更坏（Astra：契约优先于便利）。
-   */
-  function notifyOversize(length) {
-    var kb = Math.ceil(length / 1024);
-    var message = '选区过大（' + kb + ' KB），请缩小范围后再插入';
+  function notify(message) {
     try {
       if (window.__dshBridge && typeof window.__dshBridge.toast === 'function') window.__dshBridge.toast(message);
       else if (window.mpExtras && typeof window.mpExtras.toast === 'function') window.mpExtras.toast(message);
       else console.warn('[dsh-selection] ' + message);
-    } catch (error) { /* 提示失败也不改变"拒绝发送"的语义 */ }
+    } catch (error) { /* 提示失败不改变拒绝语义 */ }
   }
 
-  function emitInsert(source) {
+  function emit(kind) {
     var selection = readSelection();
     if (!selection) { hide(); return false; }
-    if (selection.text.length > MAX_INSERT_CHARS) {
+    if (kind === 'quote' && selection.text.length > MAX_INSERT_CHARS) {
       stats.oversize += 1;
-      stats.lastOversizeLength = selection.text.length;
-      notifyOversize(selection.text.length);
+      notify('选区过大（' + Math.ceil(selection.text.length / 1024) + ' KB），请缩小范围后再引用');
       return false;
     }
-    var payload = {
-      text: selection.text,
-      meta: {
-        ranges: selection.ranges,
-        length: selection.text.length,
-        count: selection.ranges.length,
-        source: 'cm6',
-      },
+    var envelope = selection.envelope;
+    function post(payload) {
+      try {
+        if (window.handler && typeof window.handler.emit === 'function') {
+          window.handler.emit(kind === 'quote' ? 'insert-quote' : 'edit-target', payload);
+        } else {
+          window.parent.postMessage({ __dshmd: true, dir: 'up', type: kind === 'quote' ? 'insert-quote' : 'edit-target', content: payload }, '*');
+        }
+      } catch (error) {
+        hide();
+        return false;
+      }
+      stats.emits += 1;
+      stats.lastTextLength = payload.text.length;
+      stats.lastRangeCount = payload.ranges.length;
+      stats.lastLineStart = payload.lineStart;
+      stats.lastLineEnd = payload.lineEnd;
+      if (kind === 'quote') stats.quotes += 1; else stats.edits += 1;
+      flash(kind);
+      var rect = anchorRect(selection.view, selection.ranges);
+      if (rect) showAt(rect, selection.view);
+      return true;
+    }
+    var payloadBase = {
+      text: envelope.text,
+      ranges: envelope.ranges,
+      docLength: envelope.docLength,
+      lineStart: envelope.lineStart,
+      lineEnd: envelope.lineEnd,
+      lines: envelope.lines,
+      capturedAt: envelope.capturedAt,
+      nonce: envelope.nonce,
+      source: 'cm6',
     };
-    var envelope = { __dshmd: true, dir: 'up', type: 'insert-to-chat', content: payload };
-    try {
-      // 走桥的 emit = 与引擎同一条 transport；桥未安装时直发父窗口（独立打开/单测）。
-      if (window.handler && typeof window.handler.emit === 'function') window.handler.emit('insert-to-chat', payload);
-      else window.parent.postMessage(envelope, '*');
-    } catch (error) {
-      hide();
+    if (kind === 'quote') return post(payloadBase);
+
+    // Explicit edit capture: bind the digest to the SAME synchronous CM6 doc
+    // the offsets came from. The hash is only computed on this click path;
+    // selectionchange/scroll never stringifies or hashes the whole document.
+    var view = selection.view;
+    var docRef = view.state.doc;
+    var fullText = docRef.toString();
+    stats.digestRequests += 1;
+    var started = Date.now();
+    var norm = String(fullText).replace(/\r\n?/g, '\n').replace(/^\uFEFF/, '');
+    var encoder = typeof TextEncoder === 'function' ? new TextEncoder() : null;
+    if (!encoder || typeof crypto === 'undefined' || !crypto.subtle) {
+      stats.digestFailures += 1;
+      notify('当前环境无法完成文档摘要，修改目标未创建；请改用只读引用');
       return false;
     }
-    stats.emits += 1;
-    stats.lastTextLength = payload.text.length;
-    stats.lastRangeCount = selection.ranges.length;
-    flashInserted();
-    // 发送后保持按钮位置（选区未变），点击别处/Escape 再隐藏。
-    var rect = anchorRect(selection.view, selection.ranges);
-    if (rect) showAt(rect);
+    crypto.subtle.digest('SHA-256', encoder.encode(norm)).then(function (digest) {
+      stats.digestRuns += 1;
+      stats.digestMs += Date.now() - started;
+      // Any document change during hashing invalidates the offsets. A selection
+      // change alone does not: the captured ranges/text still describe docRef.
+      if (view.state.doc !== docRef) {
+        stats.digestFailures += 1;
+        notify('文档在生成快照时发生变化，请重新选择后再修改');
+        return;
+      }
+      var bytes = new Uint8Array(digest);
+      var hex = '';
+      for (var i = 0; i < bytes.length; i += 1) hex += ('0' + bytes[i].toString(16)).slice(-2);
+      post(Object.assign({}, payloadBase, { docDigest: hex, docLength: docRef.length, docIdentity: 'cm6:' + docRef.length + ':' + hex }));
+    }, function () {
+      stats.digestFailures += 1;
+      notify('文档摘要计算失败，修改目标未创建；请改用只读引用');
+    });
     return true;
   }
 
-  // ── 事件：只读、事件驱动、rAF 合并 ─────────────────────────────
-  document.addEventListener('selectionchange', function () {
-    stats.selectionchange += 1;
-    schedule();
-  });
+  function emitQuote() { return emit('quote'); }
+  function emitEdit() { return emit('edit'); }
 
+  document.addEventListener('selectionchange', function () { stats.selectionchange += 1; schedule(); });
   document.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape') {
-      // 不抢 Escape 的默认行为（引擎可能用它退出图片/公式会话），只收起自己的浮按钮。
-      hide();
-      return;
-    }
+    if (event.key === 'Escape') { hide(); return; }
     if (event.key !== 'Enter' || !event.shiftKey || !(event.ctrlKey || event.metaKey)) return;
     if (event.isComposing) return;
     var selection = readSelection();
-    if (!selection) return;              // 没选区就不劫持按键，交给引擎/宿主
-    event.preventDefault();
-    event.stopPropagation();
+    if (!selection) return;
+    event.preventDefault(); event.stopPropagation();
     stats.keyboard += 1;
-    emitInsert('keyboard');
+    emitQuote('keyboard');
   }, true);
-
   document.addEventListener('pointerdown', function (event) {
-    if (!btn || btn.getAttribute('data-on') !== '1') return;
-    if (event.target === btn || btn.contains(event.target)) return;
+    if ((!btn || btn.getAttribute('data-on') !== '1') && (!editBtn || editBtn.getAttribute('data-on') !== '1')) return;
+    if (event.target === btn || (btn && btn.contains(event.target)) || event.target === editBtn || (editBtn && editBtn.contains(event.target))) return;
     hide();
   }, true);
-
-  // 滚动发生在 .cm-scroller 内部（不冒泡），capture 监听兜住；与 window resize 一起 rAF 合并。
   document.addEventListener('scroll', function () {
-    if (btn && btn.getAttribute('data-on') === '1') schedule();
+    // A hidden bar may re-enter the viewport when the user scrolls back into a
+    // long selection. Keep scheduling while any non-empty selection exists.
+    if (hasSelection || (btn && btn.getAttribute('data-on') === '1')) schedule();
   }, true);
   window.addEventListener('resize', function () {
-    if (btn && btn.getAttribute('data-on') === '1') schedule();
+    if (hasSelection || (btn && btn.getAttribute('data-on') === '1')) schedule();
   }, { passive: true });
+  window.addEventListener('dshmd:toast', function () { restoreLabels(); });
 
-  // 父窗口确认插入后可能回 toast（dsh-bridge 负责显示）；这里只把按钮状态复位，
-  // 避免"已插入"与父窗口失败提示同时出现时按钮仍停在成功态。
-  window.addEventListener('dshmd:toast', function () { restoreLabel(); });
-
-  // 诊断口（只读）：Electron 验收读 stats / 直接触发一次 update 以确认幂等。
   window.__dshSelDebug = {
     stats: stats,
     maxChars: MAX_INSERT_CHARS,
     read: readSelection,
     update: update,
     hide: hide,
-    button: function () { return btn; },
+    quote: emitQuote,
+    edit: emitEdit,
+    buttons: function () { return { quote: btn, edit: editBtn }; },
   };
-
-  // 首帧若已有选区（例如宿主恢复选区后重载），补一次。
   schedule();
 })();
