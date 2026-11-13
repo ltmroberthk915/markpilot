@@ -12,6 +12,13 @@ const {decodeDocument} = require('./text-codec');
 const fault = (code, message) => Object.assign(new Error(message), {code});
 const conflict = message => fault('MP_FILE_CONFLICT', message);
 const uuid = () => crypto.randomUUID();
+// Capabilities a host declares for every client it creates. Members without
+// these bits are "unknown" (old EXE / old plugin): no agent append is allowed
+// into a room whose leave() could delete that edit.
+const CAP_DURABLE_APPEND = 1;   // append_recovery copy + leave() keeps unacked agent edits
+const CAP_REMOTE_REPLAY = 2;    // packaged renderer applies live deltas (live-document.js)
+const LIVE_REQUIRED_CAPS = CAP_DURABLE_APPEND | CAP_REMOTE_REPLAY;
+const LIVE_HOST_CAPS = LIVE_REQUIRED_CAPS;
 const databases = new Map();
 const reservations = new AsyncLocalStorage();
 const hosts = new Set();            // 本代（本模块实例）仍有协同成员的 host；join 成功登记，leave 清空即除名
@@ -39,6 +46,12 @@ function database(directory) {
         id TEXT PRIMARY KEY, epoch TEXT NOT NULL REFERENCES rooms(epoch) ON DELETE CASCADE,
         pid INTEGER NOT NULL, seq INTEGER NOT NULL DEFAULT 0, ack INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS room_clients ON clients(epoch);
+      CREATE TABLE IF NOT EXISTS client_caps (
+        client TEXT PRIMARY KEY,
+        epoch TEXT NOT NULL,
+        caps INTEGER NOT NULL,
+        at INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS client_caps_epoch ON client_caps(epoch);
       CREATE TABLE IF NOT EXISTS changes (
         epoch TEXT NOT NULL REFERENCES rooms(epoch) ON DELETE CASCADE, version INTEGER NOT NULL,
         client TEXT NOT NULL, seq INTEGER NOT NULL, delta TEXT NOT NULL, group_id TEXT, PRIMARY KEY(epoch,version));
@@ -90,7 +103,7 @@ function database(directory) {
     const stamp = hostStamp(), stored = db.prepare("SELECT value FROM meta WHERE key='host'").get();
     if (stored && stored.value !== stamp)
       atomic(db, () => {
-        db.exec('DELETE FROM writers; DELETE FROM changes; DELETE FROM clients; DELETE FROM rooms; DELETE FROM append_recovery; DELETE FROM draft_index;');
+        db.exec('DELETE FROM writers; DELETE FROM client_caps; DELETE FROM changes; DELETE FROM clients; DELETE FROM rooms; DELETE FROM append_recovery; DELETE FROM draft_index;');
         db.prepare("INSERT OR REPLACE INTO meta VALUES('host',?)").run(stamp);
       });
     else if (!stored) atomic(db, () => db.prepare("INSERT OR REPLACE INTO meta VALUES('host',?)").run(stamp));
@@ -122,6 +135,42 @@ function localStoreUsable(filename) {
   finally { try { db?.close(); } catch { /* already closed */ } }
 }
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+// Agent edit groups are written in the same transaction as the change itself,
+// so a committed edit never advertises a group id that cannot be reviewed or
+// undone. The revision token must match documents-service.revisionTextSha:
+// comparison-normalized (CRLF -> LF, leading BOM dropped) text sha256.
+const GROUP_ID_RE = /^[0-9a-f-]{36}$/i;
+const GROUP_CHANGES_MAX = 4 * 1024 * 1024;
+const revisionTextSha = text => digest(Buffer.from(String(text).replace(/\r\n?/g, '\n').replace(/^\uFEFF/, ''), 'utf8'));
+const liveRevisionId = (epoch, version, text) => 'rev1:live:' + epoch + ':' + version + ':' + revisionTextSha(text);
+// `changes` may carry the removed bytes (the inverse of the edit). That text is
+// local audit data: it goes to agent_group only, never to changes.delta (which
+// every member receives) and never to a new on-disk journal.
+function groupChangesJson(changes) {
+  if (!Array.isArray(changes) || changes.length === 0) return null;
+  const raw = JSON.stringify(changes.map((change) => ({
+    from: Number(change?.from) || 0, to: Number(change?.to) || 0,
+    insert: String(change?.insert ?? ''), removed: String(change?.removed ?? ''),
+  })));
+  return raw.length <= GROUP_CHANGES_MAX ? raw : null;
+}
+function appendGroupRow(entry, groupId, resultRevision) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return { skipped: 'invalid-group-metadata' };
+  const wanted = String(entry.groupId ?? groupId ?? '');
+  if (!GROUP_ID_RE.test(wanted)) return { skipped: 'invalid-group-id' };
+  if (groupId != null && wanted !== String(groupId)) return { skipped: 'group-id-mismatch' };
+  const kind = String(entry.kind || 'edit');
+  if (!/^[a-z0-9-]{1,32}$/i.test(kind)) return { skipped: 'invalid-group-kind' };
+  const baseRevision = String(entry.baseRevision || '');
+  if (!baseRevision || baseRevision.length > 512) return { skipped: 'invalid-base-revision' };
+  const changes = groupChangesJson(entry.changes);
+  if (!changes) return { skipped: 'group-changes-unavailable' };
+  return { groupId: wanted, kind, baseRevision, resultRevision, changes };
+}
+function insertAgentGroupRow(db, key, group, now, actor = 'agent') {
+  db.prepare('INSERT OR REPLACE INTO agent_group(group_id,source,actor,kind,base_revision,result_revision,at,changes,undone_at) VALUES(?,?,?,?,?,?,?,?,NULL)')
+    .run(group.groupId, key, String(actor).slice(0, 32), group.kind, group.baseRevision, group.resultRevision, now, group.changes);
+}
 const DRAFT_LIMITS = Object.freeze({
   maxBytes: 8 * 1024 * 1024,
   maxRows: 512,
@@ -335,6 +384,7 @@ function retireClean(db, room) {
     if (!now || now.version !== room.version || now.saved !== room.saved) return false;
     db.prepare('DELETE FROM clients WHERE epoch=?').run(room.epoch);
     db.prepare('DELETE FROM rooms WHERE epoch=?').run(room.epoch);
+    db.prepare('DELETE FROM client_caps WHERE epoch=?').run(room.epoch);
     return true;
   });
 }
@@ -362,6 +412,7 @@ async function parkRecovery(db, directory, room) {
       .run(fileKey(room.file), target, room.epoch, room.version, room.saved, Date.now(), bytes.length, digest(bytes));
     db.prepare('DELETE FROM clients WHERE epoch=?').run(room.epoch);
     db.prepare('DELETE FROM rooms WHERE epoch=?').run(room.epoch);
+    db.prepare('DELETE FROM client_caps WHERE epoch=?').run(room.epoch);
     // Cap only the index. Parked files stay on disk until the user acts.
     const rows = db.prepare('SELECT recoveryPath FROM recovery ORDER BY at DESC').all();
     for (const row of rows.slice(RECOVERY_ROWS)) db.prepare('DELETE FROM recovery WHERE recoveryPath=?').run(row.recoveryPath);
@@ -378,6 +429,7 @@ async function sweepOrphans(db, directory) {
       if (room.version === room.saved) retireClean(db, room);
       else await parkRecovery(db, directory, room);
     }
+    try { db.prepare('DELETE FROM client_caps WHERE client NOT IN (SELECT id FROM clients)').run(); } catch { /* old schema */ }
   } catch (error) { /* housekeeping must never break a join or a write */ }
 }
 
@@ -500,6 +552,28 @@ function materialize(db, room, version = room.version) {
 const roomColumns = 'file,epoch,version,saved,disk,length,floor';
 function roomFor(db, file) { return db.prepare('SELECT '+roomColumns+' FROM rooms WHERE file=?').get(file); }
 function head(room) { return {epoch:room.epoch,version:room.version,savedVersion:room.saved,diskHash:room.disk}; }
+// Alive members plus their host-declared capabilities. client_caps is a separate
+// table: old hosts ignore it, and this build never changes clients/changes
+// columns. A missing table/row means "unknown" (0), never "safe".
+function memberView(db, epoch) {
+  const rows = db.prepare('SELECT id,pid FROM clients WHERE epoch=?').all(epoch);
+  const liveRows = rows.filter(({pid}) => alive(pid));
+  const caps = new Map();
+  try {
+    for (const row of db.prepare('SELECT client,caps FROM client_caps WHERE epoch=?').all(epoch))
+      caps.set(row.client, Number(row.caps) || 0);
+  } catch { /* store created before client_caps existed */ }
+  const replaySafe = (id) => (caps.get(id) & LIVE_REQUIRED_CAPS) === LIVE_REQUIRED_CAPS;
+  const parts = liveRows.map(({id}) => id + ':' + (caps.get(id) || 0)).sort();
+  const replaySafeMembers = liveRows.filter(({id}) => replaySafe(id)).length;
+  return {
+    members: liveRows.length,
+    localMembers: liveRows.filter(({pid}) => pid === process.pid).length,
+    replaySafeMembers,
+    allReplaySafe: liveRows.length > 0 && replaySafeMembers === liveRows.length,
+    fingerprint: digest(Buffer.from(String(epoch) + '\n' + parts.join('\n'), 'utf8')),
+  };
+}
 function updateRoom(db, room, client, seq, changes) {
   const length = checkedLength(changes, room.length), version = room.version + 1;
   db.prepare('INSERT INTO changes(epoch,version,client,seq,delta,group_id) VALUES(?,?,?,?,?,NULL)').run(room.epoch, version, client, seq, JSON.stringify(changes));
@@ -662,9 +736,19 @@ class LiveDocuments {
     try { return await this._clearDraft(...args); }
     finally { storageOperations--; }
   }
-  async _clearDraft(filePath, {docToken=null, textSha256=null, untitled=false}={}) {
+  async _clearDraft(filePath, {docToken=null, textSha256=null, expectedTextSha256=null, exact=false, untitled=false}={}) {
+    // Legacy contracts stay intact: textSha256 alone deletes by hash, docToken
+    // alone deletes by token. The new exact contract deletes only when the row
+    // matches source+kind+doc_token+text_sha in one SQL statement, so a newer
+    // value written under the same token survives (no client read-then-delete).
+    const exactMatch = exact === true;
     const bySha = textSha256 !== null && textSha256 !== undefined;
-    if (bySha) {
+    if (exactMatch) {
+      if (typeof docToken !== 'string' || !docToken)
+        throw fault('MP_DRAFT_INVALID', '缺少文档令牌');
+      if (typeof expectedTextSha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(expectedTextSha256))
+        throw fault('MP_DRAFT_INVALID', '草稿 sha 无效');
+    } else if (bySha) {
       if (typeof textSha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(textSha256))
         throw fault('MP_DRAFT_INVALID', '草稿 sha 无效');
     } else if (typeof docToken !== 'string' || !docToken) {
@@ -675,11 +759,14 @@ class LiveDocuments {
     if (!fs.existsSync(draftStoreFile(this.directory))) return {removed:0, reason:'no-store'};
     const db = this.draftWritableDb();
     return atomic(db, () => {
-      const result = bySha
-        ? db.prepare('DELETE FROM draft_index WHERE source=? AND kind=? AND text_sha=?')
-          .run(source, kind, textSha256.toLowerCase())
-        : db.prepare('DELETE FROM draft_index WHERE source=? AND kind=? AND doc_token=?')
-          .run(source, kind, docToken);
+      const result = exactMatch
+        ? db.prepare('DELETE FROM draft_index WHERE source=? AND kind=? AND doc_token=? AND text_sha=?')
+          .run(source, kind, docToken, expectedTextSha256.toLowerCase())
+        : bySha
+          ? db.prepare('DELETE FROM draft_index WHERE source=? AND kind=? AND text_sha=?')
+            .run(source, kind, textSha256.toLowerCase())
+          : db.prepare('DELETE FROM draft_index WHERE source=? AND kind=? AND doc_token=?')
+            .run(source, kind, docToken);
       return {removed:Number(result.changes || 0), source, kind};
     });
   }
@@ -744,9 +831,16 @@ class LiveDocuments {
         let room = roomFor(db, key);
         if (room) {
           for (const lease of db.prepare('SELECT id,pid FROM clients WHERE epoch=?').all(room.epoch))
-            if (!alive(lease.pid)) db.prepare('DELETE FROM clients WHERE id=?').run(lease.id);
+            if (!alive(lease.pid)) {
+              db.prepare('DELETE FROM clients WHERE id=?').run(lease.id);
+              db.prepare('DELETE FROM client_caps WHERE client=?').run(lease.id);
+            }
           if (!db.prepare('SELECT 1 FROM clients WHERE epoch=? LIMIT 1').get(room.epoch)) {
-            if (room.version === room.saved) { db.prepare('DELETE FROM rooms WHERE epoch=?').run(room.epoch); room = null; }
+            if (room.version === room.saved) {
+              db.prepare('DELETE FROM rooms WHERE epoch=?').run(room.epoch);
+              db.prepare('DELETE FROM client_caps WHERE epoch=?').run(room.epoch);
+              room = null;
+            }
             // A dirty room whose park failed stays: adoptDisk below conflicts
             // safely if the disk text changed, or resumes the draft if not.
           }
@@ -757,10 +851,12 @@ class LiveDocuments {
         } else adoptDisk(db, room, disk);
         const text = room.version === room.saved ? disk.text : materialize(db,room);
         db.prepare('INSERT INTO clients(id,epoch,pid,ack) VALUES(?,?,?,?)').run(client,room.epoch,process.pid,room.version);
+        db.prepare('INSERT OR REPLACE INTO client_caps(client,epoch,caps,at) VALUES(?,?,?,?)').run(client,room.epoch,LIVE_HOST_CAPS,Date.now());
+        db.prepare('DELETE FROM client_caps WHERE client NOT IN (SELECT id FROM clients)').run();
         let resolvedDisk = null;
         try { resolvedDisk = db.prepare('SELECT disk FROM room_resolved WHERE epoch=?').get(room.epoch)?.disk ?? null; }
         catch { /* old store: no marker table */ }
-        return {...head(room),client,text,resolvedDisk};
+        return {...head(room),client,text,resolvedDisk,caps:LIVE_HOST_CAPS};
       });
       this.clients.set(client, {key,file,epoch:joined.epoch});
       hosts.add(this); // 首个成员入座才登记 host；从未加入/全部离开的实例不占强引用
@@ -1016,21 +1112,55 @@ class LiveDocuments {
         const savedTextAvailable = room.saved >= room.floor;
         const savedText = room.version === room.saved ? text
           : (savedTextAvailable ? materialize(db, room, room.saved) : null);
-        const pids = db.prepare('SELECT pid FROM clients WHERE epoch=?').all(room.epoch);
-        const members = pids.filter(({pid}) => alive(pid)).length;
-        const localMembers = pids.filter(({pid}) => pid === process.pid).length;
+        const view = memberView(db, room.epoch);
         const resolved = (() => {
           try { return db.prepare('SELECT disk FROM room_resolved WHERE epoch=?').get(room.epoch); }
           catch { return null; } // old store created before room_resolved existed
         })();
         return {...head(room), length:room.length, text, savedText, savedTextAvailable,
-          textSha256:digest(Buffer.from(text,'utf8')), members, localMembers,
+          textSha256:digest(Buffer.from(text,'utf8')),
+          members:view.members, localMembers:view.localMembers,
+          replaySafeMembers:view.replaySafeMembers, allReplaySafe:view.allReplaySafe,
+          memberFingerprint:view.fingerprint,
           resolvedDisk: resolved?.disk ?? null};
       });
     } catch (error) {
       // A read-only WAL edge, a locked store or a transient SQLite failure must
       // not block a read. Fall back to the disk authority; write paths still go
       // through live.external/CAS and cannot silently overwrite a dirty room.
+      return null;
+    } finally { try { db.close(); } catch { /* already closed */ } }
+  }
+  // Read-only historical snapshot used by selective undo. Reconstructs the
+  // room text at `version` from the checkpoint plus the retained change log and
+  // returns the later change rows. Never creates the store and never writes.
+  // Returns null when the version predates the compacted floor or the store is
+  // foreign/unavailable, so the caller must keep the current draft.
+  async readRoomVersion(filePath, version) {
+    if (!Number.isSafeInteger(version) || version < 0) return null;
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    const filename = path.join(path.resolve(this.directory), 'rooms.sqlite');
+    if (!fs.existsSync(filename)) return null;
+    const {DatabaseSync} = require('node:sqlite');
+    let db;
+    try { db = new DatabaseSync(filename, {readOnly:true}); } catch (error) { return null; }
+    try {
+      try { db.exec('PRAGMA busy_timeout=2000'); } catch { /* best effort */ }
+      try {
+        const stored = db.prepare("SELECT value FROM meta WHERE key='host'").get()?.value;
+        if (stored !== hostStamp()) return null;
+      } catch { return null; }
+      return readTx(db, () => {
+        const room = db.prepare('SELECT file,epoch,version,saved,disk,length,floor FROM rooms WHERE file=?').get(key);
+        if (!room) return null;
+        if (version < room.floor || version > room.version) return null;
+        const text = materialize(db, room, version);
+        const changes = db.prepare('SELECT version,client,seq,delta,group_id AS groupId FROM changes WHERE epoch=? AND version>? AND version<=? ORDER BY version')
+          .all(room.epoch, version, room.version)
+          .map(({delta, ...row}) => ({...row, changes: JSON.parse(delta)}));
+        return {epoch: room.epoch, version, floor: room.floor, roomVersion: room.version, text, changes};
+      });
+    } catch (error) {
       return null;
     } finally { try { db.close(); } catch { /* already closed */ } }
   }
@@ -1061,7 +1191,10 @@ class LiveDocuments {
       from: Number(c.from) || 0, to: Number(c.to) || 0,
       insert: String(c.insert ?? ''), removed: String(c.removed ?? ''),
     }))) : null;
-    const changes = rawChanges && rawChanges.length <= 4 * 1024 * 1024 ? rawChanges : null;
+    // A group without its inverse bytes cannot be undone. Refuse the record
+    // instead of persisting a review row that the UI can only fail on.
+    if (rawChanges && rawChanges.length > GROUP_CHANGES_MAX) return null;
+    const changes = rawChanges;
     db.prepare('INSERT OR REPLACE INTO agent_group(group_id,source,actor,kind,base_revision,result_revision,at,changes,undone_at) VALUES(?,?,?,?,?,?,?,?,NULL)')
       .run(groupId, key, String(entry.actor || 'agent').slice(0, 32), String(entry.kind || 'edit').slice(0, 32),
         String(entry.baseRevision || '').slice(0, 512), String(entry.resultRevision || '').slice(0, 512), now, changes);
@@ -1087,6 +1220,35 @@ class LiveDocuments {
     const file = await canonicalFile(filePath), key = fileKey(file);
     this.db.prepare('UPDATE agent_group SET undone_at=? WHERE source=? AND group_id=?').run(Date.now(), key, String(groupId || ''));
     return true;
+  }
+  // A group that failed read-back verification must not stay visible as an
+  // undoable review row. Only remove the exact row the caller just inspected.
+  async discardAgentGroup(filePath, groupId) {
+    const id = String(groupId || '');
+    if (!GROUP_ID_RE.test(id)) return false;
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    const db = this.db;
+    return atomic(db, () => Number(db.prepare('DELETE FROM agent_group WHERE source=? AND group_id=?').run(key, id).changes || 0) > 0);
+  }
+  // Single-statement multi-group mark: an undo that restores N groups never
+  // leaves a half-marked chain. No schema change; `marked` is the ids that
+  // matched a row in this store.
+  async markAgentGroupsUndone(filePath, groupIds) {
+    const ids = Array.isArray(groupIds)
+      ? groupIds.map(String).filter((id) => /^[0-9a-f-]{36}$/i.test(id)) : [];
+    if (!ids.length) return {marked: []};
+    const file = await canonicalFile(filePath), key = fileKey(file);
+    const now = Date.now();
+    const db = this.db;
+    const marked = [];
+    atomic(db, () => {
+      const statement = db.prepare('UPDATE agent_group SET undone_at=? WHERE source=? AND group_id=?');
+      for (const id of ids) {
+        const result = statement.run(now, key, id);
+        if (Number(result.changes || 0) > 0) marked.push(id);
+      }
+    });
+    return {marked};
   }
   async listAgentGroups(filePath, limit = 20) {
     const file = await canonicalFile(filePath), key = fileKey(file);
@@ -1161,12 +1323,14 @@ class LiveDocuments {
   // the normal exchange() update stream. The transaction re-checks epoch,
   // version and the materialized base text, so a concurrent editor save or
   // peer edit can never be appended on top of a stale base.
-  async append(filePath, {epoch, baseVersion, baseText, changes, actor='agent', groupId=null, clearResolved=false} = {}) {
+  async append(filePath, {epoch, baseVersion, baseText, changes, actor='agent', groupId=null, group=null, clearResolved=false, expectedMembers=null, requireReplaySafe=false} = {}) {
     if (typeof baseText !== 'string') throw fault('MP_LIVE_APPEND', '缺少权威正文');
     if (typeof epoch !== 'string' || !epoch) throw fault('MP_LIVE_APPEND', '缺少协同会话');
     if (!Number.isSafeInteger(baseVersion) || baseVersion < 0) throw fault('MP_LIVE_APPEND', '无效的协同版本');
     if (!/^[a-z0-9-]{1,32}$/.test(String(actor))) throw fault('MP_LIVE_APPEND', '无效的追加者');
     if (groupId != null && !/^[0-9a-f-]{36}$/i.test(String(groupId))) throw fault('MP_LIVE_APPEND', '无效的编辑组');
+    if (expectedMembers != null && (typeof expectedMembers !== 'string' || !/^[0-9a-f]{64}$/.test(expectedMembers)))
+      throw fault('MP_LIVE_APPEND', '无效的成员校验值');
     const file = await canonicalFile(filePath), key = fileKey(file);
     const filename = path.join(path.resolve(this.directory), 'rooms.sqlite');
     if (!localStoreUsable(filename)) throw fault('MP_LIVE_NO_ROOM', '文档没有共享会话，请重新读取后再试');
@@ -1178,15 +1342,24 @@ class LiveDocuments {
           const room = roomFor(db, key);
           if (!room) throw fault('MP_LIVE_NO_ROOM', '文档没有共享会话，请重新读取后再试');
           if (room.epoch !== epoch) throw fault('MP_LIVE_SESSION', '文档协同会话已改变');
-          const members = db.prepare('SELECT pid FROM clients WHERE epoch=?').all(room.epoch)
-            .filter(({pid}) => alive(pid)).length;
-          if (!members) throw fault('MP_LIVE_NO_MEMBER', '没有在线的编辑器会话，请重新读取后再试');
+          const view = memberView(db, room.epoch);
+          if (!view.members) throw fault('MP_LIVE_NO_MEMBER', '没有在线的编辑器会话，请重新读取后再试');
+          if (expectedMembers != null && view.fingerprint !== expectedMembers)
+            throw fault('MP_LIVE_MEMBERS_CHANGED', '在线成员在读取后发生变化，请重新读取后再编辑');
+          if (requireReplaySafe && !view.allReplaySafe)
+            throw fault('MP_LIVE_ROOM_UNSAFE', '有在线成员不支持持久恢复/远端回放，已拒绝 AI 写入');
           if (room.version !== baseVersion || materialize(db, room) !== baseText)
             throw fault('MP_LIVE_STALE', '文档刚有新编辑，请重新读取后再应用');
           const length = checkedLength(changes, room.length);
           const version = room.version + 1;
           const nextText = apply(baseText, changes);
           if (nextText.length !== length) throw fault('MP_LIVE_CHANGE', '协同编辑的长度校验失败');
+          // The audit group is validated and committed in this same transaction.
+          // A group id is advertised on changes.group_id only when its review
+          // row is guaranteed to exist after COMMIT.
+          const groupRow = group ? appendGroupRow(group, groupId, liveRevisionId(room.epoch, version, nextText)) : null;
+          const groupRecorded = !!(groupRow && !groupRow.skipped);
+          const logGroupId = groupRecorded ? groupRow.groupId : (group == null && groupId != null ? String(groupId) : null);
           // The recovery copy is post-edit and durable before COMMIT. It is the
           // independent copy used when the room is retired before the editor
           // acknowledges this change. The transaction stays open for the write,
@@ -1198,8 +1371,9 @@ class LiveDocuments {
           // discovery record; the file is the payload.
           db.prepare('INSERT OR REPLACE INTO append_recovery VALUES(?,?,?,?,?,?,?)')
             .run(key, written.path, room.epoch, version, written.at || Date.now(), written.bytes, written.sha256);
+          if (groupRecorded) insertAgentGroupRow(db, key, groupRow, Date.now(), actor);
           db.prepare('INSERT INTO changes(epoch,version,client,seq,delta,group_id) VALUES(?,?,?,?,?,?)')
-            .run(room.epoch, version, actor, 0, JSON.stringify(changes), groupId ? String(groupId) : null);
+            .run(room.epoch, version, actor, 0, JSON.stringify(changes), logGroupId);
           db.prepare('UPDATE rooms SET version=?,length=? WHERE epoch=?').run(version, length, room.epoch);
           // A revoked resolved-conflict marker must keep blocking live.save even
           // though rooms.disk still has the external hash. Use an empty sentinel
@@ -1209,7 +1383,9 @@ class LiveDocuments {
           room.version = version; room.length = length;
           compact(db, room);
           const text = materialize(db, room);
-          return {...head(room), text, textSha256:digest(Buffer.from(text,'utf8')), recoveryPath};
+          return {...head(room), text, textSha256:digest(Buffer.from(text,'utf8')), recoveryPath,
+            groupRecorded,
+            ...(groupRecorded ? {} : {groupSkippedReason: group ? (groupRow?.skipped || 'group-unavailable') : (groupId != null ? 'group-metadata-missing' : null)})};
         });
         try { pruneAppendRecoveryRows(db, key, recoveryPath); } catch { /* retention is best effort */ }
         return result;
@@ -1222,12 +1398,14 @@ class LiveDocuments {
       }
     }, this.directory, { ...this.leaseOptions(), busyTimeoutMs: Math.min(this.leaseOptions().busyTimeoutMs ?? APPEND_BUSY_TIMEOUT_MS, APPEND_BUSY_TIMEOUT_MS) });
   }
-  async appendResolvedConflict(filePath, {epoch, baseVersion, baseText, changes, actor='agent', groupId=null, expectedDiskHash=null} = {}) {
+  async appendResolvedConflict(filePath, {epoch, baseVersion, baseText, changes, actor='agent', groupId=null, group=null, expectedDiskHash=null, expectedMembers=null, requireReplaySafe=false} = {}) {
     if (typeof baseText !== 'string') throw fault('MP_LIVE_APPEND', '缺少权威正文');
     if (typeof epoch !== 'string' || !epoch) throw fault('MP_LIVE_APPEND', '缺少协同会话');
     if (!Number.isSafeInteger(baseVersion) || baseVersion < 0) throw fault('MP_LIVE_APPEND', '无效的协同版本');
     if (!/^[a-z0-9-]{1,32}$/.test(String(actor))) throw fault('MP_LIVE_APPEND', '无效的追加者');
     if (groupId != null && !/^[0-9a-f-]{36}$/i.test(String(groupId))) throw fault('MP_LIVE_APPEND', '无效的编辑组');
+    if (expectedMembers != null && (typeof expectedMembers !== 'string' || !/^[0-9a-f]{64}$/.test(expectedMembers)))
+      throw fault('MP_LIVE_APPEND', '无效的成员校验值');
     if (typeof expectedDiskHash !== 'string' || !/^[0-9a-f]{64}$/i.test(expectedDiskHash))
       throw fault('MP_DOC_STALE', '缺少磁盘基线；请重新打开冲突');
     const file = await canonicalFile(filePath), key = fileKey(file);
@@ -1243,29 +1421,38 @@ class LiveDocuments {
           const room = roomFor(db, key);
           if (!room) throw fault('MP_LIVE_NO_ROOM', '文档没有共享会话，请重新读取后再试');
           if (room.epoch !== epoch) throw fault('MP_LIVE_SESSION', '文档协同会话已改变');
-          const members = db.prepare('SELECT pid FROM clients WHERE epoch=?').all(room.epoch)
-            .filter(({pid}) => alive(pid)).length;
-          if (!members) throw fault('MP_LIVE_NO_MEMBER', '没有在线的编辑器会话，请重新读取后再试');
+          const view = memberView(db, room.epoch);
+          if (!view.members) throw fault('MP_LIVE_NO_MEMBER', '没有在线的编辑器会话，请重新读取后再试');
+          if (expectedMembers != null && view.fingerprint !== expectedMembers)
+            throw fault('MP_LIVE_MEMBERS_CHANGED', '在线成员在读取后发生变化，请重新读取后再编辑');
+          if (requireReplaySafe && !view.allReplaySafe)
+            throw fault('MP_LIVE_ROOM_UNSAFE', '有在线成员不支持持久恢复/远端回放，已拒绝 AI 写入');
           if (room.version !== baseVersion || materialize(db, room) !== baseText)
             throw fault('MP_LIVE_STALE', '文档刚有新编辑，请重新读取后再应用');
           const length = checkedLength(changes, room.length);
           const version = room.version + 1;
           const nextText = apply(baseText, changes);
           if (nextText.length !== length) throw fault('MP_LIVE_CHANGE', '协同编辑的长度校验失败');
+          const groupRow = group ? appendGroupRow(group, groupId, liveRevisionId(room.epoch, version, nextText)) : null;
+          const groupRecorded = !!(groupRow && !groupRow.skipped);
+          const logGroupId = groupRecorded ? groupRow.groupId : (group == null && groupId != null ? String(groupId) : null);
           const written = writeAppendRecoverySync(this.directory, file, room.epoch, version, nextText);
           recoveryPath = written.path;
           recoveryCreated = written.created === true;
           db.prepare('INSERT OR REPLACE INTO append_recovery VALUES(?,?,?,?,?,?,?)')
             .run(key, written.path, room.epoch, version, written.at || Date.now(), written.bytes, written.sha256);
+          if (groupRecorded) insertAgentGroupRow(db, key, groupRow, Date.now(), actor);
           db.prepare('INSERT INTO changes(epoch,version,client,seq,delta,group_id) VALUES(?,?,?,?,?,?)')
-            .run(room.epoch, version, actor, 0, JSON.stringify(changes), groupId ? String(groupId) : null);
+            .run(room.epoch, version, actor, 0, JSON.stringify(changes), logGroupId);
           db.prepare('UPDATE rooms SET version=?,length=?,disk=? WHERE epoch=?').run(version, length, disk.hash, room.epoch);
           db.prepare('INSERT OR REPLACE INTO room_resolved(epoch,disk,resolved_at) VALUES(?,?,?)')
             .run(room.epoch, disk.hash, Date.now());
           room.version = version; room.length = length; room.disk = disk.hash;
           compact(db, room);
           const text = materialize(db, room);
-          return {...head(room), text, textSha256:digest(Buffer.from(text,'utf8')), recoveryPath: written.path, resolvedDisk: disk.hash};
+          return {...head(room), text, textSha256:digest(Buffer.from(text,'utf8')), recoveryPath: written.path, resolvedDisk: disk.hash,
+            groupRecorded,
+            ...(groupRecorded ? {} : {groupSkippedReason: group ? (groupRow?.skipped || 'group-unavailable') : (groupId != null ? 'group-metadata-missing' : null)})};
         });
         try { pruneAppendRecoveryRows(db, key, recoveryPath); } catch { /* retention is best effort */ }
         return result;
@@ -1296,10 +1483,14 @@ class LiveDocuments {
             .get(member.epoch, room.saved)?.v
         : null;
       db.prepare('DELETE FROM clients WHERE id=? AND epoch=?').run(client,member.epoch);
+      db.prepare('DELETE FROM client_caps WHERE client=?').run(client);
       const remaining = db.prepare('SELECT COUNT(*) AS c FROM clients WHERE epoch=?').get(member.epoch).c;
       if (remaining > 0) return;
       const keep = unackedAgent != null && (maxAck == null || unackedAgent > maxAck);
-      if (!keep) db.prepare('DELETE FROM rooms WHERE epoch=?').run(member.epoch);
+      if (!keep) {
+        db.prepare('DELETE FROM rooms WHERE epoch=?').run(member.epoch);
+        db.prepare('DELETE FROM client_caps WHERE epoch=?').run(member.epoch);
+      }
     });
     this.clients.delete(client);
     if (!this.clients.size) hosts.delete(this);

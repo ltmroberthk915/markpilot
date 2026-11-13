@@ -139,15 +139,16 @@ function needsScan(tr,value) {
   let scan = false;
   tr.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
     if (scan) return;
-    if (/[`~>\n\r]/.test(tr.startState.doc.sliceString(fromA, toA)) || /[`~>\n\r]/.test(inserted.toString())) { scan = true; return; }
+    if (/[\n\r]/.test(tr.startState.doc.sliceString(fromA, toA)) || /[\n\r]/.test(inserted.toString())) { scan = true; return; }
     const before=tr.startState.doc.lineAt(fromA).text,after=tr.state.doc.lineAt(fromB).text;
     const record=structuralContextAt(value,fromA),line=tr.startState.doc.lineAt(fromA);
     if (record?.lead && fromA <= line.from+record.lead || /^\s*/.exec(before)[0] !== /^\s*/.exec(after)[0]) { scan=true;return; }
     const signature=t=>{
       const prefix=lineContainers(t,0,[],false,[]);
-      return { prefix:JSON.stringify(prefix.path.map(p=>[p.kind,p.width])), paragraph:paragraphLine(t.slice(prefix.off)) };
+      return { prefix:JSON.stringify(prefix.path.map(p=>[p.kind,p.width])), paragraph:paragraphLine(t.slice(prefix.off)), off:prefix.off };
     };
     const oldSignature=signature(before),newSignature=signature(after);
+    if (fenceAt(before.slice(oldSignature.off)) || fenceAt(after.slice(newSignature.off))) { scan = true; return; }
     if(oldSignature.prefix!==newSignature.prefix){scan=true;return;}
     const previous=line.from ? structuralContextAt(value,line.from-1) : emptyContext;
     if(oldSignature.paragraph!==newSignature.paragraph && (record.path.length || previous.path.length)){scan=true;return;}

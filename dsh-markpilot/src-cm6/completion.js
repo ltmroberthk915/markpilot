@@ -147,6 +147,12 @@ function candidatesFor(state, manual) {
   if (state.selection.ranges.length !== 1 || codeBlockAt(state, state.selection.main.head)) return null;
   const head = state.selection.main.head;
   if (!state.selection.main.empty) return null;
+  /* Constant-time no-candidate exit. Both MATH_TOKEN and SLASH_TOKEN require the
+     code unit before the caret to be an ASCII letter, backslash or slash; any
+     other tail (Chinese, space, full stop, newline…) can never yield a prefix.
+     This avoids slicing 12000+1000 chars and running sourceKind per keystroke. */
+  const prev = head > 0 ? state.doc.sliceString(head - 1, head) : "";
+  if (!/[A-Za-z\\/]/.test(prev)) return null;
   const before = state.doc.sliceString(Math.max(0, head - 12000), head);
   const after = state.doc.sliceString(head, Math.min(state.doc.length, head + 1000));
   const ctx = sourceKind(before);

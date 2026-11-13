@@ -1,0 +1,2 @@
+b0ddf6bdfeff4588353a3e6a734b5433b1c0d6cba065d3d6105d2c65448c8a4c  markpilot-Setup-3.6.20.exe
+3910314fd140ca6a812dcd185f1cf7bbac89f21b261746ac704129ee0db00d96  markpilot-3.6.20-portable.exe

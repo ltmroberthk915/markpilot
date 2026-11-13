@@ -1,0 +1,44 @@
+{
+  "name": "markpilot-cm6",
+  "version": "3.6.20",
+  "description": "MarkPilot 独立桌面版 3.6.20：为 Windows 下载并启动安装版或便携版",
+  "license": "MIT",
+  "author": "jinxi",
+  "type": "commonjs",
+  "bin": {
+    "markpilot": "bin/markpilot.cjs"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md",
+    "SHA256SUMS-3.6.20.txt"
+  ],
+  "os": [
+    "win32"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "markpilot",
+    "markdown",
+    "editor",
+    "typora",
+    "desktop",
+    "windows"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ltmroberthk915/markpilot.git",
+    "directory": "npm/markpilot-cm6"
+  },
+  "homepage": "https://github.com/ltmroberthk915/markpilot/tree/main/npm/markpilot-cm6",
+  "bugs": {
+    "url": "https://github.com/ltmroberthk915/markpilot/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

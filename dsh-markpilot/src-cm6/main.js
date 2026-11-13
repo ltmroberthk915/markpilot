@@ -32,6 +32,7 @@ import { listSemantics } from "./lists.js";
 import { markdownContext, codeBlockAt, blockAt, scanFencedBlocks, scanStructuralContext, structuralContextAt, codeBody, quoteLead } from './markdown-context.js';
 import { breakParagraph as kpBreakParagraph, NO_BREAK_BEFORE, NO_BREAK_AFTER } from "./knuth-plass.js";
 import { tableKeys, tableBlockOf, tableLead, isSeparatorBody, displayWidth, fitWidths, applyEnter, applyEnterBr, applyTab, setTableHint, isFenceAt } from "./tables.js";
+import { quoteSoftBreak } from "./quote-keys.js";
 import { cachedTableWidths, registerTableWidths, inspectTableWidths } from "./table-widths.js";
 import { mathCompletion } from "./completion.js";
 import { horizontalFrame, localPoint, horizontalScrollbarHit } from './floating-layout.js';
@@ -1732,6 +1733,12 @@ function verticalIntoBlock(view, dir) {
 const blockVerticalKeys = Prec.high(keymap.of([
   { key: "ArrowUp", run: (v) => verticalIntoBlock(v, -1) },
   { key: "ArrowDown", run: (v) => verticalIntoBlock(v, 1) },
+]));
+/* Shift+Enter 在引用里是"软换行"，不是默认的裸换行：显式补上当前层级的 `>` 前缀，
+   空行才仍属于引用，行类 `.mp-quote` 与竖条/底色才会在第一帧就出现。
+   普通回车、表格、围栏、列表仍由各自既有键位处理（本命令只在引用行返回 true）。 */
+const quoteSoftBreakKeys = Prec.highest(keymap.of([
+  { key: "Shift-Enter", run: quoteSoftBreak },
 ]));
 /* 【2026-10-11 合并】原先这里还有一份 `mathVerticalKeys`（只处理块公式）✗ ——
    `blockVerticalKeys` 已经**包含**它（先块公式、再图表块）✓，两份键位都注册会互相遮蔽 ✗
@@ -7538,6 +7545,7 @@ function boot(content) {
         tableKeys,
         autoBreakMath, // 行中段 $$…$$ 收笔即换行（三道闸；零文档改动优先，闸门内才动结构）
         blockVerticalKeys, // ↑/↓ 跨块边界时进块公式或**图表块**（否则 CM6 会整块跳过）
+        quoteSoftBreakKeys, // 引用内 Shift+Enter：显式 `>` 软换行（普通行/表/围栏让位）
         verticalInputIntent,
         nativeVerticalIntent,
         docSourceClipboard, // 选区含公式时按文档源码写剪贴板（D8 配套）

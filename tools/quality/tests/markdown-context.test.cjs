@@ -172,3 +172,36 @@ test('empty/plain transitions only rescan when an adjacent semantic owner can co
   assert.deepEqual(state.field(c.markdownContext).blocks,c.scanFencedBlocks(state.doc));
  }
 });
+
+test('mid-line ` ~ > map the structural context, while container-wrapped fences still rescan', async () => {
+  const [c, { Text, EditorState }] = await modules;
+  const make = (text) => EditorState.create({ doc: Text.of(text.split('\n')), extensions: [c.markdownContext] });
+
+  // 1) Ordinary paragraph: a marker typed mid-line must map, not force a rebuild.
+  const prose = make('前文 alpha > beta `x` ~y~ 结尾');
+  const line = prose.doc.line(1);
+  for (const [name, offset, ch] of [['gt', 6, '>'], ['backtick', 12, '`'], ['tilde', 19, '~']]) {
+    const at = line.from + offset;
+    assert.ok(at > line.from && at < line.to, name + ' probe position must be mid-line');
+    const ctx = prose.update({ changes: { from: at, insert: ch } }).state.field(c.markdownContext);
+    assert.equal(ctx.rebuilt, false, name + ' typed mid-line must map the context, not rescan it');
+    assert.equal(ctx.blocks.length, 0, name + ' must not invent a fence');
+    assert.equal(ctx.records.length, 0, name + ' must not invent a container');
+  }
+
+  // 2) A fence opened behind a list prefix is indexed; editing its info must rescan.
+  const listFence = make('- ```js\n  body\n  ```\n\ntail');
+  assert.deepEqual(listFence.field(c.markdownContext).blocks.map((b) => b.info), ['js']);
+  const infoAt = listFence.doc.line(1).from + 5;
+  const infoCtx = listFence.update({ changes: { from: infoAt, insert: 'x' } }).state.field(c.markdownContext);
+  assert.equal(infoCtx.rebuilt, true, 'editing a list-wrapped fence info must rescan');
+  assert.equal(infoCtx.blocks[0].info, 'xjs');
+
+  // 3) Opening a fence right after a quote/list prefix must still rescan.
+  for (const text of ['> quote\n> more', '- item\n  text']) {
+    const state = make(text);
+    const ctx = state.update({ changes: { from: state.doc.line(1).from + 2, insert: '```' } }).state.field(c.markdownContext);
+    assert.equal(ctx.rebuilt, true, 'fence opened after a container prefix must rescan: ' + JSON.stringify(text));
+    assert.equal(ctx.blocks.length, 1, 'fence opened after a container prefix must be indexed: ' + JSON.stringify(text));
+  }
+});

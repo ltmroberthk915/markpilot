@@ -286,3 +286,26 @@ test('R3 被覆盖旧动作截断后，邻 zone 的后续自己输入可独立�
   assert.equal(text(v), base.replace('Key A', 'Key Y'), '新输入独立可撤销');
   assert.equal(notes2.length, 0);
 });
+
+test('T15 同组连击退格后外部写入：陈旧历史锚点不得抛 RangeError（3.6.17 装机实测同族）', () => {
+  const v = makeView('ABCDEFGHIJ', true);
+  const t0 = 1_000_000;
+  for (let i = 0; i < 3; i++) {
+    const pos = v.state.doc.length;
+    v.dispatch({
+      changes: { from: pos - 1, to: pos },
+      selection: { anchor: pos - 1 },
+      annotations: [Transaction.time.of(t0 + i * 16), Transaction.userEvent.of('delete.backward')],
+    });
+  }
+  assert.equal(text(v), 'ABCDEFG', '三次连击退格合并为一个历史事件');
+  assert.equal(external(v, 'ABCDEFGZZZZ'), true, '外部最小 diff 派发（addToHistory:false 走 addMapping）');
+  // 修复前：合并事件里更旧的锚点 8/9 越过 changeset 旧长度 7，mapPos 抛
+  // RangeError（装机实测 Position 3588891 > 3588890，同一形态）。
+  assert.equal(text(v), 'ABCDEFGZZZZ', '外部写入必须生效，不得被历史映射异常打断');
+  const notes = [];
+  assert.equal(run(v, 'undo', notes), true);
+  assert.ok(text(v).includes('ZZZZ'), '外部字节必须完整');
+  assert.equal(text(v).replace('ZZZZ', ''), 'ABCDEFGHIJ', '用户自己的三个字符只出现一次，不重不漏');
+  assert.equal(notes.length, 0, '贴边重插不触发危险截断');
+});
