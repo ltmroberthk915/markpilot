@@ -24,6 +24,11 @@ import { embedImageRefs } from './image-export.js';
 import { localImagePath } from './image-path.js';
 import { applyImageTransfer, finishNativeImageTransfer, imageTransferFlavor, readImageTransfer, reconcilePastedDefinitions } from './image-transfer.js';
 import { deleteGrapheme } from './grapheme-delete.js';
+/* 【脚注·单一解析器】`[^label]` 的定义/引用识别归 notes 任务维护的纯模块。
+   导出侧只消费它给出的 UTF-16 [from,to) 与稳定 ASCII DOM id，**不在这里另写第二套
+   Markdown 脚注解析器**；未解析引用（resolved:false）保持原文，导出侧不会凭空造活链接。
+   契约见 `.mp-verify/math-notes/pdf/README.md` 的「共享接口」一节。 */
+import { footnoteExportPlan } from './footnote-export.js';
 /* 【Typora 社区主题·2026-10-09】用户想直接用 Typora 的主题 CSS。
    改写逻辑**不在这里另写一份**：2.x 线早有一份纯函数实现（`user-theme.mjs` 的 adaptTyporaTheme）
    ——`#write` → 我们的写作区、`:root` 变量挂到作用域属性上、带相对 url() 的 @font-face 丢掉、
@@ -183,7 +188,7 @@ export function installExtras(deps) {
   }
   document.addEventListener('input', syncSearchInput, true);
   document.addEventListener('compositionend', syncSearchInput, true);
-  const { EditorView, getView, getImageAt, imageSource, lineStylesField, mathSpansField, scrollOffset, exportTypoCss } = deps;
+  const { EditorView, getView, getImageAt, imageSource, lineStylesField, mathSpansField, scrollOffset, exportTypoCss, footnoteAction } = deps;
   /* 【贴底/贴边翻转·2026-10-10（zoom-extremes 族 M6/M7）】三套右键菜单（图片 1567／表格 1643／表格行列 1734）
      都是**先定位、后加条目** ⇒ 定位那一刻菜单高度≈0，"下方放不下"根本判不出来 ⇒ 贴近视口底部右键时
      菜单伸出视口，只剩 36px／13px 的细条、**0 个可点项** ✗（实测 100/50/200/300 四档同签名）。
@@ -501,10 +506,29 @@ export function installExtras(deps) {
    *  本表的 compartment 原先是裸 `keymap.of(...)`（默认优先级）⇒ **被它抢先**，于是 Ctrl+I
    *  在真实按键下"没有斜体、光标却跑到整篇末尾"（实测 sel=0/16、文档零改动）。
    *  对策见 rebindKeys：本表改用 `Prec.high`，与 tableKeys / zoomKeys 同级。 */
+  /* 【脚注入口】一个动作覆盖三种上下文：光标在引用上 → 跳到定义；在定义里 → 回到
+     本次触发的那一处引用；在普通正文 → 在光标处插入引用并把定义追加到文末。
+     与正文上标/定义回链共用 footnotes-view.js 的同一套导航，不另造第二套落点逻辑。 */
+  function runFootnote() {
+    const view = getView();
+    const result = footnoteAction ? footnoteAction(view) : null;
+    if (result && result.ok === false) {
+      if (result.reason === 'opaque') toast('光标在代码或公式里，不能插入脚注');
+      else if (result.reason === 'tail-opaque') toast('文档末尾在代码或公式块内，无法把脚注定义写到文末');
+      else if (result.reason === 'table') toast('表格内不能插入脚注——请先把光标移到表外');
+      else if (result.reason === 'readonly') toast('阅读模式下不能插入脚注');
+      else if (result.reason === 'target-gone') toast('原来的引用已被删除，未跳转；再执行一次可回到第一条引用');
+      else if (result.reason === 'no-refs') toast('这条脚注没有引用可返回');
+      return false;
+    }
+    return !!(result && result.ok !== false);
+  }
+
   const DEFAULT_KEYS = {
     bold: 'Mod-b', italic: 'Mod-i', underline: 'Mod-u', strike: 'Alt-Shift-5',
     code: 'Mod-e', inlineMath: 'Mod-Shift-e', blockMath: 'Mod-Shift-m', codeBlock: 'Mod-Shift-k',
     quote: 'Mod-Shift-q', list: 'Mod-l', save: 'Mod-s', outline: 'Mod-Shift-o', export: '',
+    footnote: 'Mod-Alt-n',
   };
   const ACTIONS = {
     /* 行内格式全部走 toolbar.js 的同一个 wrap（唯一实现；落点规则与工具栏按钮逐字节一致）。 */
@@ -535,6 +559,7 @@ export function installExtras(deps) {
       } catch (e) { console.error('[mp] Ctrl+S 失败：', e); }
     },
     outline: () => toggleOutline(), export: () => exportHtml(),
+    footnote: () => runFootnote(),
   };
   function keyConfig(persistMigration = true) {
     try {
@@ -851,7 +876,16 @@ export function installExtras(deps) {
     + '.mp-math-block{margin:14px 0;text-align:center;overflow-x:auto;overflow-y:hidden}\n'
     + '.mp-math-block .katex-display{margin:0}\n'
     + '.mp-math{white-space:nowrap}\n'
-    + 'pre.mp-math{font:13px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--mp-com);white-space:pre-wrap;margin:10px 0}\n';
+    + 'pre.mp-math{font:13px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--mp-com);white-space:pre-wrap;margin:10px 0}\n'
+    /* 脚注：只新增类名，不带任何全局选择器；没有脚注的文档渲染结果不受影响。 */
+    + '.mp-fn-ref{font-size:.72em;vertical-align:super;line-height:0}\n'
+    + '.mp-fn-ref-link{color:var(--mp-primary);text-decoration:none}\n'
+    + '.mp-footnotes{margin:18px 0 8px;font-size:.86em;color:var(--mp-muted)}\n'
+    + '.mp-footnotes-sep{border:0;border-top:1px solid var(--mp-border);margin:0 0 8px}\n'
+    + '.mp-footnotes-list{padding-left:22px;margin:0}\n'
+    + '.mp-footnotes-list li{margin:0 0 6px}\n'
+    + '.mp-fn-text{color:var(--mp-fg)}\n'
+    + '.mp-fn-back{margin-left:6px;text-decoration:none;color:var(--mp-primary)}\n';
   /** 导出页 head：颜色 token 快照 ＋ 同源作者层样式 ＋ 引擎自己那份 KaTeX CSS（字体已内联为 data URL ⇒ 离线可排版）。
    *  mathCss 为空（宿主取不到样式表）时退化为只有前两者，公式会缺排版——由调用方提示。 */
   // HTML RAWTEXT ends at a literal closing style tag even inside a CSS string.
@@ -1043,13 +1077,15 @@ export function installExtras(deps) {
     })();
     return mathCssInflight.then((v) => { mathCssCache = v; mathCssInflight = null; return v; });
   }
+  const activeFootnotes = { plan: null };
   function inlineMd(line, srcMap, math = false) {
-    return renderInline(String(line).replace(/\\\|/g, '|'), {
+    const html = renderInline(String(line).replace(/\\\|/g, '|'), {
       math: tex => math && mathApi ? mathInlineHtml(tex) : '<code>' + esc(tex) + '</code>',
       image: image => image.src == null ? rewriteImgTag(image.raw, srcMap)
         : '<img alt="' + attrEsc(image.alt) + '" src="' + attrEsc(mapSrc(image.src, srcMap)) + '">',
       link: href => '<a href="' + attrEsc(href) + '">',
     });
+    return activeFootnotes.plan ? activeFootnotes.plan.expand(html) : html;
   }
   /** 正文分块生成器：边扫边吐块，调用方拿到一块就能写走（不攒整篇）
    *  【公式排版】opts.math=true 时块级公式走 KaTeX display（复用引擎 renderMathHTML）：
@@ -1059,11 +1095,16 @@ export function installExtras(deps) {
    *   · 单个公式的 TeX 源码最多攒 MATH_TEX_MAX 字符（超限退回 <pre> 文本），块级缓存与整篇无关。 */
   const MATH_TEX_MAX = 32 * 1024;
   function* mdBodyChunks(md, opts = {}) {
-    const { srcMap = null, chunkChars = CHUNK_CHARS, math = false, mermaidSvgs = null, nested = false } = opts;
+    const { srcMap = null, chunkChars = CHUNK_CHARS, math = false, mermaidSvgs = null, nested = false, footnotes = false } = opts;
     /* 【#54】导出正文剥离文档开头的 YAML front-matter（与编辑面同口径；Typora/常规导出链都不把元数据
        当正文）。判据与 markdown-context.inFrontMatter 同一正则；不匹配则原样输出。 */
     const frontMatter = nested ? null : /^\uFEFF?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(md);
-    const bodyMd = frontMatter ? md.slice(frontMatter[0].length) : md;
+    const sourceBody = frontMatter ? md.slice(frontMatter[0].length) : md;
+    /* 脚注只由共享解析器定位；这里把引用换成行内占位符、把定义区间抹成空白（保留换行），
+       块解析与行内 Markdown 仍是原来那一条链。nested 调用只消费占位符，不重复收集。 */
+    const foot = (!nested && footnotes) ? footnoteExportPlan(sourceBody) : null;
+    if (!nested) activeFootnotes.plan = foot || null;
+    const bodyMd = foot ? foot.body : sourceBody;
     const lines = bodyMd.split('\n'), structure = {};
     const codeStarts = new Map(scanFenceLines(lines, structure).map(b => [b.startLine - 1, b]));
     let buf = [], size = 0;
@@ -1372,6 +1413,11 @@ export function installExtras(deps) {
     }
     closeList();
     for (const b of pendingBlank) push(b);
+    if (foot) {
+      push(foot.endnote((text) => inlineMd(text, srcMap, math)));
+      if (size >= chunkChars) { const chunk = take(); if (chunk) yield chunk; }
+      activeFootnotes.plan = null;
+    }
     const chunk = take(); if (chunk) yield chunk;
   }
   function mdToHtml(md, opts) { let out = ''; for (const c of mdBodyChunks(md, opts)) out += c; return out; }
@@ -1436,7 +1482,7 @@ export function installExtras(deps) {
     try {
     const msMathCss = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0;
     const head = htmlHead(title, mathCss);
-    function* chunks() { yield head; yield* mdBodyChunks(md, { math: true, srcMap: images.map, mermaidSvgs: mermaidStat?.svgs }); yield HTML_TAIL; }
+    function* chunks() { yield head; yield* mdBodyChunks(md, { math: true, footnotes: true, srcMap: images.map, mermaidSvgs: mermaidStat?.svgs }); yield HTML_TAIL; }
     const msBuild = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0;
     if (dir) {                                   // ① 桌面版：写到用户选的位置
       const beg = await window.mpHost.exportBeginHtml({ dir, name: safeFileName(title) });
@@ -1474,31 +1520,226 @@ export function installExtras(deps) {
     } finally { mermaidStat?.svgs?.clear(); }
   }
 
-  /** PDF：壳层冻结的接口（内部自己选目标 → staging → printToPDF → 分片落盘）。 */
+  /* ── PDF：两条真实入口 ─────────────────────────────────────────────────────
+   * ① 桌面壳有 `window.mpHost.exportPdf` ⇒ 走冻结的壳层接口（选目标 → staging → printToPDF → 分片落盘）。
+   * ② 插件（DSH 侧栏 iframe）没有这个原生接口 ⇒ **不假装成功、也不要求装 EXE**：在用户这次点击的
+   *    手势里先试独立打印页；DSH 的 setWindowOpenHandler 若拒绝 window.open，则回退到**同源、隔离、
+   *    只含排版内容的隐藏 iframe** 打印（离屏保留布局，等字体/图片，afterprint 清理）。
+   *    两条路都用**同一条导出渲染链**（htmlHead + mdBodyChunks）把当前 Markdown 快照写成静态 HTML，
+   *    再交给浏览器/系统打印对话框（目标可选「另存为 PDF」），不依赖用户另开 HTML 文件。
+   *    安全边界：打印页 CSP `script-src 'none'`、没有脚本、没有 raw HTML 直通、图片仍按既有白名单；
+   *    不调整 iframe sandbox（活动插件已有 allow-popups allow-modals，见
+   *    dsh-markdown-editor-typora/lib/client.js:9731）；不接远程服务、不写任意本地文件。
+   *    若宿主连 modals 都拦：把隔离 iframe 版面露出来，用户按 Ctrl+P 仍可另存为 PDF。 */
+  const PLUGIN_PRINT_MAX = 24 * 1024 * 1024;
+  const pluginPrintAvailable = () => typeof window !== 'undefined'
+    && typeof window.open === 'function' && typeof window.print === 'function';
+  const PLUGIN_PRINT_CSS = `
+@page { size: A4; margin: 15mm; }
+.mp-print-hint { margin: 0; padding: 8px 12px; background: #fff6d8; color: #6b4b00;
+  border-bottom: 1px solid #e2c46b; font: 13px/1.55 system-ui, sans-serif; }
+@media print {
+  html, body { background: #fff !important; }
+  body { margin: 0 !important; padding: 0 !important; max-width: none !important; }
+  .mp-print-hint { display: none !important; }
+  pre { overflow: visible !important; white-space: pre-wrap !important; overflow-wrap: anywhere; }
+  table { max-width: 100% !important; }
+  img { max-width: 100% !important; height: auto !important; break-inside: avoid; }
+  tr, blockquote { break-inside: avoid; }
+  h1, h2, h3, h4, h5, h6 { break-after: avoid-page; }
+  a { color: var(--mp-primary) !important; text-decoration: none; }
+}`;
+  function writePopupPlaceholder(win) {
+    try {
+      const d = win.document;
+      d.open();
+      d.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>MarkPilot 打印</title></head>'
+        + '<body style="font:14px system-ui,sans-serif;padding:24px;color:#333">正在准备打印页…</body></html>');
+      d.close();
+    } catch { /* 弹窗可能已被用户关掉 */ }
+  }
+  async function buildPluginPrintHtml() {
+    const v = getView();
+    if (!v) throw new Error('没有打开的文档');
+    const md = v.state.doc.toString();
+    if (md.length > PLUGIN_PRINT_MAX) throw new Error('文档过大：请改用「单文件 HTML」导出后打印');
+    let mathCss = '';
+    try { if (mathApi) mathCss = await buildMathCss(); } catch { /* 公式样式失败不阻断打印 */ }
+    let mermaidStat = null;
+    try { if (window.mpMermaid?.prerender) mermaidStat = await window.mpMermaid.prerender(md); } catch { /* 图表失败保留源码 */ }
+    const title = mdTitle(md);
+    let head = htmlHead(title, mathCss);
+    head = head.replace('</head>', `<style>${cssRawText(PLUGIN_PRINT_CSS)}</style>\n</head>`);
+    const body = mdToHtml(md, { math: true, footnotes: true, mermaidSvgs: mermaidStat?.svgs });
+    const hint = '<div class="mp-print-hint">正在打开系统打印对话框。若没有弹出，请按 Ctrl+P'
+      + '（或浏览器菜单 → 打印），目标选择“另存为 PDF”。</div>\n';
+    return { html: head + hint + body + HTML_TAIL, title, mermaidStat };
+  }
+  async function waitPopupReady(win) {
+    try {
+      const fonts = win.document && win.document.fonts && win.document.fonts.ready;
+      if (fonts) await Promise.race([fonts, new Promise((r) => setTimeout(r, 1500))]);
+    } catch { /* 字体接口不可用 */ }
+    try {
+      await new Promise((resolve) => {
+        let done = false;
+        const finish = () => { if (!done) { done = true; resolve(); } };
+        win.addEventListener('load', finish, { once: true });
+        if (typeof win.requestAnimationFrame === 'function') {
+          win.requestAnimationFrame(() => win.requestAnimationFrame(finish));
+        } else setTimeout(finish, 50);
+        setTimeout(finish, 1500);
+      });
+    } catch { /* 关掉的弹窗不再等 */ }
+  }
+  async function printAndConfirm(win) {
+    let seen = false;
+    const on = () => { seen = true; };
+    try { win.addEventListener('beforeprint', on, { once: true }); } catch { /* 老内核 */ }
+    let threw = false;
+    try { win.focus(); win.print(); } catch { threw = true; }
+    // print() 在部分内核同步返回；给 beforeprint 一个微任务窗口，避免把“静默拦截”当成功。
+    await new Promise((r) => setTimeout(r, 300));
+    try { win.removeEventListener('beforeprint', on); } catch { /* 已触发 */ }
+    return !threw && seen;
+  }
+  async function printHtmlInWindow(win, html, title) {
+    const d = win.document;
+    d.open();
+    d.write(html);
+    d.close();
+    await waitPopupReady(win);
+    const printed = await printAndConfirm(win);
+    return { ok: true, mode: 'plugin-print-popup', file: null, printed, title };
+  }
+  /** 同源、隔离、只含排版内容的隐藏 iframe：DSH 的 setWindowOpenHandler 拒绝 window.open 时的回退。
+   *  不能用 display:none（没有布局，打印空白）；用离屏固定尺寸并保留布局。
+   *  print() 期间 iframe 仍挂载；afterprint 或兜底超时后移除，避免常驻。 */
+  function createPrintFrame() {
+    const frame = document.createElement('iframe');
+    frame.setAttribute('data-mp-print', '1');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.setAttribute('tabindex', '-1');
+    frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0;background:#fff;';
+    (document.body || document.documentElement).appendChild(frame);
+    return frame;
+  }
+  function revealPrintFrame(frame, cleanup) {
+    frame.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0;background:#fff;z-index:2147483647;';
+    frame.removeAttribute('aria-hidden');
+    const bar = document.createElement('div');
+    bar.setAttribute('data-mp-print-bar', '1');
+    bar.style.cssText = 'position:fixed;top:8px;right:12px;z-index:2147483648;';
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.textContent = '关闭打印页';
+    close.style.cssText = 'font:12px/1.6 system-ui,sans-serif;padding:4px 10px;border:1px solid #bbb;border-radius:6px;background:#fff;cursor:pointer;';
+    close.addEventListener('click', cleanup, { once: true });
+    bar.appendChild(close);
+    (document.body || document.documentElement).appendChild(bar);
+    return bar;
+  }
+  async function printHtmlInHiddenFrame(html, title) {
+    const frame = createPrintFrame();
+    const win = frame.contentWindow;
+    if (!win) { try { frame.remove(); } catch { /* 已移除 */ } throw new Error('打印框架初始化失败'); }
+    let bar = null, cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      try { bar?.remove(); } catch { /* 已移除 */ }
+      try { frame.remove(); } catch { /* 已移除 */ }
+    };
+    try {
+      const d = win.document;
+      d.open();
+      d.write(html);
+      d.close();
+      await waitPopupReady(win);
+      try { win.addEventListener('afterprint', cleanup, { once: true }); } catch { /* 老内核 */ }
+      const printed = await printAndConfirm(win);
+      if (!printed) bar = revealPrintFrame(frame, cleanup);   // 宿主连 modals 也拦：把版面露出来供 Ctrl+P
+      setTimeout(cleanup, 120000);
+      return { ok: true, mode: 'plugin-print-frame', file: null, printed, title };
+    } catch (e) {
+      cleanup();
+      throw e;
+    }
+  }
+  async function exportPdfViaPrint() {
+    if (!pluginPrintAvailable()) { toast('当前宿主不支持导出 PDF'); return { ok: false, error: 'print-unavailable' }; }
+    // ① 先在用户点击的同一任务里试 window.open（DSH 可能用 setWindowOpenHandler 拒绝）。
+    let popup = null;
+    try { popup = window.open('', '_blank'); } catch { popup = null; }
+    if (popup) {
+      try { popup.opener = null; } catch { /* 部分内核只读 */ }
+      writePopupPlaceholder(popup);
+    }
+    toast('正在准备打印页…');
+    let built = null;
+    try {
+      built = await buildPluginPrintHtml();
+      if (popup && !popup.closed) {
+        try {
+          const summary = await printHtmlInWindow(popup, built.html, built.title);
+          if (summary.printed) {
+            toast('已打开系统打印对话框：选择“另存为 PDF”即可');
+            lastExport = summary;
+            return summary;
+          }
+        } catch { /* 写入/打印失败 ⇒ 走同源隐藏框架 */ }
+        try { popup.close(); } catch { /* 已关 */ }
+        popup = null;
+      }
+      // ② 同源隔离隐藏 iframe：不依赖 window.open，也不要求用户另开 HTML。
+      const summary = await printHtmlInHiddenFrame(built.html, built.title);
+      if (summary.printed) toast('已打开系统打印对话框：选择“另存为 PDF”即可');
+      else toast('打印页已生成：请在页面按 Ctrl+P，目标选择“另存为 PDF”');
+      lastExport = summary;
+      return summary;
+    } catch (e) {
+      try { if (popup && !popup.closed) popup.close(); } catch { /* 已关 */ }
+      toast('导出 PDF 失败：' + String((e && e.message) || e));
+      return { ok: false, error: String((e && e.message) || e) };
+    } finally {
+      try { built?.mermaidStat?.svgs?.clear?.(); } catch { /* 缓存清理失败无碍 */ }
+    }
+  }
+  /** PDF：桌面上走壳层冻结接口；插件上走独立打印页（系统「另存为 PDF」）。 */
   async function exportPdf() {
     const h = window.mpHost;
-    if (!(h && typeof h.exportPdf === 'function')) { toast('导出 PDF 需要桌面版（当前宿主不支持）'); return { ok: false }; }
-    toast('正在导出 PDF…');
-    try {
-      const r = await h.exportPdf({});
-      if (r && r.ok === false) toast(`导出 PDF 失败：${r.error || '未知错误'}`);
-      else if (r && (r.path || r.file)) toastExported('已导出 PDF', r.path || r.file);   // 【可点链接】打开所在文件夹
-      return r;
+    if (h && typeof h.exportPdf === 'function') {
+      toast('正在导出 PDF…');
+      try {
+        const r = await h.exportPdf({});
+        if (r && r.ok === false) toast(`导出 PDF 失败：${r.error || '未知错误'}`);
+        else if (r && (r.path || r.file)) toastExported('已导出 PDF', r.path || r.file);   // 【可点链接】打开所在文件夹
+        return r;
+      }
+      catch (e) { toast('导出 PDF 失败：' + String((e && e.message) || e)); return { ok: false }; }
     }
-    catch (e) { toast('导出 PDF 失败：' + String((e && e.message) || e)); return { ok: false }; }
+    return exportPdfViaPrint();
   }
 
   /* ── 导出：**一个入口 → 先选格式** ─────────────────────────────────────────
    * 原先格式散在工具栏 / ⋯ 菜单 / 文件菜单三处，且单文件 HTML 直接触发浏览器下载（不问存哪儿）。
    * 现在点「导出」就是拉起这个选择框：选格式 → 需要落盘的都先让你选位置。 */
   function exportDialog() {
-    const disk = canDiskExport(), pdf = !!(window.mpHost && typeof window.mpHost.exportPdf === 'function');
+    const disk = canDiskExport();
+    const nativePdf = !!(window.mpHost && typeof window.mpHost.exportPdf === 'function');
+    const printPdf = !nativePdf && pluginPrintAvailable();
+    const pdf = nativePdf || printPdf;
+    const pdfDesc = nativePdf
+      ? '打印级排版；暗色主题自动转白纸黑字。会先让你选保存位置。'
+      : printPdf
+        ? '打开独立打印页；在系统打印对话框选择「另存为 PDF」即可，无需安装额外组件。'
+        : '需要桌面版或支持打印的浏览器宿主。';
     // 禁用态要**仍然读得清**：浏览器默认灰化 + opacity 在深色主题上会把字糊没（实测截图），
     // 所以显式给可用/不可用两种配色，靠 token 派生、不写死颜色。
     const row = (id, name, desc, ok) => `<tr><td style="white-space:nowrap"><button class="mp-key" data-ex="${id}"${ok ? '' : ' disabled'}`
       + ` style="${ok ? '' : 'color:var(--mp-muted);background:color-mix(in srgb, var(--mp-bg) 86%, var(--mp-fg));opacity:1;cursor:not-allowed'}">${name}</button></td><td class="k">${desc}</td></tr>`;
     dialog('导出', `<table>`
-      + row('pdf', 'PDF', pdf ? '打印级排版；暗色主题自动转白纸黑字。会先让你选保存位置。' : '需要桌面版（当前宿主不支持）。', pdf)
+      + row('pdf', 'PDF', pdfDesc, pdf)
       + row('html', '单文件 HTML', disk ? '本地图片内联，外链图片仍需联网。会先让你选目录；较大图片建议使用图片文件夹。' : '将用浏览器下载；本地图片需要宿主支持，外链图片仍需联网。', true)
       + row('folder', 'HTML + 图片文件夹', disk ? '图片不内联、放进 assets/，适合长期归档。会先让你选目录。' : '需要桌面版（当前宿主不支持）。', disk)
       + `</table><p class="k" style="margin:12px 0 6px">或者直接复制：</p><table>`
@@ -1596,7 +1837,7 @@ export function installExtras(deps) {
         if (!r?.ok) throw new Error(r?.error || '写入失败');
       };
       await append(htmlHead(title, mathCss));
-      for (const chunk of mdBodyChunks(md, { srcMap, math: true, mermaidSvgs: mermaidStat?.svgs })) { await append(chunk); chunks++; }
+      for (const chunk of mdBodyChunks(md, { srcMap, math: true, footnotes: true, mermaidSvgs: mermaidStat?.svgs })) { await append(chunk); chunks++; }
       await append(HTML_TAIL);
       const fin = await host.exportFinishHtml({ id: beg.id });
       if (!fin || !fin.ok) throw new Error((fin && fin.error) || '写入失败');
@@ -3358,17 +3599,18 @@ export function installExtras(deps) {
   }
   async function help() {
     const cfg = keyConfig();
-    const rows = Object.entries(cfg).map(([a, c]) => `<tr><td>${({ bold: '加粗', italic: '斜体', underline: '下划线', strike: '删除线', code: '行内代码', inlineMath: '行内公式', blockMath: '块公式', codeBlock: '代码块', quote: '引用', list: '无序列表', save: '保存', outline: '大纲', export: '导出 HTML' })[a] || a}</td><td><span class="mp-key">${c.replace('Mod', 'Ctrl')}</span></td></tr>`).join('');
+    const rows = Object.entries(cfg).map(([a, c]) => `<tr><td>${({ bold: '加粗', italic: '斜体', underline: '下划线', strike: '删除线', code: '行内代码', inlineMath: '行内公式', blockMath: '块公式', codeBlock: '代码块', quote: '引用', list: '无序列表', save: '保存', outline: '大纲', export: '导出 HTML', footnote: '脚注（插入/跳转）' })[a] || a}</td><td><span class="mp-key">${c.replace('Mod', 'Ctrl')}</span></td></tr>`).join('');
     dialog('帮助 · 快捷键', `
       <p class="k">快捷键可在「更多 → 快捷键设置」里点键位直接改。</p>
       <table>${rows}</table>
+      <p class="k" style="margin-top:10px">脚注：正文上标点一下就跳到对应定义；定义左侧的 ↩ 回到**本次触发的那一处**引用（同一条脚注被引用多次也不会串位）。新增脚注定义写在文末；文中已有的定义保持原位置不动。Ctrl+Alt+Enter 在引用/定义上跳转与返回，Alt+点击上标可只改源码。</p>
       <p class="k" style="margin-top:10px">表格：在表格内右键可插入/移动/删除行列、复制表格到 Excel。键位 —— Enter（下移一格，末行补行）、Shift+Enter（格内换行）、Tab / Shift+Tab（逐格前后，跨行）、Ctrl+E（选格）、Ctrl+A（格→行→列→整表→全篇）、Ctrl+Enter（下插行）、Ctrl+Shift+Enter（上插行）、Alt+↑/↓（上移/下移该行）、Alt+←/→（左移/右移该列，**移动**）、Ctrl+Alt+←/→（插列，**新增**）、Ctrl+Shift+Backspace（删行）、Ctrl+Alt+Delete（删列）。</p>
       <p class="k">公式：光标进公式会展开源码并浮出预渲染预览；点渲染体任意位置可精确落位。行中段直接打 $$…$$，收笔会自动独占一行。</p>
       <p class="k">复制：选中含公式/表格的内容，剪贴板里是标准 Markdown 源码，粘到 Typora/Obsidian/GitHub 都能正常渲染。</p>`);
   }
   function shortcutDialog() {
     const cfg = keyConfig();
-    const names = { bold: '加粗', italic: '斜体', underline: '下划线', strike: '删除线', code: '行内代码', inlineMath: '行内公式', blockMath: '块公式', codeBlock: '代码块', quote: '引用', list: '无序列表', save: '保存文件', outline: '大纲面板', export: '导出 HTML' };
+    const names = { bold: '加粗', italic: '斜体', underline: '下划线', strike: '删除线', code: '行内代码', inlineMath: '行内公式', blockMath: '块公式', codeBlock: '代码块', quote: '引用', list: '无序列表', save: '保存文件', outline: '大纲面板', export: '导出 HTML', footnote: '脚注（插入/跳转）' };
     dialog('快捷键设置', `<p class="k">点右侧键位后按下新组合键（Esc 取消，退格恢复默认）。</p><table id="mp-keys">` +
       Object.entries(cfg).map(([a, c]) => `<tr><td>${names[a] || a}</td><td><span class="mp-key" data-a="${a}">${showCombo(c)}</span></td></tr>`).join('') + '</table>');
     const lifecycle = panelLifecycles.get(dlgEl);
@@ -3538,6 +3780,7 @@ export function installExtras(deps) {
         p.appendChild(el);
       };
       heading('文档');
+      add('脚注', () => runFootnote(), '插入 / 跳到定义 / 返回引用');
       add('导出…', exportDialog, 'PDF / HTML / 复制');
       add('重新加载', reloadDoc, '从磁盘重读');
       add('图片操作…', () => openImageActions(anchor), '网址 / 批量转换');

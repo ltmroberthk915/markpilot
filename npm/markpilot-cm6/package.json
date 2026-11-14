@@ -1,7 +1,7 @@
 {
   "name": "markpilot-cm6",
-  "version": "3.6.20",
-  "description": "MarkPilot 独立桌面版 3.6.20：为 Windows 下载并启动安装版或便携版",
+  "version": "3.6.21",
+  "description": "MarkPilot 独立桌面版 3.6.21：为 Windows 下载并启动安装版或便携版",
   "license": "MIT",
   "author": "jinxi",
   "type": "commonjs",
@@ -13,7 +13,7 @@
     "README.md",
     "LICENSE",
     "THIRD-PARTY-NOTICES.md",
-    "SHA256SUMS-3.6.20.txt"
+    "SHA256SUMS-3.6.21.txt"
   ],
   "os": [
     "win32"

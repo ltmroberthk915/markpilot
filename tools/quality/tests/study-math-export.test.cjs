@@ -6,10 +6,12 @@ const load=name=>import(pathToFileURL(path.join(project,'src-cm6',name)).href);
 const source=read('extras.js'),inline=read('inline-format.js');
 function cut(text,start,end){const a=text.indexOf(start),b=text.indexOf(end,a);assert(a>=0&&b>a);return text.slice(a,b);}
 async function exportHtml(doc){
- const [md,table,inf]=await Promise.all([load('markdown-context.js'),load('tables.js'),load('inline-format.js')]);
+ const [md,table,inf,foot]=await Promise.all([load('markdown-context.js'),load('tables.js'),load('inline-format.js'),load('footnote-export.js')]);
  const helper=inline.includes('export function singleLineDisplayTex(')?new Function(cut(inline,'function singleLineDisplayTex(','const inlineParser')+';return singleLineDisplayTex;')():undefined;
- const keys=['scanFenceLines','tableLead','quoteLead','isSeparatorBody','codeBody','hasUnescapedDollar','singleLineDisplayTex','CHUNK_CHARS','MATH_TEX_MAX','inlineMd','isHrLine','esc'];
- const ctx={...md,...table,...inf,singleLineDisplayTex:helper,CHUNK_CHARS:65536,MATH_TEX_MAX:32768,
+ const keys=['scanFenceLines','tableLead','quoteLead','isSeparatorBody','codeBody','hasUnescapedDollar','singleLineDisplayTex','CHUNK_CHARS','MATH_TEX_MAX','inlineMd','isHrLine','esc','activeFootnotes','footnoteExportPlan'];
+ const activeFootnotes={plan:null};
+ const ctx={...md,...table,...inf,singleLineDisplayTex:helper,CHUNK_CHARS:65536,MATH_TEX_MAX:32768,activeFootnotes,
+   footnoteExportPlan:foot.footnoteExportPlan,
    inlineMd:s=>inf.renderInline(s,{math:t=>'<i>'+t+'</i>'}),isHrLine:s=>/^---$/.test(s),esc:s=>s.replaceAll('<','&lt;')};
  const fn=new Function(...keys,cut(source,'function* mdBodyChunks(','  function mdToHtml')+';return mdBodyChunks;')(...keys.map(k=>ctx[k]));
  return [...fn(doc)].join('');

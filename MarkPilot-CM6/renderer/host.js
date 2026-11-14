@@ -14,6 +14,34 @@
 // 而它只在 onDoc 分支里惰性创建 ⇒ init 分支抛 TypeError 被 up() 的 try/catch 吞掉，
 // 表现为"引擎发了 init、宿主毫无反应"（实测踩坑：init 分支整段没执行）。
 window.__mpDbg = window.__mpDbg || { init: 0, docEvents: 0, ups: [] };
+const MP_STORE_UNAVAILABLE = 'MP_STORE_UNAVAILABLE';
+function storeBaseName(file) {
+  const parts = String(file || '').split(/[\\/]/);
+  return parts[parts.length - 1] || '';
+}
+function storeNameSuffix(file) {
+  const name = storeBaseName(file);
+  return name ? '（' + name + '）' : '';
+}
+function storeUnavailableText(r, path, options = {}) {
+  const saveAs = options.saveAs === true;
+  const automatic = options.automatic === true;
+  const name = storeNameSuffix(path);
+  if (r && r.writeStarted === false) {
+    if (saveAs) return '另存为未完成：协同存储暂不可用，本次未写入目标' + name + '。修改仍在当前窗口，请保留窗口并重试。';
+    return (automatic ? '自动保存未完成' : '保存失败') + '：协同存储暂不可用，本次未保存' + name + '。修改仍在当前窗口，请保留窗口并重试。';
+  }
+  if (saveAs) return '另存为结果未确认：协同存储暂不可用' + name + '。修改仍在当前窗口，请保留窗口，核对目标文件后再重试。';
+  return '保存结果未确认：协同存储暂不可用' + name + '。修改仍在当前窗口，请保留窗口，核对磁盘内容后再重试。';
+}
+function mergedStoreUnavailableText(source, r, path) {
+  const a = storeBaseName(source && source.path) || '（未命名）';
+  const b = storeBaseName(path) || '（未命名）';
+  const names = '原文件 ' + a + '；另存为 ' + b;
+  if (source && source.writeStarted === false && r && r.writeStarted === false)
+    return '保存与另存为均未完成：协同存储暂不可用，本次未保存（' + names + '）。修改仍在当前窗口，请保留窗口并重试。';
+  return '保存结果未确认：协同存储暂不可用（' + names + '）。修改仍在当前窗口，请保留窗口，核对原文件与目标文件后再重试。';
+}
 
 const bus = Object.create(null);
 const textWaiters = [];
@@ -533,13 +561,23 @@ async function flushSave() {
   return pending;
 }
 window.mpFlushSave = flushSave;
-function showSourceRecovery(text, actions) {
+function showSourceRecovery(text, actions, meta = {}) {
   const bannerTicket = showBanner(text, actions);
-  sourceRecovery = { documentId, text, actions, bannerTicket };
+  sourceRecovery = { documentId, text, actions, bannerTicket, ...meta };
 }
 function saveAsFailure(r, path) {
   const recovery = (saveBlocked || lastSaveError) && sourceRecovery?.documentId === documentId ? sourceRecovery : null;
-  const text = '另存为失败：' + (r?.error || '未知错误') + (path ? '（' + path + '）' : '');
+  const family = r?.code === MP_STORE_UNAVAILABLE ? r : null;
+  if (family && recovery && recovery.family === MP_STORE_UNAVAILABLE) {
+    const bannerTicket = showBanner(mergedStoreUnavailableText(recovery, family, path), recovery.actions);
+    recovery.bannerTicket = bannerTicket;
+    saveTrace('saveAsFailure:store-unavailable-merged', { raw: r?.error, errcode: r?.errcode,
+      errstr: r?.errstr, storePrimary: r?.storePrimary,
+      writeStarted: r?.writeStarted === false ? false : true, path });
+    return;
+  }
+  const text = family ? storeUnavailableText(family, path, { saveAs: true })
+    : '另存为失败：' + (r?.error || '未知错误') + (path ? '（' + path + '）' : '');
   if (recovery) {
     /* 恢复横幅重绘后同步“显示票据”：否则下一次较弱 live 冲突通知会以票据失配为由替换
        DOM，吞掉用户正在按的“重新选择位置/另存为”。recovery.text 保持原文不递归增长，
@@ -548,9 +586,23 @@ function saveAsFailure(r, path) {
     recovery.bannerTicket = bannerTicket;
   } else showBanner(text, [{ label: '重新选择位置…', run: () => { void saveAsFlow(); } }]);
 }
-function saveFailure(r, path) {
+function saveFailure(r, path, options = {}) {
+  const automatic = options.automatic === true;
   lastSaveError = r?.error || '未知错误';
   if (['MP_FILE_CONFLICT', 'MP_FILE_MISSING', 'MP_FILE_LINKED'].includes(r?.code)) saveBlocked = true;
+  const family = r?.code === MP_STORE_UNAVAILABLE ? r : null;
+  if (family) {
+    const writeStarted = r?.writeStarted === false ? false : true;
+    saveTrace('saveFailure:store-unavailable', { raw: r?.error, errcode: r?.errcode, errstr: r?.errstr,
+      storePrimary: r?.storePrimary, writeStarted, path, automatic });
+    showSourceRecovery(storeUnavailableText(family, path, { automatic }), [
+      { label: '另存为…', run: () => { void saveAsFlow(); } },
+      { label: '重新加载', run: () => { void reloadDocument({ origin: 'disk' }); } },
+      ...(!saveBlocked ? [{ label: '重试', run: () => { void doSave(true); } }] : []),
+    ], { family: MP_STORE_UNAVAILABLE, path, writeStarted, rawError: r?.error, errcode: r?.errcode,
+      errstr: r?.errstr, storePrimary: r?.storePrimary, automatic });
+    return;
+  }
   showSourceRecovery('保存失败：' + lastSaveError + '（' + path + '）', [
     { label: '另存为…', run: () => { void saveAsFlow(); } },
     { label: '重新加载', run: () => { void reloadDocument({ origin: 'disk' }); } },
@@ -678,7 +730,7 @@ async function doSave(force = false, grant = null, saveAsOperation = null, autom
         staleScope = null; staleRetries = 0;
         if (operationCurrent() && r?.code !== 'MP_AUTOSAVE_DISABLED') {
           if (saveAsOperation !== null) saveAsFailure(r, capture.filePath);
-          else saveFailure(r, capture.filePath);
+          else saveFailure(r, capture.filePath, { automatic: !force && !!automatic });
         }
         return false;
       }
@@ -701,7 +753,7 @@ async function doSave(force = false, grant = null, saveAsOperation = null, autom
     } catch (e) {
       if (documentId === capture.documentId && recoverySerial === capture.recoverySerial && operationCurrent()) {
         if (saveAsOperation !== null) saveAsFailure({ error: e.message }, capture.filePath);
-        else saveFailure({ error: e.message }, capture.filePath);
+        else saveFailure({ error: e.message }, capture.filePath, { automatic: !force && !!automatic });
       }
       return false;
     } finally {

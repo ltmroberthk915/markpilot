@@ -1,4 +1,4 @@
-# MarkPilot 独立桌面版 3.6.20
+# MarkPilot 独立桌面版 3.6.21
 
 MarkPilot 是一款即时渲染的 Markdown 编辑器：公式、代码块、表格、图片、Mermaid 图表和长文稿都能在熟悉的编辑界面里完成，保存、导出与多窗口协作按同一套文档模型工作。Windows 同时提供安装版与免安装便携版。
 
@@ -24,13 +24,13 @@ markpilot --path                 # 查看找到的 MarkPilot.exe
 markpilot --version
 ```
 
-下载完成后运行 `markpilot-Setup-3.6.20.exe` 即可安装或覆盖升级，原有文档、主题、字体和最近文件设置都会保留。便携版是单个 EXE，双击即用，不需要安装。
+下载完成后运行 `markpilot-Setup-3.6.21.exe` 即可安装或覆盖升级，原有文档、主题、字体和最近文件设置都会保留。便携版是单个 EXE，双击即用，不需要安装。
 
 ## 直接下载
 
-- [安装版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.20/markpilot-Setup-3.6.20.exe)
-- [便携版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.20/markpilot-3.6.20-portable.exe)
-- [发布页](https://github.com/ltmroberthk915/markpilot/releases/tag/v3.6.20)
+- [安装版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.21/markpilot-Setup-3.6.21.exe)
+- [便携版](https://github.com/ltmroberthk915/markpilot/releases/download/v3.6.21/markpilot-3.6.21-portable.exe)
+- [发布页](https://github.com/ltmroberthk915/markpilot/releases/tag/v3.6.21)
 
 ## 许可
 

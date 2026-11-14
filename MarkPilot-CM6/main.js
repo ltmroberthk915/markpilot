@@ -1585,7 +1585,17 @@ handle('live:refresh', async (e, payload = {}) => {
     return { ok: true, changed, missing: !snap && !unstable, ...(snap ? { mtimeMs: snap.baseline.mtimeMs, size: snap.baseline.size } : {}), epoch: head.epoch, version: head.version, savedVersion: head.savedVersion, diskHash: head.diskHash };
   } catch (err) { return liveReply(err); }
 });
+const MP_STORE_UNAVAILABLE = 'MP_STORE_UNAVAILABLE';
+function classifyStoreError(error) {
+  const errcode = Number(error && error.errcode);
+  if (!Number.isInteger(errcode)) return null;
+  const storePrimary = errcode & 0xff;
+  if (storePrimary !== 11 && storePrimary !== 26) return null;
+  return { code: MP_STORE_UNAVAILABLE, storePrimary, errcode,
+    errstr: String(error.errstr || error.message || '') };
+}
 handle('file:save', async (e, { filePath, text, ...metadata }) => {
+  let writerEntered = false;
   try {
     if (metadata.automatic && state.settings.autosaveEnabled !== true) return { ok: false, code: 'MP_AUTOSAVE_DISABLED' };
     const S = sessionOf(e.sender);
@@ -1616,6 +1626,7 @@ handle('file:save', async (e, { filePath, text, ...metadata }) => {
       if (liveMeta.epoch !== entry.epoch) return { ok: false, error: '协同保存的会话标识不匹配，修改已保留；请同步后重试', code: 'MP_LIVE_SESSION' };
       if (entry.fileKey !== targetKey) return { ok: false, error: '保存目标与协同房间不是同一文件；换路径保存请走另存为', code: 'MP_SAVE_TARGET' };
       const out = await svc.save(liveMeta.client, { epoch: liveMeta.epoch, version: liveMeta.version, text }, async ({ diskHash }) => {
+        writerEntered = true;
         /* 写入前把会话 baseline 对齐权威担保的盘态（§3.3）：同房他窗刚保存的内容不误判外改。 */
         if (typeof diskHash === 'string' && S.baseline && S.baseline.sha256 !== diskHash) {
           try {
@@ -1632,7 +1643,7 @@ handle('file:save', async (e, { filePath, text, ...metadata }) => {
       liveLaneUsed = true;
     } else {
       const svc = liveService();
-      const writer = () => writeDoc(filePath, text, S, { ...rest, ownerCurrent });
+      const writer = () => { writerEntered = true; return writeDoc(filePath, text, S, { ...rest, ownerCurrent }); };
       if (liveMeta && grantLane) dbg('live:save-as-grant-lane', { note: '源房间租约不是目标凭据；目标由一次性 grant + 跨进程 external CAS 把关' });
       /* 无本房凭据（含另存为：源房间 token 不当作目标凭据）⇒ 一律经共享 external/跨进程写锁：
        * 目标房间有未保存协同草稿（**含仅插件进程持有的房间**）⇒ 拒写 MP_FILE_CONFLICT、两边保留
@@ -1656,7 +1667,18 @@ handle('file:save', async (e, { filePath, text, ...metadata }) => {
     dbg('file:save', { filePath, bytes: r.bytes, live: liveLaneUsed });
     return r;
   }
-  catch (e) { dbg('file:save:error', { filePath, error: e.message }); return { ok: false, error: e.message, code: e.code }; }
+  catch (e) {
+    dbg('file:save:error', { filePath, error: e.message });
+    const store = classifyStoreError(e);
+    if (store) {
+      const prewrite = !writerEntered;
+      dbg('file:save:store-unavailable', { filePath, storePrimary: store.storePrimary, errcode: store.errcode,
+        errstr: store.errstr, writerEntered, prewrite });
+      return { ok: false, error: e.message, code: store.code, storePrimary: store.storePrimary,
+        errcode: store.errcode, errstr: store.errstr, sqliteCode: e.code, writeStarted: !prewrite };
+    }
+    return { ok: false, error: e.message, code: e.code };
+  }
 });
 handle('file:stat', async (_e, p) => { try { const st = await fsp.stat(p); return { ok: true, mtimeMs: st.mtimeMs, size: st.size }; } catch (e) { return { ok: false, error: e.message }; } });
 handle('file:exists', async (_e, p) => { try { await fsp.access(p); return true; } catch { return false; } });
