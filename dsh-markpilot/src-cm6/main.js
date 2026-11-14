@@ -37,7 +37,7 @@ import { cachedTableWidths, registerTableWidths, inspectTableWidths } from "./ta
 import { mathCompletion } from "./completion.js";
 import { horizontalFrame, localPoint, horizontalScrollbarHit } from './floating-layout.js';
 import { previewFrame, PREVIEW_MAX_DISPLACEMENT, controlObstacles, textObstacles } from './overlay-layout.js';
-import { createRegionIndex, regionAt, regionsBetween } from './region-index.js';
+import { createRegionIndex, regionAt, regionsBetween, selectionTouchesRegion, hiddenFenceLines } from './region-index.js';
 import { createRegionSession, activateRegion, retireRegion, expandRegionPayload } from './region-session.js';
 import { containerContext, createContainerContextReader, bindContainer } from './container-presentation.js';
 import { createRenderLifecycle } from './render-lifecycle.js';
@@ -50,6 +50,7 @@ import { createHistoryGuard } from './history-guard.mjs';
 import { editPlan, inlineCodeRanges, rangesTouching } from './edit-plan.js';
 import { installToolbar, wrap as wrapInline, TOOLBAR_ACTIONS } from "./toolbar.js";
 import { installExtras } from "./extras.js";
+import { createFootnotesExtension, footnoteGoTo, footnoteIndex, footnoteInsert, footnoteJumpAt, footnoteMove, footnoteNav, footnoteStats } from './footnotes-view.js';
 import { inlineCodeSpans, renderInline, inlineLinkSpans, inlineEmphasisSpans, inlineMathSpans, hasUnescapedDollar, singleLineDisplayTex } from './inline-format.js';
 import { fileUrlOfPath, resolveImageSource, hasImageCandidate } from './image-path.js';
 import { beginNativeImageTransfer, sourceImageTicket } from './image-transfer.js';
@@ -416,15 +417,17 @@ const mermaidBlocksField = StateField.define({
 });
 /* 取证计数（排障"字段到底有没有重算"；也是"每键成本"的自证：正文打字时 updateCount 涨、scanCount 不涨 ✓） */
 let mmUpdateCount = 0, mmScanCount = 0;
-/** 块级投影：光标在块内 ⇒ 不替换（显源码 ✓）；否则整块替换成图表 ✓。
+/** 块级投影：**任一选区实际触及块**（含反向/次级选区）⇒ 显源码；否则整块替换成图表。
+ *  显示判定只用半开源码区间（selectionTouchesRegion），不读 editing —— 否则非空选区
+ *  恰好止于块头时会被 editing 的闭端点判成展开，而反方向不展开。
  *  与 blockMathField 同构（StateField 直供 + estimatedHeight 是 CM6 官方唯一受支持的块级形态 ✓）。 */
 function buildMermaidDecorations(state) {
   const out = [];
-  const head = state.selection.main.head;
+  const index = state.field(regionIndexField);
   for (const b of state.field(mermaidBlocksField, false) || []) {
-    if (state.field(regionSessionField).presentation.get(regionAt(state.field(regionIndexField),b.from,'mermaid')?.id)?.editing) continue;
-    out.push(Decoration.replace({ widget: mermaidWidget(b.src, b.from, b.to,
-      regionAt(state.field(regionIndexField), b.from, 'mermaid')), block: true }).range(b.from, b.to));
+    const region = regionAt(index, b.from, 'mermaid');
+    if (region && state.selection.ranges.some((r) => selectionTouchesRegion(region, r))) continue;
+    out.push(Decoration.replace({ widget: mermaidWidget(b.src, b.from, b.to, region), block: true }).range(b.from, b.to));
   }
   return Decoration.set(out, true);
 }
@@ -3724,9 +3727,9 @@ const tableCellClick = EditorView.domEventHandlers({
     return true;
   },
 });
-const headingDecorations = EditorView.decorations.compute(["selection", lineStylesField], (state) => {
+const headingDecorations = EditorView.decorations.compute(["selection", lineStylesField, markdownContext], (state) => {
   const out = [];
-  const { headings, hrs, fenceLines } = state.field(lineStylesField);
+  const { headings, hrs } = state.field(lineStylesField);
   const notIn = (line) => !state.selection.ranges.some((r) => r.from <= line.to && r.to >= line.from);
   for (const mark of headings) {
     const line = state.doc.lineAt(mark.from);
@@ -3741,9 +3744,17 @@ const headingDecorations = EditorView.decorations.compute(["selection", lineStyl
       out.push(Decoration.mark({ attributes: { 'data-mp-line-metric': 'structural' } }).range(line.from, line.to));
     }
   }
-  // 围栏行（```）阅读态压扁隐藏（vditor 隐藏围栏观感）；光标入行显源码
-  for (const line of fenceLines) {
-    if (notIn(line)) out.push(Decoration.line({ class: "mp-fence" }).range(line.from));
+  // 围栏行（```）阅读态压扁隐藏（vditor 隐藏围栏观感）；**块被选区实际触及时，
+  // 同一块已有的开/闭围栏一起显形**。只看围栏行本身会让光标停在块内内容行时
+  // 两侧围栏都消失（本任务修复的视觉缺陷）；正向/反向/多范围统一按半开源码
+  // 区间重叠判断，直接复用 markdownContext.blocks 的 from/closeFrom，不扫描文档。
+  // 已闭合的 mermaid 块在未触及时会被整块 replace 成图表：不要再给它的围栏行挂
+  // mp-fence（那条规则会把整行及后代设成 transparent，可能连 SVG 一起吃掉）；
+  // 未闭合 mermaid 仍按普通源码块处理。
+  const fenceBlocks = state.field(markdownContext).blocks.filter(
+    (b) => !(b.closeFrom != null && /^mermaid$/i.test(b.info || '')));
+  for (const from of hiddenFenceLines(fenceBlocks, state.selection.ranges)) {
+    out.push(Decoration.line({ class: "mp-fence" }).range(from));
   }
   return Decoration.set(out, true);
 });
@@ -5779,6 +5790,7 @@ const keyCompartment = new Compartment();
 const readingCompartment = new Compartment();
 
 const clickToSource = EditorView.domEventHandlers({  mousedown(event, view) {
+    view.__mpMermaidClick = null;
     const image = event.target?.closest?.('.mp-img[data-mp-region]');
     if (image) {
       view.__mpImageClick = null;
@@ -5795,6 +5807,19 @@ const clickToSource = EditorView.domEventHandlers({  mousedown(event, view) {
         top: shown.getBoundingClientRect().height ? shown.getBoundingClientRect().top : image.getBoundingClientRect().top,
         moved: false, serial: viewportIntent.serial(view), revision: r.revision, contextVersion: r.contextVersion };
       view.__mpRegionGesture = { phase: 'down', id: r.id, epoch: index.epoch, serial: viewportIntent.serial(view) };
+      return false;
+    }
+    /* 点击已渲染的 Mermaid = 进源码；但只接**普通单击**。mousedown 只记录，
+       修饰键/双击/图内链接/只读态一律放行（原生拖选、Shift+点、链接都保留）；
+       mouseup 时位移 ≤4px 才显式落位 —— 与块公式的 click-vs-drag 同一套判据。 */
+    const mermaid = event.target?.closest?.('.mp-mermaid[data-mp-region]');
+    if (mermaid) {
+      if (view.state.readOnly || event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey ||
+          (event.detail || 1) >= 2 || (event.target?.closest?.('a'))) return false;
+      const index = view.state.field(regionIndexField), r = index.byId.get(mermaid.dataset.mpRegion);
+      if (r?.kind !== 'mermaid') return false;
+      view.__mpMermaidClick = { id: r.id, epoch: index.epoch, x: event.clientX, y: event.clientY,
+        moved: false, serial: viewportIntent.serial(view), revision: r.revision, contextVersion: r.contextVersion };
       return false;
     }
     // Modified/secondary clicks keep CM's native selection and menu ownership.
@@ -5861,9 +5886,25 @@ const clickToSource = EditorView.domEventHandlers({  mousedown(event, view) {
     if (p && (event.buttons & 1) && Math.abs(event.clientX - p.x) + Math.abs(event.clientY - p.y) > 4) p.moved = true;
     const image = view.__mpImageClick;
     if (image && (event.buttons & 1) && Math.abs(event.clientX - image.x) + Math.abs(event.clientY - image.y) > 4) image.moved = true;
+    const mermaid = view.__mpMermaidClick;
+    if (mermaid && (event.buttons & 1) && Math.abs(event.clientX - mermaid.x) + Math.abs(event.clientY - mermaid.y) > 4) mermaid.moved = true;
     return false;
   },
   mouseup(event, view) {
+    const mermaid = view.__mpMermaidClick; view.__mpMermaidClick = null;
+    if (mermaid) {
+      const index = view.state.field(regionIndexField), r = index.byId.get(mermaid.id);
+      const current = [...view.dom.querySelectorAll('.mp-mermaid[data-mp-region]')].find(n => n.dataset.mpRegion === mermaid.id);
+      const sameSource = r?.revision === mermaid.revision && r?.contextVersion === mermaid.contextVersion;
+      if ((event.detail || 1) === 1 && event.button === 0 && !mermaid.moved &&
+          !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey &&
+          index.epoch === mermaid.epoch && r && sameSource && mermaid.serial === viewportIntent.serial(view) &&
+          current?.isConnected && Math.abs(event.clientX - mermaid.x) + Math.abs(event.clientY - mermaid.y) <= 4) {
+        view.dispatch({ selection: { anchor: r.from }, userEvent: 'select.pointer', scrollIntoView: true });
+        view.focus();
+      }
+      return false;
+    }
     const image = view.__mpImageClick; view.__mpImageClick = null;
     if (image) {
       const index = view.state.field(regionIndexField), r = index.byId.get(image.id);
@@ -6322,7 +6363,7 @@ ${editorKaiRuleCss()}
 .mp-cm6-math-live-chip { background: var(--mp-codeBg); border: 1px dashed var(--mp-border); border-radius: 4px; padding: 0 4px; margin-left: 6px; font-size: 0.95em; cursor: text; }
 /* 代码：胶囊（inline，token=codeBg 对齐 vditor 实测）与块底（telari 色板）；引用块底纹＋左缘条 */
 .cm-content code { background: var(--mp-codeBg); border-radius: 3px; padding: .2em .4em; font-size: .9em; font-family: var(--mp-font-mono); }
-.cm-content .cm-line.mp-code { background: var(--mp-codeBg); font-family: var(--mp-font-mono); font-size: .93em; }
+.cm-content .cm-line.mp-code { font-family: var(--mp-font-mono); font-size: .93em; }
 .cm-content .cm-line.mp-quote { background: var(--mp-quoteBg); border-left: 3px solid var(--mp-quoteBar); color: var(--mp-muted); font-size: 90%; padding-left: .8em; }
 .cm-content .cm-line.mp-quote-d2 { padding-left: 1.8em; }
 .cm-content .cm-line.mp-quote-d3 { padding-left: 2.8em; font-size: 85%; }
@@ -6338,7 +6379,17 @@ ${editorKaiRuleCss()}
   font-size: 10px; line-height: 12px;
 }
 /* 代码块观感对齐（终判差异清单：字号 −9%、行距收敛） */
-.cm-content .cm-line.mp-code { background: var(--mp-codeBg); font-family: var(--mp-font-mono); font-size: 0.85em; line-height: 1.55; }
+.cm-content .cm-line.mp-code { font-family: var(--mp-font-mono); font-size: 0.85em; line-height: 1.55; position: relative; }
+/* 【代码块底色·选区层·2026-11-13】与 .mp-quote 同族缺陷：行元素上的不透明底色会盖住
+   CM6 原生选区层（drawSelection 的 .cm-selectionLayer，负 z-index）⇒ 选中代码块时
+   只有块外/边缘看得到高亮，块内中段仍是代码底色。底色改由 ::after 画并放到 -2
+   （代码行的 ::before 已被行号占用，::after 空着），顺序变成
+   代码底色 < 原生选区层 < 文字；未选中的代码仍是原底色，只读/光标/语义零改动。
+   ⚠️ 本注释在 CSS 模板字符串体内，不许出现反引号。 */
+.cm-content .cm-line.mp-code::after {
+  content: ""; position: absolute; inset: 0; z-index: -2;
+  background: var(--mp-codeBg); pointer-events: none;
+}
 /* 【围栏代码行里的 span 必须"无胶囊"·2026-10-10 实测缺陷（用户报"第一个字母 a 无空格却远离 sdS"）】
    语法高亮给代码文本打的 span 与**行内代码**共用同一个高亮类 .ͼx
    （HighlightStyle 里那条 tag=t.monospace 的规则带 padding: 0.15em 0.3em、代码底色、3px 圆角
@@ -6370,7 +6421,6 @@ ${editorKaiRuleCss()}
 .cm-content .cm-line.mp-code.mp-quote,
 .cm-content .cm-line.mp-code.mp-quote[data-mp-n] {
   border-left: 3px solid var(--mp-quoteBar);
-  background: var(--mp-codeBg);
   color: var(--mp-fg);
 }
 /* 表格投影（telari：表头底 capsule、边框 border、斑马行 evenRow、8/16 padding）；
@@ -6461,6 +6511,8 @@ table.mp-row th { background: var(--mp-capsule); font-weight: 500; }
 .mp-table-bar .mp-table-bar-item { background: transparent; border: 0; color: inherit; cursor: pointer;
   font: inherit; font-size: 11px; line-height: 1; padding: 2px 4px; border-radius: 4px; }
 .mp-table-bar .mp-table-bar-item svg { width: 12px; height: 12px; }
+/* 三档列对齐的图标单独放大到 16px（只作用于带 .mp-table-align 的三个按钮） */
+.mp-table-bar .mp-table-bar-item.mp-table-align svg { width: 16px; height: 16px; }
 .mp-table-bar .mp-table-bar-item:hover { background: color-mix(in srgb, var(--mp-primary) 18%, transparent); }
 .mp-table-bar .mp-table-bar-item.is-active { background: color-mix(in srgb, var(--mp-primary) 30%, transparent); }
 /* 【β1 选择层级】行/列/整表高亮：原生选区在表格源码行上不可见（整行被 block widget 替换）⇒ 自己画。
@@ -7084,6 +7136,17 @@ function tableMenuAnchorPos(state, table, activeCell) {
   if (!cr) return null;
   return Math.max(cr[0], Math.min(cr[0] + 1, cr[1]));
 }
+/** 表格浮动条的列对齐图标：原生内联 SVG，三条横线＝长-短-长（上下等长 16，中间约 2/3＝10.67），
+ *  短线分别齐左 / 居中 / 齐右；线色走 currentColor（跟随主题明暗与激活态），不引图标字体。
+ *  按钮只放图标 —— 文字语义留在 title 与 aria-label 上（图标本身 aria-hidden）。 */
+function tableAlignIcon(align) {
+  const shortX = align === "center" ? 6.6667 : align === "right" ? 9.3333 : 4;
+  return '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">'
+    + '<path d="M4 6h16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
+    + '<path d="M' + shortX + ' 12h10.6667" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
+    + '<path d="M4 18h16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
+    + '</svg>';
+}
 function ensureTableBar() {
   if (tableBar && tableBar.isConnected) return tableBar;
   const bar = document.createElement("div");
@@ -7147,10 +7210,19 @@ function ensureTableBar() {
   left.appendChild(mkBtn("▦", "表格操作", (b) => {
     openTableMenu(b);
   }));
-  const alignBtn = (label, title, align) => mkBtn(label, title, () => withTableBarTarget(() => window.mpExtras?.setAlign?.(align)));
-  left.appendChild(alignBtn("≡左", "本列左对齐", "left"));
-  left.appendChild(alignBtn("≡中", "本列居中", "center"));
-  left.appendChild(alignBtn("≡右", "本列右对齐", "right"));
+  /* 三档列对齐：图标-only（16px，三条长度互不相同的横线）；命中区仍是 .mp-tb-item 既有的 26×24，
+     文字语义放 title / aria-label，aria-pressed 随当前列对齐同步（见 positionTableBar）。 */
+  const alignBtn = (title, align) => {
+    const b = mkBtn("", title, () => withTableBarTarget(() => window.mpExtras?.setAlign?.(align)));
+    b.classList.add("mp-table-align");
+    b.innerHTML = tableAlignIcon(align);
+    b.setAttribute("aria-label", title);
+    b.setAttribute("aria-pressed", "false");
+    return b;
+  };
+  left.appendChild(alignBtn("本列左对齐", "left"));
+  left.appendChild(alignBtn("本列居中", "center"));
+  left.appendChild(alignBtn("本列右对齐", "right"));
   right.appendChild(mkBtn("⋮", "更多表格操作", (b) => {
     openTableMenu(b);
   }));
@@ -7344,11 +7416,14 @@ function positionTableBar(ctx) {
   bar.style.left = ((tr.left - hostRect.left) / z) + "px";
   bar.style.width = (Math.max(180, tr.right - tr.left) / z) + "px";
   bar.style.top = ((top - hostRect.top) / z) + "px";
-  /* 高亮：与本列对齐一致的那个槽位 */
+  /* 高亮：与本列对齐一致的那个槽位（class 给 CSS；aria-pressed 给读屏/键盘用户）。
+     只同步带 aria-pressed 的按钮（三个对齐按钮）；▦ / ⋮ / 🗑 原样不动。 */
   const map = { left: "本列左对齐", center: "本列居中", right: "本列右对齐" };
+  const want = map[t.align] || null;
   bar.querySelectorAll(".mp-table-bar-item").forEach((b) => {
-    const want = map[t.align] || null;
-    b.classList.toggle("is-active", !!want && b.dataset.mpBar === want);
+    const active = !!want && b.dataset.mpBar === want;
+    b.classList.toggle("is-active", active);
+    if (b.hasAttribute("aria-pressed")) b.setAttribute("aria-pressed", String(active));
   });
 }
 function hideTableBar() {
@@ -7524,6 +7599,7 @@ function boot(content) {
         ])),
         imageInsertions,
         inlineMarkDecorations, // 行内标记投影：光标入段显源码、离段隐藏
+        createFootnotesExtension({ tableDataField, inlineMarksField }), // 脚注：上标投影 + 定义徽标/回链
         imgBaseField,          // 【图片】文档目录变化时踢一脚，让图片 widget 用新的 base 重建
         imgPreviewField,       // 【图片】资源代次变化时让 retained/inline 图片重建
         imageAtomicRanges, // 【图片】长 data URI 的图当原子区间（方向键整块跳过）
@@ -7888,6 +7964,17 @@ function boot(content) {
       return { blocks, math, inline, styles, mermaid: fresh ? scanMermaidBlocks(state.doc,blocks) : state.field(mermaidBlocksField) };
     },
     _view: () => view, // 调试/取证通道
+    /* 【脚注·只读/受控入口】索引、导航落点、扫描计数与同一套插入/跳转命令。
+       探针只读这里判“回到的是不是本次那一处”；它也方便用户从命令面板调用。 */
+    footnotes: {
+      index: () => footnoteIndex(view),
+      nav: () => footnoteNav(view),
+      stats: () => footnoteStats(),
+      insert: () => footnoteInsert(view, tableDataField),
+      move: () => footnoteMove(view, tableDataField),
+      jump: () => footnoteJumpAt(view),
+      goTo: labelOrId => footnoteGoTo(view, labelOrId),
+    },
     __tableWidths: () => ({ geometryVersion: mathGeometryVersion, groups: inspectTableWidths(view) }),
     __cellLayout: () => ({ active: view.state.field(activeCellField),
       owner: cellEdit && { rowFrom: cellEdit.rowFrom, col: cellEdit.col, epoch: cellEdit.epoch },
@@ -8178,6 +8265,7 @@ function boot(content) {
        行尾（列号＝列数、越界），只有表级选择状态记着原来的列。只读口，不改任何状态。 */
     tableSelect: { cycle: () => cycleTableSelection(), selectCell: () => selectCellText(), sel: () => (view ? view.state.field(tableSelectionField, false) : null) },
     lineStylesField, mathSpansField,
+    footnoteAction: () => footnoteMove(view, tableDataField), // 更多菜单/快捷键共用同一实现
     renderMathHTML, // 导出里的公式排版复用引擎这一份（不重写渲染器）
     exportTypoCss,  // 导出件作者层样式＝排版唯一真源生成（与编辑面同表；见 typography.js）
     scrollOffset: () => {

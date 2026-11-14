@@ -96,3 +96,28 @@ export function regionsBetween(index, from, to, kind) {
   for (; at < rows.length && rows[at].from <= to; at++) if (rows[at].to >= from) out.push(rows[at]);
   return out;
 }
+
+/* Source-display predicate shared by fence lines and the Mermaid projection.
+   A collapsed cursor is on the region at either endpoint; a non-empty selection
+   must overlap at least one source character (half-open [from,to) overlap).
+   Deliberately independent of `editing`: a selection ending exactly at a block
+   head must not reveal it, in either direction. */
+export function selectionTouchesRegion(region, range) {
+  if (!region || !range) return false;
+  if (!range.empty) return range.from < region.to && range.to > region.from;
+  return range.head >= region.from && range.head <= region.to;
+}
+
+/* Line starts whose fence must stay visually collapsed. A block is untouched
+   only when every selection range misses it; the caller has the authoritative
+   markdownContext.blocks (from/closeFrom), so this is O(blocks × ranges) and
+   never scans the document. */
+export function hiddenFenceLines(blocks, ranges) {
+  const hidden = [];
+  for (const block of blocks || []) {
+    if ((ranges || []).some((r) => selectionTouchesRegion(block, r))) continue;
+    hidden.push(block.from);
+    if (block.closeFrom != null) hidden.push(block.closeFrom);
+  }
+  return hidden;
+}
