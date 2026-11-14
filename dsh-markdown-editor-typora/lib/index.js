@@ -36,6 +36,9 @@ import rawTextCodec from '../host/text-codec.js';
 import {
   createDocumentsService, parseDocumentBlocks, countDocumentLines, findDocumentLine, MAX_LINE_READ_BYTES_CAP,
 } from './documents-service.js';
+import {
+  localLiveSaveFailure, markLiveBoundaryFailure, markProviderWriterError,
+} from './save-failure.js';
 import { createSessionManager, allowedActions } from './document-sessions.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize, sep, extname, basename, resolve as pathResolve, isAbsolute, relative as pathRelative }  from 'node:path';
@@ -1376,23 +1379,35 @@ export function createHost(options = {}) {
       const before=await fs.stat(current);
       if(!before)throw codedError('FS_STALE_VERSION','file no longer exists',{reason:'missing'});
       if (payload.rejectIfMirror) await rejectDraftMirrorBeforeWrite(current);
-      let result;
+      let result, writePhase='prewrite';
       const native=await fsStat(nativeTargetPath(current),{bigint:true}).catch(e=>{if(e.code!=='ENOENT')throw e;return null;});
       const local=!!native && versionOfBigInt(native)===String(before.version);
       if (payload.live) {
         const ticket=payload.live;
         if(!local||leaseOf(ticket.client).canonical!==key)throw codedError('MP_LIVE_LEASE','synchronized save target changed');
         let writerVersion;
-        result=await live.save(ticket.client,{epoch:ticket.epoch,version:ticket.version,text},async({diskHash})=>{
-          const version=await fs.stat(current);
-          const identity=await fsStat(nativeTargetPath(current),{bigint:true});
-          if (!version) throw codedError('FS_STALE_VERSION','file no longer exists',{reason:'missing'});
-          if (versionOfBigInt(identity)!==String(version.version) || pathKey(await canonicalTarget(await fs.resolve(path,resolveOptions(payload))))!==key)
-            throw codedError('FS_STALE_VERSION','file identity changed while waiting to save');
-          const receipt=await directWriteText(fs,current,text,String(version.version),diskHash);
-          writerVersion=receipt.version;
-          return receipt;
-        });
+        try {
+          result=await live.save(ticket.client,{epoch:ticket.epoch,version:ticket.version,text},async({diskHash})=>{
+            try {
+              const version=await fs.stat(current);
+              const identity=await fsStat(nativeTargetPath(current),{bigint:true});
+              if (!version) throw codedError('FS_STALE_VERSION','file no longer exists',{reason:'missing'});
+              if (versionOfBigInt(identity)!==String(version.version) || pathKey(await canonicalTarget(await fs.resolve(path,resolveOptions(payload))))!==key)
+                throw codedError('FS_STALE_VERSION','file identity changed while waiting to save');
+              writePhase='writing';
+              const receipt=await directWriteText(fs,current,text,String(version.version),diskHash);
+              writePhase='written';
+              writerVersion=receipt.version;
+              return receipt;
+            } catch (error) {
+              markProviderWriterError(error);
+              throw error;
+            }
+          });
+        } catch (error) {
+          markLiveBoundaryFailure(error, writePhase);
+          throw error;
+        }
         // 内核最终契约：写者回执保持权威（provider.version 原样），live 元数据以
         // liveVersion/savedVersion/diskHash/epoch 另列。此防御兼容过渡期旧形状
         // （旧内核把 head.version 并进回执盖掉写者版本）—— 两种形状下客户端拿到的
@@ -1400,7 +1415,24 @@ export function createHost(options = {}) {
         if(writerVersion!==undefined&&result&&typeof result==='object'&&String(result.version)!==String(writerVersion))
           result={...result,liveVersion:result.version,version:writerVersion};
       }else if(String(before.version)!==baseVersion)throw codedError('FS_STALE_VERSION','file changed since read');
-      else if(local)result=await live.external(nativeTargetPath(current),()=>directWriteText(fs,current,text,baseVersion));
+      else if(local){
+        try {
+          result=await live.external(nativeTargetPath(current),async()=>{
+            try {
+              writePhase='writing';
+              const receipt=await directWriteText(fs,current,text,baseVersion);
+              writePhase='written';
+              return receipt;
+            } catch (error) {
+              markProviderWriterError(error);
+              throw error;
+            }
+          });
+        } catch (error) {
+          markLiveBoundaryFailure(error, writePhase);
+          throw error;
+        }
+      }
       else try {result=await fs.writeText(current,text,{kind:'replaceIfVersion',version:baseVersion});}
       catch(error){
         if (isExplicitReadOnlyDenial(error))
@@ -2019,8 +2051,11 @@ export function createHost(options = {}) {
         default: return badRequest(`unknown endpoint: ${String(endpoint)}`);
       }
     } catch (error) {
-      const code = errorCode(error);
-      try { log.warn?.('%s: %s failed (%s): %s', name, String(endpoint), code, String(error?.message ?? error)); } catch { /* 日志失败不影响响应 */ }
+      const local = localLiveSaveFailure(error);
+      const localCorrupt = !!local && (local.primary === 11 || local.primary === 26);
+      const code = localCorrupt ? 'MP_STORE_CORRUPT' : errorCode(error);
+      try { log.warn?.('%s: %s failed (%s%s): %s', name, String(endpoint), code,
+        localCorrupt ? ' / local-live sqlite ' + local.primary : '', String(error?.message ?? error)); } catch { /* 日志失败不影响响应 */ }
       const reason = error?.reason || (error?.code === 'MP_FILE_MISSING' ? 'missing' : undefined);
       const recoveryPaths = error?.recoveryPaths;
       const recoveryPath = typeof recoveryPaths?.temp === 'string' ? recoveryPaths.temp : undefined;
@@ -2029,6 +2064,9 @@ export function createHost(options = {}) {
       return { ok: false, error: {
         code,
         message: String(error?.message ?? error) + suffix,
+        ...(localCorrupt ? { storageFamily: 'local-live', sqliteCode: local.primary } : {}),
+        ...(localCorrupt && local.phase === 'prewrite' ? { prewrite: true } : {}),
+        ...(localCorrupt && local.phase && local.phase !== 'prewrite' ? { writePhase: local.phase } : {}),
         ...(reason ? { reason: String(reason) } : {}),
         ...(recoveryPath ? { recoveryPath } : {}),
         ...(recoveryBackup ? { recoveryBackup } : {}),

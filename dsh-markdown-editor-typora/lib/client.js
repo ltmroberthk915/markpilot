@@ -850,6 +850,30 @@ function applyMirrorDelta(mirror,event){
       return "error";
     }
 
+    function sqlitePrimaryCode(error) {
+      const raw = Number(error && (error.sqliteCode ?? error.errcode ?? error.cause?.errcode));
+      if (!isFinite(raw) || raw <= 0) return null;
+      return Math.trunc(raw) & 0xff;
+    }
+
+    /**
+     * Only explicit SQLITE_CORRUPT(11) / SQLITE_NOTADB(26) enter this path.
+     * `prewrite` comes from the host; absent/false means the writer may already
+     * have touched the disk, so never claim the file was left untouched.
+     */
+    function storageCorruptionFailure(error) {
+      const primary = sqlitePrimaryCode(error);
+      if (primary !== 11 && primary !== 26) return null;
+      if (!error || error.storageFamily !== "local-live") return null;
+      const prewrite = !!(error && error.prewrite === true);
+      return {
+        prewrite,
+        text: prewrite
+          ? "本次未保存：协同存储暂不可用。修改仍在当前窗口，请保留窗口并重试。"
+          : "保存结果未确认：协同存储不可用，请核对磁盘。修改仍在当前窗口，请保留窗口并重试。",
+      };
+    }
+
     /** Only surface a path the host actually returned; never invent one. */
     function saveRecoveryPath(error) {
       if (!error) return "";
@@ -4865,7 +4889,7 @@ const __test = {
       conflictChoiceLabel, conflictTruncatedNotice, liveTicketDirty,
       reviewPathKey, reviewStoreKey, normalizeReviewRecord,
       normalizeSavedText, shouldAdoptSavedVersion, shouldVerifyExternalEvent, externalDiskVerdict, saveErrorKind, saveAsCandidate,
-      saveRecoveryNotice,
+      saveRecoveryNotice, sqlitePrimaryCode, storageCorruptionFailure,
       selection: {
         constants: { MAX_QUOTE: MP208_MAX_QUOTE, MAX_EDIT_INLINE: MP208_MAX_EDIT_INLINE, MAX_EDIT_BYTES: MP208_MAX_EDIT_BYTES, MAX_EDIT_INTENT: MP208_MAX_EDIT_INTENT },
         normalize: mp208NormalizeSelection,
@@ -6550,7 +6574,7 @@ const __test = {
           saveTimer: null,
           flushed: false,
           live: null, liveUnsupported: false, liveFlushSeq: 0, liveFlushWaiters: new Map(), liveStatus: null,
-          liveStaleRounds: 0, liveStaleBlocked: false,
+          liveStaleRounds: 0, liveStaleBlocked: false, liveDiskCheckSeq: 0,
           baseSha256: "", draftMirror: null, draftMirrorAck: null, draftMirrorTimer: null, draftMirrorSeq: 0,
           draftMirrorFlight: null, draftMirrorPending: false, draftMirrorLastAt: 0,
           draftMirrorRetries: 0, draftMirrorProbe: null, openStamp: 0,
@@ -7480,7 +7504,7 @@ const __test = {
                 try {
                   const stat = await api("stat", { path: doc.absPath });
                   if (alive() && stat.ok === true && stat.value && stat.value.version !== doc.lastVersion) {
-                    if (doc.live) void refreshLiveRoom();
+                    if (doc.live) void refreshLiveRoom({ afterSave: true });
                     else {
                       let adopted = false;
                       try {
@@ -7524,9 +7548,15 @@ const __test = {
                 if (manualThisRun) post("toast", "对端持续编辑中，请按 Ctrl+S 手动保存");
                 return;
               }
-              const saveKind = saveErrorKind(result.error);
               const recoveryNotice = saveRecoveryNotice(result.error);
               if (recoveryNotice) notify(recoveryNotice.text, { kind: "recovery", path: recoveryNotice.path, ttlMs: 15000 });
+              const storageFailure = storageCorruptionFailure(result.error);
+              if (storageFailure) {
+                showError(storageFailure.text);
+                if (manualThisRun) post("toast", storageFailure.text);
+                return;
+              }
+              const saveKind = saveErrorKind(result.error);
               if (saveKind === "missing") {
                 enterMissing();
                 if (manualThisRun) post("toast", "磁盘上的文件已不存在；草稿未写盘，请先重试或复制内容");
@@ -7554,10 +7584,16 @@ const __test = {
             }
           } catch (error) {
             if (alive()) {
-              const message = String(error && error.message ? error.message : error);
-              const kind = saveErrorKind(error);
               const recoveryNotice = saveRecoveryNotice(error);
               if (recoveryNotice) notify(recoveryNotice.text, { kind: "recovery", path: recoveryNotice.path, ttlMs: 15000 });
+              const storageFailure = storageCorruptionFailure(error);
+              if (storageFailure) {
+                showError(storageFailure.text);
+                if (manualThisRun) post("toast", storageFailure.text);
+                return;
+              }
+              const message = String(error && error.message ? error.message : error);
+              const kind = saveErrorKind(error);
               if (kind === "missing") enterMissing();
               else if (kind === "readonly") enterReadonly();
               else showError("保存失败：" + message);
@@ -7908,13 +7944,108 @@ const __test = {
 
         /** 外部磁盘变更：live 房间先从磁盘采纳（干净时自动进正文；有草稿时报告冲突）。 */
         const LIVE_RETRY_CODES = { MP_FILE_CONFLICT: 1, MP_FILE_MISSING: 1, MP_FILE_BUSY: 1 };
+        // A dirty live room may only be dirty because this editor has an AI edit
+        // awaiting confirmation. An own-save watch echo or a visibility refresh
+        // must not turn that into a conflict. Read the disk identity without side
+        // effects; only a version/hash pair that proves the known disk baseline
+        // may advance the baseline. Text equality is never such a proof.
+        function liveRefreshSnapshot(checkSeq, allowSaving) {
+          return {
+            seq: checkSeq,
+            allowSaving: allowSaving === true,
+            token: doc.token,
+            client: doc.live && doc.live.client,
+            epoch: doc.live && doc.live.epoch,
+            path: doc.absPath,
+            lastVersion: doc.lastVersion,
+            baseSha256: doc.baseSha256,
+          };
+        }
+        // One frozen-identity gate for every await boundary (stat, open, catch)
+        // and for the final UI write. A newer refresh, a switched document, a
+        // changed live generation, or a moved version/hash baseline is stale.
+        function liveRefreshCurrent(snap) {
+          return !!snap
+            && snap.seq === doc.liveDiskCheckSeq
+            && alive() && !doc.dead && doc.opened && !!doc.live
+            && doc.token === snap.token
+            && doc.absPath === snap.path
+            && doc.live.client === snap.client
+            && doc.live.epoch === snap.epoch
+            && doc.lastVersion === snap.lastVersion
+            && String(doc.baseSha256 || "") === String(snap.baseSha256 || "")
+            && !doc.conflict
+            && (!doc.saving || snap.allowSaving);
+        }
+        async function liveDirtyDiskVerdict(snap) {
+          if (!snap.path) return { verdict: "unknown" };
+          let stat;
+          try { stat = await api("stat", { path: snap.path }); }
+          catch (e) { return liveRefreshCurrent(snap) ? { verdict: "unknown" } : { verdict: "stale" }; }
+          if (!liveRefreshCurrent(snap)) return { verdict: "stale" };
+          if (!stat || stat.ok !== true || !stat.value) return { verdict: "unknown" };
+          if (stat.value.missing === true) return { verdict: "missing" };
+          const statVersion = stat.value.version == null ? "" : String(stat.value.version);
+          if (!statVersion) return { verdict: "unknown" };
+          // A same-version stat proves no disk change but must never advance
+          // doc.lastVersion/doc.baseSha256; the baseline moves only on a known hash.
+          if (snap.lastVersion && statVersion === String(snap.lastVersion)) return { verdict: "same", source: "stat" };
+          // The stat is only a cheap prefilter. Once the version changed, read the
+          // disk baseline with the read-only open (live:false; never joins/adopts).
+          // Only this open's exact diskRevisionSha may prove the frozen baseSha256.
+          let opened;
+          try { opened = await api("open", { path: snap.path, live: false }); }
+          catch (e) { return liveRefreshCurrent(snap) ? { verdict: "unknown" } : { verdict: "stale" }; }
+          if (!liveRefreshCurrent(snap)) return { verdict: "stale" };
+          const errorCode = opened && opened.ok === false && opened.error ? String(opened.error.code || "") : "";
+          if (errorCode === "FS_NOT_FOUND" || errorCode === "ENOENT") return { verdict: "missing" };
+          if (!opened || opened.ok !== true || !opened.value) return { verdict: "unknown" };
+          const openVersion = opened.value.version == null ? "" : String(opened.value.version);
+          if (!openVersion) return { verdict: "unknown" };
+          const diskSha = typeof opened.value.diskRevisionSha === "string" ? opened.value.diskRevisionSha.toLowerCase() : "";
+          const knownBase = String(snap.baseSha256 || "").toLowerCase();
+          if (/^[0-9a-f]{64}$/.test(diskSha) && /^[0-9a-f]{64}$/.test(knownBase) && diskSha === knownBase)
+            return { verdict: "same", source: "open", version: openVersion };
+          // Version changed and the byte hash is not the known disk baseline:
+          // equality with the current draft, lastSavedText (including an old empty
+          // value), or a normalized text is NOT proof. Fail closed; never advance.
+          return { verdict: "changed", source: "open" };
+        }
         async function refreshLiveRoom(options) {
           const opts = options || {};
           if (!doc.live) return null;
+          const checkSeq = doc.liveDiskCheckSeq = (doc.liveDiskCheckSeq || 0) + 1;
           // R1：本地有未提交/编辑中的内容时不自动采纳磁盘，避免丢掉尚在交换途中的按键。
           // A conflict-resolved buffer is intentionally dirty; let the host decide
           // whether the disk still matches room_resolved instead of faking conflict.
-          if (!opts.discard && (doc.dirty || doc.conflict || doc.saving) && !doc.resolvedDisk) {
+          if (!opts.discard && (doc.dirty || doc.conflict || doc.saving || doc.review) && !doc.resolvedDisk) {
+            // An in-flight save owns its own reconcile; never preempt it with a banner.
+            // The post-save reconcile call is explicitly allowed to probe after the
+            // successful save response while the finally-block has not cleared saving.
+            if (doc.saving && !opts.afterSave) return null;
+            // A real conflict is already latched; do not clear it on a refresh.
+            if (doc.conflict) { doc.externalStale = true; return null; }
+            const snap = liveRefreshSnapshot(checkSeq, opts.afterSave === true);
+            const diskState = await liveDirtyDiskVerdict(snap);
+            // Final gate immediately before any state/UI write. Nothing below
+            // awaits, so one frozen-identity check covers the whole commit.
+            if (!liveRefreshCurrent(snap)) return null;
+            if (diskState.verdict === "stale") return null;
+            if (diskState.verdict === "missing") { enterMissing(); return null; }
+            if (diskState.verdict === "same") {
+              // Baseline advance is allowed only for the open-proven known hash,
+              // and only the opened version moves; stat-same never touches it.
+              if (diskState.source === "open" && diskState.version) doc.lastVersion = diskState.version;
+              doc.externalStale = false;
+              doc.staleNotified = false;
+              if (doc.phase === "conflict") {
+                if (doc.review) showPhase("review", "AI 修改了 " + doc.review.count + " 处，保存前请确认");
+                else showPhase(doc.dirty ? "dirty" : "ready", "");
+              }
+              return null;
+            }
+            // changed (or unprovable unknown): real external / fail-closed. Never
+            // adopt or write; keep the current buffer and the conflict banner.
             doc.externalStale = true;
             stopSaveTimer();
             showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");

@@ -10,6 +10,15 @@ const source=fs.readFileSync(path.join(ROOT,'lib/client.js'),'utf8');
 const drain=async()=>{for(let i=0;i<40;i++)await Promise.resolve();};
 function make(options={}){
  const effects=[],refs=[],listeners=new Map(),timers=new Map(),storage=options.storage||new Map(),slots=options.slots||new Map(),posts=[],requests=[],held=[];
+ const documentListeners=new Map();
+ const eventSources=[];
+ class FakeEventSource{
+  constructor(url){this.url=String(url);this.listeners=new Map();this.onerror=null;this.closed=false;eventSources.push(this);}
+  addEventListener(type,fn){if(!this.listeners.has(type))this.listeners.set(type,new Set());this.listeners.get(type).add(fn);}
+  removeEventListener(type,fn){this.listeners.get(type)?.delete(fn);}
+  close(){this.closed=true;}
+  emit(type,data){for(const fn of [...(this.listeners.get(type)||[])])fn({data:JSON.stringify(data)});}
+ }
  const transport={dropAck:false,holdAck:false,dropText:false,rejectApply:false};
  const uiHistory=[]; let rendering=false,refCursor=0; let timerId=0,now=0,definition,ui,cwd=options.cwd||'D:/probe',fetchHandler=req=>Promise.resolve(req.endpoint==='archive'?{ok:true,value:{archivePath:'D:/probe/.archive/'+String(req.payload?.tag||'draft')+'.md',sha256:'0'.repeat(64),bytes:String(req.payload?.text||'').length}}:req.endpoint==='documents.draftRead'?{ok:true,value:null}:req.endpoint==='documents.draftClear'?{ok:true,value:{removed:0}}:{ok:true,value:{text:'disk-v1',version:'v1',displayPath:'D:/probe/a.md',size:7}});
  const engine={text:'',session:null,token:null,lastApply:null,composing:false}; let liveVersion=0;
@@ -46,7 +55,7 @@ function make(options={}){
  };
  const window={__dshDraftStore:draftStore,__ModuleLoader__:{load:d=>definition=d},addEventListener:add,removeEventListener:remove,
   localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}};
- const sandbox={window,console,queueMicrotask,document:{visibilityState:'visible',body:{hasAttribute:()=>false},addEventListener(){},removeEventListener(){}},
+ const sandbox={window,console,queueMicrotask,...(options.eventSource?{EventSource:FakeEventSource}:{}),document:{visibilityState:options.visibilityState||'visible',body:{hasAttribute:()=>false},addEventListener(type,fn){if(!documentListeners.has(type))documentListeners.set(type,new Set());documentListeners.get(type).add(fn);},removeEventListener(type,fn){documentListeners.get(type)?.delete(fn);}},
   setTimeout:(fn,ms)=>{const id=++timerId;timers.set(id,{fn,at:now+ms,ms});return id;},clearTimeout:id=>timers.delete(id),setInterval(){},clearInterval(){},
   fetch:(url,opts)=>{const req={endpoint:url.split('/').at(-1),payload:JSON.parse(opts.body),keepalive:!!opts.keepalive};requests.push(req);return Promise.resolve(fetchHandler(req)).then(value=>({ok:true,json:()=>Promise.resolve(value)}));}};
  vm.createContext(sandbox);
@@ -59,7 +68,7 @@ function make(options={}){
  const cleanups=effects.map(effect=>effect()).filter(value=>typeof value==='function');
  const cleanup=()=>{for(const dispose of [...cleanups].reverse())dispose();};
  const st=refs[2].current;st.doc.win=win;
- return{uiHistory,test:mod.__test,render(){rendering=true;refCursor=0;try{return mod.__test.EditorTabBodyInner(componentProps);}finally{rendering=false;}},setUiForRender(value){ui={...ui,...value};},st,posts,requests,storage,slots,timers,cleanup,message,transport,held,engine,draftStore,setFetch:f=>fetchHandler=f,setCwd:value=>{cwd=value;},setLiveVersion:value=>{liveVersion=value;},ui:()=>ui,
+ return{uiHistory,eventSources,test:mod.__test,render(){rendering=true;refCursor=0;try{return mod.__test.EditorTabBodyInner(componentProps);}finally{rendering=false;}},setUiForRender(value){ui={...ui,...value};},st,posts,requests,storage,slots,timers,cleanup,message,transport,held,engine,draftStore,setFetch:f=>fetchHandler=f,setCwd:value=>{cwd=value;},setLiveVersion:value=>{liveVersion=value;},ui:()=>ui,setVisibility(value){sandbox.document.visibilityState=String(value);for(const fn of [...(documentListeners.get('visibilitychange')||[])])fn();},
   edit(text,composing=false){if(!engine.session)throw Error('Renderer not initialized');const before={...engine.session},beforeLength=engine.text.length;engine.session={...before,sourceRevision:before.sourceRevision+1};engine.text=text;engine.composing=composing;message('document-delta',{protocol:2,docToken:engine.token,before,after:{...engine.session},beforeLength,afterLength:text.length,changes:[{from:0,to:beforeLength,insert:text}],composing,lastApply:engine.lastApply});},
   composition(value){engine.composing=value;message('composition',{protocol:2,docToken:engine.token,session:{...engine.session},composing:value});},
   releaseAck(){for(const m of held.splice(0))message(m.type,m.content);},

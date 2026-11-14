@@ -11,6 +11,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { isAbsolute, join, sep } from 'node:path';
 import { tmpdir } from 'node:os';
+import { classifyStorageFailure } from './save-failure.js';
 
 const LIVE_REVISION = /^rev1:live:([^:]+):(\d+):([0-9a-f]{64})$/;
 const DISK_PREFIX = 'rev1:disk:';
@@ -1957,11 +1958,14 @@ export function createDocumentsService(deps) {
   }
 
   function fail(error, a) {
-    const rawCode = error?.code || 'FS_IO_ERROR';
     const message = String(error?.message || error);
-    const code = (/SQLITE_BUSY|ERR_SQLITE/i.test(String(rawCode)) || /database is locked/i.test(message))
-      ? 'MP_LIVE_BUSY' : rawCode;
+    const classified = classifyStorageFailure(error);
+    const code = classified.code;
     const value = { code, message };
+    if (classified.sqliteCode !== undefined) value.sqliteCode = classified.sqliteCode;
+    if (classified.storageFamily !== undefined) value.storageFamily = classified.storageFamily;
+    if (classified.prewrite === true) value.prewrite = true;
+    else if (classified.writePhase !== undefined) value.writePhase = classified.writePhase;
     if (error?.reason) value.reason = String(error.reason);
     if (Number.isSafeInteger(error?.max)) value.max = error.max;
     if (Number.isSafeInteger(error?.requested)) value.requested = error.requested;
@@ -1978,7 +1982,11 @@ export function createDocumentsService(deps) {
       if (a.draftStale === true) value.draftStale = true;
       if (a.draftUnknown === true) value.draftUnknown = true;
     }
-    try { log?.warn?.('documents: %s: %s', code, value.message); } catch { /* best effort */ }
+    try {
+      log?.warn?.('documents: %s%s: %s', code,
+        classified.sqliteCode !== undefined ? ' (sqlite ' + classified.sqliteCode + ')' : '',
+        value.message);
+    } catch { /* best effort */ }
     return { ok: false, error: value };
   }
 
