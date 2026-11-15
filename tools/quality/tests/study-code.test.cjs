@@ -4,6 +4,7 @@ const {pathToFileURL}=require('node:url');
 const root=path.resolve(__dirname,'../../..'),project=path.join(root,'dsh-markpilot'),engine=path.join(project,'src-cm6');
 const moduleAt=file=>import(pathToFileURL(file).href);
 const inline=moduleAt(path.join(engine,'inline-format.js')),toolbar=moduleAt(path.join(engine,'toolbar.js'));
+const publicMarkdown=moduleAt(path.join(engine,'public-markdown.js'));
 const cm=moduleAt(path.join(project,'node_modules/@codemirror/state/dist/index.js')),commands=moduleAt(path.join(project,'node_modules/@codemirror/commands/dist/index.js'));
 const tick=String.fromCharCode(96);
 async function viewFor(doc,anchor,head){
@@ -70,13 +71,18 @@ test('code wrapping preserves both raw newline edges through a full unwrap',asyn
   }finally{if(prior===undefined)delete global.window;else global.window=prior;}
 });
 async function projectInline(source, math=[]) {
-  const file=fs.readFileSync(path.join(engine,'main.js'),'utf8'),a=file.indexOf('function scanInlineMarks('),b=file.indexOf('const inlineMarksField',a);
-  assert(a>=0&&b>a);
+  const file=fs.readFileSync(path.join(engine,'main.js'),'utf8');
+  /* 候选把注释/代码区间抽到 scanInlineMarks 之外：把依赖块一起注入，注释由真实 analyzePublic 提供。 */
+  const h0=file.indexOf('const EMPTY_PUBLIC_ANNOTATIONS'),h1=file.indexOf('const publicAnnotationsField',h0);
+  const a=file.indexOf('function scanInlineMarks('),b=file.indexOf('const inlineMarksField',a);
+  assert(h0>=0&&h1>h0&&a>=0&&b>a,'main.js public annotation extraction anchors');
   const {Text}=await cm,plan=await moduleAt(path.join(project,'src-cm6/edit-plan.js')),context=await moduleAt(path.join(project,'src-cm6/markdown-context.js'));
   const helpers={...await inline,...plan,...context,tableLead:context.quoteLead,scanImageMarks:()=>[]};
   helpers.inlineCodeSpans=(await inline).inlineCodeSpans;
-  const scan=new Function(...Object.keys(helpers),file.slice(a,b)+'\nreturn scanInlineMarks;')(...Object.values(helpers));
-  return scan(Text.of(source.split('\n')),math);
+  const scan=new Function(...Object.keys(helpers),file.slice(h0,h1)+'\n'+file.slice(a,b)+'\nreturn scanInlineMarks;')(...Object.values(helpers));
+  const {analyzePublic}=await publicMarkdown;
+  const annotations=analyzePublic(source,{mathRanges:math});
+  return scan(Text.of(source.split('\n')),math,undefined,annotations);
 }
 test('a literal HTML comment opener in inline code does not hide later notes',async()=>{
   const example='Example '+tick+'<!--'+tick,source=example+'\nSECOND NOTE\nTHIRD NOTE';

@@ -2,10 +2,34 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  collectFootnotes, isFootnoteOpaque, hasStructuralChars, resolveBackTarget,
+  collectFootnotes, isFootnoteOpaque, isFootnoteTailOpaque, hasStructuralChars, resolveBackTarget,
 } = require('../src-cm6/footnotes.cjs');
 
+/* 与产品同一个 @lezer/markdown（dsh-markpilot/node_modules），配置与
+   @codemirror/lang-markdown 的 markdownLanguage 一致（GFM + Subscript/Superscript/Emoji）。
+   candidate 本身不导入 parser；测试只把 parser 本体作为可选第二参传入。 */
+const { parser, GFM, Subscript, Superscript, Emoji } = require('@lezer/markdown');
+const codeParser = parser.configure([GFM, Subscript, Superscript, Emoji]);
+
 const slices = (text, ranges) => ranges.map(range => text.slice(range.from, range.to));
+const counts = index => ({
+  refs: index.refs.length,
+  resolved: index.refs.filter(ref => ref.resolved).length,
+  backs: index.notes.reduce((sum, note) => sum + note.refs.length, 0),
+});
+function codeRangesOf(md) {
+  const ranges = [];
+  codeParser.parse(md).iterate({
+    enter(ref) {
+      if (ref.name === 'InlineCode' || ref.name === 'CodeBlock') {
+        ranges.push({ from: ref.from, to: ref.to, kind: ref.name });
+        return false;
+      }
+      return undefined;
+    },
+  });
+  return ranges;
+}
 
 test('basic: numbering follows first reference order, ids are ASCII-only', () => {
   const md = '甲[^b]乙[^a]丙[^b]\n\n[^a]: A 定义\n[^b]: B 定义\n';
@@ -265,5 +289,104 @@ test('table refs: parser indexes them (export/numbering), editor projection owns
   const result = collectFootnotes(md);
   assert.deepEqual(result.refs.map(ref => [ref.label, ref.resolved]), [['t', true]]);
   assert.equal(result.notes[0].text, 'T');
+});
+
+/* ───────────── 2026-11-14 literal-foot：跨行 InlineCode / 4 空格 CodeBlock ───────────── */
+
+const CROSS_LINE = 'start `abc\ninside [^demo] end`\n\nnormal [^demo]\n\n[^demo]: note\n';
+const INDENT_CODE = '    literal [^demo]\n\nnormal [^demo]\n\n[^demo]: note\n';
+const CONTROL = 'normal [^demo]\n\n[^demo]: note\n';
+
+test('literal-foot: parser code ranges exclude cross-line InlineCode and 4-space CodeBlock', () => {
+  for (const md of [CROSS_LINE, INDENT_CODE]) {
+    const result = collectFootnotes(md, codeParser.parse(md));
+    assert.deepEqual(counts(result), { refs: 1, resolved: 1, backs: 1 });
+    assert.deepEqual(slices(md, result.refs), ['[^demo]']);
+    assert.deepEqual(result.notes.map(note => [note.label, note.text]), [['demo', 'note']]);
+  }
+  const control = collectFootnotes(CONTROL, codeParser.parse(CONTROL));
+  assert.deepEqual(counts(control), { refs: 1, resolved: 1, backs: 1 });
+});
+
+test('literal-foot: real parser nodes are InlineCode(6..30) / CodeBlock(4..19) and five input forms agree', () => {
+  assert.deepEqual(codeRangesOf(CROSS_LINE), [{ from: 6, to: 30, kind: 'InlineCode' }]);
+  assert.deepEqual(codeRangesOf(INDENT_CODE), [{ from: 4, to: 19, kind: 'CodeBlock' }]);
+  const ranges = codeRangesOf(CROSS_LINE);
+  const tree = codeParser.parse(CROSS_LINE);
+  const forms = [
+    ['tree', tree],
+    ['ranges', ranges],
+    ['analyzePublic-like {code}', { code: ranges }],
+    ['{tree}', { tree }],
+    ['{parser}', { parser: codeParser }],
+  ];
+  for (const [name, input] of forms) {
+    assert.deepEqual(counts(collectFootnotes(CROSS_LINE, input)), { refs: 1, resolved: 1, backs: 1 }, name);
+  }
+});
+
+test('literal-foot: definition inside cross-line InlineCode is not a definition', () => {
+  const md = 'start `abc\n[^demo]: fake\nend`\n\nnormal [^demo]\n\n[^demo]: real\n';
+  const result = collectFootnotes(md, codeParser.parse(md));
+  assert.deepEqual(result.notes.map(note => [note.label, note.text]), [['demo', 'real']]);
+  assert.deepEqual(counts(result), { refs: 1, resolved: 1, backs: 1 });
+});
+
+test('literal-foot: 4-space definition continuation is not CodeBlock; an indented code block is opaque', () => {
+  const cont = '正文[^a]\n\n[^a]: note\n    续行 [^inner]\n\n后文[^a]\n';
+  // CommonMark 把 `[^a]: note` 当 LinkReference，紧随 4 空格行算 CodeBlock；
+  // 脚注文法里它是定义续行 ⇒ candidate 把这类 CodeBlock 从 opaque 剔除。
+  assert.equal(codeRangesOf(cont).filter(range => range.kind === 'CodeBlock').length, 1, 'raw parser sees CodeBlock');
+  const contResult = collectFootnotes(cont, codeParser.parse(cont));
+  assert.deepEqual(contResult.refs.map(ref => ref.label), ['a', 'a']);
+  assert.equal(contResult.notes[0].text, 'note\n续行 [^inner]');
+  assert.equal(isFootnoteOpaque(cont, cont.indexOf('续行'), codeParser), false);
+
+  const code = '正文[^a]\n\n    [^b]\n\n后文[^a]\n\n[^a]: A\n';
+  assert.equal(codeRangesOf(code).filter(range => range.kind === 'CodeBlock').length, 1);
+  const codeResult = collectFootnotes(code, codeParser.parse(code));
+  assert.deepEqual(codeResult.refs.map(ref => ref.label), ['a', 'a']);
+  assert.equal(isFootnoteOpaque(code, code.indexOf('[^b]'), codeParser), true);
+
+  // 引用区里的缩进代码紧跟定义：第一行不是 4 空格续行 ⇒ 不能当定义续行剔除。
+  const quoted = '正文[^a]\n\n[^a]: note\n>     [^b]\n\n[^b]: B\n';
+  const quotedResult = collectFootnotes(quoted, codeParser.parse(quoted));
+  assert.deepEqual(quotedResult.refs.map(ref => ref.label), ['a']);
+  assert.equal(isFootnoteOpaque(quoted, quoted.indexOf('[^b]'), codeParser), true);
+});
+
+test('literal-foot: rangeAt ordered premise — earlier link-def destination cannot be missed after a later fence', () => {
+  const md = [
+    '[x]: https://e/<!--',
+    '',
+    'real [^demo]',
+    '',
+    '-->',
+    '',
+    '```',
+    'code',
+    '```',
+    '',
+    '[^demo]: note',
+    '',
+  ].join('\n');
+  assert.deepEqual(collectFootnotes(md).refs.map(ref => ref.label), ['demo']);
+  assert.deepEqual(collectFootnotes(md, codeParser).refs.map(ref => ref.label), ['demo']);
+});
+
+test('literal-foot: no "[^" fast path never builds a parse tree', () => {
+  const throwingParser = { parse() { throw new Error('parser must not run'); } };
+  assert.deepEqual(collectFootnotes('普通段落 `code` 与 $$x$$，没有脚注\n', throwingParser), { refs: [], notes: [] });
+});
+
+test('literal-foot: isFootnoteOpaque / isFootnoteTailOpaque accept the same parser input', () => {
+  const crossPos = CROSS_LINE.indexOf('[^demo]');
+  assert.equal(isFootnoteOpaque(CROSS_LINE, crossPos, codeParser), true);
+  assert.equal(isFootnoteOpaque(CROSS_LINE, CROSS_LINE.lastIndexOf('[^demo]'), codeParser), false);
+  assert.equal(isFootnoteOpaque(INDENT_CODE, INDENT_CODE.indexOf('[^demo]'), codeParser), true);
+  const indentReal = INDENT_CODE.indexOf('[^demo]', INDENT_CODE.indexOf('normal'));
+  assert.equal(isFootnoteOpaque(INDENT_CODE, indentReal, codeParser), false);
+  assert.equal(isFootnoteTailOpaque('```\ncode\n', codeParser), true);
+  assert.equal(isFootnoteTailOpaque('```\ncode\n```\n', codeParser), false);
 });
 

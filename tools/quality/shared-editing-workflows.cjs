@@ -17,10 +17,12 @@ const rows = text => text.split('\n').filter(line => line.startsWith('|'))
   const result = {cases: []}, record = recorder(dir, result);
   let run;
   try {
-    if (process.platform === 'win32') process.env.LOCALAPPDATA = path.join(dir, 'local-cache');
+    // Compatibility seam: keep the explicit per-run base, but pass it as a
+    // child-only override instead of rewriting process.env for every child.
+    const explicit = process.platform === 'win32' ? { LOCALAPPDATA: path.join(dir, 'local-cache') } : {};
     const seed = path.join(dir, 'seed.md');
     fs.writeFileSync(seed, '隔离测试\n');
-    run = await launch({...o, settings: {autosaveEnabled: false, restoreLast: false}}, seed, dir);
+    run = await launch({...o, settings: {autosaveEnabled: false, restoreLast: false}}, seed, dir, explicit);
     result.artifact = run.metadata;
     await record('native-undo-after-external-proof-reorder-keeps-disk-and-view', async trace => {
       const file = path.join(dir, 'proof.md');

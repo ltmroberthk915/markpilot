@@ -5,6 +5,7 @@ const os = require('node:os');
 const crypto = require('node:crypto');
 const { spawn, execFileSync } = require('node:child_process');
 const { playwright } = require('./dependencies.cjs');
+const storeIsolation = require('./store-isolation.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const sha256 = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -40,6 +41,8 @@ async function launch(o, doc, runDir, extraEnv = {}) {
   const exe = path.resolve(o.exe || o.electron);
   const hash = sha256(exe);
   if (o['expected-sha256'] && hash !== o['expected-sha256']) throw new Error('Executable SHA256 mismatch');
+  // Validate/create the private store before touching the profile or settings.
+  const isolated = storeIsolation.prepareStoreEnv(runDir, extraEnv);
   const profile = o.profilePath ? path.resolve(o.profilePath) : path.join(runDir, 'profile-' + crypto.randomUUID());
   if (path.dirname(profile) !== path.resolve(runDir) || !path.basename(profile).startsWith('profile-')) throw new Error('Reusable profile must belong to this run directory');
   const reusedProfile = fs.existsSync(profile);
@@ -49,7 +52,13 @@ async function launch(o, doc, runDir, extraEnv = {}) {
   // Product defaults remain manual; default-policy probes use a seed without
   // these opt-in keys and verify the actual upgrade/default path separately.
   if (!reusedProfile) fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify({ restoreLast: false, theme: 'light', autosaveEnabled: true, autosaveIntervalMs: 1000, winBounds: { width: 1100, height: 800, x: 50, y: 50 }, ...o.settings }));
-  const env = { ...process.env, MP_TEST_NO_DIALOG: '1', MP_TEST_HOOKS: '1', MP_DEBUG: '1', MP_MIGRATE_FROM: path.join(runDir, 'absent-legacy-profile'), ...extraEnv };
+  // The store env is child-only. The same runDir reuses its private base
+  // across restarts in this process; an app-slot parent passes its base via
+  // MP_QUALITY_STORE_BASE, so descendants share the same database.
+  const env = storeIsolation.mergeEnv(process.env, {
+    MP_TEST_NO_DIALOG: '1', MP_TEST_HOOKS: '1', MP_DEBUG: '1',
+    MP_MIGRATE_FROM: path.join(runDir, 'absent-legacy-profile'),
+  }, extraEnv, isolated.env);
   delete env.ELECTRON_RUN_AS_NODE;
   const argv = [...(o.app ? [path.resolve(o.app)] : []), doc, ...(o.inspectMain ? ['--inspect=0'] : []), '--remote-debugging-port=0', '--user-data-dir=' + profile, '--enable-logging=stderr'];
   const child = spawn(exe, argv, { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -136,4 +145,5 @@ async function launch(o, doc, runDir, extraEnv = {}) {
     return { browser, page, child, profile, cleanup, ...(o.inspectMain ? { nodeInspectorURL: launchLog.match(/Debugger listening on (ws:\/\/127\.0\.0\.1:\d+\/[a-z0-9-]+)/i)?.[1] } : {}), metadata: { executable: path.basename(exe), executablePath:exe, exeSha256: hash, runtimeExecutablePath,runtimeExecutableSha256, artifactRoot,app: info, sourceMode: !!o.app, resourcesPath, asarPath, asarSha256, bootMs: Math.round(performance.now() - started), node: process.version, platform: process.platform, cpu: os.cpus()[0]?.model, ramGiB: Math.round(os.totalmem()/1073741824), engineBundleSha256: o.app ? sha256(path.join(o.app, 'renderer/cm6/app.js')) : null,artifactFiles } };
   } catch (e) { await cleanup(); throw new Error(e.message + '\n' + launchLog.slice(-1200)); }
 }
-module.exports = { ROOT, sleep, sha256, acquireSlot, args, launch };
+const prepareStoreEnv = (runDir, extraEnv) => storeIsolation.prepareStoreEnv(runDir, extraEnv);
+module.exports = { ROOT, sleep, sha256, acquireSlot, args, launch, prepareStoreEnv };

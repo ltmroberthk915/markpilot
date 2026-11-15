@@ -11,6 +11,8 @@ const { pathToFileURL } = require('node:url');
 const product = path.resolve(process.argv[2] || path.join(__dirname, '../../../MarkPilot-CM6'));
 const { DocumentStore, createSession } = require(path.join(product, 'shell/document-store'));
 const { prepareSaveAsAssets } = require(path.join(product, 'shell/save-as-assets'));
+const liveDocuments = require(path.join(product, 'shell/live-documents'));
+const retireLive = () => { try { liveDocuments.retireLiveStorage?.(); } catch { /* older copy or in-flight lease */ } };
 const { collectImageRefs } = require(path.join(product, 'shell/markdown-images'));
 const { classify } = require(path.join(product, 'export-folder'));
 const receipts = [];
@@ -33,7 +35,7 @@ let root;
 async function fixture(name, text, options = {}) {
   const dir = path.join(root, name), from = path.join(dir, 'old', 'note.md'), to = path.join(dir, 'new', 'note.md');
   await write(from, text); await fsp.mkdir(path.dirname(to), { recursive: true });
-  const store = new DocumentStore({ prepareSaveAs: prepareSaveAsAssets, ...options }), S = createSession();
+  const store = new DocumentStore({ prepareSaveAs: prepareSaveAsAssets, ...options, commitDirectory: path.join(dir, 'commit') }), S = createSession();
   await store.load(S, from); store.markDirty(S, { documentId: S.documentId, revision: 1, dirty: true });
   return { dir, from, to, store, S, text };
 }
@@ -204,7 +206,7 @@ async function main() {
     process.stdout.write(JSON.stringify({ passed: receipts.every(r=>r.status==='pass'), cases: receipts }, null, 2) + '\n');
   } finally {
     // Only this mkdtemp-owned root. No workspace/user deletion.
-    if (root) {const absolute=path.resolve(root);assert.equal(path.dirname(absolute).toLowerCase(),path.resolve(os.tmpdir()).toLowerCase());assert(path.basename(absolute).startsWith('mp-save-assets-test-'));await fsp.rm(absolute, { recursive: true, force: true });}
+    if (root) {const absolute=path.resolve(root);assert.equal(path.dirname(absolute).toLowerCase(),path.resolve(os.tmpdir()).toLowerCase());assert(path.basename(absolute).startsWith('mp-save-assets-test-'));retireLive();await fsp.rm(absolute, { recursive: true, force: true });}
   }
 }
 main().catch(error => { process.stderr.write(error.stack + '\n'); process.exitCode = 1; });

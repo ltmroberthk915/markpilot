@@ -1,12 +1,16 @@
 'use strict';
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
-const {DocumentStore,createSession}=require(process.env.MP_TEST_DOCUMENT_STORE ? path.resolve(process.env.MP_TEST_DOCUMENT_STORE) : '../../../MarkPilot-CM6/shell/document-store');
+const storeModule=process.env.MP_TEST_DOCUMENT_STORE ? path.resolve(process.env.MP_TEST_DOCUMENT_STORE) : path.resolve(__dirname,'../../../MarkPilot-CM6/shell/document-store');
+const {DocumentStore,createSession}=require(storeModule);
+// Commit leases open SQLite inside commitDirectory; keep it in the fixture and
+// retire it before cleanup so Windows does not keep the directory busy.
+const retireLive=(()=>{try{const fn=require(path.join(path.dirname(storeModule),'live-documents')).retireLiveStorage;return typeof fn==='function'?fn:null;}catch{return null;}})();
 const defer=()=>{let resolve;return {promise:new Promise(r=>resolve=r),resolve:v=>resolve(v)}};
 async function fixture(t,options){
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'markpilot-store-'));
- t.after(async()=>{const actual=await fs.realpath(dir),parent=await fs.realpath(os.tmpdir());assert.equal(path.dirname(actual),parent);assert(path.basename(actual).startsWith('markpilot-store-'));await fs.rm(actual,{recursive:true,force:true});});
- const store=new DocumentStore(options),file=path.join(dir,'a.md');await fs.writeFile(file,'original\n');const S=createSession();await store.load(S,file);return {dir,store,file,S};
+ t.after(async()=>{retireLive?.();const actual=await fs.realpath(dir),parent=await fs.realpath(os.tmpdir());assert.equal(path.dirname(actual),parent);assert(path.basename(actual).startsWith('markpilot-store-'));await fs.rm(actual,{recursive:true,force:true});});
+ const store=new DocumentStore({...options,commitDirectory:path.join(dir,'commit')}),file=path.join(dir,'a.md');await fs.writeFile(file,'original\n');const S=createSession();await store.load(S,file);return {dir,store,file,S};
 }
 function edit(store,S,revision){store.markDirty(S,{documentId:S.documentId,revision,dirty:true});}
 function save(store,S,text,revision,grant){return store.save(S,{filePath:grant?.filePath||S.filePath,text,documentId:S.documentId,revision,...(grant?{saveAsToken:grant.saveAsToken}:{})});}

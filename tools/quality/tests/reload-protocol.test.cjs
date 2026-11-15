@@ -2,6 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'../../..');
 const {DocumentStore,createSession}=require(path.join(root,'MarkPilot-CM6/shell/document-store.js'));
+const {retireLiveStorage}=require(path.join(root,'MarkPilot-CM6/shell/live-documents.js'));
 const defer=()=>{let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve}};
 test('guarded disk load refuses a newer revision, path or logical document at atomic adoption',async()=>{
  for(const mutate of [S=>S.revision++,S=>S.filePath+='new',S=>S.documentId+='new']){
@@ -51,7 +52,7 @@ for(const phase of ['before-replace','during-validation'])test('a consumed Save 
  const io=require('node:fs/promises'),dir=await io.mkdtemp(path.join(root,'.mp-verify/store-overlap-'));
  const primary=path.join(dir,'primary.md'),older=path.join(dir,'older.md'),newer=path.join(dir,'newer.md'),entered=defer(),release=defer();
  try{
-  await io.writeFile(primary,'original\n');const S=createSession(),store=new DocumentStore();await store.load(S,primary);
+  await io.writeFile(primary,'original\n');const S=createSession(),store=new DocumentStore({commitDirectory:path.join(dir,'commit')});await store.load(S,primary);
   const grant=await store.grantSaveAs(S,older);
   if(phase==='before-replace')store.beforeReplace=async()=>{entered.resolve();await release.promise;};
   else{const validate=store.validate.bind(store);let calls=0;store.validate=async(...args)=>{await validate(...args);if(++calls===2){entered.resolve();await release.promise;}};}
@@ -60,5 +61,5 @@ for(const phase of ['before-replace','during-validation'])test('a consumed Save 
   assert(stale.error,'superseded permission is refused before target replacement');assert.equal(fs.existsSync(older),false);assert.equal(S.filePath,primary);assert.equal(S.saveAsGrant.token,current.saveAsToken);
   store.beforeReplace=async()=>{};const result=await store.save(S,{filePath:newer,text:'current text\n',documentId:S.documentId,revision:S.revision,saveAsToken:current.saveAsToken});
   assert(result.ok&&result.current);assert.equal(S.filePath,newer);assert.equal(await io.readFile(newer,'utf8'),'current text\n');assert.equal(await io.readFile(primary,'utf8'),'original\n');
- }finally{release.resolve();const resolved=await io.realpath(dir);assert(resolved.startsWith(path.join(fs.realpathSync(root),'.mp-verify')+path.sep));assert(path.basename(resolved).startsWith('store-overlap-'));await io.rm(resolved,{recursive:true,force:true});}
+ }finally{release.resolve();retireLiveStorage();const resolved=await io.realpath(dir);assert(resolved.startsWith(path.join(fs.realpathSync(root),'.mp-verify')+path.sep));assert(path.basename(resolved).startsWith('store-overlap-'));await io.rm(resolved,{recursive:true,force:true});}
 });

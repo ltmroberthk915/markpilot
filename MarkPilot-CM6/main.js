@@ -34,6 +34,46 @@ const documents = new DocumentStore({
   },
 });
 
+/* ── 阅读位置存储（与 DSH 插件共用；只存锚点，不存正文/草稿）─────────────────
+ * 目录默认 %LOCALAPPDATA%\.markpilot\reading-v1，可用 MP_READING_POSITION_DIR
+ * 指向隔离测试根。隔离启动（MP_TEST_HOOKS + --user-data-dir）回落 userData 下，
+ * 避免普通测试污染日常阅读记录。IPC 一律以**本窗口会话已加载的真实文件**为路径，
+ * 渲染侧不能指定任意路径。 */
+const { ReadingPositionStore } = require('./shell/reading-position-store');
+let readingPositionStoreInstance = null;
+function readingPositionStore() {
+  if (readingPositionStoreInstance) return readingPositionStoreInstance;
+  const isolated = !process.env.MP_READING_POSITION_DIR && mpTestIsolated();
+  readingPositionStoreInstance = new ReadingPositionStore(isolated
+    ? { directory: path.join(app.getPath('userData'), 'reading-v1') }
+    : {});
+  return readingPositionStoreInstance;
+}
+function readingSessionIdOf(S) {
+  if (!S.__readingSessionId) S.__readingSessionId = crypto.randomUUID();
+  return S.__readingSessionId;
+}
+function readingSaveForSession(S, payload) {
+  if (!S || !S.filePath) return { ok: false, error: '当前窗口没有已加载的文档' };
+  const anchor = payload && payload.anchor;
+  if (!anchor || typeof anchor !== 'object') return { ok: false, error: '缺少阅读锚点' };
+  if (typeof payload.path === 'string' && payload.path && documents.key(payload.path) !== documents.key(S.filePath))
+    return { ok: false, code: 'MP_READING_STALE', error: '阅读位置不属于当前文档' };
+  const store = readingPositionStore();
+  const sessionId = readingSessionIdOf(S);
+  const bound = store.begin({ id: sessionId, role: 'desktop', path: S.filePath, pid: process.pid, ttlMs: 120000 });
+  if (!bound.ok) return { ok: false, code: 'MP_READING_UNAVAILABLE', error: bound.reason };
+  const result = store.save({ path: S.filePath, role: 'desktop', sessionId, anchor, seq: payload.seq,
+    sampleAt: payload.sampleAt });
+  return { ok: result.stored === true || result.reason === 'plugin-active' || result.reason === 'gate' || result.reason === 'stale', value: result };
+}
+function readingReleaseForSession(S) {
+  if (!S || !S.__readingSessionId) return;
+  const id = S.__readingSessionId;
+  S.__readingSessionId = null;
+  try { if (readingPositionStoreInstance) readingPositionStoreInstance.end(id); } catch { /* 退出收尾不反噬 */ }
+}
+
 /* 【载入前禁写·2026-10-09】settings.json 在 `loadSettings()` 之前**不许被写**。
  *  起因：改名迁移把老设置拷进新 userData 后，`loadSettings()` 读到的却是应用默认值
  *  （诊断留痕：`settings:load {"bytes":332,"theme":"system","keys":["theme","recent","winBounds"]}`）——
@@ -904,6 +944,7 @@ function createWindow(session = state) {   // 【文件多开·第 3 步·3a】�
   /* live owner 清理：窗口关了，它名下的协同 client 就地 leave（房间最后一个 client
      离开时房间随之回收，未保存草稿不悬空成“永远拒写”的幽灵房间）。 */
   try { liveLeaveOwned(entry => __wcId != null ? entry.senderId === __wcId : entry.sender === W.webContents, 'window-closed'); } catch { }
+  try { readingReleaseForSession(session); } catch { /* 阅读位置会话清理不阻塞关窗 */ }
   try { retireClipboardIntentFor(W.webContents); } catch { }
 });
   } catch (e) { dbg("session:register-failed", String((e && e.message) || e)); }
@@ -1064,7 +1105,10 @@ try {
     ])
       .then(results => { if (results[1]?.cleanupError) dbg('file-worker:cleanup-error', results[1]); })
       .catch(error => dbg('file-worker:shutdown-error', String(error)))
-      .finally(() => { workerQuitReady = true; app.quit(); });
+      .finally(() => {
+        try { if (readingPositionStoreInstance) readingPositionStoreInstance.close(); } catch { /* 位置库关闭失败不阻塞退出 */ }
+        workerQuitReady = true; app.quit();
+      });
   });
 }
 
@@ -1122,6 +1166,26 @@ handle('doc:ready', e => {
   const S = sessionOf(e.sender);
   if (S.filePath && !S.dirty) sendTo(windowOf(e), 'doc', documents.metadata(S));
   return documents.metadata(S);
+});
+/* 阅读位置：路径来自 sessionOf(sender).filePath，渲染侧送来的 path 只用于陈旧校验。 */
+handle('reading:get', e => {
+  const S = sessionOf(e.sender);
+  if (!S.filePath) return { ok: true, value: null };
+  const store = readingPositionStore();
+  const sessionId = readingSessionIdOf(S);
+  const bound = store.begin({ id: sessionId, role: 'desktop', path: S.filePath, pid: process.pid, ttlMs: 120000 });
+  if (!bound.ok) return { ok: false, code: 'MP_READING_UNAVAILABLE', error: bound.reason };
+  return { ok: true, value: store.load({ path: S.filePath }) };
+});
+handle('reading:save', (e, payload) => readingSaveForSession(sessionOf(e.sender), payload || {}));
+handle('reading:release', e => {
+  const S = sessionOf(e.sender);
+  readingReleaseForSession(S);
+  return { ok: true };
+});
+ipcMain.on('reading:flush', (e, payload) => {
+  try { e.returnValue = readingSaveForSession(sessionOf(e.sender), payload || {}); }
+  catch (error) { e.returnValue = { ok: false, error: String(error && error.message || error) }; }
 });
 handle('view:reload', e => reloadEditorView(windowOf(e)));
 handle('file:cancelCloseSave', e => {

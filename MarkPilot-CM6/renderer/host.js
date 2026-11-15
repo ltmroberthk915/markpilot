@@ -95,6 +95,36 @@ const STALE_AWAIT = Symbol('stale-await'); // 显式保存等待哨兵（私有 
 let reloadPending = null;
 const consumedReloads = new Set();
 
+/* ── 阅读位置（跨宿主共享；主进程按本窗口已获准打开的真实文件绑定）──────────
+ * 引擎只算锚点、只滚视口；这里只负责“开页就绪后取一次 / 用户真滚动后合并保存 /
+ * 关窗同步 flush”。打开期间的初始 scrollTop=0 不会产生保存（引擎要求真实用户
+ * 滚动意图），旧文档迟到的 load 回执由 client 的 attach 代际丢弃。 */
+const readingClient = (window.MPReadingClient && typeof window.MPReadingClient.createReadingClient === 'function')
+  ? window.MPReadingClient.createReadingClient({
+    getEngine: () => window.mpEngine,
+    load: () => window.mpHost.readingGet().then(result => (result && result.ok === true ? result.value : null)),
+    save: payload => window.mpHost.readingSave(payload),
+    flush: payload => window.mpHost.readingFlush(payload),
+    release: () => window.mpHost.readingRelease(),
+    onError: error => console.warn('[host] reading position:', error && error.message || error),
+  })
+  : null;
+function readingAttach(path, id, restore) {
+  if (!readingClient) return;
+  try { void readingClient.attach({ path, documentId: id, restore }); }
+  catch (error) { console.warn('[host] reading attach failed', error); }
+}
+function readingDetach() {
+  if (!readingClient) return;
+  try { readingClient.detach({ flush: true, release: true }); }
+  catch (error) { console.warn('[host] reading detach failed', error); }
+}
+function flushReadingPosition(reason) {
+  if (!readingClient) return null;
+  try { return readingClient.flush(reason || 'pagehide', { sync: true }); }
+  catch (error) { console.warn('[host] reading flush failed', error); return null; }
+}
+
 /* ── CM Live：共享文档（同文件多窗口实时协同）────────────────────────────
  * 引擎 facade（window.mpEngine.liveDocument）+ 主进程 live:* IPC。
  * 契约：bind(initialText,{join,exchange,leave,onError,onStatus}) / unbind / flush / status / refresh。
@@ -364,6 +394,8 @@ function applyDoc(text, path, id, loadedRevision = 0, loadKind = 'replace', tick
     observedSource = window.mpEngine?.documentSession?.() || null;
     dirty = false; refreshTitle();
     if (filePath) void bindLive(text); // CM Live：挂载成功即加入共享房间
+    if (filePath) readingAttach(filePath, documentId, loadKind !== 'reload');
+    else readingDetach();
     if (!transaction) checkpoint.commit();
     return true;
   } catch (e) {
@@ -1147,3 +1179,17 @@ window.addEventListener('focus', async () => {
   } catch { }
   refreshTitle();
 })();
+
+/* 阅读位置的普通退出收口：pagehide/beforeunload 用 sendSync 立即落盘；
+   页面隐藏时也补一次（崩溃/被杀时只能依赖滚动合并保存的最后一笔）。 */
+window.addEventListener('pagehide', () => {
+  try {
+    if (readingClient) readingClient.detach({ flush: true, release: true });
+    else flushReadingPosition('pagehide');
+  } catch (error) { console.warn('[host] reading pagehide flush failed', error); }
+});
+window.addEventListener('beforeunload', () => { flushReadingPosition('beforeunload'); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'hidden') return;
+  flushReadingPosition('visibility-hidden');
+});

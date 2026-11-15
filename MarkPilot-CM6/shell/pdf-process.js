@@ -6,11 +6,37 @@ const {spawn}=require('node:child_process');
 const {createNativeWorkerLease}=require('./native-worker-lease');
 const {prepareFile}=require('./safe-file');
 const pdf=require('../export-pdf');
-const LIMITS=Object.freeze({jobMemoryMB:3072,maxPrivateMB:2560,minAvailableMB:3072,minAvailableCommitMB:3072,cpuRatePercent:25,maxDurationMs:290000,sampleIntervalMs:250});
+// minAvailable* is the old startup threshold and keeps the old 3072 MiB
+// default. A new caller may lower only the optional runtime threshold; when
+// the runtime keys are absent, the native helper keeps both stages equal, so
+// old callers and old configs behave exactly as before.
+const LEGACY_LIMITS=Object.freeze({jobMemoryMB:3072,maxPrivateMB:2560,minAvailableMB:3072,minAvailableCommitMB:3072,cpuRatePercent:25,maxDurationMs:290000,sampleIntervalMs:250});
+const LIMITS=Object.freeze({...LEGACY_LIMITS,minAvailableMB:1792,minAvailableCommitMB:1792,runtimeMinAvailableMB:1024,runtimeMinAvailableCommitMB:1024});
 const active=new Set();let closing=false;
 const canceled=()=>Object.assign(Error('已取消导出 PDF'),{canceled:true});
 const fail=(code,message,extra={})=>Object.assign(Error(message),{code,...extra});
 const same=(a,b)=>path.resolve(a).toLowerCase()===path.resolve(b).toLowerCase();
+function resolveLimits(input){
+ const explicit=input&&typeof input==='object'?input:null;
+ if(!explicit)return{...LIMITS};
+ if('runtimeMinAvailableMB' in explicit||'runtimeMinAvailableCommitMB' in explicit)return{...LIMITS,...explicit};
+ if('minAvailableMB' in explicit||'minAvailableCommitMB' in explicit)return{...LEGACY_LIMITS,...explicit};
+ return{...LIMITS,...explicit};
+}
+const MEMORY_FALLBACK='系统内存余量不足，已停止 PDF 打印以保持系统响应，请释放内存后重试';
+function memoryFailureText(guard){
+ const stage=guard?.memoryErrorStage,resource=guard?.memoryErrorResource;
+ const actual=Number(guard?.memoryErrorActualMB),limit=Number(guard?.memoryErrorLimitMB);
+ if(!Number.isFinite(actual)||!Number.isFinite(limit)||actual<0||limit<=0)return '';
+ // Floor one decimal: one byte below the 1792 MiB startup line must not read 1792.0.
+ const actualText=(Math.floor(actual*10)/10).toFixed(1),limitText=String(Math.round(limit));
+ if(stage==='startup'&&resource==='available')return `可用内存为 ${actualText} MiB，开始打印至少需要 ${limitText} MiB。`;
+ if(stage==='startup'&&resource==='commit')return `可用提交量为 ${actualText} MiB，开始打印至少需要 ${limitText} MiB。`;
+ if(stage==='runtime'&&resource==='available')return `可用内存为 ${actualText} MiB，继续打印至少需要 ${limitText} MiB。`;
+ if(stage==='runtime'&&resource==='commit')return `可用提交量为 ${actualText} MiB，继续打印至少需要 ${limitText} MiB。`;
+ if(stage==='private'&&resource==='private')return `PDF 打印进程已用私有内存 ${actualText} MiB，上限为 ${limitText} MiB。`;
+ return '';
+}
 async function atomicJson(file,value){const temp=file+'.next';await fsp.writeFile(temp,JSON.stringify(value),{mode:0o600});await fsp.rename(temp,file);}
 async function readJson(file,max=1024*1024){const s=await fsp.stat(file);if(s.size>max)throw Error('PDF 工作进程回复过大');return JSON.parse(await fsp.readFile(file,'utf8'));}
 async function hashFile(file){const h=crypto.createHash('sha256');for await(const b of fs.createReadStream(file))h.update(b);return h.digest('hex');}
@@ -106,7 +132,7 @@ function printInWorker(options){
    await atomicJson(inputFile,input);
    lease=await createNativeWorkerLease({name:'pdf-worker-guard.exe'});
    const argv=[...(options.app.isPackaged?[]:[options.app.getAppPath()]),'--mp-pdf-worker='+inputFile,'--user-data-dir='+profile];
-   const limits={...LIMITS,...options.limits};
+   const limits=resolveLimits(options.limits);
    const config={runDir:job.runDir,exePath:process.execPath,profilePath:profile,expectedExeSha256:await hashFile(process.execPath),workingDirectory:job.runDir,arguments:argv,runnerPid:process.pid,ownerToken:job.token,...limits};
    const configFile=path.join(job.runDir,'guard-config.json');await atomicJson(configFile,config);
    if(requestedCancel())throw canceled();
@@ -127,7 +153,7 @@ function printInWorker(options){
     return {ok:false,canceled:true,worker,ms:Date.now()-t0};
    }
    if(job.stopReason==='timeout'||guard?.reason==='owned total duration threshold')throw fail('MP_PDF_TIMEOUT','PDF 打印超过等待上限，已停止打印进程，请重试',{worker});
-   if(/memory threshold|private bytes threshold/.test(guard?.reason||'')||guard?.error?.includes('MP_PDF_LOW_MEMORY'))throw fail('MP_PDF_MEMORY','系统内存余量不足，已停止 PDF 打印以保持系统响应，请释放内存后重试',{worker});
+   if(/memory threshold|private bytes threshold/.test(guard?.reason||'')||guard?.error?.includes('MP_PDF_LOW_MEMORY'))throw fail('MP_PDF_MEMORY',memoryFailureText(guard)||MEMORY_FALLBACK,{worker});
    if(exit.code!==0||!guard?.success||!guard.assignedBeforeResume||!guard.jobEmpty||guard.rootPid===process.pid)throw fail('MP_PDF_WORKER','PDF 打印进程未正常完成，原保存目标未改动',{worker,detail:job.spawnError||stderr});
    result=await readJson(path.join(job.runDir,'result.json'));
    if(result.token!==job.token||result.pid!==guard.rootPid||!result.result?.ok)throw fail('MP_PDF_WORKER',result.result?.error||'PDF 打印结果无效',{worker});
