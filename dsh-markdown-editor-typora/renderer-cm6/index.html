@@ -62,8 +62,10 @@
       padding-right: 8px !important;
     }
     /* Parent controls occupy physical x=12..44 and y=8..84. Island and content
-       zoom are independent; reserve physical pixels through their own scales. */
-    html[data-mp-workbench-collapsed="1"] .mp-toolbar {
+       zoom are independent; reserve physical pixels through their own scales.
+       The folded island docks itself at the editor's top-right (engine CSS);
+       this inset must not drag it back to the parent rail. */
+    html[data-mp-workbench-collapsed="1"] .mp-toolbar:not(.is-folded) {
       left: calc(56px / var(--mp-island-scale,1));
       max-width: calc(100% - 12px - 56px / var(--mp-island-scale,1));
     }

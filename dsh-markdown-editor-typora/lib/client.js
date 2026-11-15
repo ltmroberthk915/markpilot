@@ -3033,7 +3033,133 @@ var squeezeForTests = null;
  * 手柄有稳定属性 data-width-handle（不依赖哈希类名）。
  */
 const LAYOUT_STYLE_ID = "dsh-markdown-editor-typora-layout-style";
-const LAYOUT_STYLE_CSS = '[data-mp-layout="on"] [data-width-handle]{display:none !important}';
+/* Compact chrome. Every rule is scoped by data-mp-chrome, which the engine only
+   writes while the workbench is open and the 紧凑工作台 setting is on; removing
+   the attribute (close / setting off / restore) returns the host to its own
+   layout with no residue. Selectors use substring class matching because DSH
+   appends state classes (e.g. "…_treeBody …_wide"), which breaks suffix
+   matching.
+
+   Wide column, one row, reading order left to right:
+     title (+ its mode marker) | 14px | view tabs + views More | flexible gap |
+     session More, right-column tools.
+   The title cluster keeps the host's own ellipsis, the tab row keeps a width
+   that does not depend on how many tabs the host chooses to show (so DSH's
+   ResizeObserver loop settles instead of oscillating), and every control keeps
+   the host's resting background and border: only hover and focus states are
+   added, drawn from theme tokens.
+
+   Narrow column, two rows: title and its mode marker share the first row with
+   the trailing tools; the view tabs take the second row, starting where the
+   title starts. */
+const LAYOUT_STYLE_CSS = `
+[data-mp-layout="on"] [data-width-handle]{display:none !important}
+/* dsh-ui-alt owns the header when its own compact mode is on: stand down so the
+   two plugins never fight over the same rows. */
+html:not([data-dcc-enabled="on"][data-dcc-compact-header="on"])
+  [data-mp-chrome] [data-slot="conversation.header"] header[data-window-drag]:not([class*="_headerBlank"]):has([data-conversation-header-corner]) {
+  min-height:0 !important; padding:2px 16px 2px 20px !important;
+  align-items:center; border-bottom:0.5px solid var(--dsw-alias-border-l3);
+  /* The slot anchor is display:contents in DSH; the header itself is the row. */
+  & [class*="_titleRow"] { display:contents; }
+  & [class*="_titleCluster"] {
+    /* Host fade band reaches over the utilities seat; drop it and let the
+       cluster clip its own title so nothing overlaps a neighbour. */
+    --title-cluster-fade:0px;
+    flex:0 1 auto; min-width:0; min-height:28px;
+    margin:0; padding:0; gap:8px; overflow:hidden;
+    mask-image:none;
+  }
+  & [class*="_crumbs"] { min-width:0; }
+  & [class*="_crumb"] { max-width:min(34vw,420px); }
+  /* Title keeps the host's own weight and colour; no new type scale. */
+  & [class*="_crumbCurrent"] { font-weight:500; }
+  & [class*="_headerUtilities"] {
+    position:relative; z-index:1; margin-left:auto; gap:6px;
+  }
+  & [data-conversation-header-corner] { margin:0; }
+  & div:has(> [data-conversation-tabs]) {
+    margin:0; padding:0; align-items:center; gap:2px 8px; flex-wrap:nowrap;
+  }
+  & [data-conversation-tabs] { min-height:0; gap:2px 4px; flex-wrap:nowrap; }
+  & [role="tab"] {
+    --dsh-tab-hit-inline:8px;
+    min-height:28px; margin:0; padding:6px 8px;
+  }
+  /* Resting chrome is the host's; hover and focus are the only additions. */
+  & [role="tab"]:hover { color:var(--dsw-alias-label-primary); }
+  & [role="tab"]:focus-visible {
+    outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));
+    outline-offset:-2px; border-radius:var(--dsw-radius-sm);
+  }
+  & [class*="_viewsMore"][aria-haspopup="menu"] {
+    min-width:28px; min-height:28px; margin:0;
+  }
+  /* The More launcher rides an inline wrapper; make it a flex box so the row
+     measures the 28px control instead of a taller line box. */
+  & [class*="_viewsMoreAnchor"] { display:inline-flex; align-items:center; flex:none; }
+  & [class*="_viewsMore"][aria-haspopup="menu"]:hover {
+    background:var(--dsw-alias-interactive-bg-hover);
+  }
+  & [class*="_viewsMore"][aria-haspopup="menu"]:focus-visible {
+    outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));
+    outline-offset:-2px;
+  }
+}
+/* Wide: one row. Flex order puts the tab row directly after the title group
+   and pushes the trailing tools to the right edge. */
+html:not([data-dcc-enabled="on"][data-dcc-compact-header="on"])
+  [data-mp-chrome="wide"] [data-slot="conversation.header"] header[data-window-drag]:has([data-conversation-tabs]):has([class*="_viewsMore"][aria-haspopup="menu"]):has([data-conversation-header-corner]) {
+  display:flex; flex-wrap:nowrap; column-gap:0;
+  & [data-conversation-header-leading] { order:0; flex:none; }
+  & [class*="_titleCluster"] { order:1; }
+  & div:has(> [data-conversation-tabs]) {
+    order:2; flex:0 0 auto;
+    /* Width must not depend on the visible tab count, or DSH's own
+       ResizeObserver loop would keep re-deciding how many tabs fit. */
+    width:clamp(200px,40%,420px);
+    margin-inline-start:14px; justify-content:flex-start;
+  }
+  & [class*="_headerUtilities"] { order:3; }
+  & [data-conversation-header-corner] { order:4; }
+}
+/* Narrow: two rows. Title and its mode marker sit on row 1 with the trailing
+   tools; the tab row starts on row 2 at the title's own start edge. */
+html:not([data-dcc-enabled="on"][data-dcc-compact-header="on"])
+  [data-mp-chrome="narrow"] [data-slot="conversation.header"] header[data-window-drag]:has([data-conversation-tabs]):has([data-conversation-header-corner]) {
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto auto;
+  grid-template-rows:auto auto;
+  column-gap:6px; row-gap:2px;
+  & [data-conversation-header-leading] { grid-area:1/1; }
+  & [class*="_titleCluster"] { grid-area:1/2; }
+  & [class*="_headerUtilities"] { grid-area:1/3; margin-left:0; }
+  & [data-conversation-header-corner] { grid-area:1/4; }
+  & div:has(> [data-conversation-tabs]) {
+    grid-area:2/2/3/5; width:100%; min-width:0;
+    margin-inline-start:0; justify-content:flex-start;
+  }
+}
+/* Expanded workspace sidebar only: reclaim the brand row, the new-session bar
+   and the panel rows for the session list, and let a tall plugin footer scroll
+   instead of pushing the list out. Brand, entry button and panel rows share one
+   inline start so the column keeps a single left rhythm. The drawer, the
+   collapsed rail and the Windows caption keep the host's geometry. */
+[data-mp-squeezed]:not([data-sidebar-drawer]):not([data-sidebar-collapsed="true"]):has([data-mp-chrome])
+  [class*="_sidebarCol"] [class*="_root"]:has(> [class*="_footArea"]):has([data-sidebar-scrollport]) {
+  & > [class*="_logoRow"] { height:32px !important; margin-block:0; padding:0 0 0 12px; }
+  & > [class*="_newSessionRow"] { margin:3px 0 !important; }
+  & button[class*="_newSession"] { height:30px; padding-inline:12px; }
+  & [data-sidebar-scrollport] > nav { gap:1px; margin-bottom:2px; }
+  & [data-sidebar-scrollport] > nav button[class*="_panelRow"] { min-height:28px; padding-block:3px; }
+  & > [class*="_footArea"] { max-height:32%; overflow-y:auto; overscroll-behavior:contain; }
+  /* Keyboard focus stays visible against the column fill. */
+  & button[class*="_newSession"]:focus-visible,
+  & [data-sidebar-scrollport] > nav button[class*="_panelRow"]:focus-visible {
+    outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));
+    outline-offset:-2px;
+  }
+}`;
 
 function ensureLayoutStyle(doc) {
   try {
@@ -3096,6 +3222,7 @@ const SETTINGS_DEFAULTS = {
   passiveOpenMode: "workbench",
   docsTemplate: "# {title}\n\n",
   transparent: true,     // 编辑区透明：让应用背景（含 dream-skin 皮肤）透上来
+  compactChrome: true,
   keepResizeHandlesAfterClose: false,
   docsListCollapsed: false,  // 文档中心左侧列表是否折叠
   docsListWidth: 268,       // 文档中心左侧列表宽度（可拖，160..460）
@@ -3120,6 +3247,7 @@ function readSettings(storage) {
     passiveOpenMode: SETTINGS_DEFAULTS.passiveOpenMode,
     docsTemplate: SETTINGS_DEFAULTS.docsTemplate,
     transparent: SETTINGS_DEFAULTS.transparent,
+    compactChrome: SETTINGS_DEFAULTS.compactChrome,
     docsListCollapsed: SETTINGS_DEFAULTS.docsListCollapsed,
     keepResizeHandlesAfterClose: SETTINGS_DEFAULTS.keepResizeHandlesAfterClose,
     rightbarWidth: SETTINGS_DEFAULTS.rightbarWidth,
@@ -3146,6 +3274,7 @@ function readSettings(storage) {
     if (["workbench", "overlay"].includes(s.passiveOpenMode)) out.passiveOpenMode=s.passiveOpenMode;
     if (typeof s.docsTemplate === "string") out.docsTemplate = s.docsTemplate;
     if (typeof s.transparent === "boolean") out.transparent = s.transparent;
+    if (typeof s.compactChrome === "boolean") out.compactChrome = s.compactChrome;
     if (typeof s.keepResizeHandlesAfterClose === "boolean") out.keepResizeHandlesAfterClose = s.keepResizeHandlesAfterClose;
     if (typeof s.docsListCollapsed === "boolean") out.docsListCollapsed = s.docsListCollapsed;
     if (typeof s.docsListWidth === "number") out.docsListWidth = Math.round(layoutClamp(s.docsListWidth, 160, 460));
@@ -3822,6 +3951,15 @@ function createLayoutEngine(options) {
     rememberOriginal(body);
     state.root = root;
     state.body = body;
+    // Set before measuring the header: both the stage and its divider must
+    // start below the rendered row, including on the very first open.
+    if (root.getAttribute && root.setAttribute) {
+      var chrome = cfg.compactChrome === false ? null : (rect.width >= 680 ? "wide" : "narrow");
+      if (root.getAttribute("data-mp-chrome") !== chrome) {
+        if (chrome) root.setAttribute("data-mp-chrome", chrome);
+        else root.removeAttribute("data-mp-chrome");
+      }
+    }
     var headerResolved = null;
     if (!commitOverride && !derivedGeo) {
       headerResolved = resolveHeader(root);
@@ -4031,6 +4169,7 @@ function createLayoutEngine(options) {
     }
     if (state.root) {
       try { if (state.root.removeAttribute) state.root.removeAttribute(LAYOUT_FLAG_ATTR); } catch (e) { /* 忽略 */ }
+      try { state.root.removeAttribute("data-mp-chrome"); } catch (e) { /* detached */ }
       try { if (state.root.removeAttribute) state.root.removeAttribute("data-mp-narrow-chat"); } catch (e) { /* 忽略 */ }
       try {
         var frameR = state.root.closest ? state.root.closest('[class*="_frame"]') : null;
@@ -4325,17 +4464,30 @@ const NARROW_CHAT_PX = 360;
 //   · 之前那一堆 `overflow-wrap:anywhere` / `min-width:0` / `max-width:100%` 规则
 //     反而把 composer 挤成 43px 的竖条、把英文拆成一字一行 —— 实测（关掉整组 CSS 即恢复正常）。
 // 保留常量与注入点，方便将来某个具体控件真出问题时**单条**加回来，而不是整组。
-// 窄列下**只**处理输入区那一行的按钮尺寸：宿主按钮是固定尺寸，列一窄就换行占两行高。
+// 窄列下**只**处理输入区那一行的控件排版：宿主按钮是固定尺寸，列一窄就换行占两行高。
 // 注意作用域挂 frame（composer 在会话根之外，`[data-mp-narrow-chat]` 盖不到它）。
+//
+// 【2026-11-15】删掉 `@container (max-width:320px)` 那条 `flex:1 0 100%`：
+// 宿主 `.row` 本身就是 `flex-wrap:wrap` + `container-type:inline-size`，宿主自己的
+// `observeControlRow` 会按"各组实测宽之和 vs 行内容宽"决定模型紧凑态；再来一条固定
+// 320px 阈值等于**绕过**宿主测量：只要行宽 ≤320 就把 trailing 拉成整行，即使其余宽度
+// 明明放得下（实测 294px 行里 tools 76 + trailing 内容 ~145 本可同行，却被拆成两行）。
+// 现在只做两件事：把控件间距压紧（紧凑外观），并允许 trailing 在极窄时按**自己的内容宽**
+// 折行 —— 能不能单行由浏览器按真实可用宽度决定，不再由我们写死阈值。
+// 纪律：不改控件尺寸（点击面积不变）、不覆盖 [hidden]、不改活动态/禁用态、不写 flex 比例。
 const NARROW_CHAT_CSS = [
   // Only adapt the native input card. Composer dock slots belong to other
   // plugins (including balance-dsh), whose buttons must retain their sizing.
-  '[data-mp-narrow-frame] [data-composer-card] > [class*="_row"]{flex-wrap:wrap;gap:4px;min-width:0}',
+  '[data-mp-narrow-frame] [data-composer-card] > [class*="_row"]{gap:4px;min-width:0}',
   '[data-mp-narrow-frame] [data-composer-card] > [class*="_row"] > *{min-width:0;max-width:100%}',
-  '[data-mp-narrow-frame] [data-composer-card] > [class*="_row"] > [class*="_tools"]{flex-wrap:nowrap;gap:4px}',
-  // Keep model/language/send together; wrapping this native group creates a
-  // four-storey input card at the 220px chat minimum. Do not size slot buttons.
-  '@container (max-width:320px){[data-mp-narrow-frame] [data-composer-card] > [class*="_row"] > [class*="_trailing"]{flex:1 0 100%;width:100%;max-width:100%;flex-wrap:nowrap;gap:4px;margin-left:0}[data-mp-narrow-frame] [data-composer-card] > [class*="_row"] > [class*="_trailing"] > [class*="_standardControls"]{flex:1 1 auto;min-width:0;gap:4px}}',
+  // 极窄 + 额外插槽（WorkBuddy 等）时，左侧组可能比行还宽：让它按自己的内容宽有序换行，
+  // 而不是把组内按钮压到互相重叠/越界（按钮尺寸与顺序都不变）。
+  '[data-mp-narrow-frame] [data-composer-card] > [class*="_row"] > [class*="_tools"]{gap:4px;flex-wrap:wrap}',
+  // trailing 保持宿主给的内容宽（flex:none）与 margin-left:auto：放得下就与左侧同行并贴右，
+  // 放不下时整组换到下一行并由 auto 外边距重新贴右（宿主注释里的原始设计）。
+  // max-width:100% + flex-wrap 只在"这一组比整行还宽"时生效 ⇒ 组内自然折行、不溢出。
+  '[data-mp-narrow-frame] [data-composer-card] > [class*="_row"] > [class*="_trailing"]{min-width:0;max-width:100%;flex-wrap:wrap;justify-content:flex-end;gap:4px}',
+  '[data-mp-narrow-frame] [data-composer-card] > [class*="_row"] > [class*="_trailing"] > [class*="_standardControls"]{min-width:0;max-width:100%;gap:4px}',
   // F10：最窄列时正文会溢出到输入框/底部状态条下面（实测"the turn was closed"压住 3/7/2%）。
   // 给滚动区留出底部安全区；只在我们挤压期间生效。
   // 对话列内容顶部留白偏多（用户自检反馈）：列容器与内容顶部的 padding 都收到 0/8。
@@ -4356,13 +4508,8 @@ const NARROW_CHAT_CSS = [
   '[data-mp-workbench] [data-mp-rail-action]{background:transparent !important;border-color:transparent !important;border-radius:8px !important;transition:background .12s ease,color .12s ease,border-color .12s ease}',
   '[data-mp-workbench] [data-mp-rail-action]:hover{background:color-mix(in srgb,currentColor 10%,transparent) !important;border-color:color-mix(in srgb,currentColor 20%,transparent) !important}',
   '[data-mp-workbench] [data-mp-rail-action]:focus-visible{outline:2px solid var(--dsw-focus-ring-color,#4f8ef7);outline-offset:1px;background:color-mix(in srgb,currentColor 10%,transparent) !important}',
-  // ── 表头：只压缩高度，**不合并行** ────────────────────────────────────
-  // 试过把标题行与标签行并成一行（横向 flex）：标题 "Test Rely OK" 直接被挤没了（实测截图），
-  // 所以改成保守做法——两行都保留，只把行高/间距压紧，省下 8~10px。
-  // 会话头：**不做并一行**。试过两次（flex 横排 + ellipsis），都会把宿主的标题块压成 0 宽、
-  // 标题 "Test Rely OK" 直接消失 —— 这是宿主结构决定的，只能保守压缩高度。
+  // Legacy split layout: compact chrome adds only scoped rules for the native header.
   '[data-mp-squeezed] [data-phase] > :first-child{padding-top:0 !important;padding-bottom:0 !important;min-height:0 !important}',
-  '[data-mp-squeezed] [data-phase] > :first-child > *{min-height:0 !important}',
   '[data-mp-squeezed] [data-phase] > :first-child > *{min-height:0 !important}',
 ].join("\n");
 
@@ -4383,15 +4530,39 @@ function removeStageHandleStyle(doc) {
   } catch (e) { /* 已移除或不可访问 */ }
 }
 
+/* 窄列输入区样式表：**同 id 节点原地升级**，不是"找到 id 就跳过"。
+   0.14/0.15 的这个样式没有版本标记；桌面热升级后新客户端若直接 return，已打开的宿主页面会
+   继续跑旧规则（旧版把 trailing 强制整行 ⇒ 约 320px 时"上一行 +/权限、下一行靠左模型 +
+   靠右发送、中间大片空白"）。做法：
+     · 首次见到已存在的节点 ⇒ 按当前 CSS 文本就地更新（旧节点、无标记节点都能升级）；
+     · 之后若还是同一个节点 ⇒ 直接返回（重复 apply/拖动零 DOM 写入，也不读布局）；
+     · 节点被删除/重建 ⇒ getElementById 会给出新节点，重新核对文本后缓存。
+   卸载不删除节点：旧版本本身也从不删除它，而且全部规则都挂在 [data-mp-narrow-*] 标记上，
+   没有标记时零效果 ⇒ 从根上避免"旧 controller 卸载误删新样式"，不需要所有权代号/额外属性。 */
+const NARROW_CHAT_STYLE_ID = "mp-narrow-chat-style";
+let narrowChatStyleNode = null;   // 本模块已确认过的节点（模块级缓存，不跨模块共享）
+
 function ensureNarrowChatStyle(doc) {
-  if (!doc || typeof doc.createElement !== "function") return;
+  if (!doc || typeof doc.createElement !== "function") return null;
   try {
-    if (doc.getElementById("mp-narrow-chat-style")) return;
-    const st = doc.createElement("style");
-    st.id = "mp-narrow-chat-style";
-    st.textContent = (typeof NARROW_CHAT_CSS === "string" ? NARROW_CHAT_CSS : "");
+    const css = (typeof NARROW_CHAT_CSS === "string" ? NARROW_CHAT_CSS : "");
+    let st = null;
+    try { st = doc.getElementById ? doc.getElementById(NARROW_CHAT_STYLE_ID) : null; } catch (e0) { st = null; }
+    if (st) {
+      if (st === narrowChatStyleNode) return st;      /* 同一节点：已确认是当前 CSS */
+      let text = null;
+      try { text = st.textContent; } catch (e1) { text = null; }
+      if (text !== css) { try { st.textContent = css; } catch (e2) { /* 写不进去就沿用旧值 */ } }
+      narrowChatStyleNode = st;
+      return st;
+    }
+    st = doc.createElement("style");
+    st.id = NARROW_CHAT_STYLE_ID;
+    st.textContent = css;
     (doc.head || doc.documentElement).appendChild(st);
-  } catch (e) { /* 注入失败就退化为宿主原始排版 */ }
+    narrowChatStyleNode = st;
+    return st;
+  } catch (e) { return null; }   /* 注入失败就退化为宿主原始排版 */
 }
 
 function waitForConversationRoot(engine, options) {
@@ -4552,6 +4723,7 @@ function mountLayout(ctx, overrides) {
       } catch (e) { /* 忽略 */ }
       return hostEngine;
     }
+    cfg.compactChrome = readSettings(storage).compactChrome;
     var engine = createLayoutEngine({
       doc: doc,
       win: win,
@@ -4561,6 +4733,13 @@ function mountLayout(ctx, overrides) {
     });
 
       var layoutDisposed = false;
+      var syncChrome = function (event) {
+        if (event.type === "storage" && event.key !== null && event.key !== SETTINGS_KEY) return;
+        var compact = readSettings(storage).compactChrome;
+        if (cfg.compactChrome === compact) return;
+        cfg.compactChrome = compact;
+        engine.requestApply();
+      };
       var stopPanelWatch = null;
       var onLayoutResize = function () {
         if (!layoutDisposed) engine.requestApply();
@@ -4571,6 +4750,8 @@ function mountLayout(ctx, overrides) {
           // 窄窗右栏保护：**加载时也要跑一次**（只在 resize 里跑的话，窄窗直接打开页面时
           // 右栏仍在屏幕外 —— 实测 x=2855 而窗口右边界 1679）。
           win.addEventListener("resize", onLayoutResize);
+          win.addEventListener(SETTINGS_CHANGED_EVENT, syncChrome);
+          win.addEventListener("storage", syncChrome);
         }
       } catch (e) { /* 忽略 */ }
 
@@ -4663,6 +4844,10 @@ function mountLayout(ctx, overrides) {
       try { if (waiter && waiter.stop) waiter.stop(); } catch (e) { /* 忽略 */ }
       clearInterval(watchTimer);
       try { if (win && win.removeEventListener) win.removeEventListener("resize", onLayoutResize); } catch (e) { /* 忽略 */ }
+      if (win && win.removeEventListener) {
+        win.removeEventListener(SETTINGS_CHANGED_EVENT, syncChrome);
+        win.removeEventListener("storage", syncChrome);
+      }
       try {
         if (typeof stopPanelWatch === "function") stopPanelWatch();
         else if (stopPanelWatch && typeof stopPanelWatch.unsubscribe === "function") stopPanelWatch.unsubscribe();
@@ -5181,6 +5366,13 @@ const __test = {
     defaults: LAYOUT_DEFAULTS,
     storageKey: LAYOUT_STORAGE_KEY,
     widthVar: LAYOUT_WIDTH_VAR,
+    // 窄列输入区样式：热升级/幂等/所有权释放的回归测试入口（产品路径同一实现）。
+    narrowChatStyle: {
+      ensure: ensureNarrowChatStyle,
+      css: NARROW_CHAT_CSS,
+      id: NARROW_CHAT_STYLE_ID,
+      resetCache: function () { narrowChatStyleNode = null; },
+    },
   },
   parseFileAddress: parseFileAddress,
       basenameOf: basenameOf,
@@ -5810,6 +6002,67 @@ const __test = {
       return function () { try { document.removeEventListener("click", onClick, true); } catch (e) { /* 忽略 */ } };
     }
 
+    /* 侧栏「Markdown」入口的点击短路。
+     *
+     * 宿主对 sidebar.panellist 的点击走 layout.selectPanel(id)，main slot 的
+     * entryKey 由 "conversation" 变成我们的面板 id ⇒ 会话列整棵卸载、再按新 key
+     * 重建。会话越长，这次重建越贵（实测：合成 180 行内容后打开就绪中位数
+     * 501ms，轻内容 387ms；会话子树每次打开被重新插入 1 次）。
+     *
+     * 而本插件的编辑面画在 shell.overlay（见 EditorOverlayStage），主区域右侧
+     * 本来就留着对话；把会话列拆掉纯属副作用。所以在捕获阶段吃掉这一次点击，
+     * 直接开/关工作台，主区域保持挂载。
+     *
+     * 只认我们自己注册的那一行（label 由 slot 的 label 决定；文案随语言变化，
+     * 因此用入口元素上宿主给的 aria-label 与我们的 slot label 常量比对），
+     * 其它面板入口、以及带修饰键/非左键的点击一律原样交给宿主。 */
+    function installPanelEntryShortcut() {
+      if (typeof document === "undefined" || typeof document.addEventListener !== "function") return function () {};
+      /* Resolve the entry row, then ask whether OUR icon is inside it.
+       *
+       * Not `closest('nav button [data-mp-docs-entry]')`: that looks for a marked
+       * ANCESTOR of the event target, so it only matches when the click lands on
+       * the icon itself. Clicking the row's label, its blank padding, or
+       * activating it from the keyboard targets the button, and the marked icon
+       * is its CHILD — the selector then finds nothing and the host's default
+       * panel switch runs, rebuilding the conversation subtree.
+       *
+       * Looking the icon up inside the resolved button covers all four ways the
+       * row can be activated with one check, and keeps the ownership test on a
+       * static attribute rather than a localized label. */
+      var onClick = function (ev) {
+        if (!ev || ev.defaultPrevented) return;
+        if (typeof ev.button === "number" && ev.button !== 0) return;
+        if (ev.metaKey || ev.ctrlKey || ev.altKey || ev.shiftKey) return;
+        var target = ev.target;
+        if (!target || typeof target.closest !== "function") return;
+        var row = null;
+        try { row = target.closest("nav button"); } catch (e) { row = null; }
+        if (!row) return;
+        var ours = false;
+        try { ours = !!row.querySelector("[" + DOCS_PANEL_MARK + "]"); } catch (e1) { ours = false; }
+        if (!ours) return;
+        try {
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+        } catch (e2) { /* 忽略 */ }
+        try {
+          var host = docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("layout") : null;
+          // 用户在别的面板页时要先把 main 换回会话，否则编辑面无处可挤；
+          // 这一步之后本插件的编辑面才能在会话列右侧展开。
+          var activePanel = null;
+          try { activePanel = host && host.panelInfo && typeof host.panelInfo.getSnapshot === "function"
+            ? host.panelInfo.getSnapshot().activePanelId : null; } catch (e3) { activePanel = null; }
+          if (activePanel !== null && typeof host.selectPanel === "function") host.selectPanel(null);
+        } catch (e4) { /* 忽略 */ }
+        if (docsModeOn || overlayDoc) void closeWorkspaceEditor();
+        else void openWorkspace(workspaceContext());
+      };
+      document.addEventListener("click", onClick, true);
+      return function () { try { document.removeEventListener("click", onClick, true); } catch (e) { /* 忽略 */ } };
+    }
+
     function installWorkspaceNavigation(ctx) {
       var stops=[], disposed=false, queued=false, previous=null;
       function observe() {
@@ -5941,13 +6194,21 @@ const __test = {
 
     var DOCS_PANEL_ID = "dsh-markdown-editor-typora-docs";
 
+    /* Ownership marker for the sidebar row. The host renders this icon inside the
+       entry button and nowhere else, so a static attribute on it identifies our
+       row without depending on the visible label (which is localized and could
+       coincide with another panel's name). */
+    var DOCS_PANEL_MARK = "data-mp-docs-entry";
+
     function DocsPanelIcon(props) {
       var size = (props && typeof props.size === "number") ? props.size : 16;
       var h = React.createElement;
-      return h("svg", {
+      var mark = {};
+      mark[DOCS_PANEL_MARK] = "";
+      return h("svg", Object.assign({
         width: size, height: size, viewBox: "0 0 24 24", fill: "none",
         xmlns: "http://www.w3.org/2000/svg", "aria-hidden": "true",
-      },
+      }, mark),
       h("path", { d: "M6 3.5h7.5L18 8v12.5H6z", stroke: "currentColor", strokeWidth: 1.6, strokeLinejoin: "round" }),
       h("path", { d: "M13.5 3.5V8H18", stroke: "currentColor", strokeWidth: 1.6, strokeLinejoin: "round" }),
       h("path", { d: "M9 12.5h6M9 16h4.5", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" }));
@@ -6323,6 +6584,13 @@ const __test = {
           }),
           h("span", { style: { color: "var(--dsw-alias-label-secondary, #9aa4b2)" } },
             settings.enabled ? "已开启" : "已关闭"))),
+        h(SettingsField, {
+          label: "紧凑工作台",
+          hint: "分栏编辑时收紧左侧导航；空间足够时，会话标题和视图标签共用一行。",
+        }, h("label", { style: { display: "flex", alignItems: "center", gap: 8, cursor: "pointer" } },
+          h("input", { type: "checkbox", "aria-label": "紧凑工作台", checked: settings.compactChrome,
+            onChange: function (e) { save({ compactChrome: e.target.checked }); } }),
+          h("span", null, settings.compactChrome ? "已开启" : "已关闭"))),
         h(SettingsField, {
           label: "退出编辑器后保留分栏拖动",
           hint: "关闭后恢复宿主布局；开启时仍可使用扩展拖动范围。",
@@ -10575,6 +10843,10 @@ const __test = {
         }
       };
 
+      // 窄列输入区样式：客户端（重）加载时就主动把同 id 的旧样式原地升级到当前 CSS，
+      // 已打开的宿主页面不需要重启/重开；规则全部挂在 [data-mp-narrow-*] 上，没有标记时零效果。
+      runEffect(() => { ensureNarrowChatStyle(document); }, "dsh-markdown-editor-typora: narrow chat style");
+
       // DSH 0.2.2 adds will-change:transform to the sticky composer seat.
       // balance-dsh positions its fixed pill in viewport coordinates; retain
       // that coordinate system without changing its sizing or usage logic.
@@ -10762,6 +11034,13 @@ const __test = {
       try { SessionsBridge.getSessions = () => get("sessions"); } catch (e) { /* 忽略 */ }
       ctx.effect(() => installWorkspaceNavigation(ctx), "dsh-markdown-editor-typora: workspace navigation");
       ctx.effect(() => installFileLinkInterceptor(), "dsh-markdown-editor-typora: document links");
+      /* 面板入口短路：宿主的 sidebar.panellist 点击会 layout.selectPanel(id)，
+         把 main slot 的 key 换成我们的面板页 —— 会话列因此整棵卸载再重建。
+         长聊天重挂正是"点 Markdown 就卡一下"的来源，而本插件的编辑面本来画在
+         shell.overlay 上、主区域右侧仍留着对话（见 EditorOverlayStage 注释）。
+         所以在捕获阶段吃掉这次点击：直接开/关工作台，不切换 main slot。
+         只拦我们自己的入口按钮；其它面板入口原样交给宿主。 */
+      ctx.effect(() => installPanelEntryShortcut(), "dsh-markdown-editor-typora: panel entry");
 
       // Rightbar preferences apply only to the editor-owned grid.
 

@@ -478,68 +478,23 @@ const ACTIONS = {
 };
 
 /** 折叠态：持久化 ＋ 一键收起/展开。折叠后是**小圆岛**（外壳动画在 main.js 的 .mp-toolbar 规则里，
- *  只动 width/height/padding/圆角，由点击触发，不在键入路径上）。 */
+ *  只动 width/height/padding/圆角，由点击触发，不在键入路径上）。
+ *
+ *  【折叠位·2026-11-15】折叠态由 CSS 贴**编辑区右上角**（left:auto; right:12px，与展开态同一内边距），
+ *  不再用 JS 写 translateX 去"追"滚动条。旧做法要在每次 resize 时标定位移比例 k：
+ *  临时把 --mp-fold-shift 写成 0px、100px 各读一次 rect 再还原 —— 拖动分隔条时它每帧都跑，
+ *  实测采样帧里能读到 transform 停在 100px、圆岛右缘与滚动条右缘的间距在 15~226px 之间跳，
+ *  折叠柄的 x 在一次单向拖动里反向 160 次（用户看到的就是"按钮反复左右刷新闪动"）。
+ *  CSS 锚定后：位置只由编辑区右界决定 ⇒ 拖动过程中平滑跟随，且没有中间写入。 */
 const FOLD_KEY = "mp-toolbar-folded";
 const isFolded = () => { try { return localStorage.getItem(FOLD_KEY) === "1"; } catch { return false; } };
-/* 折叠态：贴右上"上边缘"（top 不动），右向只保留"不压滚动条"所需的必要内缩。
-   为什么不再用算术：clientWidth/2 - (12 + f/2) 把 12px 当"右边留缝"，而滚动条自身占 10px
-   ⇒ 净余量只有 2px（实测 1.5px）—— 任何 DPI/字号/取整差异都会压上去，用户"有时压有时不压"即此。
-   为什么必须实测标定：位移写在 --mp-fold-shift 上、由 transform: translateX(...) 消费，而 .mp-toolbar
-   上还有 zoom: var(--mp-island-scale)，两者的换算关系不该靠猜 —— 这里给一个**已知位移 P**，量它在屏幕上
-   实际走了多远，得到比例 k，再按 k 反算需要的位移。（标定期间临时关掉 transition，否则读到的是
-   0.18s 动画的中间值。） */
-let lastFoldShift = 0;                  /* 上一次算出的位移：标定退化时沿用它，别硬算 */
-const foldShift = (bar, folded) => {
-  if (!bar || folded === false) return 0;
-  if (!(bar.offsetWidth > 0)) return lastFoldShift;     /* 无盒子（display:none 等）：沿用上次，不测量 */
-  const GAP = 8;                        /* 圆岛右缘与滚动条之间的净间距 */
-  let targetRight = null;
-  try {
-    const sc = document.querySelector(".cm-scroller");
-    if (sc) {
-      const sr = sc.getBoundingClientRect();
-      const sbW = sc.offsetWidth - sc.clientWidth;    /* 滚动条槽宽：scrollbar-gutter:stable ⇒ 恒为 10 */
-      /* 【无条件减槽宽·2026-10-09】改前按"此刻是否真的显示滚动条"分支：无滚动条时右缘会伸进
-         恒定保留的 gutter 里 2.5px，之后再输入到出现滚动条时位移又不重算 ⇒ 交集 2.5×35 ≈ 87.5px²
-         （对抗复核实测）。统一减 sbW 后，位置与"滚动条此刻在不在"解耦。 */
-      targetRight = sr.right - sbW - GAP;
-    }
-  } catch { }
-  if (targetRight == null) {
-    /* 量不到编辑面（异常情形）：沿用旧算术，保持与历史一致，不引入新行为 */
-    let f = 35;
-    try {
-      const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mp-toolbar-fold'));
-      if (Number.isFinite(v) && v > 0) f = v;
-    } catch { }
-    return Math.max(0, Math.round(document.documentElement.clientWidth / 2 - (12 + f / 2)));
-  }
-  const wasFolded = bar.classList.contains("is-folded");
-  const prevShift = bar.style.getPropertyValue("--mp-fold-shift");
-  const prevTr = bar.style.transition;
-  bar.style.transition = "none";        /* 标定期间不许动画 */
-  if (!wasFolded) bar.classList.add("is-folded");
-  bar.style.setProperty("--mp-fold-shift", "0px");
-  const baseRight = bar.getBoundingClientRect().right;
-  const P = 100;                        /* 参考位移：由它量出"每 1px 位移 = 多少屏幕像素" */
-  bar.style.setProperty("--mp-fold-shift", P + "px");
-  const probeRight = bar.getBoundingClientRect().right;
-  bar.style.setProperty("--mp-fold-shift", prevShift);
-  bar.style.transition = prevTr;
-  if (!wasFolded) bar.classList.remove("is-folded");
-  const k = (probeRight - baseRight) / P;
-  /* 【标定退化】量不出位移（rect 全 0 等）⇒ 沿用上次位移；不要拿 k=1 硬算
-     （实测那样会写出 1148px 这种离谱值，要等下一次 ResizeObserver 才自愈）。 */
-  if (!(Math.abs(k) > 1e-3)) return lastFoldShift;
-  const v = Math.max(0, Math.round((targetRight - baseRight) / k));
-  lastFoldShift = v;
-  return v;
-};
 function setFolded(bar, v) {
   bar.classList.toggle("is-folded", v);
-  bar.style.setProperty("--mp-fold-shift", foldShift(bar, v) + "px");
   const btn = bar.querySelector(".mp-tb-fold");
-  if (btn) btn.title = v ? "展开工具栏" : "收起工具栏";
+  if (btn) {
+    btn.title = v ? "展开工具栏" : "收起工具栏";
+    btn.setAttribute("aria-label", btn.title);
+  }
   try { localStorage.setItem(FOLD_KEY, v ? "1" : "0"); } catch { }
 }
 
@@ -664,22 +619,59 @@ export function installToolbar(view) {
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-mode", "data-editor-theme"] });
   } catch { /* 没有 MutationObserver：至少初次正确 */ }
   setThemeIcon(themeBtn);
+  /* ── 展开态"能不能单行"：按真实宽度分档，带迟滞 ──────────────────────────────
+   * 岛是 fit-content + 居中：宽度每跨一次换行阈值，整行按钮就会横向重排（居中的行
+   * 变宽/变窄都会让按钮左右跳）。拖动分隔条时宽度连续变化，临界点附近
+   * "折一行 ↔ 不折"会来回切 —— 用户看到的就是按钮反复左右闪。
+   * 这里把"单行 / 多行"变成显式状态 data-mp-fit：
+   *   needed ≤ available           → row  （单行，CSS 钉 flex-wrap:nowrap）
+   *   needed >  available          → stack（多行；CSS 把岛宽钉满，行宽不再随换行次数变）
+   * 迟滞 12px：从 stack 回到 row 需要"确实富余"，单次单向拖动只切一次。
+   * 不隐藏任何按钮、不延迟拖动、不改松手后的定位；只让换行决策稳定。 */
+  const FIT_JOIN_SLACK = 12;
+  const fitNeeded = () => {
+    // 逐项量（屏幕 px，含 zoom），gap/padding 同坐标系 ⇒ 与可用宽可直接比较。
+    const cs = getComputedStyle(bar);
+    const gap = parseFloat(cs.columnGap) || 0;
+    const padL = parseFloat(cs.paddingLeft) || 0;
+    const padR = parseFloat(cs.paddingRight) || 0;
+    let total = padL + padR;
+    let n = 0;
+    for (const kid of bar.children) {
+      const r = kid.getBoundingClientRect();
+      if (!(r.width > 0)) continue;
+      const kcs = getComputedStyle(kid);
+      total += r.width + (parseFloat(kcs.marginLeft) || 0) + (parseFloat(kcs.marginRight) || 0);
+      n += 1;
+    }
+    return total + Math.max(0, n - 1) * gap;
+  };
+  const syncFit = () => {
+    if (bar.classList.contains("is-folded")) return;
+    const available = document.documentElement.clientWidth - 24;   // 与 left/right:12px 同一内边距
+    if (!(available > 0)) return;
+    const needed = fitNeeded();
+    const prev = bar.getAttribute("data-mp-fit") || "";
+    let next;
+    if (prev === "stack") next = needed <= available - FIT_JOIN_SLACK ? "row" : "stack";
+    else next = needed <= available ? "row" : "stack";
+    // 只有真的量到盒子才写：折叠动画中间态/display:none 时 needed 不可信。
+    if (!(needed > 0)) return;
+    if (next !== prev) bar.setAttribute("data-mp-fit", next);
+  };
   // 高度联动：换行后条会变高，正文 padding-top 必须跟着走（否则正文被压住）
   const sync = () => {
     const h = Math.ceil(bar.getBoundingClientRect().height) || 32;
     document.documentElement.style.setProperty("--mp-toolbar-h", h + "px");
-    // 视口宽度变了 ⇒ 折叠态的位移量要重算（否则小圆会偏离右边缝）
-    if (bar.classList.contains("is-folded")) bar.style.setProperty("--mp-fold-shift", foldShift(bar, true) + "px");
+    syncFit();
   };
   sync();
   let ro = null;
   try { ro = new ResizeObserver(sync); ro.observe(bar); } catch { }
   /* 【窗口级兜底·2026-10-09】折叠态的 bar 盒子被 .is-folded 钉成 --mp-toolbar-fold(35px) ⇒ 它**不随窗口变**
-     ⇒ 只 observe(bar) 的 ResizeObserver 在"折叠 + 拖动窗口"时**根本不响**。实测：窗口 1200→900（变了 500px）
-     位移恒 548px，宽 886 时圆岛右缘 1008.5 已在视口外、右余量 −132.5；而**展开态**（bar 会随窗口变宽）
-     RO 会响（--mp-toolbar-h 32→57）⇒ 这条缺口是**折叠态特有**的，所以窗口监听必须**无条件**挂上，
-     不能只放在 ResizeObserver 构造失败的 catch 分支里。
-     rAF 去抖：resize 事件密集，而 sync() 内含强制布局读取（foldShift 标定要连读两次 rect）。 */
+     ⇒ 只 observe(bar) 的 ResizeObserver 在"折叠 + 拖动窗口"时**根本不响**；而展开态的盒子随窗口变，
+     RO 会响。两种态都要在窗口 resize 时重算（折叠态位置现由 CSS 锚定，无需 JS 位移）。
+     rAF 去抖：resize 事件密集，sync() 内含布局读取。 */
   let rafSync = 0;
   const onWinResize = () => {
     if (rafSync) return;

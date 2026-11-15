@@ -6836,13 +6836,22 @@ table.mp-row tr.mp-src-sel > th, table.mp-row tr.mp-src-sel > td { background: c
      不在键入路径上 ⇒ 不违反"无新增每键 O(整篇)"。interpolate-size 让 fit-content/auto ↔ 44px 也能插值
      （Chromium 129+，本机 Electron 33＝Chromium 130）；不支持的宿主退化为瞬跳，功能不受影响。 */
   interpolate-size: allow-keywords;
-  /* 折叠时整体飞向**右边**（用户要求：小圆别摆中间挡正文）。这里不改布局锚点（left/right/auto 外边距
-     全程保持居中），只叠一段 transform —— 好处是"包裹宽度"与"横向位移"两条都是可插值属性，
-     收起/展开两头都不会跳位。位移量由 JS 按 clientWidth 精确算（不含滚动条），见 toolbar.js setFolded。 */
-  transform: translateX(var(--mp-fold-shift, 0px));
+  /* 【折叠位·2026-11-15】折叠态由 CSS 锚到编辑区右上（见 .mp-toolbar.is-folded），这里不再叠
+     transform。旧做法在每次 resize 时用 JS 标定 --mp-fold-shift（临时写 0px/100px 各读一次 rect），
+     拖动分隔条时每帧都跑 ⇒ 采样帧里能读到 transform 停在 100px、折叠柄 x 单向拖动反向 160 次。
+     transform 留在 transition 里没有意义了（没有消费方），一并删掉，免得将来又有人往这写位移。 */
+  /* 展开态换行档（toolbar.js syncFit 写）：row＝能单行（钉住不折），stack＝多行（岛宽钉满，
+     行宽不再随换行次数变化 ⇒ 按钮不会左右跳）。迟滞见 FIT_JOIN_SLACK。 */
   transition: width .22s cubic-bezier(.22,.61,.36,1), height .22s cubic-bezier(.22,.61,.36,1),
-              padding .22s cubic-bezier(.22,.61,.36,1), border-radius .22s cubic-bezier(.22,.61,.36,1),
-              transform .22s cubic-bezier(.22,.61,.36,1); }
+              padding .22s cubic-bezier(.22,.61,.36,1), border-radius .22s cubic-bezier(.22,.61,.36,1); }
+.mp-toolbar[data-mp-fit="row"] { flex-wrap: nowrap; }
+.mp-toolbar[data-mp-fit="stack"] { width: 100%; max-width: calc(100% - 24px); }
+/* 折叠柄：**不参与换行流**，钉在岛的右上角（内边距与岛自身一致：3px），
+   于是多行岛上它不会跟着最后一行左移右移；折叠态里回到静态居中。 */
+.mp-toolbar { padding-right: 33px; }
+.mp-tb-item.mp-tb-fold { position: absolute; top: 3px; right: 3px; }
+.mp-toolbar.is-folded { padding-right: 0; }
+.mp-toolbar.is-folded .mp-tb-item.mp-tb-fold { position: static; }
 /* 滚动条（前沿编辑器口径：细、圆角、低对比、悬停提亮、无轨道底色、稳定槽位不跳版）
    为什么不是一条补丁：滚动条是**表面系统**的一部分——所有可滚面板（正文、弹层、大纲、对话框）
    共用同一套 token 化外观；色相由 --mp-fg 派生（不写死颜色），因此任何主题都自动跟随。
@@ -6918,8 +6927,12 @@ table.mp-row tr.mp-src-sel > th, table.mp-row tr.mp-src-sel > td { background: c
   background: color-mix(in srgb, var(--mp-fg) 44%, transparent); background-clip: padding-box; }
 .cm-scroller::-webkit-scrollbar-corner, .mp-pop::-webkit-scrollbar-corner, .mp-outline::-webkit-scrollbar-corner, .mp-outline-dock::-webkit-scrollbar-corner, .mp-dlg::-webkit-scrollbar-corner { background: transparent; }
 /* 折叠态＝**小圆岛**（直径 --mp-toolbar-fold），只留折叠按钮本身；其余项直接不参与布局，
-   外壳宽度由 width/max-width 驱动 ⇒ 宽度动画平滑（子项消失不会让宽度瞬跳）。 */
-.mp-toolbar.is-folded { width: var(--mp-toolbar-fold); max-width: var(--mp-toolbar-fold); height: var(--mp-toolbar-fold);
+   外壳宽度由 width/max-width 驱动 ⇒ 宽度动画平滑（子项消失不会让宽度瞬跳）。
+   【右上锚定·2026-11-15】折叠柄贴编辑区右上角，内边距与展开态一致（top 6 / right 12），
+   位置只由编辑区右界决定：拖动分隔条时随右界平滑跟随，不再有 JS 位移与中间写入。
+   left:auto 必须显式写 —— 展开态的 left:12 仍在，不覆盖的话圆岛会被拉成通栏。 */
+.mp-toolbar.is-folded { left: auto; right: 12px; margin-inline: 0;
+  width: var(--mp-toolbar-fold); max-width: var(--mp-toolbar-fold); height: var(--mp-toolbar-fold);
   padding: 0; flex-wrap: nowrap; justify-content: center; align-items: center; }
 .mp-toolbar.is-folded .mp-tb-item:not(.mp-tb-fold) { display: none; }
 .mp-toolbar.is-folded .mp-tb-sep { display: none; }
