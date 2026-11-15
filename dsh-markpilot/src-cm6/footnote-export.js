@@ -12,12 +12,17 @@
  */
 'use strict';
 
-import { scanFenceLines } from './markdown-context.js';
+import { analyzePublic } from './public-markdown.js';
 import { inlineCodeSpans, inlineMathSpans, inlineLinkSpans } from './inline-format.js';
 import { inlineImageAtoms } from './resource-images.js';
+import { markdownLanguage } from '@codemirror/lang-markdown';
 import * as footnoteApi from './footnotes.cjs';
 
 const FOOTNOTE_ID = /^[A-Za-z][A-Za-z0-9:_.-]{0,80}$/;
+/* 与编辑端同一个已配置 parser（@codemirror/lang-markdown 的 markdownLanguage，
+   GFM + Subscript/Superscript/Emoji）；只把 parser 本体交给 footnotes.cjs 取
+   InlineCode / CodeBlock 区间，绝不在这里另建第二份 Markdown 解析器。 */
+const FOOTNOTE_CODE_PARSER = markdownLanguage.parser;
 const attrEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
   .replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -32,8 +37,24 @@ export function footnoteExportPlan(md) {
   const collect = footnoteApi && (footnoteApi.collectFootnotes
     || (footnoteApi.default && footnoteApi.default.collectFootnotes));
   if (typeof collect !== 'function') return null;
+  // 外层先看有没有脚注语法：没有 "[^" 就不构建语法树（collectFootnotes 内部也会早退）。
+  if (md.indexOf('[^') === -1) return null;
+
+  /* 共享 opaque 真源：围栏只信 Lezer `FencedCode`（容器隐式闭合 / 反缩进 / CRLF 都对；
+     scanFenceLines 不认注释、CRLF 下 0 block，不能再当第二真源）。有真 HTML 注释时
+     同时传 analyzePublic 的 comments/code，注释与代码都由同一趟解析给出。 */
+  let input = { parser: FOOTNOTE_CODE_PARSER, authoritative: true };
+  if (md.indexOf('<!--') !== -1) {
+    try {
+      const analysis = analyzePublic(md);
+      const comments = [...(analysis.comments || [])].map(c => ({
+        from: c.from, to: c.to, block: !!c.block, closed: c.closed !== false,
+      }));
+      input = { code: [...(analysis.code || [])], comments, authoritative: true };
+    } catch { /* 注释分析失败：退回 parser 的 FencedCode/CommentBlock，不信任空 comments */ }
+  }
   let raw;
-  try { raw = collect(md); } catch { return null; }
+  try { raw = collect(md, input); } catch { return null; }
   if (!raw || !Array.isArray(raw.refs) || !Array.isArray(raw.notes)) return null;
 
   const starts = [0];
@@ -48,13 +69,6 @@ export function footnoteExportPlan(md) {
   };
   const lineText = (index) => md.slice(starts[index],
     index + 1 < starts.length ? starts[index + 1] - 1 : md.length);
-
-  const fenced = new Set();
-  try {
-    for (const block of scanFenceLines(md.split('\n'))) {
-      for (let line = block.startLine - 1; line < block.endLine; line++) fenced.add(line);
-    }
-  } catch { /* 围栏扫描失败时只靠共享解析器的隔离结果 */ }
 
   const notes = [], noteById = new Map();
   for (const note of raw.notes) {
@@ -76,7 +90,7 @@ export function footnoteExportPlan(md) {
     if (typeof ref.noteId !== 'string' || !noteById.has(ref.noteId)) continue;   // 未解析引用保持原文
     if (notes.some((note) => ref.from < note.to && ref.to > note.from)) continue;
     const line = lineAt(ref.from);
-    if (line < 0 || line >= starts.length || lineAt(ref.to - 1) !== line || fenced.has(line)) continue;
+    if (line < 0 || line >= starts.length || lineAt(ref.to - 1) !== line) continue;
     const text = lineText(line), base = starts[line], from = ref.from - base, to = ref.to - base;
     if (inlineCodeSpans(text).some((span) => from >= span.from && to <= span.to)) continue;
     if (inlineMathSpans(text).some((span) => from >= span.from && to <= span.to)) continue;

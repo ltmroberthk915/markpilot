@@ -12,7 +12,7 @@ import { createAsyncMarkdown } from './async-markdown.js';
 import { EditorState, EditorSelection, StateField, StateEffect, Transaction, Annotation, Prec, Compartment, Text } from "@codemirror/state";
 import { EditorView, ViewPlugin, Decoration, WidgetType, keymap, runScopeHandlers } from "@codemirror/view";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 import { basicSetup } from "codemirror";
 import { undo, redo, isolateHistory, undoDepth, invertedEffects, redoDepth } from "@codemirror/commands";
@@ -43,6 +43,7 @@ import { containerContext, createContainerContextReader, bindContainer } from '.
 import { createRenderLifecycle } from './render-lifecycle.js';
 import {compositionPointerSelection} from './composition-pointer.js';
 import { createViewportIntent, scrollViewportBounds } from './viewport-intent.js';
+import { createReadingPositionController } from './reading-position.js';
 import { beforeImageReveal, imageReadingPoint } from './image-layout.js';
 import { createLiveDocument, liveRemoteAccepted } from './live-document.js';
 import { createCommandContext } from './command-context.js';
@@ -52,6 +53,10 @@ import { installToolbar, wrap as wrapInline, TOOLBAR_ACTIONS } from "./toolbar.j
 import { installExtras } from "./extras.js";
 import { createFootnotesExtension, footnoteGoTo, footnoteIndex, footnoteInsert, footnoteJumpAt, footnoteMove, footnoteNav, footnoteStats } from './footnotes-view.js';
 import { inlineCodeSpans, renderInline, inlineLinkSpans, inlineEmphasisSpans, inlineMathSpans, hasUnescapedDollar, singleLineDisplayTex } from './inline-format.js';
+/* 【3.6.21 渲染修复·sem】公开文法区间（与导出端同一份）：真注释只来自完整 parser 的一次全文分析。
+ * 依赖 sem 作者交付的 ./public-markdown.js；签名以 analyzePublic(source, opts).comments 为准
+ * （[{from,to,block,closed}]，UTF-16、end-exclusive；供编辑态与公开态共用）。 */
+import { analyzePublic } from './public-markdown.js';
 import { fileUrlOfPath, resolveImageSource, hasImageCandidate } from './image-path.js';
 import { beginNativeImageTransfer, sourceImageTicket } from './image-transfer.js';
 import { imageInsertions, cancelImageInsertions } from './image-insertion.js';
@@ -2340,7 +2345,7 @@ function reusableTableRowParts(dom, inputView, next, previous, owner) {
   const sameGeometry = (a, b) => a.geometry.key === b.geometry.key &&
     a.cells.length === b.cells.length && a.cells.every((cell, k) => cell === b.cells[k]) &&
     a.alignKey === b.alignKey && a.qDepth === b.qDepth && a.qLead === b.qLead && a.selKey === b.selKey &&
-    a.ranges.length === b.ranges.length && a.widths.length === b.widths.length;
+    a.ranges.length === b.ranges.length && a.widths.length === b.widths.length && !!a.srcSel === !!b.srcSel;
   if (!sameGeometry(owner, previous) || !sameGeometry(previous, next) ||
       !sameGeometry(owner, next)) return null;
   const rowSelected = w => w.selKind === "row" && w.rowFrom === w.selRow;
@@ -2363,6 +2368,7 @@ function reusableTableRowParts(dom, inputView, next, previous, owner) {
       colgroup.children.length !== next.widths.length ||
       [...colgroup.children].some(col => col.tagName !== "COL") ||
       tr.classList.contains("mp-sel-row") !== rowSelected(previous) ||
+      tr.classList.contains("mp-src-sel") !== !!previous.srcSel ||
       dom.classList.contains("mp-sel-table") !== (previous.selKind === "table")) return null;
   for (let k = 0; k < next.widths.length; k++) {
     const cell = tr.cells[k], range = previous.ranges[k], hasSrc = !!range;
@@ -2379,7 +2385,7 @@ function reusableTableRowParts(dom, inputView, next, previous, owner) {
   return { wrap: dom, table, colgroup, tr };
 }
 class TableRowWidget extends WidgetType {
-  constructor(cells, widths, isHeader, ranges, rowFrom, activeCol, qDepth = 0, qLead = 0, weights = null, selKey = "", aligns = null, region = null, geometry = null) {
+  constructor(cells, widths, isHeader, ranges, rowFrom, activeCol, qDepth = 0, qLead = 0, weights = null, selKey = "", aligns = null, region = null, geometry = null, srcSel = false) {
     super(); this.cells = cells; this.widths = widths; this.isHeader = isHeader;
     this.ranges = ranges; this.rowFrom = rowFrom; this.activeCol = activeCol ?? -1;
     /* 【β1 选择层级】把 "kind:rowFrom:col" 解成三个字段：行/列/整表的高亮由它决定。
@@ -2396,7 +2402,7 @@ class TableRowWidget extends WidgetType {
        widget 是**整行块级替换**，`.mp-quote` 行类对它不生效 ⇒ 引用竖条与缩进必须在 widget 内部画，
        否则表一渲染，引用块就在这几行上"断了"。 */
     this.qDepth = qDepth || 0; this.qLead = qLead || 0;
-    this.region = region; this.geometry = geometry;
+    this.region = region; this.geometry = geometry; this.srcSel = !!srcSel;
     /* 【列宽下限·2026-10-08】weights＝各列的**显示宽度**权重（scanTables 算好）。
        `toDOM` 里按表格真实可用宽度现算一次"每列至少 minPercent"，防止窄窗口/窄版心下
        中文列被压成一字一行（用户 3.0.5 装机截图）。 */
@@ -2420,7 +2426,8 @@ class TableRowWidget extends WidgetType {
     if (other.rowFrom !== this.rowFrom || other.isHeader !== this.isHeader || other.widths.join(",") !== this.widths.join(",")
       || other.ranges.length !== this.ranges.length || other.activeCol !== this.activeCol
       || other.qDepth !== this.qDepth || other.qLead !== this.qLead) return false;
-    if ((other.selKey || "") !== (this.selKey || "")) return false;   // 【β1】选择状态变了必须重建（否则高亮陈旧）
+    if ((other.selKey || "") !== (this.selKey || "")) return false;
+    if (!!other.srcSel !== !!this.srcSel) return false;   // 【β1】选择状态变了必须重建（否则高亮陈旧）
     if ((other.alignKey || "") !== (this.alignKey || "")) return false; // 【β2】列对齐变了必须重建（活动行分支同样适用）
     /* weights 参与 eq：列宽下限是按 weights 现算的，权重变了必须重建（否则改一格文字后列宽不跟着走）。 */
     if ((other.weights ? other.weights.join(",") : "") !== (this.weights ? this.weights.join(",") : "")) return false;
@@ -2535,6 +2542,7 @@ class TableRowWidget extends WidgetType {
     /* 【β1 选择层级】整表 ⇒ wrap 描边；行 ⇒ 本行 <tr>；列 ⇒ **每一行**的第 col 格（缺格的行不画）。 */
     if (!reusableWrap && this.selKind === "table") wrap.classList.add("mp-sel-table");
     if (!reusableWrap && this.selKind === "row" && this.rowFrom === this.selRow) tr.className = "mp-sel-row";
+    tr.classList.toggle("mp-src-sel", !!this.srcSel);
     for (let k = 0; k < this.widths.length; k++) {
       const cell = reusableWrap ? tr.cells[k] : this.isHeader ? document.createElement("th") : document.createElement("td");
       const hasSrc = !!this.ranges[k];
@@ -3503,6 +3511,8 @@ function isFullTableRowSelection(st) {
 
 function tableRowWidgetFor(state,tb,block,isHeader,region) {
   const active = state.field(activeCellField);
+  const freeze = state.field(tablePointerFreezeField, false);
+  const srcSel = !!freeze && blockHasSelectedText(state, block);
   const sel = state.field(tableSelectionField, false);
   /* 【β1】行/列/整表的高亮只能靠 widget DOM 的 class（源码行被 block widget 整行替换，
      原生选区在屏幕上不可见）⇒ 把选择状态编成一个短 key 传给 widget，由它在 toDOM 里落 class。 */
@@ -3513,7 +3523,7 @@ function tableRowWidgetFor(state,tb,block,isHeader,region) {
   if (!ranges.length) return null;
   const activeCol = active && active.rowFrom === block.from ? active.col : -1;
   return new TableRowWidget(isHeader ? tb.headerBlock.cells : block.cells, tb.widths, isHeader, ranges, block.from, activeCol,
-    tb.headerBlock.qDepth || 0, block.lead || 0, tb.weights || null, selKey, tb.aligns || null, region, tableRowGeometry(state,tb,block,isHeader,region));
+    tb.headerBlock.qDepth || 0, block.lead || 0, tb.weights || null, selKey, tb.aligns || null, region, tableRowGeometry(state,tb,block,isHeader,region), srcSel);
 }
 // Native source ranges need real DOM text at every table-block endpoint without a cell/table owner.
 function sourceTableBlockRange(state, previous = null) {
@@ -3579,9 +3589,95 @@ const tableSourceRangeField = StateField.define({
     return sourceTableBlockRange(tr.state, value);
   },
 });
-const tableDecorations = EditorView.decorations.compute([tableDataField, activeCellField, tableSelectionField, tableSourceRangeField, tableImeTailField], (state) => {
+/* ── 指针手势期冻结表格投影（A′）──
+ * 拖动时行 widget 与源码行互换会改块高；块高一变，同一屏幕点的 hit-test 就跨到相邻
+ * 块边界（CM6 对 block widget 只返回 from/to）⇒ range 收缩/展开闭环 = 高频抖动。
+ * 公式族已用 region-session 的 display 边界滞回收口；表格的源码显形本身是“选区端点
+ * 要真文本”的既有契约，不能一刀切保持渲染 ⇒ 手势期冻结**有效投影**、用选中色覆盖
+ * 真实选区（不改变任何几何），抬手后解冻；desired（tableSourceRangeField）仍是今天
+ * 那条精确规则。只改显示：不动 selection / 文档 / 历史。
+ * 冻结入口是 mouseSelectionStyle facet：排在 floatingSelectionStyle 之前，保证在 CM6
+ * 首笔选区 dispatch 之前完成；点格由 tableCellClick 先返回 true，不会走到这里。 */
+const setTablePointerFreeze = StateEffect.define();
+let tableFreezeToken = 0;
+const tablePointerFreezeField = StateField.define({
+  create: () => null,
+  update(value, tr) {
+    let frozen = value;
+    for (const effect of tr.effects) if (effect.is(setTablePointerFreeze)) frozen = effect.value;
+    if (!frozen) return null;
+    /* 守卫一旦成立（外部编辑/只读/活动格/表级选择/IME tail/多选区），冻结立即失效；
+       desired 自己的 null 守卫一行不动。 */
+    if (tr.docChanged || tr.state.readOnly || tr.state.field(activeCellField, false) ||
+        tr.state.field(tableSelectionField, false) || tr.state.field(tableImeTailField, false) ||
+        tr.state.selection.ranges.length !== 1) return null;
+    return frozen;
+  },
+});
+/** 冻结期的有效源码范围：冻结值优先，否则读今天的 desired。所有可见消费者读它。 */
+function tableEffectiveSource(state) {
+  const frozen = state.field(tablePointerFreezeField, false);
+  return frozen ? frozen.range : state.field(tableSourceRangeField, false);
+}
+/** 闭合端点不参与着色：块里至少要有 1 个被选中的字符（与选区命中口径一致）。 */
+function blockHasSelectedText(state, block) {
+  const sel = state.selection.main;
+  return !sel.empty && sel.from < block.to && sel.to > block.from;
+}
+const tablePointerFreezeStyle = EditorView.mouseSelectionStyle.of((owner, down) => {
+  if (!down || down.button !== 0 || owner.state.readOnly) return null;
+  const state = owner.state;
+  if (state.field(activeCellField, false) || state.field(tableSelectionField, false) ||
+      state.field(tableImeTailField, false) || state.selection.ranges.length !== 1) return null;
+  const token = ++tableFreezeToken;
+  const range = state.field(tableSourceRangeField, false);
+  owner.dispatch({ effects: setTablePointerFreeze.of({ token, range }),
+    annotations: Transaction.addToHistory.of(false) });
+  return null;   // 选区样式交回默认/后续 facet
+});
+/* 解冻：mouseup 的微任务（保证 CM6 MouseSelection.up 的 final select 已派发）。
+ * Escape 不解冻（CM 的拖选不由 Escape 结束）；doc 变化/守卫由 field 自己清。
+ * 文档级监听保证在编辑器外松开也能收场；buttons===0 的 mousemove 兜底漏掉的 mouseup。 */
+const tablePointerFreezeLifecycle = ViewPlugin.fromClass(class {
+  constructor(owner) {
+    this.owner = owner;
+    this.document = owner.dom.ownerDocument;
+    this.release = () => {
+      const frozen = owner.state.field(tablePointerFreezeField, false);
+      if (!frozen) return;
+      const token = frozen.token;
+      queueMicrotask(() => {
+        if (!owner.dom.isConnected) return;
+        const current = owner.state.field(tablePointerFreezeField, false);
+        if (!current || current.token !== token) return;
+        owner.dispatch({ effects: setTablePointerFreeze.of(null), annotations: Transaction.addToHistory.of(false) });
+      });
+    };
+    this.move = event => { if (event.isTrusted && !(event.buttons & 1)) this.release(); };
+    this.visibility = () => { if (this.document.visibilityState === "hidden") this.release(); };
+    const doc = this.document;
+    doc.addEventListener("mouseup", this.release, true);
+    doc.addEventListener("pointercancel", this.release, true);
+    doc.addEventListener("contextmenu", this.release, true);
+    doc.addEventListener("compositionstart", this.release, true);
+    doc.addEventListener("mousemove", this.move, true);
+    doc.addEventListener("visibilitychange", this.visibility, true);
+    window.addEventListener("blur", this.release, true);
+  }
+  destroy() {
+    const doc = this.document;
+    doc.removeEventListener("mouseup", this.release, true);
+    doc.removeEventListener("pointercancel", this.release, true);
+    doc.removeEventListener("contextmenu", this.release, true);
+    doc.removeEventListener("compositionstart", this.release, true);
+    doc.removeEventListener("mousemove", this.move, true);
+    doc.removeEventListener("visibilitychange", this.visibility, true);
+    window.removeEventListener("blur", this.release, true);
+  }
+});
+const tableDecorations = EditorView.decorations.compute([tableDataField, activeCellField, tableSelectionField, tableSourceRangeField, tablePointerFreezeField, tableImeTailField], (state) => {
   const out = [];
-  const source = state.field(tableSourceRangeField);
+  const source = tableEffectiveSource(state);
   const tail = state.field(tableImeTailField);
   for (const tb of tail ? tail.tables : state.field(tableDataField)) {
     const mk = (block, isHeader) => {
@@ -4168,10 +4264,176 @@ function scanImageMarks(line, content, free, take, qoff = 0) {
   }
   return out;
 }
-function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
+/* ── 公开文法注释区间（3.6.21·sem）──────────────────────────────────────────
+ * 真源：analyzePublic(全文) 一次给出 comments/code；不再逐行 indexOf("<!--") +
+ * 单行 inlineCodeSpans 猜。注释在真源里是**一条整 range**（旧实现逐行 push
+ * [cmtFrom,line.to] 形成嵌套 ⇒ 屏幕整篇缺失）。渲染仍按行切 hides，replace 不跨行。
+ * 无 `<!--` 文档零解析（plan §2.1/§2.2 口径）。 */
+const EMPTY_PUBLIC_ANNOTATIONS = Object.freeze({ comments: Object.freeze([]), code: Object.freeze([]), version: 0, opener: false });
+/* public-markdown.js 的 code.kind 取自 lezer 节点名：'InlineCode' | 'FencedCode' | 'CodeBlock'。 */
+const isInlineCodeKind = kind => kind === 'InlineCode';
+const isBlockCodeKind = kind => kind === 'FencedCode' || kind === 'CodeBlock';
+/* 行结构签名：只保留会影响 HTML 注释 / 缩进代码 / 围栏 / HTML block / 列表 / front-matter
+ * 分类的块级前缀。0-3 空格与 0 空格对块起点等价（围栏/HTML block/列表都允许 ≤3），
+ * 所以只区分「<4 列」与「≥4 列」。**不再用"行首前 N 字符"这种位置兜底**——普通行打字
+ * 只要前后签名一致就不重算。 */
+const publicLineShape = text => {
+  let i = 0, quote = 0;
+  for (;;) {
+    const m = /^ {0,3}>[ \t]?/.exec(text.slice(i));
+    if (!m) break;
+    i += m[0].length; quote++;
+  }
+  const rest = text.slice(i);
+  const ws = /^[ \t]*/.exec(rest)[0];
+  let cols = 0;
+  for (let k = 0; k < ws.length; k++) cols = ws[k] === '\t' ? cols + 4 - (cols % 4) : cols + 1;
+  const body = rest.slice(ws.length);
+  return {
+    quote,
+    indented: cols >= 4,
+    blank: body === '',
+    fence: /^(?:```|~~~)/.test(body),
+    html: /^(?:<!--|<\/?[A-Za-z][A-Za-z0-9-]*(?:[ \t>\/]|$)|<[!?])/.test(body),
+    list: /^(?:[-+*]|\d{1,9}[.)])(?:[ \t]+|$)/.test(body),
+    fm: /^---[ \t]*$/.test(body),
+  };
+};
+const publicShapeKey = s => [s.quote, s.indented ? 1 : 0, s.fence ? 1 : 0, s.html ? 1 : 0, s.list ? 1 : 0, s.fm ? 1 : 0].join('');
+const publicShapeRisky = s => s.indented || s.fence || s.html || s.list || s.fm;
+/* 改动缝里是否拼出了完整注释标记；只认与本次改动 ±1 相交的那一处（附近既有的不算）。 */
+const publicDelimiterTouchingChange = (doc, fromB, toB, openerOnly) => {
+  const start = Math.max(0, fromB - 3), end = Math.min(doc.length, toB + 3);
+  const slice = doc.sliceString(start, end);
+  const tokens = openerOnly ? ['<!--'] : ['<!--', '-->'];
+  for (const token of tokens) {
+    let at = slice.indexOf(token);
+    while (at >= 0) {
+      const a = start + at, b = a + token.length;
+      if (a <= toB + 1 && b >= fromB - 1) return true;
+      at = slice.indexOf(token, at + 1);
+    }
+  }
+  return false;
+};
+/* 注释标记/端点附近才算结构变化；注释正文里的普通编辑只映射。 */
+const publicCommentDelimiterTouched = (ranges, fromA, toA) => ranges.some(c =>
+  (fromA < c.from + 4 && toA > c.from) || (fromA < c.to && toA > c.to - 3) ||
+  (fromA <= c.from + 1 && toA >= c.from - 1) || (fromA <= c.to + 1 && toA >= c.to - 1));
+/* 代码区间：普通内容编辑只映射；边界、缩进代码里的换行、围栏内容里的反引号另由结构字符/签名闸门处理。 */
+const publicCodeEditRisky = (ranges, fromA, toA, hasNewline) => {
+  for (const c of ranges) {
+    if (!(fromA - 1 < c.to && toA + 1 > c.from)) continue;
+    if (fromA <= c.from + 1 || toA >= c.to - 1) return true;   // 代码区间边界
+    if (hasNewline && c.kind === 'CodeBlock') return true;      // 缩进代码里换行可能把后半行变成散文
+    return false;
+  }
+  return false;
+};
+/* 回车/多行改动：只有碰到缩进代码、围栏、HTML block、列表、front-matter 或把新行拆成
+ * 这些形态时才重算；普通段落回车只映射。 */
+const publicNewlineRisky = (tr, fromA, fromB, toB) => {
+  const oldDoc = tr.startState.doc, newDoc = tr.state.doc;
+  if (publicShapeRisky(publicLineShape(oldDoc.lineAt(Math.min(fromA, oldDoc.length)).text))) return true;
+  const first = newDoc.lineAt(Math.min(fromB, newDoc.length));
+  if (publicShapeRisky(publicLineShape(first.text))) return true;
+  const last = newDoc.lineAt(Math.min(toB, newDoc.length));
+  if (publicShapeRisky(publicLineShape(last.text))) return true;
+  if (last.number < newDoc.lines && publicShapeRisky(publicLineShape(newDoc.line(last.number + 1).text))) return true;
+  return false;
+};
+/* 围栏内容内部：回车/普通文本编辑不改变围栏边界（边界行由签名/反引号闸门管）。 */
+const publicInsideFence = (ranges, fromA, toA) => ranges.some(c =>
+  c.kind === 'FencedCode' && fromA > c.from && toA < c.to);
+const publicLowerBound = (ranges, pos) => {
+  let lo = 0, hi = ranges.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (ranges[mid].from < pos) lo = mid + 1; else hi = mid; }
+  return lo;
+};
+/* parser 产出的区间互不重叠且有序 ⇒ O(log n)。端点相碰不算相交。 */
+const publicRangeTouching = (ranges, a, b) => {
+  if (!ranges || !ranges.length) return null;
+  const i = publicLowerBound(ranges, b) - 1;
+  return i >= 0 && ranges[i].to > a ? ranges[i] : null;
+};
+const publicCodeBlockAt = (annotations, pos) => {
+  const r = publicRangeTouching((annotations && annotations.code) || [], pos, pos + 1);
+  return r && isBlockCodeKind(r.kind) ? r : null;
+};
+function analyzePublicAnnotations(doc, mathSpans, previous) {
+  const version = ((previous && previous.version) || 0) + 1;
+  const src = doc.toString();                 // 只在闸门命中/首次构建时全文一次
+  const opener = src.indexOf('<!--') >= 0;
+  if (!opener) return EMPTY_PUBLIC_ANNOTATIONS;
+  try {
+    /* 契约：analyzePublic(source, { mathRanges }) -> { comments:[{from,to,block,closed}], code:[{from,to,kind}] }。
+       comments/code 是冻结数组 ⇒ 先复制再排序，不能原地 sort。 */
+    const res = analyzePublic(src, { mathRanges: mathSpans || [] }) || {};
+    const comments = [...(res.comments || [])];
+    const code = [...(res.code || [])];
+    comments.sort((a, b) => a.from - b.from || a.to - b.to);
+    code.sort((a, b) => a.from - b.from || a.to - b.to);
+    return { comments, code, version, opener: true };
+  } catch {
+    /* 解析异常：文档已变，**绝不复用旧坐标**（旧位置会被映射成错的隐藏区）。
+       返回空区间 ⇒ 注释按字面显示（不吞正文），保留 opener 让后续语法改动继续重算。 */
+    return { comments: [], code: [], version, opener: true };
+  }
+}
+const publicAnnotationsField = StateField.define({
+  create(state) { return analyzePublicAnnotations(state.doc, state.field(mathSpansField).spans, null); },
+  update(value, tr) {
+    if (!tr.docChanged) return value;
+    const nextMath = tr.state.field(mathSpansField).spans;
+    let reparse = false;
+    /* 只读局部：删除串/插入串 + 改动缝；普通行打字/回车不重算。不碰整篇 toString。 */
+    tr.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
+      if (reparse) return;
+      const removed = tr.startState.doc.sliceString(fromA, toA), added = inserted.toString();
+      /* 空态进入：只有改动缝真的拼出 `<!--` 才进入解析。 */
+      if (!value.opener) {
+        if (publicDelimiterTouchingChange(tr.state.doc, fromB, toB, true)) reparse = true;
+        return;
+      }
+      const hasNewline = /[\r\n]/.test(removed) || /[\r\n]/.test(added);
+      /* 能改变代码/数学/缩进解析的字符；`< ! > -` 不再一刀切，交给标记缝/端点/行签名判定。 */
+      const structural = /[`~$\t]/.test(removed) || /[`~$\t]/.test(added);
+      const delimiter = publicDelimiterTouchingChange(tr.state.doc, fromB, toB, false) ||
+        publicCommentDelimiterTouched(value.comments, fromA, toA);
+      const insideFence = publicInsideFence(value.code, fromA, toA);
+      const shapeChanged = hasNewline ? (!insideFence && publicNewlineRisky(tr, fromA, fromB, toB)) :
+        publicShapeKey(publicLineShape(tr.startState.doc.lineAt(Math.min(fromA, tr.startState.doc.length)).text)) !==
+        publicShapeKey(publicLineShape(tr.state.doc.lineAt(Math.min(fromB, tr.state.doc.length)).text));
+      if (structural || delimiter || shapeChanged ||
+          publicCodeEditRisky(value.code, fromA, toA, hasNewline)) reparse = true;
+    });
+    if (!value.opener && !reparse) return EMPTY_PUBLIC_ANNOTATIONS;   // 零注释文档：永不解析
+    if (reparse) return analyzePublicAnnotations(tr.state.doc, nextMath, value);
+    /* 普通编辑（无语法变化）：区间随文档映射，版本不变 ⇒ 不触发编辑态全量重扫。 */
+    const mapFrom = p => tr.changes.mapPos(p, 1), mapTo = p => tr.changes.mapPos(p, -1);
+    const remap = c => { const f = mapFrom(c.from); return { ...c, from: f, to: Math.max(f + 1, mapTo(c.to)) }; };
+    return { ...value, comments: value.comments.map(remap), code: value.code.map(remap) };
+  },
+});
+function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc), annotations = EMPTY_PUBLIC_ANNOTATIONS) {
+  const ann = annotations || EMPTY_PUBLIC_ANNOTATIONS;
+  const commentRanges = ann.comments || [], parserCodeRanges = ann.code || [];
   const marks = []; // { from, to, hides: [[a,b],...], bullet? } wrapper 与隐藏件
   const overlapsMath = (a, b) => rangesTouching(mathSpans, a, b).some(s => a < s.to && b > s.from);
-  let cmtFrom = -1;        // 【HTML 注释】未闭合注释的**绝对起点**（-1＝不在注释里）
+  /* 整条注释 mark：一条 range（不再逐行嵌套），hides 按行切开供零宽 replace。 */
+  const commentHides = c => {
+    const hides = [];
+    let line = doc.lineAt(Math.min(c.from, doc.length));
+    for (;;) {
+      const a = Math.max(c.from, line.from), b = Math.min(c.to, line.to);
+      if (b > a) hides.push([a, b]);
+      if (line.to >= c.to || line.number >= doc.lines) break;
+      line = doc.line(line.number + 1);
+    }
+    return hides;
+  };
+  for (const c of commentRanges) marks.push({ from: c.from, to: c.to, comment: true, block: !!c.block, hides: commentHides(c) });
+  let cmtLine = 0;         // 当前行可能相交的注释下标
   let olCtx = null;        // 【有序列表】当前列表的计数上下文 { key, n }（key = 引用前缀+缩进+分隔符）
   let from = 0;
   for (const t of doc.iterLines()) {
@@ -4194,39 +4456,42 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
     if (qoff) {
       marks.push({ from: line.from, to: line.from + qoff, qmark: true, hides: [[line.from, line.from + qoff]] });
     }
-    if (code) { cmtFrom = -1; olCtx = null; continue; }
-    /* 【HTML 注释】`<!-- … -->`：编辑面隐藏，光标进入该行显源码（沿用 F7 规则：含选区的行由派生层放开）。
-     *  跨行：**一条连续区间**从头盖到尾（改前逐行各标一段 `<!--` / `-->`，中间那几行照样露在屏幕上
-     *  —— 用户看到的"注释只在首尾消失、正文还在"就是这个形态）。 */
+    if (code || publicCodeBlockAt(ann, line.from)) { olCtx = null; continue; }
+    /* 【HTML 注释·3.6.21】注释区间来自 analyzePublic 的全文分析（见文件上方 publicAnnotationsField）：
+     *   · 整行被真注释覆盖 ⇒ 直接跳过其它行内扫描（注释 mark 已按整条 range 发过）；
+     *   · 部分覆盖 ⇒ 行内格式/转义/图片一律不得与注释区间相交（free/inComment 守卫）。
+     *   代码（围栏/缩进/跨行行内代码）里的 `<!--` 不再被当注释 ⇒ 不吞正文。 */
+    while (cmtLine < commentRanges.length && commentRanges[cmtLine].to <= line.from) cmtLine++;
+    const wholeLineComment = commentRanges[cmtLine] &&
+      commentRanges[cmtLine].from <= line.from && commentRanges[cmtLine].to >= line.to;
+    if (wholeLineComment) continue;
     const huge = t.length > 20000;
     const codeRecords = huge ? [] : inlineCodeSpans(c);
     const codeSpans = huge ? inlineCodeRanges(c) : codeRecords.map(s => [s.from, s.to]);
-    const inCodeSpan = (a, b) => codeSpans.some(([x, y]) => a < y && b > x);
-    // A tutorial can show the literal opener in code or TeX without starting
-    // an HTML comment that hides the rest of its lesson.
-    let cIdx = c.indexOf("<!--");
-    while (cIdx >= 0 && (inCodeSpan(cIdx, cIdx + 4) || overlapsMath(line.from + qoff + cIdx, line.from + qoff + cIdx + 4))) {
-      cIdx = c.indexOf("<!--", cIdx + 4);
+    const cBase = line.from + qoff, cEndPos = cBase + c.length;
+    /* 跨行行内代码：至多一条区间从本行之前延续进来（parser 区间互不重叠）。 */
+    const parserCode = [];
+    let firstCode = publicLowerBound(parserCodeRanges, cBase);
+    if (firstCode > 0 && parserCodeRanges[firstCode - 1].to > cBase) {
+      firstCode -= 1;
+      const r = parserCodeRanges[firstCode];
+      if (isInlineCodeKind(r.kind))
+        parserCode.push([Math.max(r.from, cBase) - cBase, Math.min(r.to, cEndPos) - cBase]);
+      firstCode += 1;
     }
-    let cEnd = -1, cFromOff = -1, closesMulti = -1;
-    if (cmtFrom >= 0) {                                        // 续上一行的未闭合注释
-      const e = c.indexOf("-->");
-      if (e >= 0) { closesMulti = cmtFrom; cEnd = line.from + qoff + e + 3; cmtFrom = -1; }
-    } else if (cIdx >= 0) {
-      const e = c.indexOf("-->", cIdx + 4);
-      if (e >= 0) { cEnd = line.from + qoff + e + 3; cFromOff = line.from + qoff + cIdx; }
-      else { cmtFrom = line.from + qoff + cIdx; cEnd = line.to; }   // 未闭合 ⇒ 先吃掉本行
+    for (let i = firstCode; i < parserCodeRanges.length; i++) {
+      const r = parserCodeRanges[i];
+      if (r.from >= cEndPos) break;
+      if (!isInlineCodeKind(r.kind) || r.to <= cBase) continue;
+      parserCode.push([Math.max(r.from, cBase) - cBase, Math.min(r.to, cEndPos) - cBase]);
     }
-    if (closesMulti >= 0) {                                    // 跨行注释的收尾行：整段盖到 `-->` 末
-      if (cEnd > closesMulti) marks.push({ from: closesMulti, to: cEnd, comment: true, hides: [[closesMulti, cEnd]] });
-      if (cEnd >= line.from + qoff + c.length) continue;       // 收尾即行尾 ⇒ 本行没别的了
-    } else if (cFromOff >= 0 && cEnd > cFromOff) {             // 单行完整注释
-      marks.push({ from: cFromOff, to: cEnd, comment: true, hides: [[cFromOff, cEnd]] });
-      if (cEnd >= line.from + qoff + c.length) continue;
-    } else if (cmtFrom >= 0) {                                 // 跨行注释：本行从注释起点盖到行尾
-      marks.push({ from: cmtFrom, to: line.to, comment: true, hides: [[cmtFrom, line.to]] });
-      continue;
+    const inCodeSpan = (a, b) => parserCode.some(([x, y]) => a < y && b > x) || codeSpans.some(([x, y]) => a < y && b > x);
+    /* 本行相交的注释：从游标向后走，条数与相交数同阶（不再每行 filter 全部注释）。 */
+    const lineComments = [];
+    for (let i = cmtLine; i < commentRanges.length && commentRanges[i].from < line.to; i++) {
+      if (commentRanges[i].to > line.from) lineComments.push(commentRanges[i]);
     }
+    const inComment = (a, b) => lineComments.some(r => a < r.to && b > r.from);
     // 无序列表标记：- / * / + ＋空格 → 阅读态换 • 圆点（光标入行显源码，同 F7 规则）
     // 【引用区】判据对象换成 `c`（去前缀后的内容），`base` 把索引加回前缀长度。
     const base = line.from + qoff;
@@ -4263,7 +4528,7 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
 
     // 【A2-P0①补全】转义序列的「\」本身阅读态隐藏（vditor 语义：\* 显示为 *）
     for (let k = 1; !huge && k < t.length; k++) {
-      if (t[k - 1] === "\\" && "*~`[]()#_$".includes(t[k]) && !inCodeSpan(k - qoff - 1, k - qoff) && !overlapsMath(line.from + k - 1, line.from + k)) {
+      if (t[k - 1] === "\\" && "*~`[]()#_$".includes(t[k]) && !inCodeSpan(k - qoff - 1, k - qoff) && !inComment(line.from + k - 1, line.from + k) && !overlapsMath(line.from + k - 1, line.from + k)) {
         marks.push({ from: line.from + k - 1, to: line.from + k, hides: [[line.from + k - 1, line.from + k]] });
       }
     }
@@ -4290,7 +4555,7 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
        ⇒ `nest` 由调用点显式声明，默认 false（严格）。 */
     const free = (a, b, nest) =>
       !consumed.some(([x, y, edge = 0]) => a < y && b > x && !(nest && a > x && b < y && a >= x + edge && b <= y - edge))
-      && !overlapsMath(base + a, base + b) && !escapedAt(a, b);
+      && !overlapsMath(base + a, base + b) && !inComment(base + a, base + b) && !escapedAt(a, b);
     const take = (a, b, edge = 0) => { const record = [a, b, edge]; consumed.push(record); return record; };
     /* 【图片】两条写法都替换成真图。**传 `c` 而不是 `line`**：`scanImageMarks` 内部 `base` 已含 `qoff`，
        它自己再拿整行扫就会把前缀算两遍（见该函数注释）——`free`/`take` 也按 `c` 的相对下标工作。 */
@@ -4299,7 +4564,7 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
        否则写在反引号里的 `![x](y)` 会变成真图（清单 1.17 就是这么红的）。
        注意用**独立的 codeSpans**、不调 take()：take 会把它算作已占用，后面真正的行内代码扫描就再也吃不到它了。 */
 
-    for (const mk of scanImageMarks(line, c, (a, b) => !inCodeSpan(a, b) && free(a, b), take, qoff)) marks.push(mk);
+    for (const mk of scanImageMarks(line, c, (a, b) => !inCodeSpan(a, b) && !inComment(base + a, base + b) && free(a, b), take, qoff)) marks.push(mk);
     const push = (a, b, hides) => marks.push({
       from: base + a, to: base + b,
       hides: hides.map(([x, y]) => [base + x, base + y]),
@@ -4363,7 +4628,7 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
     for (const { from: a, to: b, innerFrom, innerTo } of codeRecords) {
       // The parser owns literal escapes inside code; a backslash before its
       // closing fence cannot turn that delimiter into prose.
-      if (consumed.some(([x, y]) => a < y && b > x) || overlapsMath(base + a, base + b)) continue;
+      if (consumed.some(([x, y]) => a < y && b > x) || inComment(base + a, base + b) || overlapsMath(base + a, base + b)) continue;
       push(a, b, [[a, innerFrom], [innerTo, b]]);
       take(a, b);
     }
@@ -4462,33 +4727,45 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc)) {
   return marks;
 }
 const inlineMarksField = StateField.define({
-  create(state) { return scanInlineMarks(state.doc, state.field(mathSpansField).spans, state.field(markdownContext).blocks); },
+  create(state) { return scanInlineMarks(state.doc, state.field(mathSpansField).spans, state.field(markdownContext).blocks, state.field(publicAnnotationsField)); },
   update(value, tr) {
     if (!tr.docChanged) return value;
     const context = tr.state.field(markdownContext);
+    const annotations = tr.state.field(publicAnnotationsField);
+    /* 注释/代码区间重算过（版本变）⇒ 不许走局部路径：局部扫描拿不到全文文法上下文。 */
+    const annotationsFresh = annotations.version !== tr.startState.field(publicAnnotationsField).version;
     const plan = tr.state.field(editPlan), map = p => tr.changes.mapPos(p, 1);
     const mapMark = m => ({ ...m, from: map(m.from), to: map(m.to), hides: m.hides.map(([a,b]) => [map(a),map(b)]),
       ...(m.uInner ? { uInner: m.uInner.map(map) } : {}), ...(m.payload ? { payload: m.payload.map(map), editFrom: map(m.editFrom) } : {}) });
-    if (!context.rebuilt && plan && !blockAt(context.blocks, plan.after.from) &&
+    /* 行首不再有独立闸门：缩进/围栏等结构变化会由 publicAnnotationsField 的签名/标记闸门
+     * 触发重算并抬高 version ⇒ annotationsFresh；普通行首打字照旧走单行局部路径。 */
+    const commentDelim = !!plan && (/<!--|-->/.test(plan.before.text) || /<!--|-->/.test(plan.after.text));
+    if (!context.rebuilt && plan && !annotationsFresh && !commentDelim &&
+        !blockAt(context.blocks, plan.after.from) && !publicCodeBlockAt(annotations, plan.after.from) &&
+        !publicCodeBlockAt(annotations, plan.before.from) &&
         !/<!--|-->|^\s*(?:\d+[.)]|[-+*])\s/.test(plan.before.text.slice(quoteLead(plan.before.text).off)) &&
         !value.some(m => m.comment && m.from <= plan.before.to && m.to >= plan.before.from) &&
         !rangesTouching(value, plan.before.from, plan.before.to).some(m => m.from < plan.before.from || m.to > plan.before.to)) {
       const from = plan.after.from, to = plan.after.to;
       const localMath = rangesTouching(tr.state.field(mathSpansField).spans, from, to).map(s => a1MapSpan(s, p => p-from));
-      const local = scanInlineMarks(Text.of([plan.after.text]), localMath, []);
+      /* 本篇无注释标记、行首未动 ⇒ 该行不可能是真注释/缩进代码边界，空 annotations 安全。 */
+      const local = scanInlineMarks(Text.of([plan.after.text]), localMath, [], EMPTY_PUBLIC_ANNOTATIONS);
       return value.filter(m => m.to < plan.before.from || m.from > plan.before.to).map(mapMark)
         .concat(local.map(m => ({ ...m, from: m.from+from, to: m.to+from, hides: m.hides.map(([a,b])=>[a+from,b+from]),
           ...(m.uInner ? { uInner: m.uInner.map(p=>p+from) } : {}), ...(m.payload ? { payload: m.payload.map(p=>p+from), editFrom: m.editFrom+from } : {}) })))
         .sort((a,b)=>a.from-b.from);
     }
-    let touched = context.rebuilt || !plan;
+    let touched = context.rebuilt || !plan || annotationsFresh;
     tr.changes.iterChanges((fromA, toA, fromB, toB, inserted) => {
       if (touched) return;
-      if (/[`*_~$\\\n\r<>!\[\]()]/.test(tr.startState.doc.sliceString(fromA, toA)) || /[`*_~$\\\n\r<>!\[\]()]/.test(inserted.toString()) ||
+      const removed = tr.startState.doc.sliceString(fromA, toA), added = inserted.toString();
+      if (/[`*_~$\\\n\r<>!\[\]()]/.test(removed) || /[`*_~$\\\n\r<>!\[\]()]/.test(added) ||
+          /<!--|-->/.test(removed) || /<!--|-->/.test(added) ||
           value.some(m => fromA <= m.to && toA >= m.from) ||
+          !!publicRangeTouching(annotations.code, fromA, toA) ||
           hasImageCandidate(tr.startState.doc.lineAt(fromA).text) || hasImageCandidate(tr.state.doc.lineAt(fromB).text)) touched = true;
     });
-    if (touched) return scanInlineMarks(tr.state.doc, tr.state.field(mathSpansField).spans, context.blocks);
+    if (touched) return scanInlineMarks(tr.state.doc, tr.state.field(mathSpansField).spans, context.blocks, annotations);
     return value.map(mapMark);
   },
 });
@@ -4579,7 +4856,7 @@ const imageAtomicRanges = EditorView.atomicRanges.of((view) => {
   const session = view.state.field(regionSessionField), index = view.state.field(regionIndexField);
   for (const m of marks) if (m.image) {
     const r = regionAt(index, m.from, 'image');
-    const protectedImage = isEmbeddedImage(r), tableSource = view.state.field(tableSourceRangeField);
+    const protectedImage = isEmbeddedImage(r), tableSource = tableEffectiveSource(view.state);
     if (!protectedImage && m.image.src.length <= 512) continue;
     if (r?.id === session.imageId || protectedImage && tableSource && r.from >= tableSource.from && r.to <= tableSource.to) {
       if (protectedImage) { rs.push(Decoration.replace({}).range(...r.payload)); continue; }
@@ -4655,7 +4932,7 @@ class QuoteMarkWidget extends WidgetType {
   }
   ignoreEvent() { return true; }
 }
-const inlineMarkDecorations = EditorView.decorations.compute(["selection", inlineMarksField, tableDataField, tableSourceRangeField, imgBaseField, imgPreviewField, regionIndexField, regionSessionField], (state) => {
+const inlineMarkDecorations = EditorView.decorations.compute(["selection", inlineMarksField, tableDataField, tableSourceRangeField, tablePointerFreezeField, imgBaseField, imgPreviewField, regionIndexField, regionSessionField], (state) => {
   const out = [];
   const tables = state.field(tableDataField, false) || [];
   const inTable = (pos) => tables.some((t) => pos >= t.from && pos <= t.to);   // 表格行走块级 widget，行内装饰必须让位
@@ -4665,7 +4942,7 @@ const inlineMarkDecorations = EditorView.decorations.compute(["selection", inlin
        前沿线实测那种行"折行"要 50~78ms/键。所以**长 src 的图永远保持 widget**（要改地址走"编辑源码"）。 */
     if (mark.image) {
       const region = regionAt(state.field(regionIndexField), mark.from, 'image');
-      const tableSource = state.field(tableSourceRangeField);
+      const tableSource = tableEffectiveSource(state);
       if (isEmbeddedImage(region) && tableSource && mark.from >= tableSource.from && mark.to <= tableSource.to) {
         out.push(protectedPayloadDecoration(region));
         continue;
@@ -6363,6 +6640,25 @@ ${editorKaiRuleCss()}
 .mp-cm6-math-live-chip { background: var(--mp-codeBg); border: 1px dashed var(--mp-border); border-radius: 4px; padding: 0 4px; margin-left: 6px; font-size: 0.95em; cursor: text; }
 /* 代码：胶囊（inline，token=codeBg 对齐 vditor 实测）与块底（telari 色板）；引用块底纹＋左缘条 */
 .cm-content code { background: var(--mp-codeBg); border-radius: 3px; padding: .2em .4em; font-size: .9em; font-family: var(--mp-font-mono); }
+/* 【行内代码胶囊·outerDecorations 标记·2026-11-14】胶囊只挂在单一标记上（两个 CodeMark 之间的内容），
+   语法高亮给 token 打的 span 不再带内边距/底色/圆角 ⇒ span 被切成多段时接缝不会叠加内边距。
+   内边距按原胶囊折算：原值 0.15em/0.3em 作用在 0.9em 的 token 上，外层标记继承正文字号 ⇒ 乘 0.9。 */
+.cm-content .mp-inline-code-capsule {
+  background: var(--mp-codeBg); border-radius: 3px;
+  padding: 0.135em 0.27em;
+}
+/* 【胶囊内选区可见·2026-11-14】basicSetup 带入的 drawSelection 用 transparent !important 藏掉
+   .cm-line 内的原生 ::selection（官方 hideNativeSelection，主题类前缀后特异度约 (0,2,1)，
+   压过本仓 .cm-content ::selection 的 (0,1,1)），选区改由 z-index -1 的 .cm-selectionLayer
+   绘制；胶囊底色在内容层，把层内选区矩形盖住 ⇒ 拖选行内代码时看不见高亮（CE-2）。
+   此处以 (0,3,1) 更高特异度在胶囊内恢复原生 ::selection——与官方对层盖不到处的 :focus
+   carve-out 同款手法——色值与选区层同用 --mp-sel，不产生第二种蓝；纯 CSS，零重绘/布局开销。
+   .cm-editor 前缀是必要的：缺它特异度回落到 (0,2,1)，与藏选区规则打平、胜负取决于挂载顺序。
+   主控两端对照实测：修前 alpha 0 → 修后 0.26。 */
+.cm-editor .cm-content .mp-inline-code-capsule::selection,
+.cm-editor .cm-content .mp-inline-code-capsule ::selection {
+  background-color: var(--mp-sel) !important;
+}
 .cm-content .cm-line.mp-code { font-family: var(--mp-font-mono); font-size: .93em; }
 .cm-content .cm-line.mp-quote { background: var(--mp-quoteBg); border-left: 3px solid var(--mp-quoteBar); color: var(--mp-muted); font-size: 90%; padding-left: .8em; }
 .cm-content .cm-line.mp-quote-d2 { padding-left: 1.8em; }
@@ -6389,25 +6685,6 @@ ${editorKaiRuleCss()}
 .cm-content .cm-line.mp-code::after {
   content: ""; position: absolute; inset: 0; z-index: -2;
   background: var(--mp-codeBg); pointer-events: none;
-}
-/* 【围栏代码行里的 span 必须"无胶囊"·2026-10-10 实测缺陷（用户报"第一个字母 a 无空格却远离 sdS"）】
-   语法高亮给代码文本打的 span 与**行内代码**共用同一个高亮类 .ͼx
-   （HighlightStyle 里那条 tag=t.monospace 的规则带 padding: 0.15em 0.3em、代码底色、3px 圆角
-    —— 那一套本意只给"行内代码"的小胶囊用）。
-   后果：一行代码只要被 CM6 切成两个 span（一次多字符插入 / 输入法提交 / 代码行首按 Tab / 重做），
-   两个 span 各自的左右内边距就在**接缝处叠加** ⇒ 凭空多出 6.4px，屏幕上正好"多一个空格"。
-   实测（同一文本 a 空格 sdS，文档里只有 1 个 U+0020）：
-     载入态 1 个 span：a→s = 6.274px，total−Σadvances = −0.02
-     裂成 2 个 span：  a→s = 12.704px，total−Σadvances = +6.400px（= 2×3.213px padding）
-   关连字、换等宽字体都不变 ⇒ 与字体无关，纯粹是内边距叠加；裂开后继续打字/退格/滚动都不自愈。
-   修法：**围栏行内**的 span 归零内边距/底色/圆角（字号字体仍由行类统一给）。
-   正文里的行内代码不受影响：它不在 .mp-code 行内，规则命中不到。
-   ⚠️ 本注释在 CSS 模板字符串体内，**不许出现反引号**（一个反引号就会把模板提前结束）。 */
-.cm-content .cm-line.mp-code span.ͼx {
-  padding: 0 !important; background: transparent !important; border-radius: 0 !important;
-}
-.cm-content .cm-line.mp-code span.ͼx {
-  padding: 0 !important; background: transparent !important; border-radius: 0 !important;
 }
 /* 【引用区代码块·两类共存·2026-10-08】引用区的围栏行/代码行同时带 mp-code 与 mp-quote：
    · 竖条：必须压过 .mp-code[data-mp-n] 那条 **1px 行号分隔线**（同特异度 (0,4,0)、靠后胜）
@@ -6519,6 +6796,7 @@ table.mp-row th { background: var(--mp-capsule); font-weight: 500; }
    色值全部由主题变量派生（--mp-primary），不写死色值。 */
 table.mp-row tr.mp-sel-row > th, table.mp-row tr.mp-sel-row > td { background: color-mix(in srgb, var(--mp-primary) 16%, transparent) !important; }
 table.mp-row td.mp-sel-col, table.mp-row th.mp-sel-col { background: color-mix(in srgb, var(--mp-primary) 13%, transparent) !important; }
+table.mp-row tr.mp-src-sel > th, table.mp-row tr.mp-src-sel > td { background: color-mix(in srgb, var(--mp-sel) 38%, transparent) !important; }
 .mp-table-wrap.mp-sel-table { outline: 2px solid color-mix(in srgb, var(--mp-primary) 55%, transparent); outline-offset: -2px; border-radius: 3px; }
 /* 补全菜单（数学命令 / 块片段）：色值全部由主题变量派生，深浅与用户自带主题自适应 */
 .mp-complete { position: fixed; z-index: 50; min-width: 200px; max-height: 264px; overflow-y: auto;
@@ -6841,7 +7119,7 @@ const mdHighlight = HighlightStyle.define([
   { tag: t.url, color: "var(--mp-muted)", fontSize: "0.92em" },
   { tag: [t.processingInstruction, t.meta], color: "var(--mp-faint)" },
   { tag: t.quote, color: "var(--mp-muted)" },
-  { tag: t.monospace, fontFamily: "var(--mp-type-code, var(--mp-font-mono))", background: "var(--mp-codeBg)", borderRadius: "3px", padding: "0.15em 0.3em", fontSize: "0.9em" },
+  { tag: t.monospace, fontFamily: "var(--mp-type-code, var(--mp-font-mono))", fontSize: "0.9em" },
   /* 代码围栏语法梯子（telari 六级，2.3.3 hljs 对齐） */
   { tag: t.keyword, color: "var(--mp-kw)" },
   { tag: t.string, color: "var(--mp-str)" },
@@ -6862,6 +7140,14 @@ let documentExtensions = null;
 let suppressChange = false;
 let composingDirty = false; // IME 组字期间挂起的脏标（compositionend 一笔补发）
 let sourceRevision = 0;
+/* Reading position: capture/restore only; persistence belongs to the host.
+   The controller is attached once the view exists and is armed by the host
+   after a document was fully applied (never on a blank first frame). */
+const readingPosition = createReadingPositionController({
+  getView: () => view,
+  epochOf: v => v.state.field(regionIndexField, false)?.epoch ?? -1,
+  scrollIntoView: pos => EditorView.scrollIntoView(pos, { y: 'start' }),
+});
 const commands = createCommandContext({
   getView: () => view,
   epochOf: v => v.state.field(regionIndexField).epoch,
@@ -7438,7 +7724,7 @@ function tableBarReadSource(t) {
   if (!t || !view || document.documentElement.dataset.mpReading === "1") return null;
   try {
     if (typeof tableSourceRangeField !== "undefined") {
-      const value = view.state.field(tableSourceRangeField, false);
+      const value = tableEffectiveSource(view.state);
       if (value && Number.isFinite(value.from) && Number.isFinite(value.to) &&
           value.from <= t.table.to && value.to >= t.table.from) return { from: value.from, to: value.to };
     }
@@ -7484,6 +7770,46 @@ function installTableBar(v) {
         cachedRows: owner?.recent.size || 0, epoch: owner?.epoch ?? null };
     } };
 }
+
+/* 【行内代码胶囊·独立 viewport ViewPlugin·2026-11-14】
+   读 syntaxTree 的 InlineCode，取首尾两个 CodeMark 之间的内容，用一条复用的 mark
+   从 outerDecorations 提供（优先级垫底）⇒ 胶囊包住语法高亮的 token span，保持整段，
+   不会在 span 接缝处叠加内边距。只在文档/视口/树变化时重建，纯选区移动不重算；
+   visibleRanges 已排序，用上一个 InlineCode 起点去重，跨可见区间不重复收。 */
+const inlineCodePill = Decoration.mark({ class: "mp-inline-code-capsule" });
+const inlineCodeCapsuleDeco = (view) => {
+  const tree = syntaxTree(view.state);
+  if (!tree) return Decoration.none;
+  const ranges = [];
+  let lastFrom = -1;
+  for (const { from, to } of view.visibleRanges) {
+    tree.iterate({ from, to, enter(node) {
+      if (node.name !== "InlineCode") return;
+      if (node.from <= lastFrom) return false;
+      lastFrom = node.from;
+      const open = node.node.firstChild, close = node.node.lastChild;
+      if (!open || open === close || open.name !== "CodeMark" || close.name !== "CodeMark") return false;
+      if (close.from > open.to) ranges.push(inlineCodePill.range(open.to, close.from));
+      return false;
+    } });
+  }
+  return ranges.length ? Decoration.set(ranges, true) : Decoration.none;
+};
+const inlineCodeCapsule = ViewPlugin.fromClass(class {
+  constructor(view) {
+    this.tree = syntaxTree(view.state);
+    this.decorations = inlineCodeCapsuleDeco(view);
+  }
+  update(update) {
+    const tree = syntaxTree(update.state);
+    if (!update.docChanged && !update.viewportChanged && tree === this.tree) return;
+    this.tree = tree;
+    this.decorations = inlineCodeCapsuleDeco(update.view);
+  }
+}, {
+  provide: plugin => EditorView.outerDecorations.of(view =>
+    view.plugin(plugin)?.decorations || Decoration.none),
+});
 
 function boot(content) {
   if (view) return;
@@ -7565,6 +7891,7 @@ function boot(content) {
         lineClassDecorations, // 行类派生（mp-h1..h6/mp-code/mp-quote → telari 版式）
         mermaidBlocksField, // 【mermaid·2026-10-11】图表块数据层（仅文档变化且含结构字符时重扫）
         mermaidDecorations, // 【mermaid】块级投影：光标入块显源码、离块渲染图表
+        publicAnnotationsField, // 【3.6.21】公开文法注释/代码区间（state field 必须注册；须在 mathSpansField 后）
         inlineMarksField, // 行内标记数据层（**/`/~~/链接，仅文档变化重扫；须在 mathSpansField 后）
         regionIndexField,
         regionSessionField,
@@ -7599,6 +7926,7 @@ function boot(content) {
         ])),
         imageInsertions,
         inlineMarkDecorations, // 行内标记投影：光标入段显源码、离段隐藏
+        inlineCodeCapsule, // 行内代码胶囊：syntaxTree InlineCode 的两个 CodeMark 之间 → outerDecorations 单条 mark
         createFootnotesExtension({ tableDataField, inlineMarksField }), // 脚注：上标投影 + 定义徽标/回链
         imgBaseField,          // 【图片】文档目录变化时踢一脚，让图片 widget 用新的 base 重建
         imgPreviewField,       // 【图片】资源代次变化时让 retained/inline 图片重建
@@ -7608,6 +7936,7 @@ function boot(content) {
         cellBackgroundClick,
         editorContentDragDisabled,
         tableCellClick,
+        tablePointerFreezeLifecycle, // 手势解冻：mouseup 微任务 + 失焦/取消/组字兜底
         searchCellFocus,
         extrasCompartment.of([]),
         keyCompartment.of(keymap.of([])),
@@ -7615,6 +7944,7 @@ function boot(content) {
         tableImeTailField,
         tableSelectionField, // 【β1】选择层级（格/行/列/整表）—— 与活动格**解耦**（见 tableSelectionField 注释）
         tableSourceRangeField, // 同一 separator 行的原生选区；null/相同块坐标保持身份
+        tablePointerFreezeField, // 手势期冻结值：effective = frozen?.range ?? desired
         tableSelectionTextInput,
         tableSelInputGuard, // 【β1】行/列/整表层级下打字：先收场再放行（不许一个看不见的按键改表结构）
         listSemantics,
@@ -7626,6 +7956,7 @@ function boot(content) {
         nativeVerticalIntent,
         docSourceClipboard, // 选区含公式时按文档源码写剪贴板（D8 配套）
         mathPointerGesture,
+        tablePointerFreezeStyle, // 冻结入口必须排在 floatingSelectionStyle 之前
         floatingSelectionStyle,
         clickToSource,
         imageRightBlankClick, // 【图片右侧·2026-10-31】右侧空白 ⇒ 下一行行首（近/远两个入口；不展开源码、不失焦）
@@ -7725,6 +8056,7 @@ function boot(content) {
     parent: document.getElementById("editor"),
     dispatchTransactions: (transactions, target) => imageRemoval.dispatch(transactions, target),
   });
+  readingPosition.attach(view);
   /* 【#51·2026-10-18 实测缺陷 N6】行/列/整表选择下开始 IME 组字：表行是 block widget，没有可承载
      IME 焦点的文本 DOM；守卫把第一笔组字事务搬进格首后收掉表级状态，而 CM6 的组字观察器仍以
      widget 边界为锚 ⇒ 第二笔组字起被插到表格下方的新行（实测 ni 进格、nihao/你好 跑到表外）。
@@ -7959,7 +8291,7 @@ function boot(content) {
     __recognition: (fresh = false) => {
       const state = view.state, context = fresh ? scanStructuralContext(state.doc) : state.field(markdownContext), blocks = context.blocks;
       const math = fresh ? scanMathSpans(state.doc,blocks,context) : state.field(mathSpansField).spans;
-      const inline = fresh ? scanInlineMarks(state.doc,math,blocks) : state.field(inlineMarksField);
+      const inline = fresh ? scanInlineMarks(state.doc,math,blocks, analyzePublicAnnotations(state.doc, math, null)) : state.field(inlineMarksField);
       const styles = fresh ? { ...scanLineStyles(state.doc,blocks,context), tables: scanTables(state.doc,blocks) } : { ...state.field(lineStylesField), tables: state.field(tableDataField) };
       return { blocks, math, inline, styles, mermaid: fresh ? scanMermaidBlocks(state.doc,blocks) : state.field(mermaidBlocksField) };
     },
@@ -7976,6 +8308,7 @@ function boot(content) {
       goTo: labelOrId => footnoteGoTo(view, labelOrId),
     },
     __tableWidths: () => ({ geometryVersion: mathGeometryVersion, groups: inspectTableWidths(view) }),
+    __tableProjection: () => ({ desired: view.state.field(tableSourceRangeField, false), effective: tableEffectiveSource(view.state), frozen: view.state.field(tablePointerFreezeField, false) }),
     __cellLayout: () => ({ active: view.state.field(activeCellField),
       owner: cellEdit && { rowFrom: cellEdit.rowFrom, col: cellEdit.col, epoch: cellEdit.epoch },
       nativeDragDiagnostic: null,
@@ -8129,6 +8462,7 @@ function boot(content) {
       view.__mpMathClick = null;
       view.__mpImageClick = null; view.__mpRegionGesture = null;
       view.__mpMathGesture = null; view.__mpVerticalInput = false;
+      readingPosition.reset();
       suppressChange = true;
       try { view.setState(fresh); }
       finally { suppressChange = false; }
@@ -8208,6 +8542,15 @@ function boot(content) {
         suppressChange = false;
       }
     },
+    /* Reading position: anchor arithmetic lives in the engine, persistence in
+       the host. None of these entries moves the selection or changes the doc. */
+    captureReadingPosition: () => readingPosition.capture(),
+    applyReadingPosition: anchor => readingPosition.apply(anchor),
+    armReadingPosition: () => readingPosition.arm(),
+    resetReadingPosition: () => readingPosition.reset(),
+    onReadingPositionChange: fn => readingPosition.subscribe(fn),
+    flushReadingPosition: () => readingPosition.flush(),
+    readingPositionState: () => readingPosition.inspect(),
     focus: () => view && view.focus(),
     /** 主题切换（工具栏用）：写偏好并立即应用（同文档内 storage 事件不会触发）。 */
     setTheme: (id) => {

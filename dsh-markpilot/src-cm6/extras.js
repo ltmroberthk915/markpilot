@@ -36,6 +36,15 @@ import { footnoteExportPlan } from './footnote-export.js';
 import { adaptTyporaTheme } from "../../Typora-Editor-App/app/renderer/js/user-theme.mjs";
 /* 【正文右键菜单复用·2026-10-10】编辑动作与工具栏共用同一张表（见 toolbar.js 的导出注释）。 */
 import { TOOLBAR_ACTIONS } from "./toolbar.js";
+/* 【公开快照·3.6.21·主控定稿】对外产物（单文件/文件夹 HTML、插件打印与 PDF、copyRich、表格
+ *  TSV/HTML、mdToHtml/mdBodyChunks 直接调用）一律不携带编辑注释。
+ *  文法真源是与编辑端共用的共享模块（主控已选 plan/public-markdown.js）：
+ *   · publicMarkdown(source) 返回**变长新文档**：真注释被删除（block 注释保留换行），
+ *     代码/数学/转义/链接目标逐字保留；结果**不是**源文偏移空间，下游必须当新文档处理；
+ *   · commentRanges(source) 给**源文** UTF-16 区间（编辑端 Decoration / 表格按原坐标裁剪用）。
+ *  · 无 "<!--" 的文档零解析、原样返回。
+ *  本模块只消费，不解析；publicMarkdown 失败按导出失败处理（不回退源文，绝不把注释送进公开产物）。 */
+import { publicMarkdown, commentRanges } from './public-markdown.js';
 
 /** 面板样式（岛、弹层、面板、吐司） */
 const CSS = `
@@ -513,8 +522,9 @@ export function installExtras(deps) {
     const view = getView();
     const result = footnoteAction ? footnoteAction(view) : null;
     if (result && result.ok === false) {
-      if (result.reason === 'opaque') toast('光标在代码或公式里，不能插入脚注');
-      else if (result.reason === 'tail-opaque') toast('文档末尾在代码或公式块内，无法把脚注定义写到文末');
+      if (result.reason === 'ref-hidden') toast('光标在代码、公式或注释里（或与相邻链接/脚注语法相连），不能插入脚注；已取消，原文未改动');
+      else if (result.reason === 'def-hidden') toast('文档末尾有未闭合的注释/代码块/公式或容器，脚注定义会被隐藏；已取消，原文未改动');
+      else if (result.reason === 'verify-failed') toast('无法校验脚注落点，已取消（原文未改动）');
       else if (result.reason === 'table') toast('表格内不能插入脚注——请先把光标移到表外');
       else if (result.reason === 'readonly') toast('阅读模式下不能插入脚注');
       else if (result.reason === 'target-gone') toast('原来的引用已被删除，未跳转；再执行一次可回到第一条引用');
@@ -1077,15 +1087,18 @@ export function installExtras(deps) {
     })();
     return mathCssInflight.then((v) => { mathCssCache = v; mathCssInflight = null; return v; });
   }
-  const activeFootnotes = { plan: null };
-  function inlineMd(line, srcMap, math = false) {
+  /* 【脚注投影局部化·3.6.21】旧实现把 current plan 挂在 installExtras 级全局 activeFootnotes 上：
+     mdBodyChunks 是惰性生成器，chunk 之间会 await 写盘/IPC；A 文档挂起期间 B 文档（另一次导出/
+     copyRich）会覆盖它 ⇒ A 恢复后用 B 的编号/id 展开，或 plan 已被清空、占位符裸漏。
+     改为沿调用链显式传参（第 4 参 foot）；嵌套生成器经 opts.footPlan 继承父层 plan。 */
+  function inlineMd(line, srcMap, math = false, foot = null) {
     const html = renderInline(String(line).replace(/\\\|/g, '|'), {
       math: tex => math && mathApi ? mathInlineHtml(tex) : '<code>' + esc(tex) + '</code>',
       image: image => image.src == null ? rewriteImgTag(image.raw, srcMap)
         : '<img alt="' + attrEsc(image.alt) + '" src="' + attrEsc(mapSrc(image.src, srcMap)) + '">',
       link: href => '<a href="' + attrEsc(href) + '">',
     });
-    return activeFootnotes.plan ? activeFootnotes.plan.expand(html) : html;
+    return foot ? foot.expand(html) : html;
   }
   /** 正文分块生成器：边扫边吐块，调用方拿到一块就能写走（不攒整篇）
    *  【公式排版】opts.math=true 时块级公式走 KaTeX display（复用引擎 renderMathHTML）：
@@ -1095,16 +1108,25 @@ export function installExtras(deps) {
    *   · 单个公式的 TeX 源码最多攒 MATH_TEX_MAX 字符（超限退回 <pre> 文本），块级缓存与整篇无关。 */
   const MATH_TEX_MAX = 32 * 1024;
   function* mdBodyChunks(md, opts = {}) {
-    const { srcMap = null, chunkChars = CHUNK_CHARS, math = false, mermaidSvgs = null, nested = false, footnotes = false } = opts;
+    const { srcMap = null, chunkChars = CHUNK_CHARS, math = false, mermaidSvgs = null, nested = false, footnotes = false, footPlan = null, publicized = false } = opts;
+    /* 【公开快照·只做一次】非嵌套调用先取一次变长公开快照（新文档）：
+       · 入口层（exportHtml/exportFolder/打印页/copyRich）已经取过快照，传 publicized:true
+         ⇒ 这里**不再解析**（消除"公开 md 二次解析"；快照不是源文偏移空间，重复处理只会白跑）；
+       · mdToHtml/mdBodyChunks 的**直接调用方**没有入口层，publicized 缺省 false ⇒ 在这里取一次；
+       · nested 调用收到的是父层已处理/切出的子块，**永不**再解析（片段上下文不完整，
+         对片段重判注释开闭会误删/误留）。 */
+    const publicMd = (nested || publicized) ? String(md) : publicMarkdown(String(md));
     /* 【#54】导出正文剥离文档开头的 YAML front-matter（与编辑面同口径；Typora/常规导出链都不把元数据
        当正文）。判据与 markdown-context.inFrontMatter 同一正则；不匹配则原样输出。 */
-    const frontMatter = nested ? null : /^\uFEFF?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(md);
-    const sourceBody = frontMatter ? md.slice(frontMatter[0].length) : md;
+    const frontMatter = nested ? null : /^\uFEFF?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(publicMd);
+    const sourceBody = frontMatter ? publicMd.slice(frontMatter[0].length) : publicMd;
     /* 脚注只由共享解析器定位；这里把引用换成行内占位符、把定义区间抹成空白（保留换行），
-       块解析与行内 Markdown 仍是原来那一条链。nested 调用只消费占位符，不重复收集。 */
-    const foot = (!nested && footnotes) ? footnoteExportPlan(sourceBody) : null;
-    if (!nested) activeFootnotes.plan = foot || null;
-    const bodyMd = foot ? foot.body : sourceBody;
+       块解析与行内 Markdown 仍是原来那一条链。nested 调用只消费占位符，不重复收集。
+       【局部化】ownFoot 只在**顶层**收集；嵌套层经 opts.footPlan 继承父层 plan 供 inlineMd 展开，
+       endnote 区块仍只由拥有 plan 的那一层输出（嵌套块不重复生成脚注区）。 */
+    const ownFoot = (!nested && footnotes) ? footnoteExportPlan(sourceBody) : null;
+    const foot = ownFoot || footPlan;
+    const bodyMd = ownFoot ? ownFoot.body : sourceBody;
     const lines = bodyMd.split('\n'), structure = {};
     const codeStarts = new Map(scanFenceLines(lines, structure).map(b => [b.startLine - 1, b]));
     let buf = [], size = 0;
@@ -1229,19 +1251,19 @@ export function installExtras(deps) {
           if (task) {
             const checked = task[1].toLowerCase() === 'x';
             openItem(ordered, item[2], item[1], item[3], `<li class="mp-task-item"><input type="checkbox" disabled${checked ? ' checked' : ''}> `);
-            push(inlineMd(task[2], srcMap, math));
+            push(inlineMd(task[2], srcMap, math, foot));
           } else {
             openItem(ordered, item[2], item[1], item[3], '<li>');
-            push(inlineMd(item[4], srcMap, math));
+            push(inlineMd(item[4], srcMap, math, foot));
           }
         } else if (h) {
           closeInner();
-          push(`<h${h[1].length}>${inlineMd(h[2] || '', srcMap, math)}</h${h[1].length}>`);
+          push(`<h${h[1].length}>${inlineMd(h[2] || '', srcMap, math, foot)}</h${h[1].length}>`);
         } else if (!raw.trim()) {
           closeInner();
         } else {
           closeInner();
-          push(`<p>${inlineMd(raw, srcMap, math)}</p>`);
+          push(`<p>${inlineMd(raw, srcMap, math, foot)}</p>`);
         }
       }
       closeInner();
@@ -1266,7 +1288,7 @@ export function installExtras(deps) {
         const leaf = collectIndentedLeaf(i, top.contentCol);
         const block = pendingBlank.concat(leaf.block); pendingBlank = [];
         const outer = take(); if (outer) yield outer;
-        yield* mdBodyChunks(block.join('\n'), { ...opts, nested: true });
+        yield* mdBodyChunks(block.join('\n'), { ...opts, nested: true, footPlan: foot });
         i = leaf.end - 1;
         continue;
       }
@@ -1285,7 +1307,7 @@ export function installExtras(deps) {
           k++;
         }
         const outer = take(); if (outer) yield outer;
-        yield* mdBodyChunks(childLines.join('\n'), { ...opts, nested: true });
+        yield* mdBodyChunks(childLines.join('\n'), { ...opts, nested: true, footPlan: foot });
         i = k - 1;
         continue;
       }
@@ -1303,7 +1325,7 @@ export function installExtras(deps) {
         const outer = take(); if (outer) yield outer;
         push('<blockquote>');
         const open = take(); if (open) yield open;
-        yield* mdBodyChunks(group.join('\n'), { ...opts, nested: true });
+        yield* mdBodyChunks(group.join('\n'), { ...opts, nested: true, footPlan: foot });
         push('</blockquote>');
         i = k - 1;
         continue;
@@ -1337,7 +1359,7 @@ export function installExtras(deps) {
           const sep = cellsOf(next);
           const aligns = sep.map(c => c.startsWith(':') && c.endsWith(':') ? 'center' : c.endsWith(':') ? 'right' : null);
           const rowHtml = (cells, tag) => '<tr>' + cells.slice(0, header.length).map((c, k) =>
-            `<${tag}${aligns[k] ? ` style="text-align:${aligns[k]}"` : ''}>${inlineMd(c, srcMap, math)}</${tag}>`).join('') + '</tr>';
+            `<${tag}${aligns[k] ? ` style="text-align:${aligns[k]}"` : ''}>${inlineMd(c, srcMap, math, foot)}</${tag}>`).join('') + '</tr>';
           if (lead.q) push('<blockquote>');
           push('<table><thead>' + rowHtml(header, 'th') + '</thead><tbody>');
           i += 1;
@@ -1354,7 +1376,7 @@ export function installExtras(deps) {
           else {
             const rest = line.slice(/^\s*\$\$/.exec(line)[0].length), tail = !!rest.trim();
             const close = tail && hasUnescapedDollar(rest) ? -1 : tail ? nextTailClose[i] : nextFenceClose[i];
-            if (close < 0) push(`<p>${inlineMd(line, srcMap, math)}</p>`);
+            if (close < 0) push(`<p>${inlineMd(line, srcMap, math, foot)}</p>`);
             else {
               const parts = [rest, ...lines.slice(i + 1, close)];
               if (tail) parts.push(lines[close].replace(/\$\$\s*$/, ''));
@@ -1372,7 +1394,7 @@ export function installExtras(deps) {
             push(blockHtml(open.slice(1, sameLine).trim()));
           } else {
             const close = nextSingleClose[i];
-            if (close < 0) push(`<p>${inlineMd(line, srcMap, math)}</p>`);
+            if (close < 0) push(`<p>${inlineMd(line, srcMap, math, foot)}</p>`);
             else {
               const parts = [open.slice(1)];
               for (let k = i + 1; k < close; k++) parts.push(lines[k]);
@@ -1393,18 +1415,18 @@ export function installExtras(deps) {
             if (task) {
               const checked = task[1].toLowerCase() === 'x';
               openItem(ordered, item[2], item[1], item[3] || '', `<li class="mp-task-item"><input type="checkbox" disabled${checked ? ' checked' : ''}> `);
-              push(inlineMd(task[2], srcMap, math));
+              push(inlineMd(task[2], srcMap, math, foot));
             } else {
               openItem(ordered, item[2], item[1], item[3] || '', '<li>');
-              push(inlineMd(content, srcMap, math));
+              push(inlineMd(content, srcMap, math, foot));
             }
           } else {
             closeList();
-            if (h) push(`<h${h[1].length}>${inlineMd(h[2] || '', srcMap, math)}</h${h[1].length}>`);
+            if (h) push(`<h${h[1].length}>${inlineMd(h[2] || '', srcMap, math, foot)}</h${h[1].length}>`);
             else {
               if (isHrLine(line)) push('<hr>');
               else if (!line.trim()) push('');
-              else push(`<p>${inlineMd(line, srcMap, math)}</p>`);
+              else push(`<p>${inlineMd(line, srcMap, math, foot)}</p>`);
             }
           }
         }
@@ -1413,10 +1435,9 @@ export function installExtras(deps) {
     }
     closeList();
     for (const b of pendingBlank) push(b);
-    if (foot) {
-      push(foot.endnote((text) => inlineMd(text, srcMap, math)));
+    if (ownFoot) {
+      push(ownFoot.endnote((text) => inlineMd(text, srcMap, math, ownFoot)));
       if (size >= chunkChars) { const chunk = take(); if (chunk) yield chunk; }
-      activeFootnotes.plan = null;
     }
     const chunk = take(); if (chunk) yield chunk;
   }
@@ -1454,6 +1475,9 @@ export function installExtras(deps) {
   async function exportHtml() {
     const v = getView(); if (!v) return { ok: false };
     const md = v.state.doc.toString(), directory = window.__mpDocDir || null;
+    /* 【公开快照】先取一次（变长新文档）：标题/文件名、图片预扫描、图表预渲染、正文分块
+       全部消费这一份；真注释里的标题/图片/图表因此不进入公开产物。 */
+    const pub = publicMarkdown(md);
     let dir = null;
     if (canDiskExport()) {   // 让用户选存哪儿
       const pick = await pickDir();
@@ -1465,9 +1489,9 @@ export function installExtras(deps) {
       dir = pick.dir;
     }
     toast('正在导出…');
-    const title = mdTitle(md);
+    const title = mdTitle(pub);
     const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-    const images = await embedImageRefs(collectImageRefs(md), directory, async (url, maxBytes) => {
+    const images = await embedImageRefs(collectImageRefs(pub), directory, async (url, maxBytes) => {
       if (!hostReadable()) return { ok: false, error: '当前宿主不支持读取本地图片' };
       return window.mpHost.readFileBase64(fileUrlToPath(url), { maxBytes });
     });
@@ -1477,12 +1501,12 @@ export function installExtras(deps) {
     /* 【mermaid 预渲染·2026-10-11】与公式同一个范式：**先 await 一次**把全部图表渲进缓存，
        下面的同步生成器才能直接查缓存吐 `<div class="mp-mermaid">` ✓（一个钩子覆盖 HTML/PDF/复制 ✓）。 */
     let mermaidStat = null;
-    try { if (window.mpMermaid?.prerender) mermaidStat = await window.mpMermaid.prerender(md); }
+    try { if (window.mpMermaid?.prerender) mermaidStat = await window.mpMermaid.prerender(pub); }
     catch (e) { toast('导出失败：' + (e?.message || e)); return { ok: false, error: String(e?.message || e) }; }
     try {
     const msMathCss = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0;
     const head = htmlHead(title, mathCss);
-    function* chunks() { yield head; yield* mdBodyChunks(md, { math: true, footnotes: true, srcMap: images.map, mermaidSvgs: mermaidStat?.svgs }); yield HTML_TAIL; }
+    function* chunks() { yield head; yield* mdBodyChunks(pub, { publicized: true, math: true, footnotes: true, srcMap: images.map, mermaidSvgs: mermaidStat?.svgs }); yield HTML_TAIL; }
     const msBuild = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0;
     if (dir) {                                   // ① 桌面版：写到用户选的位置
       const beg = await window.mpHost.exportBeginHtml({ dir, name: safeFileName(title) });
@@ -1563,14 +1587,16 @@ export function installExtras(deps) {
     if (!v) throw new Error('没有打开的文档');
     const md = v.state.doc.toString();
     if (md.length > PLUGIN_PRINT_MAX) throw new Error('文档过大：请改用「单文件 HTML」导出后打印');
+    /* 【公开快照】插件打印页 / 「另存为 PDF」同样是公开产物：注释不进打印 HTML。 */
+    const pub = publicMarkdown(md);
     let mathCss = '';
     try { if (mathApi) mathCss = await buildMathCss(); } catch { /* 公式样式失败不阻断打印 */ }
     let mermaidStat = null;
-    try { if (window.mpMermaid?.prerender) mermaidStat = await window.mpMermaid.prerender(md); } catch { /* 图表失败保留源码 */ }
-    const title = mdTitle(md);
+    try { if (window.mpMermaid?.prerender) mermaidStat = await window.mpMermaid.prerender(pub); } catch { /* 图表失败保留源码 */ }
+    const title = mdTitle(pub);
     let head = htmlHead(title, mathCss);
     head = head.replace('</head>', `<style>${cssRawText(PLUGIN_PRINT_CSS)}</style>\n</head>`);
-    const body = mdToHtml(md, { math: true, footnotes: true, mermaidSvgs: mermaidStat?.svgs });
+    const body = mdToHtml(pub, { publicized: true, math: true, footnotes: true, mermaidSvgs: mermaidStat?.svgs });
     const hint = '<div class="mp-print-hint">正在打开系统打印对话框。若没有弹出，请按 Ctrl+P'
       + '（或浏览器菜单 → 打印），目标选择“另存为 PDF”。</div>\n';
     return { html: head + hint + body + HTML_TAIL, title, mermaidStat };
@@ -1788,7 +1814,10 @@ export function installExtras(deps) {
       return exportHtml();
     }
     const md = v.state.doc.toString();
-    const title = mdTitle(md);
+    /* 【公开快照】文件夹 HTML 与桌面 PDF（host.js 的 export:make-html 静默复用本流程 → staging
+       → 打印窗口）共用这一份：标题/文件名、图片预扫描（注释里的图不复制、不内联）、正文分块。 */
+    const pub = publicMarkdown(md);
+    const title = mdTitle(pub);
     const name = safeFileName(title);
     const docPath = window.__mpDocPath || (window.__mpDocDir ? window.__mpDocDir.replace(/[\\/]+$/, '') + '/__export__.md' : null);
 
@@ -1804,7 +1833,7 @@ export function installExtras(deps) {
       try { host.onExportProgress((p) => { if (p && p.total) say(`正在复制图片 ${p.done}/${p.total}…`, 60000); }); } catch { }
     }
 
-    const refs = collectImageRefs(md);
+    const refs = collectImageRefs(pub);
     const pdfStage = opts.pdfSessionId !== undefined;
     if (pdfStage) {
       // Reject oversized/invalid payloads before IPC copies their encoded data.
@@ -1831,13 +1860,13 @@ export function installExtras(deps) {
     let chunks = 0, mermaidStat = null;
     try {
       const mathCss = mathApi ? await buildMathCss() : '';
-      if (window.mpMermaid?.prerender) mermaidStat = await window.mpMermaid.prerender(md);
+      if (window.mpMermaid?.prerender) mermaidStat = await window.mpMermaid.prerender(pub);
       const append = async text => {
         const r = await host.exportAppendHtml({ id: beg.id, text });
         if (!r?.ok) throw new Error(r?.error || '写入失败');
       };
       await append(htmlHead(title, mathCss));
-      for (const chunk of mdBodyChunks(md, { srcMap, math: true, footnotes: true, mermaidSvgs: mermaidStat?.svgs })) { await append(chunk); chunks++; }
+      for (const chunk of mdBodyChunks(pub, { publicized: true, srcMap, math: true, footnotes: true, mermaidSvgs: mermaidStat?.svgs })) { await append(chunk); chunks++; }
       await append(HTML_TAIL);
       const fin = await host.exportFinishHtml({ id: beg.id });
       if (!fin || !fin.ok) throw new Error((fin && fin.error) || '写入失败');
@@ -1863,6 +1892,13 @@ export function installExtras(deps) {
     const richToken = window.mpHost && typeof window.mpHost.beginClipboardIntent === 'function' ? window.mpHost.beginClipboardIntent('copy') : null;
     const v = getView(); if (!v) return;
     const md = v.state.doc.toString();
+    /* 【公开快照】copyRich 是"粘到知乎/公众号/微信"的公开通道：text/html 与 text/plain
+       都不带编辑注释；普通源码 Ctrl+C/Ctrl+X、保存、AI 选区仍走源文（sourceTextPayload 不动）。
+       · html 走 render 模式（删注释后补空格/必要时加 \ 转义，防止接出新的块级语法）；
+       · text/plain 走 text 模式（纯文本不再按 Markdown 解析，不把护栏用的反斜杠带给用户）。
+       无 "<!--" 的文档两条都是零解析快路径；有注释时才各取一次（不是把公开结果再解析一遍）。 */
+    const pub = publicMarkdown(md);
+    const pubText = publicMarkdown(md, { mode: 'text' });
     const inlineCss = (html) => html
       .replace(/<strong>/g, '<strong style="font-weight:600">')
       .replace(/<h1>/g, '<h1 style="font-size:24px;font-weight:600;margin:22px 0 10px">').replace(/<h2>/g, '<h2 style="font-size:20px;font-weight:600;margin:20px 0 8px">')
@@ -1884,20 +1920,20 @@ export function installExtras(deps) {
        （少了这一步，复制到知乎/微信时图表位置会变成源码块 —— 与"导出有图、复制没图"的不一致 ✗）。 */
     let mermaidStat = null, html;
     try {
-      if (window.mpMermaid?.prerender) mermaidStat = await window.mpMermaid.prerender(md);
-      html = inlineCss(mdToHtml(md, { mermaidSvgs: mermaidStat?.svgs }));
+      if (window.mpMermaid?.prerender) mermaidStat = await window.mpMermaid.prerender(pub);
+      html = inlineCss(mdToHtml(pub, { publicized: true, mermaidSvgs: mermaidStat?.svgs }));
     } catch (e) { toast('复制失败：' + (e?.message || e)); return false; }
     finally { mermaidStat?.svgs?.clear(); }
     const hostRich = window.mpHost;
     if (hostRich && typeof hostRich.beginClipboardIntent === 'function') {
-      const ok = await writeClip({ text: md, html }, richToken);
+      const ok = await writeClip({ text: pubText, html }, richToken);
       toast(ok ? '已复制富文本（可直接粘到知乎/公众号编辑器）' : '复制失败：剪贴板不可用');
       return ok;
     }
     try {
       await navigator.clipboard.write([new ClipboardItem({
         'text/html': new Blob([html], { type: 'text/html' }),
-        'text/plain': new Blob([md], { type: 'text/plain' }),
+        'text/plain': new Blob([pubText], { type: 'text/plain' }),
       })]);
       toast('已复制富文本（可直接粘到知乎/公众号编辑器）');
     } catch (e) {
@@ -2742,16 +2778,90 @@ export function installExtras(deps) {
     // Shared panel close handlers cover Escape, outside presses, blur, scroll
     // and document changes. No per-menu delayed listener survives its panel.
   }
+  /* 【表格公开化·共用手法】按**源文语义**的 commentRanges 删除注释，不重解析公开文本：
+     表格的 TSV/HTML 是公开载荷（右键菜单「复制表格」与 main.js 的 N1/B-1 两个 copy 处理器
+     都调 tableClipPayload）。注释是变长删除 ⇒ 绝不能"先拼格再 split"去猜位置。
+       ① copyTable 有全文与行原坐标：对整篇取 commentRanges（GFM 全文语法），把与每行相交的
+          区间裁到行内再删；跨格 `<!--` 在全文里本来就不是 Comment ⇒ 原样保留；
+       ② 外部入口只拿到格文本：**逐格**按 inline 文法取 commentRanges（格是单行 inline 上下文，
+          与源文 GFM TableCell 同口径）；跨格标记同样按字面保留。每格删除只在格内变长，
+          行数/列数/对齐格/相邻有效格位置全部不变，不存在"整表拼接后丢位置"。 */
+  const CUT_HTML_PUNCT = new Set(['<', '>', '/', '=', '"', "'"]);
+  const isCutSpace = (ch) => ch === ' ' || ch === '\t' || ch === '\r' || ch === '\n';
+  /** 在 text 上删除 ranges（局部坐标，变长；两侧都是可见非标点字符时补一个空格，防粘词）。 */
+  function cutCommentRanges(text, ranges) {
+    if (!ranges || !ranges.length) return text;
+    const list = ranges.slice().sort((a, b) => a.from - b.from || a.to - b.to);
+    let out = '', pos = 0;
+    for (const range of list) {
+      const from = Math.max(pos, Math.min(text.length, range.from | 0));
+      const to = Math.max(from, Math.min(text.length, range.to | 0));
+      if (to <= pos) continue;
+      out += text.slice(pos, from);
+      const prev = out ? out[out.length - 1] : '';
+      const next = text[to] || '';
+      if (prev && next && !isCutSpace(prev) && !isCutSpace(next) &&
+        !CUT_HTML_PUNCT.has(prev) && !CUT_HTML_PUNCT.has(next)) out += ' ';
+      pos = to;
+    }
+    return out + text.slice(pos);
+  }
+  const alignsOfSepRow = (sepRowText) => splitRow(sepRowText).map((cell) => {
+    const c = String(cell || '').trim();
+    const hasL = c.startsWith(':'), hasR = c.length > 1 && c.endsWith(':');
+    return hasL && hasR ? 'center' : hasR ? 'right' : hasL ? 'left' : null;
+  });
+  /** 外部入口（只有格文本）：逐格 inline 文法去注释。
+   *  表格的格是**单行 inline 上下文**（GFM TableCell 不跨行）：跨格的 `<!--` 在源文里就是字面，
+   *  编辑端 commentRanges(全文) 也不会把它当注释（实测：跨行表格里的 `<!-- … -->` 在 GFM 下
+   *  不产生 Comment 节点）。因此这里禁止"把整表拼成多行片段再重判注释"——那会把用户看得见的
+   *  字面当真注释删掉（误删）。逐格解析时前缀一个中性字符，让格首的 `<!--` 仍按行内处理。 */
+  function publicCellRows(rowCells) {
+    const rows = (rowCells || []).map((r) => (r || []).map((c) => String(c == null ? '' : c)));
+    return rows.map((row) => row.map((cell) => {
+      if (!cell.includes('<!--')) return cell;
+      const comments = commentRanges('x' + cell);
+      if (!comments.length) return cell;
+      const local = [];
+      for (const c of comments) {
+        const from = c.from - 1, to = c.to - 1;
+        if (from >= 0 && to <= cell.length && to > from) local.push({ from, to });
+      }
+      return cutCommentRanges(cell, local);
+    }));
+  }
+  /** copyTable 专用：有全文与行原坐标 ⇒ 按全文 commentRanges 的源偏移裁每行（最精确的一条路）。 */
+  function publicTableArgsFromSource(docText, rows) {
+    const comments = commentRanges(docText);
+    const rowCells = [];
+    let aligns = [];
+    for (const row of rows) {
+      const text = docText.slice(row.from, row.to);
+      const local = [];
+      for (const c of comments) {
+        if (c.to <= row.from || c.from >= row.to) continue;
+        local.push({ from: Math.max(c.from, row.from) - row.from, to: Math.min(c.to, row.to) - row.from });
+      }
+      const clean = cutCommentRanges(text, local);
+      if (isSep(clean)) { aligns = alignsOfSepRow(clean); continue; }
+      rowCells.push(splitRow(clean));
+    }
+    return { rowCells, aligns };
+  }
   /* 【N1/B-1 同源·唯一实现】"表格的格行" ⇒ 剪贴板载荷（TSV + `<table>` HTML）。
      三个出口**必须**都调这里（PLAN-3.1.0 §4 的 ③ 口径），否则又会分裂成
      "菜单粘出来是表、Ctrl+C 粘出来是源码"：
        · 右键菜单「复制表格（可粘 Excel）」  → copyTable()
        · 格里 Ctrl+C（覆盖层无 DOM 选区）   → main.js 覆盖层的 copy 处理器（N1）
        · 文档里选中整表 Ctrl+C              → main.js 的 docSourceClipboard（B-1）
-     入参 rowCells ＝ 按行按列的**格源码**（`\|` 的还原只在这里做一次）；aligns ＝ 每列对齐词。 */
-  function tableClipPayload(rowCells, aligns) {
+     入参 rowCells ＝ 按行按列的**格源码**（`\|` 的还原只在这里做一次）；aligns ＝ 每列对齐词。
+     opts.publicized:true 表示调用方已按源文/全文 commentRanges 去过注释（copyTable），这里不再分析。 */
+  function tableClipPayload(rowCells, aligns, opts = {}) {
     // 【A4b】与导出同口径：剪贴板里的 `a\|b` 还原成 `a|b`（Excel/Word 里看到的应是字面竖线）
-    const rows = (rowCells || []).map((r) => (r || []).map((c) => String(c == null ? '' : c).replace(/\\\|/g, '|')));
+    let rows = opts.publicized === true
+      ? (rowCells || []).map((r) => (r || []).map((c) => String(c == null ? '' : c)))
+      : publicCellRows(rowCells);
+    rows = rows.map((r) => r.map((c) => c.replace(/\\\|/g, '|')));
     /* 【软换行口径统一·2026-10-08】TSV（纯文本出口）里 `<br>` 还原成**真换行**：
        Excel/Word 的格内换行就是这个语义；留着字面 `<br>` 会让人以为粘贴坏了。 */
     const tsv = rows.map((r) => r.map((c) => c.replace(/<br\s*\/?>/gi, '\n')).join('\t')).join('\n');
@@ -2775,25 +2885,14 @@ export function installExtras(deps) {
     }).join('') + '</tr>').join('') + '</table>';
     return { tsv, html, rows: rows.length, cols: rows.length ? rows[0].length : 0 };
   }
-  /** tableAt() 的结果 ⇒ tableClipPayload 的两个入参（分隔行**不进**载荷，与旧口径一致）。 */
-  function tableClipArgs(cur) {
-    const rowCells = cur.rows.filter((r) => !isSep(r.text)).map((r) => splitRow(r.text));
-    const sepRow = cur.rows.find((r) => isSep(r.text));
-    const aligns = !sepRow ? [] : splitRow(sepRow.text).map((cell) => {
-      const c = String(cell || '').trim();
-      const hasL = c.startsWith(':'), hasR = c.length > 1 && c.endsWith(':');
-      return hasL && hasR ? 'center' : hasR ? 'right' : hasL ? 'left' : null;
-    });
-    return { rowCells, aligns };
-  }
   async function copyTable(target = null) {
     const tableToken = window.mpHost && typeof window.mpHost.beginClipboardIntent === 'function' ? window.mpHost.beginClipboardIntent('copy') : null;
     const v = getView();
     const pos = target != null ? target : v.state.selection.main.head;
     const cur = tableAt(pos);
     if (!cur) { toast('光标不在表格内'); return; }
-    const args = tableClipArgs(cur);
-    const { tsv, html } = tableClipPayload(args.rowCells, args.aligns);
+    const args = publicTableArgsFromSource(v.state.doc.toString(), cur.rows);
+    const { tsv, html } = tableClipPayload(args.rowCells, args.aligns, { publicized: true });
     if (await writeClip({ text: tsv, html }, tableToken)) toast('已复制表格（Excel/Word 可直接粘成表格）');
     else toast('复制表格失败：剪贴板不可用');
   }
