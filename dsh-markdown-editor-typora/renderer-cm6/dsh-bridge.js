@@ -380,9 +380,71 @@
   var openTrace = null;
 
   var boundDocToken = null, lastApply = null, applyFlight = null;
-  var lastRequest = null, maxApplySerial = 0;
+  var lastRequest = null, maxApplySerial = 0, readingClient = null, boundReadingSession = null;
   function sessionNow() { return window.mpEngine && window.mpEngine.documentSession(); }
   function sameSession(a,b) { return !!a && !!b && a.epoch===b.epoch && a.sourceRevision===b.sourceRevision; }
+  /* Reading position uses the same host-neutral coordinator as the desktop
+     (renderer-cm6/reading-position-client.js, synced by sync-host).  The bridge
+     only maps its engine callbacks to the protocol-v2 parent messages. */
+  function readingSend(payload, final) {
+    if (!boundDocToken || !payload) return;
+    send('reading-position', { protocol: 2, docToken: boundDocToken, sessionId: boundReadingSession,
+      anchor: payload.anchor, reason: payload.reason || 'scroll', seq: payload.seq,
+      at: payload.at ?? payload.sampleAt, ...(final ? { final: true } : {}) });
+  }
+  function ensureReadingClient() {
+    if (readingClient) return readingClient;
+    if (!window.MPReadingClient || typeof window.MPReadingClient.createReadingClient !== 'function' || !window.mpEngine) return null;
+    readingClient = window.MPReadingClient.createReadingClient({
+      getEngine: function () { return window.mpEngine; },
+      load: function () { return Promise.resolve(null); },
+      save: function (payload) { readingSend(payload, false); return Promise.resolve({ ok: true, value: { stored: true } }); },
+      flush: function (payload) { readingSend(payload, true); return { ok: true }; },
+      release: function () {
+        if (boundDocToken && boundReadingSession)
+          send('reading-release', { protocol: 2, docToken: boundDocToken, sessionId: boundReadingSession });
+        return Promise.resolve();
+      },
+      onError: function () { /* persistence failures are silent by design */ },
+    });
+    readingClient.attach({ path: boundDocToken || 'document',
+      documentId: boundReadingSession || boundDocToken, restore: false });
+    return readingClient;
+  }
+  function handleReadingControl(type, content) {
+    if (!boundDocToken || !content || content.docToken !== boundDocToken) return;
+    if (Object.prototype.hasOwnProperty.call(content, 'sessionId'))
+      boundReadingSession = typeof content.sessionId === 'string' && content.sessionId ? content.sessionId : null;
+    var engine = window.mpEngine;
+    if (!engine) return;
+    if (type === 'reading-flush') {
+      var client = ensureReadingClient();
+      if (client) {
+        var flushed = client.flush('flush', { sync: true });
+        if (flushed && flushed.anchor) readingSend(flushed, true);
+        return;
+      }
+      var captured = typeof engine.flushReadingPosition === 'function' ? engine.flushReadingPosition() : null;
+      if (captured && captured.anchor) readingSend(captured, true);
+      return;
+    }
+    if (type === 'reading-arm') { ensureReadingClient(); return; }
+    if (type !== 'reading-anchor') return;
+    var reader = ensureReadingClient();
+    if (reader) { reader.restore(content.anchor); return; }
+    Promise.resolve()
+      .then(function () { return engine.applyReadingPosition ? engine.applyReadingPosition(content.anchor) : null; })
+      .catch(function () { return null; })
+      .then(function () { try { engine.armReadingPosition?.(); } catch (error) { /* engine gone */ } });
+  }
+  window.addEventListener('pagehide', function () {
+    if (!window.mpEngine || !boundDocToken) return;
+    if (readingClient) { try { readingClient.detach({ flush: true, release: true }); } catch (error) { /* closing must not throw */ } return; }
+    try {
+      var captured = window.mpEngine.flushReadingPosition?.();
+      if (captured && captured.anchor) readingSend(captured, true);
+    } catch (error) { /* closing must not throw */ }
+  });
   function applicationResult(request,applied,reason) {
     return {protocol:2,docToken:request.docToken,applyId:request.applyId,applied:applied,reason:reason||null,session:sessionNow()||null,composing:!!window.mpEngine?.isComposing?.()};
   }
@@ -425,6 +487,7 @@
         for(var i=0;i<list.length;i++)list[i]({content:request.content,rootPath:request.rootPath});
         if(!window.mpEngine || !sessionNow())throw Error('boot-failed');
         boundDocToken=request.docToken;
+        ensureReadingClient();
         queueMicrotask(maybeApplyPendingTheme);
       }else{
         if(!boundDocToken || !sameSession(request.expected,sessionNow()))throw Error('stale');
@@ -600,6 +663,7 @@
     var type = data.type;
     var content = data.content;
     if (content && content.protocol === 2 && typeof type === 'string' && type.indexOf('live-') === 0) { handleLiveControl(type, content); return; }
+    if (content && content.protocol === 2 && (type === 'reading-anchor' || type === 'reading-arm' || type === 'reading-flush')) { handleReadingControl(type, content); return; }
     if (content && content.protocol === 2 && (type === "open" || type === "setValue")) { void applyDocument(type,content); return; }
     if (content && content.protocol === 2 && type === "requestText") { sendSnapshot(content); return; }
 

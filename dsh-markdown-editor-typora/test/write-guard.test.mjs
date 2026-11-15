@@ -90,11 +90,20 @@ test('a policy intent does not bypass a dirty room', async () => {
   await assert.rejects(() => call(h, 'fs/write-intent', { kind: 'createIfAbsent' }), (error) => error.code === 'MP_DOC_DIRTY');
 });
 
-test('lookup failure fails open (does not block AI writes)', async () => {
+test('lookup failure is fail-closed on the first intent', async () => {
   const h = makeCtx();
   makeGuard({ lookup: async () => { throw new Error('db locked'); } }).install(h.ctx);
-  const { result } = await call(h, 'fs/write-intent', BASE);
-  assert.deepEqual(result, BASE);
+  const entry = h.listeners.get('fs/write-intent');
+  let nextCalls = 0;
+  await assert.rejects(
+    () => entry.handler(TARGET, {}, async () => { nextCalls += 1; return BASE; }),
+    (error) => {
+      assert.equal(error.code, 'MP_DOC_LOOKUP_FAILED');
+      assert.equal(error.path, TARGET.displayPath);
+      return true;
+    },
+  );
+  assert.equal(nextCalls, 1, 'next() runs first by contract; the guard still refuses the write');
 });
 
 test('clean room whose file disappeared is fail-open for creation', async () => {
@@ -124,18 +133,25 @@ test('installing twice on the same ctx is idempotent', async () => {
   assert.equal(h.listeners.size, 3);
 });
 
-test('lookup failure becomes fail-closed after the bounded threshold', async () => {
+test('lookup failure fails closed immediately and releases on the next readable lookup', async () => {
   const h = makeCtx();
   let calls = 0;
-  makeGuard({ lookup: async () => { calls += 1; if (calls <= 3) throw new Error('db locked'); return null; } }).install(h.ctx);
-  const first = await call(h, 'fs/write-intent', BASE);
-  assert.deepEqual(first.result, BASE);
-  const second = await call(h, 'fs/write-intent', BASE);
-  assert.deepEqual(second.result, BASE);
+  makeGuard({ lookup: async () => { calls += 1; if (calls === 1) throw new Error('db locked'); return null; } }).install(h.ctx);
   await assert.rejects(() => call(h, 'fs/write-intent', BASE), (error) => error.code === 'MP_DOC_LOOKUP_FAILED');
   const recovered = await call(h, 'fs/write-intent', BASE);
   assert.deepEqual(recovered.result, BASE);
-  assert.equal(calls, 4);
+  assert.equal(calls, 2);
+
+  // No sticky failure budget: a later failure closes writes again at once, and
+  // the next readable state releases the write again.
+  const failing = makeCtx();
+  let failures = 0;
+  makeGuard({ lookup: async () => { failures += 1; if (failures === 1 || failures === 3) throw new Error('db locked'); return null; } }).install(failing.ctx);
+  await assert.rejects(() => call(failing, 'fs/write-intent', BASE), (error) => error.code === 'MP_DOC_LOOKUP_FAILED');
+  const readable = await call(failing, 'fs/write-intent', BASE);
+  assert.deepEqual(readable.result, BASE);
+  await assert.rejects(() => call(failing, 'fs/write-intent', BASE), (error) => error.code === 'MP_DOC_LOOKUP_FAILED');
+  assert.equal(failures, 3);
 });
 
 test('fsSessionIntents wraps ctx.fs writes and refuses dirty sessions', async () => {
@@ -175,11 +191,10 @@ test('fsSessionIntents checks moveFile destination too', async () => {
 test('write guard error messages distinguish lookup failure and mirror', async () => {
   const h = makeCtx();
   makeGuard({ lookup: async () => { throw new Error('db locked'); } }).install(h.ctx);
-  await call(h, 'fs/write-intent', BASE);
-  await call(h, 'fs/write-intent', BASE);
   await assert.rejects(() => call(h, 'fs/write-intent', BASE), (error) => {
     assert.equal(error.code, 'MP_DOC_LOOKUP_FAILED');
-    assert.match(error.message, /连续无法读取未保存状态/);
+    assert.match(error.message, /无法读取未保存状态/);
+    assert.match(error.message, /D:\/probe\/a\.md/);
     return true;
   });
   const mirror = makeCtx();

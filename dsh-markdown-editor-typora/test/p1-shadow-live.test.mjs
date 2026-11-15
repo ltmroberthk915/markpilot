@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { randomUUID, createHash } from 'node:crypto';
@@ -51,19 +52,23 @@ async function compareShadow(host, file, scenario) {
 
 function remoteJoin(liveDir, file, base) {
   const modulePath = require.resolve('../host/live-documents.js');
-  const script = `const {LiveDocuments}=require(${JSON.stringify(modulePath)});(async()=>{const l=new LiveDocuments({directory:${JSON.stringify(liveDir)}});await l.join(${JSON.stringify(file)},${JSON.stringify(base)});process.stdout.write('ready\\n');setInterval(()=>{},1000);})().catch(e=>{console.error(e);process.exit(1)});`;
-  const child = spawn(process.execPath, ['-e', script], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const timer = setTimeout(() => { if (!settled) { settled = true; child.kill(); reject(new Error('remote join timeout')); } }, 10000);
-    child.stdout.on('data', (chunk) => {
-      if (settled) return;
-      if (String(chunk).includes('ready')) {
-        settled = true; clearTimeout(timer); resolve(child);
-      }
-    });
-    child.on('exit', (code) => { if (!settled) { settled = true; clearTimeout(timer); reject(new Error('remote join exited ' + code)); } });
-  });
+  const ready = path.join(path.dirname(file), `.remote-ready-${process.pid}-${Date.now()}`);
+  const failure = ready + '.err';
+  const script = `const fs=require('node:fs');const {LiveDocuments}=require(${JSON.stringify(modulePath)});(async()=>{const l=new LiveDocuments({directory:${JSON.stringify(liveDir)}});await l.join(${JSON.stringify(file)},${JSON.stringify(base)});fs.writeFileSync(${JSON.stringify(ready)},'ready');setInterval(()=>{},1000);})().catch(e=>{try{fs.writeFileSync(${JSON.stringify(failure)},String(e&&e.stack||e));}catch{}process.exit(1)});`;
+  // stdio:ignore works under sandboxes that refuse piped child stdio; readiness
+  // is proved by the ready file and a failed child leaves its error behind.
+  const child = spawn(process.execPath, ['-e', script], { stdio: 'ignore', windowsHide: true });
+  return (async () => {
+    const deadline = Date.now() + 10000;
+    while (Date.now() < deadline) {
+      if (fsSync.existsSync(ready)) return child;
+      if (fsSync.existsSync(failure)) throw new Error('remote join failed: ' + fsSync.readFileSync(failure, 'utf8'));
+      if (child.exitCode !== null) throw new Error('remote join exited ' + child.exitCode);
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    child.kill();
+    throw new Error('remote join timeout');
+  })();
 }
 
 test('P1-G1 live room states: dirty, conflict, orphan, mirror match state', async () => {
@@ -141,13 +146,37 @@ test('P1-G1 live room states: dirty, conflict, orphan, mirror match state', asyn
     const remote = await remoteJoin(path.join(root, 'live'), ownedFile, 'remote base\n');
     try {
       const owned = await compareShadow(host, ownedFile, 'owned-remote');
-      assert.equal(owned.value.state, 'owned-elsewhere');
+      assert.equal(owned.value.state, 'clean');
+      assert.equal(owned.value.source, 'buffer');
+      assert.equal(owned.value.dirty, false);
+      assert.equal(owned.value.crossMember, true);
+      assert.equal(owned.value.replaySafe, true);
+      assert.equal(owned.value.localMembers, 0);
+      assert.equal(owned.value.bufferOwnedElsewhere, false);
+      scenarios += 1;
+
+      // The same room seen by a legacy member (no replay caps) must fall back to
+      // disk authority and report the buffer as owned elsewhere. Use a fresh
+      // host generation so the test observes the legacy room instead of the
+      // previous generation's 30-minute session cache.
+      const { DatabaseSync } = await import('node:sqlite');
+      const capsDb = new DatabaseSync(path.join(root, 'live', 'rooms.sqlite'));
+      try { capsDb.prepare('DELETE FROM client_caps').run(); } finally { capsDb.close(); }
+      const legacyHost = createHost({ fs: dynamicProvider(), liveDocuments: live, log: { warn() {} } });
+      try {
+        const legacy = await compareShadow(legacyHost, ownedFile, 'owned-remote-legacy');
+        assert.equal(legacy.value.state, 'owned-elsewhere');
+        assert.equal(legacy.value.source, 'disk');
+        assert.equal(legacy.value.bufferOwnedElsewhere, true);
+        assert.equal(legacy.value.replaySafe, false);
+        assert.equal(legacy.value.unsavedElsewhere, false);
+      } finally { legacyHost.close(); }
       scenarios += 1;
     } finally {
       remote.kill();
     }
 
-    assert.equal(scenarios, 36);
+    assert.equal(scenarios, 37);
     host.close();
   } finally {
     host.close();

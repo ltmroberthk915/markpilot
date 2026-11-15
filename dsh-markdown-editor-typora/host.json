@@ -22,6 +22,11 @@
       "sha256": "fcc9ba8d1fb67fbe25c0231881709cc7e69c4d533a580dbe4168e7d22ef3d515"
     },
     {
+      "path": "reading-position-store.js",
+      "bytes": 23027,
+      "sha256": "c88aca323a66cc0fe4a6e6bc6e86343537ffb9aaa4c720f1dd0094976f442ab1"
+    },
+    {
       "path": "native-worker-lease.js",
       "bytes": 8612,
       "sha256": "b8dc6b7af75dd685130a26c250c45d17f72d01c523768783a4fa617604857b81"

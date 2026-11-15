@@ -33,6 +33,7 @@ import { createRequire } from 'node:module';
 import rawDiskStore from '../host/document-store.js';
 import rawLiveStore from '../host/live-documents.js';
 import rawTextCodec from '../host/text-codec.js';
+import rawReadingStore from '../host/reading-position-store.js';
 import {
   createDocumentsService, parseDocumentBlocks, countDocumentLines, findDocumentLine, MAX_LINE_READ_BYTES_CAP,
 } from './documents-service.js';
@@ -69,7 +70,7 @@ const OWNED_ORIGINALS = new WeakMap();
  *   ⑤ 同代多 host/多 live 窗口共享一张图：单 host.close 只减计数，最后一个才释放。
  * 不降级、不换目录、共享房间/原子写语义不变。 */
 const HOST_GRAPH_KEY = Symbol.for('dsh-markdown-editor-typora:host-graph');
-const HOST_ENTRY_ORDER = ['text-codec.js', 'safe-file.js', 'live-documents.js', 'document-store.js'];   // 依赖拓扑序
+const HOST_ENTRY_ORDER = ['text-codec.js', 'safe-file.js', 'live-documents.js', 'document-store.js', 'reading-position-store.js'];   // 依赖拓扑序
 function hostGraphSlot(hostDir) {
   const root = (globalThis[HOST_GRAPH_KEY] ??= new Map());
   let slot = root.get(hostDir);
@@ -77,6 +78,7 @@ function hostGraphSlot(hostDir) {
   return slot;
 }
 const HOST_GRAPH_REQUIRED = new Set(['document-store.js', 'live-documents.js', 'text-codec.js', 'safe-file.js',
+  'reading-position-store.js',
   'native-worker-lease.js', 'native-worker-path.ps1', 'native/file-worker.exe', 'native/file-worker.exe.build.json']);
 function readHostGraph(hostDir) {
   // 真实 sync-host 约定：manifest 在**插件根**（host/ 上一级）的 host.json。
@@ -179,7 +181,8 @@ function loadHostGraph() {
   if (slot.current && slot.current.digest === graph.digest && slot.current.abi === HOST_GRAPH_ABI) {
     const current = slot.current;
     return { live: current.modules.get('live-documents.js'), disk: current.modules.get('document-store.js'),
-      codec: current.modules.get('text-codec.js'), safeFile: current.modules.get('safe-file.js'), graph: current };
+      codec: current.modules.get('text-codec.js'), safeFile: current.modules.get('safe-file.js'),
+      reading: current.modules.get('reading-position-store.js'), graph: current };
   }
   // 预载新图：逐出本图 .js 成员缓存键（含 native-worker-lease 等），拓扑序 require，形状验证。
   const restore = evictHostCacheKeys(graph.members);
@@ -205,6 +208,7 @@ function loadHostGraph() {
     if (typeof live?.LiveDocuments !== 'function' || typeof live?.withFileCommit !== 'function'
       || typeof disk?.DocumentStore !== 'function' || typeof disk?.createSession !== 'function'
       || typeof loaded.get('text-codec.js')?.decodeDocument !== 'function'
+      || typeof loaded.get('reading-position-store.js')?.ReadingPositionStore !== 'function'
       || typeof loaded.get('safe-file.js')?.prepareFile !== 'function')
       throw new Error('host graph 新代导出面不完整（digest=' + graph.digest.slice(0, 12) + '）');
   } catch (error) {
@@ -236,7 +240,8 @@ function loadHostGraph() {
   }
   slot.current = nextGraph;
   return { live: loaded.get('live-documents.js'), disk: loaded.get('document-store.js'),
-    codec: loaded.get('text-codec.js'), safeFile: loaded.get('safe-file.js'), graph: slot.current };
+    codec: loaded.get('text-codec.js'), safeFile: loaded.get('safe-file.js'),
+    reading: loaded.get('reading-position-store.js'), graph: slot.current };
 }
 /** 发布前绑定/导出一致性校验：真实 Module 对象缺失或 exports 形状不符 ⇒ 直接失败（不静默放过）。 */
 function validateOwnedGraph(loaded, cjsModules) {
@@ -252,6 +257,8 @@ function validateOwnedGraph(loaded, cjsModules) {
     throw new Error('host graph 校验失败：live-documents 导出面不完整');
   if (typeof disk?.DocumentStore !== 'function' || typeof disk?.createSession !== 'function')
     throw new Error('host graph 校验失败：document-store 导出面不完整');
+  if (typeof loaded.get('reading-position-store.js')?.ReadingPositionStore !== 'function')
+    throw new Error('host graph 校验失败：reading-position-store 导出面不完整');
   // 只读构造探针：document-store 构造函数仅赋值（无 IO），defaultDirectory 混代时必抛
   // liveCommitDirectory is not a function —— 这正是发布前要拦下的形态。
   const probe = new disk.DocumentStore();
@@ -295,6 +302,7 @@ const hostModules = loadHostGraph();
 const diskStore = hostModules.disk;
 const liveStore = hostModules.live;
 const textCodec = hostModules.codec;
+const readingStore = hostModules.reading;
 const activeHostGraph = hostModules.graph;
 function registerHost(token) { activeHostGraph.hosts.add(token); }
 function scheduleHostRetirement(ownerGraph) {
@@ -326,7 +334,7 @@ const MODEL_TOOL = Symbol('markdown model tool');
 export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'documents.session', 'documents.recoveryList', 'documents.recoveryRead', 'documents.recoveryDiscard', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'documents.captureSelection', 'documents.readSelection', 'documents.editSelection', 'diag']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'reading', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'documents.session', 'documents.recoveryList', 'documents.recoveryRead', 'documents.recoveryDiscard', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'documents.captureSelection', 'documents.readSelection', 'documents.editSelection', 'diag']);
 const SESSION_MUTATING_ENDPOINTS = new Set(['open', 'save', 'edit', 'live', 'docs/create', 'docs/saveAs', 'docs/archive', 'documents.applyEdits', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.undoGroups', 'documents.merge3', 'documents.reviewGroup', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftClear']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
@@ -785,6 +793,12 @@ export function createHost(options = {}) {
   const watchers = new Map();
   const fileIdentities = new Map();
   const live = options.liveDocuments ?? new liveStore.LiveDocuments();
+  const reading = options.readingPositions ?? new readingStore.ReadingPositionStore(
+    options.readingDirectory ? { directory: options.readingDirectory } : {});
+  /* Files this host instance opened through apiOpen.  The reading endpoint is
+     scoped to that set: the renderer cannot ask us to remember a position for
+     an arbitrary path it never opened. */
+  const openedReadingPaths = new Map();
   const leases = new Map();
   let closed = false;
 
@@ -840,8 +854,73 @@ export function createHost(options = {}) {
       };
     } finally { try { db.close(); } catch { /* 已关闭 */ } }
   }
-  function liveEndpoint(payload) {
-    leaseOf(payload.client);
+  const READING_OPEN_TTL_MS = 24 * 60 * 60 * 1000;
+  async function rememberReadingTarget(target) {
+    try {
+      const canonical = await canonicalTarget(target);
+      const key = pathKey(canonical);
+      const at = Date.now();
+      openedReadingPaths.set(key, { path: canonical, at });
+      if (openedReadingPaths.size > 512) {
+        for (const [candidate, entry] of openedReadingPaths) {
+          if (openedReadingPaths.size <= 512) break;
+          if (at - entry.at > READING_OPEN_TTL_MS || candidate !== key) openedReadingPaths.delete(candidate);
+        }
+      }
+    } catch { /* reading positions are optional; never block open */ }
+  }
+  async function readingTarget(raw) {
+    if (typeof raw !== 'string' || !raw || raw.length > 32768 || !isAbsolute(raw)) return null;
+    let canonical = raw;
+    try { canonical = await realpath(raw); }
+    catch (error) { if (error?.code !== 'ENOENT') return null; }
+    try {
+      const info = await fsStat(canonical);
+      if (!info || (typeof info.isFile === 'function' && !info.isFile())) return null;
+    } catch { return null; }
+    const key = pathKey(canonical);
+    const opened = openedReadingPaths.get(key);
+    if (!opened || Date.now() - opened.at > READING_OPEN_TTL_MS) return null;
+    return { key, path: opened.path };
+  }
+  /**
+   * Reading-position endpoint.  It is only reachable for a file this host
+   * instance already opened through apiOpen; the body contains an anchor, never
+   * document text.  `register` is the ONLY op that creates/refreshes a plugin
+   * lease; get/touch/save never resurrect a released or expired session.
+   */
+  async function apiReading(payload) {
+    const op = typeof payload?.op === 'string' ? payload.op : '';
+    const sessionId = typeof payload?.sessionId === 'string' && payload.sessionId ? payload.sessionId : null;
+    if (op === 'release') {
+      if (sessionId) reading.end(sessionId);
+      return { ok: true, value: { released: !!sessionId } };
+    }
+    if (op !== 'register' && op !== 'get' && op !== 'touch' && op !== 'save')
+      return badRequest('unknown reading op');
+    const target = await readingTarget(payload?.path);
+    if (!target) throw codedError('MP_READING_UNBOUND', 'reading position is only available for a file opened in this editor');
+    if (!sessionId) throw codedError('MP_READING_SESSION', 'reading position requires an editor session');
+    if (op === 'register') {
+      const began = reading.begin({ id: sessionId, role: 'plugin', path: target.path, pid: process.pid, ttlMs: 60000 });
+      if (!began.ok) throw codedError('MP_READING_STALE_SESSION', 'reading session was already closed');
+      return { ok: true, value: { active: true, expiresAt: began.expiresAt } };
+    }
+    if (!reading.activeSession(sessionId, target.path))
+      throw codedError('MP_READING_STALE_SESSION', 'reading session is closed, stale, or bound to another file');
+    if (op === 'touch') {
+      const touched = reading.touch({ id: sessionId, path: target.path, ttlMs: 60000 });
+      if (!touched.ok) throw codedError('MP_READING_STALE_SESSION', 'reading session is closed or stale');
+      return { ok: true, value: { active: true } };
+    }
+    if (op === 'get') return { ok: true, value: reading.load({ path: target.path, sessionId }) };
+    const result = reading.save({ path: target.path, role: 'plugin', sessionId,
+      anchor: payload?.anchor, seq: payload?.seq, sampleAt: payload?.sampleAt });
+    if (result.reason === 'session-stale')
+      throw codedError('MP_READING_STALE_SESSION', 'reading session was closed before this save arrived');
+    return { ok: true, value: result };
+  }
+  function liveEndpoint(payload) {    leaseOf(payload.client);
     if (payload.action === 'leave') {
       releaseLive(payload.client);
       return {ok:true,value:null};
@@ -1193,6 +1272,7 @@ export function createHost(options = {}) {
           ...(Array.isArray(joined.recovered)?{recovered:joined.recovered}:{})};
         value.text=joined.text;
       }
+      if (authority !== MODEL_TOOL) await rememberReadingTarget(target);
       return {ok:true,value};
     }
     throw codedError('FS_STALE_VERSION','file changed during read; retry after the external write finishes');
@@ -1974,6 +2054,9 @@ export function createHost(options = {}) {
         case 'save': return await apiSave(payload);
         case 'stat': return await apiStat(payload);
         case 'live': return authority === MODEL_TOOL ? badRequest('editor lease required') : await liveEndpoint(payload);
+        case 'reading':
+          if (authority === MODEL_TOOL) return badRequest('editor UI authority required');
+          return await apiReading(payload);
         case 'edit': return await apiEdit(payload, invocation);
         case 'documents.captureSelection':
           if (authority === MODEL_TOOL) return badRequest('captureSelection is editor-only');
@@ -2219,6 +2302,7 @@ export function createHost(options = {}) {
 
   function close() {
     closed=true;
+    try { reading.close(); } catch { /* position store is optional */ }
     // 先放本 host 自己的资源（leases → SSE → watchers），再离场代际计数：
     // 已接纳的异步 save 排空后才可能触发旧代资源关闭（scheduleHostRetirement）。
     for(const client of leases.keys())releaseLive(client);

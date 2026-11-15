@@ -81,7 +81,7 @@ test('B3.3b-client discard clears a mirror even without a local handle', async (
   h.cleanup();
 });
 
-test('B3.3b-client cleanup cancels the pending mirror timer', async () => {
+test('B3.3b-client cleanup cancels the pending mirror timer and writes one final mirror on a dirty close', async () => {
   const h = make();
   h.setFetch((req) => {
     if (req.endpoint === 'open') return opened('base', 'v1');
@@ -92,13 +92,22 @@ test('B3.3b-client cleanup cancels the pending mirror timer', async () => {
   const doc = h.st.doc;
   doc.liveUnsupported = true;
   doc.baseSha256 = 'a'.repeat(64);
+  const mirrors = () => h.requests.filter((r) => r.endpoint === 'documents.draftMirror');
   h.edit('typed');
   await drain();
-  const before = h.requests.filter((r) => r.endpoint === 'documents.draftMirror').length;
+  assert.equal(mirrors().length, 1, 'the first dirty edit mirrors immediately');
+  // The second edit inside the minimum interval parks a trailing timer.
+  h.edit('typed twice');
+  await drain();
+  assert.equal(mirrors().length, 1, 'the trailing edit waits for its timer');
   h.cleanup();
+  await drain();
+  // A dirty close still makes exactly one best-effort final mirror for readers;
+  // this is the close flush, not the cancelled timer.
+  assert.equal(mirrors().length, 2, 'dirty close writes exactly one final mirror');
+  assert.equal(mirrors()[1].payload.text, 'typed twice', 'the close flush carries the latest text');
   await h.advance(1600);
-  assert.equal(h.requests.filter((r) => r.endpoint === 'documents.draftMirror').length, before);
-  h.cleanup();
+  assert.equal(mirrors().length, 2, 'the cancelled timer must not write after cleanup');
 });
 
 test('B3.3b-client open adopts an existing mirror handle for later cleanup', async () => {

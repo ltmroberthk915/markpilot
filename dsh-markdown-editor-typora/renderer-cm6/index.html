@@ -16,6 +16,8 @@
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self' data:; script-src 'self'; connect-src 'self' data: blob:; worker-src 'self' blob:" />
   <link rel="stylesheet" href="cm6/app.css" />
+  <!-- 阅读位置协调器：与桌面共用的同一份实现（sync-host 同步到此，sync-core 不覆盖）。 -->
+  <script src="reading-position-client.js"></script>
   <!-- 桥必须先于引擎加载：引擎在脚本尾部调用 window.handler.on(...) 注册下行处理。 -->
   <script src="dsh-bridge.js"></script>
   <!-- 选区浮按钮在 app.js 之后执行（defer 保证正文脚本先跑完）；它只读引擎 state，不改。 -->

@@ -15,8 +15,13 @@ function makeWorld(options = {}) {
   let version = options.version ?? 'v1';
   let diskVersion = version;
   const calls = { append: [], edit: [], save: [], archive: [] };
+  const groups = new Map();
   const room = options.room === undefined ? null : options.room;
   if (room && room.localMembers === undefined) room.localMembers = room.members;
+  // A current live member advertises both required caps (durable append and
+  // remote replay). documents-service only permits a buffer append while every
+  // live member is replay-safe; legacy rooms omit the flag and stay fail-closed.
+  if (room && room.allReplaySafe === undefined) room.allReplaySafe = true;
   const live = {
     async readRoom(p) { assert.equal(p, file); return room; },
     async listAppendRecovery(p) { assert.equal(p, file); return options.recovery ?? []; },
@@ -38,6 +43,18 @@ function makeWorld(options = {}) {
       room.text = next;
       room.textSha256 = sha256Text(next);
       return { epoch: room.epoch, version: room.version, savedVersion: room.savedVersion, diskHash: room.diskHash, text: next, textSha256: sha256Text(next), recoveryPath: options.recoveryPath };
+    },
+    // A current host persists the agent group in the same store as the room; the
+    // service only advertises a group id after reading the exact record back.
+    async recordAgentGroup(p, group) {
+      assert.equal(p, file);
+      calls.groupRecorded = (calls.groupRecorded || 0) + 1;
+      groups.set(group.groupId, { ...group });
+      return { groupId: group.groupId };
+    },
+    async getAgentGroup(p, groupId) {
+      assert.equal(p, file);
+      return groups.get(groupId) || null;
     },
   };
   const service = createDocumentsService({
@@ -272,6 +289,44 @@ test('B3-S8 the buffer write policy is fail-closed for read-only and outside the
   assert.equal(deniedDisk.ok, false);
   assert.equal(deniedDisk.error.code, 'FS_SANDBOX_DENIED');
   assert.equal(disk.calls.save.length, 0);
+});
+
+test('B3-S13 a legacy live member cannot accept a buffer append; disk authority stays version-guarded', async () => {
+  const baseRoom = { epoch: 'e-1', version: 2, savedVersion: 2, diskHash: 'd1', text: 'hello\n', savedText: 'hello\n', savedTextAvailable: true, members: 1, localMembers: 1, allReplaySafe: false, textSha256: sha256Text('hello\n') };
+  const base = makeLiveRevisionId('e-1', 2, sha256Text('hello\n'));
+
+  // A legacy member (no replay caps) still leaves the room authoritative for
+  // reads, but an agent append is refused before the archive or the room write.
+  const local = makeWorld({ room: { ...baseRoom } });
+  const localRead = await local.service.read({ path: local.file }, {});
+  assert.equal(localRead.value.source, 'buffer');
+  assert.equal(localRead.value.unsafeMembers, true);
+  assert.equal(localRead.value.replaySafe, false);
+  assert.equal(localRead.value.writable, false);
+  const refused = await local.service.applyEdits({ path: local.file, baseRevisionId: base, oldString: 'hello', newString: 'bye' }, {}, undefined);
+  assert.equal(refused.ok, false);
+  assert.equal(refused.error.code, 'MP_DOC_UNSAFE_MEMBERS');
+  assert.equal(local.calls.append.length, 0);
+  assert.equal(local.calls.archive.length, 0);
+  assert.equal(local.state.text, 'hello\n');
+
+  // A legacy member in another process is buffer-owned-elsewhere: reads are disk
+  // authority and an edit keeps the provider version contract instead of failing
+  // just because a legacy member exists.
+  const remote = makeWorld({ room: { ...baseRoom, members: 2, localMembers: 1 } });
+  const remoteRead = await remote.service.read({ path: remote.file }, {});
+  assert.equal(remoteRead.value.source, 'disk');
+  assert.equal(remoteRead.value.bufferOwnedElsewhere, true);
+  assert.equal(remoteRead.value.unsafeMembers, true);
+  assert.equal(remoteRead.value.writable, true);
+  const disk = await remote.service.applyEdits({ path: remote.file, baseRevisionId: remoteRead.value.version, oldString: 'hello', newString: 'bye' }, {}, undefined);
+  assert.equal(disk.ok, true);
+  assert.equal(disk.value.source, 'disk');
+  assert.equal(disk.value.saved, true);
+  assert.equal(remote.calls.append.length, 0);
+  assert.equal(remote.calls.edit.length, 1);
+  assert.equal(remote.calls.edit[0].baseVersion, 'v1');
+  assert.equal(remote.state.text, 'bye\n');
 });
 
 test('B3-S9 revision tokens round-trip, including provider versions with colons', () => {

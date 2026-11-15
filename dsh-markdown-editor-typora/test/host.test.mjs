@@ -1,3 +1,4 @@
+import './fixtures/isolate-markpilot-state.cjs';
 // dsh-markdown-editor-typora 宿主半边：纯函数 + mock ctx + 真实 node:http 集成测试。
 // 运行：node --test test/host.test.mjs
 import { test } from 'node:test';

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -22,20 +23,29 @@ function makeCtx() {
 }
 
 function lockedChild(dbFile) {
-  const code = `const { DatabaseSync } = require('node:sqlite');
-const db = new DatabaseSync(${JSON.stringify(dbFile)});
+  const ready = dbFile + '.locked-' + process.pid;
+  const failure = ready + '.err';
+  const code = `const fs=require('node:fs');const { DatabaseSync } = require('node:sqlite');
+try { const db = new DatabaseSync(${JSON.stringify(dbFile)});
 db.exec('PRAGMA locking_mode=EXCLUSIVE');
 db.exec('BEGIN EXCLUSIVE');
-process.stdout.write('locked\\n');
+fs.writeFileSync(${JSON.stringify(ready)}, 'locked'); }
+catch (error) { fs.writeFileSync(${JSON.stringify(failure)}, String(error && error.stack || error)); process.exit(1); }
 setInterval(() => {}, 1000);`;
-  const child = spawn(process.execPath, ['-e', code], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { child.kill(); reject(new Error('lock child timeout')); }, 5000);
-    child.stdout.on('data', (chunk) => {
-      if (String(chunk).includes('locked')) { clearTimeout(timer); resolve(child); }
-    });
-    child.on('exit', (code) => { if (code !== null) { clearTimeout(timer); reject(new Error('lock child exited ' + code)); } });
-  });
+  // stdio:ignore works under sandboxes that refuse piped child stdio; the lock
+  // file is the readiness proof, and a failed child leaves its error behind.
+  const child = spawn(process.execPath, ['-e', code], { stdio: 'ignore', windowsHide: true });
+  return (async () => {
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline) {
+      if (fsSync.existsSync(ready)) return child;
+      if (fsSync.existsSync(failure)) throw new Error('lock child failed: ' + fsSync.readFileSync(failure, 'utf8'));
+      if (child.exitCode !== null) throw new Error('lock child exited ' + child.exitCode);
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    child.kill();
+    throw new Error('lock child timeout');
+  })();
 }
 
 test('P5-G5 real SQLite lock makes the write guard fail closed', async () => {
@@ -62,14 +72,43 @@ test('P5-G5 real SQLite lock makes the write guard fail closed', async () => {
     });
     guard.install(h.ctx);
     const writeIntent = h.listeners.get('fs/write-intent');
-    const first = await writeIntent(TARGET, {}, async () => BASE);
-    assert.deepEqual(first, BASE);
-    const second = await writeIntent(TARGET, {}, async () => BASE);
-    assert.deepEqual(second, BASE);
+    let nextCalls = 0;
+    const next = async () => { nextCalls += 1; return BASE; };
+    // A real SQLite lock proves the draft state is unknown. The guard refuses
+    // the first intent: no fail-open warm-up and no retry counter.
     await assert.rejects(
-      () => writeIntent(TARGET, {}, async () => BASE),
-      (error) => error.code === 'MP_DOC_LOOKUP_FAILED',
+      () => writeIntent(TARGET, {}, next),
+      (error) => {
+        assert.equal(error.code, 'MP_DOC_LOOKUP_FAILED');
+        assert.equal(error.path, TARGET.displayPath);
+        assert.match(error.message, /无法读取未保存状态/);
+        return true;
+      },
     );
+    assert.equal(nextCalls, 1, 'intent handlers run next() first; the guard still refuses the write');
+    await assert.rejects(() => writeIntent(TARGET, {}, next), (error) => error.code === 'MP_DOC_LOOKUP_FAILED');
+    assert.equal(nextCalls, 2);
+
+    // Releasing the real lock must release the guard immediately: there is no
+    // sticky failure budget left behind.
+    child.kill();
+    await new Promise((resolve) => {
+      if (child.exitCode !== null) return resolve();
+      const timer = setTimeout(resolve, 3000);
+      child.once('exit', () => { clearTimeout(timer); resolve(); });
+    });
+    const recovered = await (async () => {
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        try { return await writeIntent(TARGET, {}, next); }
+        catch (error) {
+          if (error.code !== 'MP_DOC_LOOKUP_FAILED') throw error;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+      }
+      throw new Error('real SQLite lock did not release within 2s');
+    })();
+    assert.deepEqual(recovered, BASE);
+    assert.equal(nextCalls > 2, true);
   } finally {
     if (child) child.kill();
     await fs.rm(root, { recursive: true, force: true }).catch(() => {});

@@ -1,6 +1,10 @@
-// The plugin is installed outside the DSH package tree, so the bundled
-// @deepseek-ai/dsh-tools is not ESM-resolvable from lib/index.js. The registry
-// fallback must still produce a valid JSON-Schema tool and register it.
+// Drop-in replacement for dsh-markdown-editor-typora/test/markdown-tool-registration.test.mjs.
+//
+// The shipped test pins the pre-selection action enum
+// (read/edit/blocks/batch/merge3/undo). The current author schema also exposes
+// editSelection/readSelection, and both are dispatched (lib/index.js branches on
+// action === 'readSelection' / 'editSelection'). The fallback conversion itself
+// is correct; only the hard-coded expectation was stale.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -10,6 +14,36 @@ import {
 
 const noopDispatch = async () => ({ ok: false, error: { code: 'PROBE', message: 'probe' } });
 
+test('authorSchemaToRegistrySchema lifts required:true into parent required arrays and preserves enums', () => {
+  const converted = authorSchemaToRegistrySchema({
+    type: 'object',
+    properties: {
+      title: { type: 'string', required: true, enum: ['a', 'b'] },
+      config: {
+        type: 'object', required: true,
+        properties: {
+          mode: { type: 'string', required: true, enum: ['x'] },
+          label: { type: 'string' },
+        },
+      },
+      entries: {
+        type: 'array', required: true,
+        items: { type: 'object', properties: { id: { type: 'string', required: true } } },
+      },
+      optional: { type: 'string' },
+    },
+    additionalProperties: false,
+  });
+  assert.deepEqual(converted.required, ['title', 'config', 'entries']);
+  assert.equal(converted.properties.title.required, undefined);
+  assert.deepEqual(converted.properties.title.enum, ['a', 'b']);
+  assert.deepEqual(converted.properties.config.required, ['mode']);
+  assert.equal(converted.properties.config.properties.label.required, undefined);
+  assert.deepEqual(converted.properties.entries.items.required, ['id']);
+  assert.equal(converted.properties.optional.required, undefined);
+  assert.equal(converted.additionalProperties, false);
+});
+
 test('registry fallback converts author required:true into JSON-Schema required arrays', () => {
   const spec = createMarkdownToolDefinition(noopDispatch);
   const def = createRegistryMarkdownToolDefinition(spec);
@@ -18,7 +52,13 @@ test('registry fallback converts author required:true into JSON-Schema required 
   assert.deepEqual(def.parameters.required, ['action', 'path']);
   assert.equal(def.parameters.properties.action.type, 'string');
   assert.equal(def.parameters.properties.action.required, undefined);
-  assert.deepEqual(def.parameters.properties.action.enum, ['read', 'edit', 'blocks', 'batch', 'merge3', 'undo']);
+  // The fallback must preserve the author's action enum verbatim. The current
+  // public action contract includes the two selection actions; the fallback
+  // path must expose them too (they are dispatched in lib/index.js).
+  assert.deepEqual(def.parameters.properties.action.enum, spec.parameters.action.enum);
+  for (const action of ['read', 'edit', 'blocks', 'batch', 'merge3', 'undo', 'editSelection', 'readSelection']) {
+    assert.ok(def.parameters.properties.action.enum.includes(action), `action ${action}`);
+  }
   assert.deepEqual(def.output.schema.required, ['ok', 'action']);
   assert.deepEqual(def.output.schema.properties.error.required, ['code', 'message']);
   assert.equal(typeof def.output.render, 'function');

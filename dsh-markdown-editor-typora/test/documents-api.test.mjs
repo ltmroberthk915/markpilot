@@ -226,27 +226,46 @@ async function otherProcessOwns(dir) {
   finally { db.close(); }
 }
 
-test('B3-API7 a room owned only by another process is disk authority; dirty elsewhere is refused', async () => {
+// A store written before client_caps existed (or by an old host) advertises no
+// replay caps. Deleting the rows is the exact legacy shape the room reader sees.
+async function dropClientCaps(dir) {
+  const { DatabaseSync } = await import('node:sqlite');
+  const db = new DatabaseSync(path.join(dir, 'rooms.sqlite'));
+  try { db.prepare('DELETE FROM client_caps').run(); }
+  finally { db.close(); }
+}
+
+test('B3-API7 a replay-safe room owned by another process keeps buffer authority; a legacy member falls back to disk', async () => {
+  // Arm 1: current member (durable append + remote replay) in another process.
+  // The buffer is authoritative because that member can replay an agent append.
   const cleanWorld = await makeWorld('elsewhere-clean', 'hello\n');
   try {
     const liveDocs = new LiveDocuments({ directory: cleanWorld.live });
-    const joined = await liveDocs.join(cleanWorld.file, 'hello\n');
+    await liveDocs.join(cleanWorld.file, 'hello\n');
     await otherProcessOwns(cleanWorld.live);
     const host = createHost({ fs: provider(cleanWorld.file), liveDocuments: liveDocs, log: { warn() {} } });
     const read = await host.dispatch('documents.read', { path: cleanWorld.file }, MODEL_TOOL, execution(cleanWorld.root));
-    assert.equal(read.value.source, 'disk');
-    assert.equal(read.value.bufferOwnedElsewhere, true);
-    assert.equal(read.value.unsavedElsewhere, false);
+    assert.equal(read.value.source, 'buffer');
+    assert.equal(read.value.crossMember, true);
+    assert.equal(read.value.replaySafe, true);
+    assert.equal(read.value.localMembers, 0);
+    assert.equal(read.value.bufferOwnedElsewhere, false);
     const apply = await host.dispatch('documents.applyEdits', {
       path: cleanWorld.file, baseRevisionId: read.value.version, oldString: 'hello', newString: 'bye',
     }, MODEL_TOOL, execution(cleanWorld.root));
     assert.equal(apply.ok, true);
-    assert.equal(apply.value.source, 'disk');
-    assert.equal(apply.value.saved, true);
-    assert.equal(await fs.readFile(cleanWorld.file, 'utf8'), 'bye\n');
+    assert.equal(apply.value.source, 'buffer');
+    assert.equal(apply.value.saved, false);
+    assert.equal(apply.value.dirty, true);
+    assert.equal(await fs.readFile(cleanWorld.file, 'utf8'), 'hello\n', 'buffer apply must not write disk');
+    const after = await host.dispatch('documents.read', { path: cleanWorld.file }, MODEL_TOOL, execution(cleanWorld.root));
+    assert.equal(after.value.text, 'bye\n');
+    assert.equal(after.value.dirty, true);
     host.close();
   } finally { cleanWorld.restore(); }
 
+  // Arm 2: a replay-safe remote room that is already dirty keeps buffer
+  // authority; the agent append is replayable and the disk baseline is untouched.
   const dirtyWorld = await makeWorld('elsewhere-dirty', 'hello\n');
   try {
     const liveDocs = new LiveDocuments({ directory: dirtyWorld.live });
@@ -258,17 +277,69 @@ test('B3-API7 a room owned only by another process is disk authority; dirty else
     await otherProcessOwns(dirtyWorld.live);
     const host = createHost({ fs: provider(dirtyWorld.file), liveDocuments: liveDocs, log: { warn() {} } });
     const read = await host.dispatch('documents.read', { path: dirtyWorld.file }, MODEL_TOOL, execution(dirtyWorld.root));
-    assert.equal(read.value.source, 'disk');
-    assert.equal(read.value.bufferOwnedElsewhere, true);
-    assert.equal(read.value.unsavedElsewhere, true);
+    assert.equal(read.value.source, 'buffer');
+    assert.equal(read.value.dirty, true);
+    assert.equal(read.value.crossMember, true);
+    assert.equal(read.value.replaySafe, true);
     const apply = await host.dispatch('documents.applyEdits', {
       path: dirtyWorld.file, baseRevisionId: read.value.version, oldString: 'hello', newString: 'bye',
     }, MODEL_TOOL, execution(dirtyWorld.root));
-    assert.equal(apply.ok, false);
-    assert.equal(apply.error.code, 'MP_DOC_UNSAVED_ELSEWHERE');
+    assert.equal(apply.ok, true);
+    assert.equal(apply.value.source, 'buffer');
     assert.equal(await fs.readFile(dirtyWorld.file, 'utf8'), 'hello\n');
     host.close();
   } finally { dirtyWorld.restore(); }
+
+  // Arm 3: legacy clean member (no replay caps) is buffer-owned-elsewhere: disk
+  // authority and a version-guarded disk write.
+  const legacyClean = await makeWorld('elsewhere-legacy-clean', 'hello\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: legacyClean.live });
+    await liveDocs.join(legacyClean.file, 'hello\n');
+    await otherProcessOwns(legacyClean.live);
+    await dropClientCaps(legacyClean.live);
+    const host = createHost({ fs: provider(legacyClean.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const read = await host.dispatch('documents.read', { path: legacyClean.file }, MODEL_TOOL, execution(legacyClean.root));
+    assert.equal(read.value.source, 'disk');
+    assert.equal(read.value.bufferOwnedElsewhere, true);
+    assert.equal(read.value.replaySafe, false);
+    assert.equal(read.value.unsavedElsewhere, false);
+    const apply = await host.dispatch('documents.applyEdits', {
+      path: legacyClean.file, baseRevisionId: read.value.version, oldString: 'hello', newString: 'bye',
+    }, MODEL_TOOL, execution(legacyClean.root));
+    assert.equal(apply.ok, true);
+    assert.equal(apply.value.source, 'disk');
+    assert.equal(apply.value.saved, true);
+    assert.equal(await fs.readFile(legacyClean.file, 'utf8'), 'bye\n');
+    host.close();
+  } finally { legacyClean.restore(); }
+
+  // Arm 4: legacy dirty member cannot replay the dirty buffer; the write is
+  // refused and the disk bytes stay exactly as they were.
+  const legacyDirty = await makeWorld('elsewhere-legacy-dirty', 'hello\n');
+  try {
+    const liveDocs = new LiveDocuments({ directory: legacyDirty.live });
+    const joined = await liveDocs.join(legacyDirty.file, 'hello\n');
+    await liveDocs.append(legacyDirty.file, {
+      epoch: joined.epoch, baseVersion: 0, baseText: 'hello\n', actor: 'agent',
+      changes: [{ from: 5, to: 5, insert: '!' }],
+    });
+    await otherProcessOwns(legacyDirty.live);
+    await dropClientCaps(legacyDirty.live);
+    const host = createHost({ fs: provider(legacyDirty.file), liveDocuments: liveDocs, log: { warn() {} } });
+    const read = await host.dispatch('documents.read', { path: legacyDirty.file }, MODEL_TOOL, execution(legacyDirty.root));
+    assert.equal(read.value.source, 'disk');
+    assert.equal(read.value.bufferOwnedElsewhere, true);
+    assert.equal(read.value.replaySafe, false);
+    assert.equal(read.value.unsavedElsewhere, true);
+    const apply = await host.dispatch('documents.applyEdits', {
+      path: legacyDirty.file, baseRevisionId: read.value.version, oldString: 'hello', newString: 'bye',
+    }, MODEL_TOOL, execution(legacyDirty.root));
+    assert.equal(apply.ok, false);
+    assert.equal(apply.error.code, 'MP_DOC_UNSAVED_ELSEWHERE');
+    assert.equal(await fs.readFile(legacyDirty.file, 'utf8'), 'hello\n');
+    host.close();
+  } finally { legacyDirty.restore(); }
 });
 
 test('B4.1-API1 markdown blocks/edit blockId goes through the live room and returns a group id', async () => {

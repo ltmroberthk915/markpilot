@@ -4881,8 +4881,217 @@ function normDocs(d) {
   return { open: d.open === true, listW: (isFinite(w) && w > 0) ? Math.round(w) : 268 };
 }
 
+function captureReadingFromWindow(win) {
+  if (!win || win === window) return null;
+  try {
+    const engine = win.mpEngine;
+    if (!engine || typeof engine.flushReadingPosition !== 'function') return null;
+    const captured = engine.flushReadingPosition();
+    return captured && captured.anchor ? captured : null;
+  } catch { return null; }
+}
+
+const defaultReadingTimers = {
+  setTimeout: (...args) => globalThis.setTimeout(...args),
+  clearTimeout: (...args) => globalThis.clearTimeout(...args),
+};
+
+function createReadingLeaseKeeper({
+  api, makeSessionId, alive, generation, path, isUntitled,
+  now = () => Date.now(), heartbeatMs = 20000,
+  timers = defaultReadingTimers,
+  onLease, onLeaseLost, onRestore, onArm, onError = () => {},
+}) {
+  const s = {
+    started: false, stopped: false, gen: null, sessionId: null, leaseLost: false,
+    last: null, lastAt: 0, lastSeq: 0, dirty: false,
+    recovering: false, recoverAttempts: 0, recoverTimer: null,
+    heartbeatTimer: null, inFlight: null, pending: null, waiters: [], restored: false,
+  };
+  const retryDelay = [1000, 5000, 15000];
+  const current = () => !s.stopped && alive() && s.gen === generation();
+  const codeOf = result => result && (result.code || (result.error && result.error.code));
+  const leaseCode = result => codeOf(result) === 'MP_READING_STALE_SESSION' || codeOf(result) === 'MP_READING_SESSION';
+  const retryable = result => codeOf(result) === 'MP_READING_UNAVAILABLE' || !codeOf(result);
+  const resolveWaiters = () => {
+    if (s.inFlight) return;
+    if (s.pending && s.stopped && (!s.sessionId || s.leaseLost)) s.pending = null;
+    if (s.pending) return;
+    const waiters = s.waiters; s.waiters = [];
+    for (const resolve of waiters) resolve();
+  };
+  const clearHeartbeat = () => {
+    if (s.heartbeatTimer) { timers.clearTimeout(s.heartbeatTimer); s.heartbeatTimer = null; }
+  };
+  const clearRecover = () => {
+    if (s.recoverTimer) { timers.clearTimeout(s.recoverTimer); s.recoverTimer = null; }
+  };
+  const scheduleHeartbeat = () => {
+    if (!current() || s.heartbeatTimer) return;
+    s.heartbeatTimer = timers.setTimeout(() => { s.heartbeatTimer = null; void beat(); }, heartbeatMs);
+  };
+  const scheduleRecover = delay => {
+    if (!current() || s.stopped || s.recoverTimer) return;
+    s.recoverTimer = timers.setTimeout(() => {
+      s.recoverTimer = null;
+      void acquire(false);
+    }, delay === undefined ? 0 : delay);
+  };
+  const loseLease = ({ keepPending = false } = {}) => {
+    s.sessionId = null;
+    s.leaseLost = true;
+    clearHeartbeat();
+    if (typeof onLeaseLost === 'function') onLeaseLost();
+    if (!keepPending) { s.pending = null; s.dirty = false; s.last = null; }
+    else if (!s.pending) s.dirty = false;
+  };
+  async function beat() {
+    if (!current()) return;
+    if (!s.sessionId || s.leaseLost) { scheduleRecover(0); return; }
+    const sessionId = s.sessionId;
+    let result;
+    try { result = await api('touch', { path: path(), sessionId }); }
+    catch { result = { ok: false, error: { code: 'MP_READING_UNAVAILABLE' } }; }
+    if (!current() || s.sessionId !== sessionId) return;
+    if (result && result.ok === true) { s.recoverAttempts = 0; scheduleHeartbeat(); return; }
+    if (leaseCode(result)) {
+      loseLease();
+      scheduleRecover(0);
+      return;
+    }
+    s.recoverAttempts += 1;
+    if (s.recoverAttempts < 3) scheduleRecover(retryDelay[Math.min(s.recoverAttempts - 1, retryDelay.length - 1)]);
+    else scheduleHeartbeat();
+  }
+  async function acquire(restore) {
+    if (!current() || s.stopped || s.recovering) return;
+    s.recovering = true;
+    const sessionId = makeSessionId();
+    let result;
+    try { result = await api('register', { path: path(), sessionId }); }
+    catch { result = { ok: false, error: { code: 'MP_READING_UNAVAILABLE' } }; }
+    s.recovering = false;
+    if (!current() || s.stopped) return;
+    if (!result || result.ok !== true) {
+      if (leaseCode(result) || retryable(result)) {
+        s.recoverAttempts += 1;
+        if (s.recoverAttempts < 3) scheduleRecover(retryDelay[Math.min(s.recoverAttempts - 1, retryDelay.length - 1)]);
+        else scheduleHeartbeat();
+      } else onError(result);
+      return;
+    }
+    s.sessionId = sessionId;
+    s.leaseLost = false;
+    s.recoverAttempts = 0;
+    if (typeof onLease === 'function') onLease(sessionId);
+    if (restore && !s.restored) {
+      s.restored = true;
+      let got;
+      try { got = await api('get', { path: path(), sessionId }); }
+      catch { got = { ok: false, error: { code: 'MP_READING_UNAVAILABLE' } }; }
+      if (!current() || s.sessionId !== sessionId) return;
+      if (got && got.ok === true && got.value && got.value.anchor) {
+        if (typeof onRestore === 'function') onRestore(got.value.anchor);
+      } else if (typeof onArm === 'function') onArm();
+    }
+    scheduleHeartbeat();
+    drain();
+  }
+  function drain() {
+    if (s.inFlight || !s.pending || !s.sessionId || s.leaseLost) return;
+    const payload = s.pending;
+    s.pending = null;
+    const sessionId = s.sessionId;
+    s.inFlight = Promise.resolve()
+      .then(() => api('save', { ...payload, path: path(), sessionId }))
+      .catch(() => ({ ok: false, error: { code: 'MP_READING_UNAVAILABLE' } }))
+      .then(result => {
+        if (!result || result.ok !== true) {
+          if (leaseCode(result)) {
+            loseLease({ keepPending: !!s.pending });
+            scheduleRecover(0);
+          } else if (retryable(result)) {
+            s.pending = s.pending || payload;
+            scheduleRecover(0);
+          }
+        } else {
+          s.leaseLost = false;
+          if (!s.pending) s.dirty = false;
+        }
+        return result;
+      })
+      .finally(() => {
+        s.inFlight = null;
+        if (s.pending && s.sessionId && !s.leaseLost) drain();
+        resolveWaiters();
+      });
+  }
+  function whenIdle() {
+    if (!s.inFlight && !s.pending) return Promise.resolve();
+    if (s.stopped && !s.inFlight && (!s.sessionId || s.leaseLost)) {
+      s.pending = null;
+      return Promise.resolve();
+    }
+    return new Promise(resolve => { s.waiters.push(resolve); });
+  }
+  return {
+    start() {
+      if (s.started) return;
+      s.started = true;
+      s.gen = generation();
+      void acquire(true);
+    },
+    notePosition({ anchor, seq, at, reason } = {}) {
+      if (!current() || !anchor || isUntitled()) return;
+      s.last = anchor;
+      s.lastAt = Number.isFinite(at) && at > 0 ? at : now();
+      s.lastSeq = Number.isSafeInteger(seq) ? Math.max(s.lastSeq, seq) : s.lastSeq + 1;
+      s.dirty = true;
+      s.pending = { op: 'save', anchor, seq: s.lastSeq, sampleAt: s.lastAt, reason: reason || 'scroll' };
+      if (!s.sessionId || s.leaseLost) { scheduleRecover(0); return; }
+      drain();
+    },
+    capturePosition({ anchor, seq, at } = {}) {
+      if (!current() || !anchor || isUntitled()) return false;
+      s.last = anchor;
+      s.lastAt = Number.isFinite(at) && at > 0 ? at : now();
+      s.lastSeq = Number.isSafeInteger(seq) ? Math.max(s.lastSeq, seq) : s.lastSeq + 1;
+      s.dirty = true;
+      return true;
+    },
+    stop(flush) {
+      if (s.stopped) return whenIdle();
+      s.stopped = true;
+      clearHeartbeat();
+      clearRecover();
+      if (flush && s.dirty && s.last && s.sessionId && !s.leaseLost) {
+        s.pending = { op: 'save', anchor: s.last, seq: s.lastSeq + 1, sampleAt: s.lastAt || now(), reason: 'close-flush' };
+      } else if (!s.sessionId || s.leaseLost) {
+        s.pending = null;
+      }
+      drain();
+      if (!s.inFlight && !s.pending) resolveWaiters();
+      return whenIdle();
+    },
+    whenIdle,
+    currentSessionId: () => s.sessionId,
+    isStopped: () => s.stopped,
+    isLeaseLost: () => s.leaseLost,
+  };
+}
+
+function chainReadingClose(savePromise, release) {
+  return Promise.resolve(savePromise)
+    .catch(() => null)
+    .then(() => (typeof release === 'function' ? release() : null))
+    .catch(() => null);
+}
+
 const __test = {
       createDraftStore,
+      chainReadingClose,
+      createReadingLeaseKeeper,
+      captureReadingFromWindow,
       mergeReviewGroup, reviewUndoGroup, reviewIsMulti, reviewSuppressesSave,
       reviewRestorableFromHost, reviewRestoreKeeps, undoFailureNotice, undoResultNotice,
       conflictDefaultChoices, conflictResolutionsFromChoices, conflictApplyEnabled,
@@ -6575,6 +6784,7 @@ const __test = {
           flushed: false,
           live: null, liveUnsupported: false, liveFlushSeq: 0, liveFlushWaiters: new Map(), liveStatus: null,
           liveStaleRounds: 0, liveStaleBlocked: false, liveDiskCheckSeq: 0,
+          reading: { keeper: null, started: false, stopped: false },
           baseSha256: "", draftMirror: null, draftMirrorAck: null, draftMirrorTimer: null, draftMirrorSeq: 0,
           draftMirrorFlight: null, draftMirrorPending: false, draftMirrorLastAt: 0,
           draftMirrorRetries: 0, draftMirrorProbe: null, openStamp: 0,
@@ -6848,11 +7058,79 @@ const __test = {
             setUiIfChangedWithRecovered(recovered);
           }
         }
-        // Bind a newly saved document to its live room. A one-time clean reload
-        // is intentional here: the engine may still hold local edit deltas from
-        // the pre-join untitled session; a bare live-bind would leave those
-        // deltas in front of the room's first append (Position N out of range).
-        // The caller only reaches this after saving, with no new edits.
+        /* ── 阅读位置（插件优先租约在宿主业务层；这里只做当前文档代的票据映射）──
+         * 打开/重载完成（apply-result.applied）后取一次位置；之后引擎只在真实用户滚动时
+         * 上行锚点，保存合并进行；关 tab 前 flush + release，插件关闭后桌面才可接管。 */
+        function newReadingSessionId(token) {
+          const suffix = (typeof crypto !== 'undefined' && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : (Date.now().toString(36) + ':' + Math.random().toString(36).slice(2, 12));
+          return String(token) + ':rp:' + suffix;
+        }
+        function onReadingPosition(content) {
+          if (!alive() || !content || content.protocol !== 2 || content.docToken !== doc.token) return;
+          const reading = doc.reading;
+          const keeper = reading && reading.keeper;
+          if (!keeper || !content.anchor) return;
+          const sessionId = keeper.currentSessionId();
+          if (content.sessionId && sessionId && content.sessionId !== sessionId) return;
+          keeper.notePosition({ anchor: content.anchor, seq: content.seq, at: content.at,
+            reason: content.reason || 'scroll' });
+        }
+        function startReadingPosition() {
+          const reading = doc.reading;
+          if (!reading || reading.started || !doc.absPath || doc.untitled) return;
+          reading.started = true;
+          const keeper = createReadingLeaseKeeper({
+            api: (op, payload) => api('reading', { op, ...payload }),
+            makeSessionId: () => newReadingSessionId(doc.token),
+            alive,
+            generation: () => doc.gen,
+            path: () => doc.absPath,
+            isUntitled: () => doc.untitled,
+            onLease: sessionId => {
+              if (alive() && !reading.stopped)
+                post('reading-arm', { protocol: 2, docToken: doc.token, sessionId });
+            },
+            onLeaseLost: () => {
+              if (alive() && !reading.stopped)
+                post('reading-arm', { protocol: 2, docToken: doc.token, sessionId: null });
+            },
+            onRestore: anchor => {
+              if (alive() && !reading.stopped)
+                post('reading-anchor', { protocol: 2, docToken: doc.token, sessionId: keeper.currentSessionId(), anchor });
+            },
+            onArm: () => {
+              if (alive() && !reading.stopped)
+                post('reading-arm', { protocol: 2, docToken: doc.token, sessionId: keeper.currentSessionId() });
+            },
+          });
+          reading.keeper = keeper;
+          keeper.start();
+        }
+        function captureReadingNow() {
+          const reading = doc.reading;
+          const keeper = reading && reading.keeper;
+          if (!keeper) return;
+          const captured = captureReadingFromWindow(currentFrameWin() || doc.win);
+          if (captured) keeper.capturePosition(captured);
+        }
+        function stopReadingPosition(flush) {
+          const reading = doc.reading;
+          const keeper = reading && reading.keeper;
+          if (!keeper || reading.stopped) return;
+          // The iframe is same-origin (sandbox includes allow-same-origin) and
+          // its engine is still readable in the pre-unmount cleanup.  Capture
+          // the current scroll before releasing: otherwise the first wheel can
+          // be closed inside one rAF, before the 320/900ms trailing publish.
+          if (flush) captureReadingNow();
+          reading.stopped = true;
+          const sessionId = keeper.currentSessionId();
+          const settled = keeper.stop(flush);
+          // Release only after every queued save has settled.  Late save/touch
+          // are also rejected by the host, so this is durability + defense.
+          chainReadingClose(settled, () => (sessionId ? api('reading', { op: 'release', sessionId }) : null));
+        }
         async function joinLiveIfNeeded() {
           if (!alive() || doc.live || doc.liveUnsupported || doc.untitled || !doc.absPath) return false;
           if (doc.dirty || doc.conflict || doc.saving || doc.pendingApply || doc.applyUnknown) return false;
@@ -6988,6 +7266,7 @@ const __test = {
           // 必须如实标记脏 —— baseVersion/lastVersion 仍指向磁盘版本，绝不能把共享正文
           // 当成"已在盘上"的基线；后续落盘只能走 live 票（房间校验）路径。
           doc.dirty=restore||doc.untitled||(pending.firstOpen&&value.live&&liveTicketDirty(value.live));
+          if(pending.firstOpen && !doc.untitled) startReadingPosition();
           if (pending.firstOpen || restore) restorePersistedReview();
           if(pending.firstOpen && !doc.untitled) recordRecentDoc({path:doc.absPath,scope:"absolute"},doc.sessionId,doc.workspace);
           doc.conflict=false;doc.externalStale=false;doc.staleNotified=false;
@@ -8828,6 +9107,18 @@ const __test = {
           }
           // 已死代际只放行"关 tab flush 的 text 回执"（旧回执一律丢弃）。
           if (!alive() && !(doc.closeUntil >= Date.now() && ["text","document-delta","composition","apply-result","live-exchange","live-leave","live-flush-result"].includes(type))) return;
+          if (type === "reading-position") { if (alive()) onReadingPosition(data.content); return; }
+          if (type === "reading-release") {
+            const content = data.content || {};
+            const keeper = doc.reading.keeper;
+            if (content.docToken === doc.token && content.sessionId && keeper &&
+                content.sessionId === keeper.currentSessionId()) {
+              const sessionId = content.sessionId;
+              chainReadingClose(keeper.whenIdle(),
+                () => api("reading", { op: "release", sessionId }).catch(() => {}));
+            }
+            return;
+          }
           if (type === "apply-result") { onApplyResult(data.content); return; }
           if (type === "document-delta") { onDelta(data.content); return; }
           if (type === "composition") { onComposition(data.content); return; }
@@ -9494,7 +9785,10 @@ const __test = {
         const tabSignal = tab && tab.signal;
         try {
           if (tabSignal && typeof tabSignal.addEventListener === "function") {
-            const onAbort = () => { try { flushClose(); } catch (e) { /* 最后一搏失败不阻塞关闭 */ } };
+            const onAbort = () => {
+              try { captureReadingNow(); } catch (e) { /* reading capture is best effort */ }
+              try { flushClose(); } catch (e) { /* 最后一搏失败不阻塞关闭 */ }
+            };
             tabSignal.addEventListener("abort", onAbort, { once: true });
             cleanups.push(() => { try { tabSignal.removeEventListener("abort", onAbort); } catch (e) { /* 忽略 */ } });
           }
@@ -9504,6 +9798,7 @@ const __test = {
 
         return () => {
           try { flushClose(); } catch (e) { /* 已尽力 */ }
+          try { stopReadingPosition(true); } catch (e) { /* 位置收尾不阻塞关闭 */ }
           doc.dead = true;
           cancelDraftMirror();
           // live 会话离场：先请 facade 解绑（iframe 还在时经上行 leave），再直接向宿主
