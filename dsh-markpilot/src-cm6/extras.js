@@ -966,11 +966,11 @@ export function installExtras(deps) {
     const html = mathApi ? mathApi(String(tex), false) : null;
     return html == null ? `<code>${esc(String(tex))}</code>` : `<span class="mp-math">${stripSrcMap(html)}</span>`;
   }
-  function mathBlockHtml(tex) {
+  function mathBlockHtml(tex, attrs = '') {
     const t = String(tex == null ? "" : tex);
-    if (!t.trim()) return '<div class="mp-math-block"></div>';
+    if (!t.trim()) return `<div class="mp-math-block"${attrs}></div>`;
     const html = mathApi ? mathApi(t, true) : null;
-    return html == null ? `<pre class="mp-math">${esc(t)}</pre>` : `<div class="mp-math-block">${stripSrcMap(html)}</div>`;
+    return html == null ? `<pre class="mp-math"${attrs}>${esc(t)}</pre>` : `<div class="mp-math-block"${attrs}>${stripSrcMap(html)}</div>`;
   }
   /* ── 导出页的 KaTeX 样式与字体（离线可排版）──────────────────────────────
    * 取的是**引擎自己正在用的那份** KaTeX CSS（渲染面 <link> 的 app.css），不另抄一份：
@@ -1129,6 +1129,13 @@ export function installExtras(deps) {
     const bodyMd = ownFoot ? ownFoot.body : sourceBody;
     const lines = bodyMd.split('\n'), structure = {};
     const codeStarts = new Map(scanFenceLines(lines, structure).map(b => [b.startLine - 1, b]));
+    /* Optional absolute line anchors for the in-editor Markdown fence preview.
+       Nested list/quote fragments receive the parent line base, so a quoted
+       heading/paragraph/table/formula still points at its own source line.
+       Export callers never pass this option, so their bytes are unchanged. */
+    const lineBase = Number.isInteger(opts.lineBase) ? opts.lineBase : 0;
+    const lineAnchors = opts.lineAnchors === true;
+    const lineAttr = lineAnchors ? (n) => ` data-mp-src-line="${lineBase + n}"` : () => '';
     let buf = [], size = 0;
     const take = () => { if (!buf.length) return null; const s = buf.join('\n') + '\n'; buf = []; size = 0; return s; };
     const push = s => { buf.push(s); size += s.length + 1; };
@@ -1194,7 +1201,9 @@ export function installExtras(deps) {
       }
       return { block, end };
     };
-    const blockHtml = tex => math ? mathBlockHtml(tex) : `<pre class="mp-math">${esc(tex)}</pre>`;
+    const blockHtml = (tex, line = -1) => math
+      ? mathBlockHtml(tex, line >= 0 ? lineAttr(line) : '')
+      : `<pre class="mp-math"${line >= 0 ? lineAttr(line) : ''}>${esc(tex)}</pre>`;
     const isMathClose = s => /^\s*\$\$\s*$/.test(s);
     const cellsOf = line => line.slice(tableLead(line).off).trim().replace(/^\||\|$/g, '').split(/(?<!\\)\|/).map(c => c.trim());
     /* 【#53】表格行判据补齐单列表（TBL-7 合法形态）：旧 rowText 要求剥掉首尾管道后**中间还有管道**，
@@ -1286,9 +1295,10 @@ export function installExtras(deps) {
       const top = listStack[listStack.length - 1];
       if (top && !item && colOf(leadWhite) >= top.contentCol) {
         const leaf = collectIndentedLeaf(i, top.contentCol);
+        const blankCount = pendingBlank.length;
         const block = pendingBlank.concat(leaf.block); pendingBlank = [];
         const outer = take(); if (outer) yield outer;
-        yield* mdBodyChunks(block.join('\n'), { ...opts, nested: true, footPlan: foot });
+        yield* mdBodyChunks(block.join('\n'), { ...opts, nested: true, footPlan: foot, lineBase: lineBase + i - blankCount });
         i = leaf.end - 1;
         continue;
       }
@@ -1307,7 +1317,7 @@ export function installExtras(deps) {
           k++;
         }
         const outer = take(); if (outer) yield outer;
-        yield* mdBodyChunks(childLines.join('\n'), { ...opts, nested: true, footPlan: foot });
+        yield* mdBodyChunks(childLines.join('\n'), { ...opts, nested: true, footPlan: foot, lineBase: lineBase + i });
         i = k - 1;
         continue;
       }
@@ -1323,9 +1333,9 @@ export function installExtras(deps) {
           k++;
         }
         const outer = take(); if (outer) yield outer;
-        push('<blockquote>');
+        push(`<blockquote${lineAttr(i)}>`);
         const open = take(); if (open) yield open;
-        yield* mdBodyChunks(group.join('\n'), { ...opts, nested: true, footPlan: foot });
+        yield* mdBodyChunks(group.join('\n'), { ...opts, nested: true, footPlan: foot, lineBase: lineBase + i });
         push('</blockquote>');
         i = k - 1;
         continue;
@@ -1338,9 +1348,9 @@ export function installExtras(deps) {
         const api = typeof window !== 'undefined' ? window.mpMermaid : null;
         const svg = /^mermaid$/i.test(code.info) ? (mermaidSvgs ? mermaidSvgs.get(src) : api?.getSvg?.(src)) : null;
         for (let n = 0; n < code.depth; n++) push('<blockquote>');
-        if (svg) push(`<div class="mp-mermaid">${svg}</div>`);
+        if (svg) push(`<div class="mp-mermaid"${lineAttr(i)}>${svg}</div>`);
         else {
-          push('<pre><code>');
+          push(`<pre${lineAttr(i)}><code>`);
           for (const part of parts) {
             push(esc(part));
             if (size >= chunkChars) { const chunk = take(); if (chunk) yield chunk; }
@@ -1358,13 +1368,14 @@ export function installExtras(deps) {
           closeList();
           const sep = cellsOf(next);
           const aligns = sep.map(c => c.startsWith(':') && c.endsWith(':') ? 'center' : c.endsWith(':') ? 'right' : null);
-          const rowHtml = (cells, tag) => '<tr>' + cells.slice(0, header.length).map((c, k) =>
+          const rowHtml = (cells, tag, line) => `<tr${lineAttr(line)}>` + cells.slice(0, header.length).map((c, k) =>
             `<${tag}${aligns[k] ? ` style="text-align:${aligns[k]}"` : ''}>${inlineMd(c, srcMap, math, foot)}</${tag}>`).join('') + '</tr>';
-          if (lead.q) push('<blockquote>');
-          push('<table><thead>' + rowHtml(header, 'th') + '</thead><tbody>');
+          if (lead.q) push(`<blockquote${lineAttr(i)}>`);
+          push(`<table${lineAttr(i)}><thead>` + rowHtml(header, 'th', i) + '</thead><tbody>');
           i += 1;
           while (i + 1 < lines.length && !codeStarts.has(i + 1) && tableRowCells(lines[i + 1]) && tableLead(lines[i + 1]).q === lead.q) {
-            push(rowHtml(cellsOf(lines[++i]), 'td'));
+            const rowLine = i + 1;
+            push(rowHtml(cellsOf(lines[++i]), 'td', rowLine));
             if (size >= chunkChars) { const chunk = take(); if (chunk) yield chunk; }
           }
           push('</tbody></table>');
@@ -1372,16 +1383,16 @@ export function installExtras(deps) {
         } else if (/^\s*\$\$/.test(line)) {
           closeList();
           const single = singleLineDisplayTex(line.trimStart());
-          if (single) push(blockHtml(single.trim()));
+          if (single) push(blockHtml(single.trim(), i));
           else {
             const rest = line.slice(/^\s*\$\$/.exec(line)[0].length), tail = !!rest.trim();
             const close = tail && hasUnescapedDollar(rest) ? -1 : tail ? nextTailClose[i] : nextFenceClose[i];
-            if (close < 0) push(`<p>${inlineMd(line, srcMap, math, foot)}</p>`);
+            if (close < 0) push(`<p${lineAttr(i)}>${inlineMd(line, srcMap, math, foot)}</p>`);
             else {
               const parts = [rest, ...lines.slice(i + 1, close)];
               if (tail) parts.push(lines[close].replace(/\$\$\s*$/, ''));
               const tex = parts.join('\n');
-              push(tex.length > MATH_TEX_MAX ? `<pre class="mp-math">${esc(tex)}</pre>` : blockHtml(tex));
+              push(tex.length > MATH_TEX_MAX ? `<pre class="mp-math"${lineAttr(i)}>${esc(tex)}</pre>` : blockHtml(tex, i));
               i = close;
             }
           }
@@ -1391,16 +1402,16 @@ export function installExtras(deps) {
           const open = line.slice(line.indexOf('$'));
           const sameLine = open.lastIndexOf('$');
           if (sameLine > 0 && /^\s*$/.test(open.slice(sameLine + 1))) {
-            push(blockHtml(open.slice(1, sameLine).trim()));
+            push(blockHtml(open.slice(1, sameLine).trim(), i));
           } else {
             const close = nextSingleClose[i];
-            if (close < 0) push(`<p>${inlineMd(line, srcMap, math, foot)}</p>`);
+            if (close < 0) push(`<p${lineAttr(i)}>${inlineMd(line, srcMap, math, foot)}</p>`);
             else {
               const parts = [open.slice(1)];
               for (let k = i + 1; k < close; k++) parts.push(lines[k]);
               parts.push(lines[close].replace(/\$[ \t]*$/, ''));
               const tex = parts.join('\n');
-              push(tex.length > MATH_TEX_MAX ? `<pre class="mp-math">${esc(tex)}</pre>` : blockHtml(tex));
+              push(tex.length > MATH_TEX_MAX ? `<pre class="mp-math"${lineAttr(i)}>${esc(tex)}</pre>` : blockHtml(tex, i));
               i = close;
             }
           }
@@ -1422,11 +1433,11 @@ export function installExtras(deps) {
             }
           } else {
             closeList();
-            if (h) push(`<h${h[1].length}>${inlineMd(h[2] || '', srcMap, math, foot)}</h${h[1].length}>`);
+            if (h) push(`<h${h[1].length}${lineAttr(i)}>${inlineMd(h[2] || '', srcMap, math, foot)}</h${h[1].length}>`);
             else {
-              if (isHrLine(line)) push('<hr>');
+              if (isHrLine(line)) push(`<hr${lineAttr(i)}>`);
               else if (!line.trim()) push('');
-              else push(`<p>${inlineMd(line, srcMap, math, foot)}</p>`);
+              else push(`<p${lineAttr(i)}>${inlineMd(line, srcMap, math, foot)}</p>`);
             }
           }
         }

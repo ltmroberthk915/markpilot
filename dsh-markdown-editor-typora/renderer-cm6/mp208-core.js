@@ -132,7 +132,7 @@
     } else {
       text = body;
     }
-    var sourceLine = '来源：' + (paths || '(未命名文档)') + ' · 第 ' + span.lineStart
+    var sourceLine = '只读引用：' + (paths || '(未命名文档)') + ' · 第 ' + span.lineStart
       + (span.lineEnd !== span.lineStart ? '–' + span.lineEnd : '') + ' 行';
     var full = sourceLine + '\n\n' + text;
     if (full.length > MAX_QUOTE_CHARS) {
@@ -164,6 +164,19 @@
     };
   }
 
+  function editSelectionBody(sel) {
+    var ranges = sel && Array.isArray(sel.ranges) ? sel.ranges : [];
+    if (ranges.length > 1) {
+      return ranges.map(function (r, i) { return '[第' + (i + 1) + '段]\n' + r.text; }).join('\n\n');
+    }
+    if (ranges.length) return ranges[0].text;
+    return sel && typeof sel.text === 'string' ? sel.text : '';
+  }
+
+  function replacementsHint(count) {
+    return 'replacements=[每段替换后的文本]（按原文段序，共 ' + count + ' 项）';
+  }
+
   function editRequest(input) {
     var opts = input || {};
     var intent = String(opts.intent || '').trim();
@@ -177,51 +190,45 @@
     var selectionId = String(opts.selectionId || '').trim();
     if (!path || !selectionId) return { ok: false, code: 'EDIT_TARGET_MISSING', message: '修改目标缺少文件或选择标识' };
     var span = lineSpan(opts.doc, rangeCheck.ranges, opts.lineStart, opts.lineEnd);
-    var text = typeof opts.text === 'string' ? opts.text : rangeCheck.ranges.map(function (r) { return r.text; }).join('\n\n');
-    if (byteLength(text) > MAX_EDIT_BYTES) {
+    var body = typeof opts.text === 'string' ? opts.text : rangeCheck.ranges.map(function (r) { return r.text; }).join('\n\n');
+    if (byteLength(body) > MAX_EDIT_BYTES) {
       return { ok: false, code: 'EDIT_SELECTION_TOO_LARGE', message: '选区超过 32 KiB，请缩小范围后再修改（模型单次按需读取上限为 32 KiB）' };
     }
     var inlineBudget = Number.isSafeInteger(opts.inlineBudget) ? opts.inlineBudget : MAX_EDIT_INLINE;
-    var revision = opts.originRevision === undefined ? '' : (typeof opts.originRevision === 'string'
-      ? opts.originRevision : JSON.stringify(opts.originRevision));
-    var lines = [
-      '【MarkPilot 选区修改】',
-      '文件：' + path,
-      '选区：第 ' + span.lineStart + (span.lineEnd !== span.lineStart ? '–' + span.lineEnd : '') + ' 行 · selectionId=' + selectionId,
-      revision ? '来源版本：' + revision : '',
-      '',
-      '【用户意图】',
-      intent,
-      '',
-    ];
-    var mode;
-    if (byteLength(text) <= inlineBudget) {
-      mode = 'inline';
-      lines.push('【选区原文 · 只读快照】', '```md', text, '```', '');
-    } else if (opts.readSelection === true) {
-      mode = 'read-on-demand';
-      lines.push('选区超出内联预算（' + text.length + ' 字符），未内联原文。',
-        '请先调用 markdown 工具 action="readSelection", path=' + JSON.stringify(path)
-        + ', selectionId=' + JSON.stringify(selectionId) + ' 读取受限快照，再执行修改。', '');
-    } else {
+    var inline = byteLength(body) <= inlineBudget;
+    if (!inline && opts.readSelection !== true) {
       return {
         ok: false,
         code: 'EDIT_SELECTION_TOO_LARGE',
-        message: '选区过大（' + text.length + ' 字符），当前宿主不支持按需读取；请缩小范围后再修改',
+        message: '选区过大（' + body.length + ' 字符），当前宿主不支持按需读取；请缩小范围后再修改',
       };
     }
-    lines.push(
-      '请只调用 markdown 工具修改这一处：',
-      'action="editSelection"',
-      'path=' + JSON.stringify(path),
-      'selectionId=' + JSON.stringify(selectionId),
-      'newString="<替换后的文本>"（多段用 replacements: ["<段1>", "<段2>"]）',
-      '不要改选区之外的任何内容，不要用 write/str_replace 全文改写。',
-    );
+    var multi = rangeCheck.ranges.length > 1;
+    var pathArg = 'path=' + JSON.stringify(path);
+    var idArg = 'selectionId=' + JSON.stringify(selectionId);
+    var action = multi
+      ? replacementsHint(rangeCheck.ranges.length)
+      : 'newString="修改后的完整选区"';
+    var label = '第 ' + span.lineStart + (span.lineEnd !== span.lineStart ? '–' + span.lineEnd : '') + ' 行';
+    var lines = [intent];
+    if (inline) {
+      lines.push(
+        '选区已读，直接调用 markdown。',
+        'markdown：action="editSelection",' + pathArg + ',' + idArg + ',' + action,
+        '原文（' + label + (multi ? '，' + rangeCheck.ranges.length + ' 段，按段序' : '') + '）：',
+        editSelectionBody({ ranges: rangeCheck.ranges, text: body }),
+      );
+    } else {
+      lines.push(
+        '先读取：markdown：action="readSelection",' + pathArg + ',' + idArg,
+        '再修改：markdown：action="editSelection",' + pathArg + ',' + idArg + ',' + action,
+        '原文未内联（' + body.length + ' 字符）。',
+      );
+    }
     var message = lines.join('\n');
     return {
       ok: true,
-      mode: mode,
+      mode: inline ? 'inline' : 'read-on-demand',
       message: message,
       path: path,
       selectionId: selectionId,
@@ -230,9 +237,15 @@
       summary: {
         label: basename(path) + ' · 第 ' + span.lineStart + (span.lineEnd !== span.lineStart ? '–' + span.lineEnd : '') + ' 行',
         title: intent.slice(0, 120),
-        detail: mode === 'inline' ? ('内联 ' + text.length + ' 字符') : ('按需读取 · ' + text.length + ' 字符'),
+        detail: inline ? ('原文一次 · ' + body.length + ' 字符') : ('按需读取 · ' + body.length + ' 字符'),
       },
-      meta: { kind: 'restricted-edit', mode: mode, chars: message.length, bytes: byteLength(message), selectionChars: text.length },
+      meta: {
+        kind: 'restricted-edit', mode: inline ? 'inline' : 'read-on-demand',
+        promptVersion: '2.0.18',
+        chars: message.length, bytes: byteLength(message), selectionChars: body.length,
+        rangeCount: rangeCheck.ranges.length, multi: multi,
+        toolCalls: inline ? 1 : 2,
+      },
     };
   }
 
@@ -327,6 +340,8 @@
     envelopeFromView: envelopeFromView,
     quotePayload: quotePayload,
     editRequest: editRequest,
+    editSelectionBody: editSelectionBody,
+    replacementsHint: replacementsHint,
     mathPayload: mathPayload,
     formatQuoteLines: formatQuoteLines,
   };

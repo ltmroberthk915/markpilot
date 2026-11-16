@@ -1,8 +1,12 @@
-> **更名（1.4.0 起）：** 本插件包名改为 **`dsh-markdown-editor-typora`**（原 `dsh-markdown-typora` 停在 1.3.x）。当前候选：**2.0.0**（B4.3 冲突解决 + B3.3b 草稿镜像）；安装：`dsh plugin --profile desktop add <绝对路径>/dsh-markdown-editor-typora-2.0.0.tgz`。历史 1.4.0 安装方式仅作参考。
+> 自 1.4.0 起，插件包名为 **`dsh-markdown-editor-typora`**。安装 2.0.20 正式版可运行 **`dsh plugin --profile desktop add dsh-markdown-editor-typora@2.0.20`**。旧包 `dsh-markdown-typora` 停留在 1.3.x。
 
 # dsh-markdown-typora
 
 [![开放插件市场](https://img.shields.io/endpoint?url=https%3A%2F%2Fdshopen.org%2Fbadge%2Fdsh-markdown-editor-typora.json)](https://dshopen.org/zh/plugins/dsh-markdown-editor-typora/)
+
+## 2.0.20 · 原位预览 Markdown 示例
+
+在标记为 `markdown` 或 `md` 的围栏里写流程图、表格和公式，移出光标即可看到结果，点回去继续编辑源码。
 
 ## MarkPilot for DSH 1.1 · IDE 式 Markdown × AI 工作台
 
@@ -11,6 +15,7 @@
 ![DSH 中的 Markdown 编辑器与 AI 对话并排，选中文段一键插入对话](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/3.6.6/dsh-insert-to-chat.jpg)
 
 - **选中即聊，精准交给 AI。** 选中文段，一键把 Markdown 源码和文件路径插入当前对话输入框；支持 Ctrl/Cmd+Shift+Enter，也可用 `@mp` 引用当前文档。检查后再发送，上下文由你掌控。
+- **选中即改，直接交给对话。** 选中文段点「修改此处」，说明要怎么改后点「提交给对话」，这段选区、文件与行定位和说明会作为一条消息提交；输入框里已有的草稿与附件不会被发送或覆盖。只想先讨论时用「引用」或 Ctrl/Cmd+Shift+Enter，只进入草稿，等你确认后再发送。
 - **像 IDE 一样安排工作空间。** 文件、正文、对话并排，拖动分栏分配空间；收起工具栏专注写作，关闭编辑器恢复原生布局。
 - **项目切换，思路不断。** 每个工作目录记住最近打开的笔记；同目录切会话保留文档，跨目录可跟随项目，也可固定当前文档。
 - **灵感来了，先写再存。** 直接打开空白稿，首次保存落在所属工作目录；最近文档、文件列表、空白起笔任你选，无历史时另设打开方式。

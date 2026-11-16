@@ -48,7 +48,7 @@ export function createRegionSession(indexField) {
       if(r.form==='display'&&!empty)return head>r.from&&head<r.to;
       return head>=r.from&&(head<r.to||(head===r.to&&(r.form==='display'||image.lastPointer===true)));
     };
-    for(const kind of ['math','code','mermaid','table','image']) for(const selection of state.selection.ranges) {
+    for(const kind of ['math','code','mermaid','markdown','table','image']) for(const selection of state.selection.ranges) {
       for(const r of regionsBetween(index,selection.from,selection.to,kind)) {
         const current=presentation.get(r.id)||{id:r.id,kind,from:r.from,to:r.to,selected:false,editing:false,preview:false};
         current.selected=true;

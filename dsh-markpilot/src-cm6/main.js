@@ -56,7 +56,8 @@ import { inlineCodeSpans, renderInline, inlineLinkSpans, inlineEmphasisSpans, in
 /* 【3.6.21 渲染修复·sem】公开文法区间（与导出端同一份）：真注释只来自完整 parser 的一次全文分析。
  * 依赖 sem 作者交付的 ./public-markdown.js；签名以 analyzePublic(source, opts).comments 为准
  * （[{from,to,block,closed}]，UTF-16、end-exclusive；供编辑态与公开态共用）。 */
-import { analyzePublic } from './public-markdown.js';
+import { analyzePublic, publicMarkdown } from './public-markdown.js';
+import { isMarkdownFence, scanMarkdownFenceBlocks, fragmentMermaidSources } from './markdown-fence.js';
 import { fileUrlOfPath, resolveImageSource, hasImageCandidate } from './image-path.js';
 import { beginNativeImageTransfer, sourceImageTicket } from './image-transfer.js';
 import { imageInsertions, cancelImageInsertions } from './image-insertion.js';
@@ -65,7 +66,7 @@ import { mappedCellSource, cellSourceOffset, cellTextOffset, cellTextChange, enc
 import { installSplit } from "./splitview.js";
 import { isEmbeddedImage, embeddedImages, protectedPayloadDecoration, protectImagePayloads, safeImagePayloadPosition } from './image-payload.js';
 import { createImageRemovalGate } from './image-removal.js';
-import { editorFontVarsCss, editorHeadingsCss, editorContentMetricsCss, editorKaiRuleCss, editorKaiStyle, exportTypoCss } from "./typography.js";
+import { MP_TYPO, editorFontVarsCss, editorHeadingsCss, editorContentMetricsCss, editorKaiRuleCss, editorKaiStyle, exportTypoCss } from "./typography.js";
 
 /* ══ 数学渲染缓存层（W1×W2 交叉确认快赢包）══
  * 旧债三笔：① widgetCache 超 2000 条 clear() 雪崩（滚动回访全量重建）；
@@ -182,7 +183,8 @@ function loadMermaid(win) {
  *  而 mermaid **未知主题静默忽略**（实测回显错名但 themeVariables 不变 ✗）⇒ 必须自己收敛 ✓。 */
 function mermaidTheme() {
   try {
-    if (document.documentElement.dataset.mpDark === '1') return 'dark';
+    const root = document.documentElement;
+    if (root.dataset.mpDark === '1' || root.dataset.mode === 'dark') return 'dark';
     const id = localStorage.getItem('editor-theme') || '';
     return /dark/i.test(id) ? 'dark' : 'default';
   } catch { return 'default'; }
@@ -497,6 +499,423 @@ window.mpMermaid = {
   /** 诊断（探针用）：块数/缓存规模/字段计数 */
   stat() { return { svg缓存条数: svgCache.size, widget缓存条数: mermaidWidgetCache.size, 高度缓存条数: mermaidHeights.size, 队列中: mermaidQueue.length, 累计渲染完成: mermaidDone, 字段update次数: mmUpdateCount, 字段重扫次数: mmScanCount, 脚本已加载: !!window.mermaid, 脚本URL: MERMAID_URL }; },
 };
+
+/* ══ 显式 Markdown 围栏：整块原位预览 ══════════════════════════════════════════
+ *
+ * Source/preview policy is the Mermaid projection's, not a second one:
+ *   · only a CLOSED fence whose info word is an explicit Markdown alias;
+ *   · a collapsed caret or any non-empty selection that overlaps the block
+ *     reveals the whole original fence text (selectionTouchesRegion);
+ *   · no selection touching the block replaces the whole [from, to] range with
+ *     one block widget at its original position;
+ *   · clicking the preview or moving into it with the keyboard leaves the
+ *     widget and restores the exact source bytes;
+ *   · every byte still belongs to the CM document, so save/undo/history never
+ *     know the preview exists.
+ *
+ * The renderer is the existing, escaping Markdown-to-HTML projector
+ * (window.mpExtras.mdToHtml) with math enabled. Raw HTML is escaped there, and
+ * the fragment is additionally made passive here: no event attributes and no
+ * document links. Images keep the editor's normal Markdown image contract
+ * (document-relative paths, image-host URLs, alt placeholder on failure);
+ * external CSS resources and script-capable URLs are still rejected. Inner Mermaid diagrams are the
+ * only asynchronous part; they render through the shared queue with the
+ * EDITOR theme (never the export theme), and a late result is dropped unless
+ * this exact mounted widget still owns the same source and region revision.
+ */
+const mdFenceHeights = new Map();
+const MD_FENCE_HEIGHT_MAX = 128;
+let mdFenceRendered = 0, mdFenceStaleDrops = 0, mdFenceErrors = 0, mdFenceThemeRefreshes = 0;
+let mdFenceScanCount = 0, mdFenceUpdateCount = 0;
+/* Width is part of the estimate: the same fragment is taller in a narrow
+ * split than in a wide one. Bucketing keeps the key stable during smooth
+ * resizes while still letting CM reserve the right height in a long document. */
+let mdFenceWidthHint = 800;
+const mdFenceHeightKey = (src, theme, contextVersion, width = mdFenceWidthHint) =>
+  theme + '|' + contextVersion + '|' + widthBucket(width) + '|' + src;
+
+/* Theme changes are dataset/CSS writes; mounted SVG does not restyle itself.
+ * Watch the same two attributes the toolbar already observes, and refresh only
+ * widgets whose Mermaid color key actually changed. No CM transaction is
+ * dispatched here, so the selection/caret cannot move. */
+const mdFenceLiveWidgets = new Set();
+let mdFenceThemeObserver = null;
+function watchMdFenceTheme() {
+  if (mdFenceThemeObserver || typeof MutationObserver !== 'function' || !document.documentElement) return;
+  mdFenceThemeObserver = new MutationObserver(() => {
+    const next = mermaidTheme();
+    for (const live of [...mdFenceLiveWidgets]) {
+      try { live.refreshTheme(next); } catch { /* 单个 widget 失败不影响其它 */ }
+    }
+  });
+  mdFenceThemeObserver.observe(document.documentElement, {
+    attributes: true, attributeFilter: ['data-mode', 'data-editor-theme', 'data-mp-dark'],
+  });
+}
+
+const MD_PREVIEW_BLOCKED = new Set([
+  'script', 'iframe', 'object', 'embed', 'applet', 'frame', 'frameset', 'link',
+  'meta', 'base', 'form', 'button', 'select', 'textarea', 'video', 'audio',
+  'source', 'track', 'canvas', 'portal', 'template',
+]);
+
+/** URL policy for non-image references (links, CSS resources). Document links
+ *  are made inert on purpose, and external CSS resources never load. A fragment
+ *  (`#id`) is allowed for SVG paint servers. Images use mdPreviewImageSrc. */
+function mdPreviewUrl(raw, fragment = false) {
+  const value = String(raw == null ? '' : raw).trim();
+  if (!value) return '';
+  if (value.startsWith('#')) return fragment ? value : '';
+  if (/^\/\//.test(value)) return '';
+  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return /^(?:data|blob|file):/i.test(value) ? value : '';
+  return value;
+}
+
+/** Images keep the editor's existing Markdown image contract: document-relative
+ *  paths go through the same resolver as native image widgets (in DSH the base
+ *  URL points at the host image route), and ordinary image-host URLs stay URLs.
+ *  Only script-capable schemes are rejected; a failed load is replaced by the
+ *  alt-text placeholder by the widget's error handler. */
+function mdPreviewImageSrc(raw) {
+  const src = String(raw == null ? '' : raw).trim();
+  if (!src) return '';
+  if (/^(?:javascript|vbscript):/i.test(src) || /^data:text\/html/i.test(src)) return '';
+  try { return resolveImageSource(src, mpDocDir) || src; } catch { return src; }
+}
+
+function mdPreviewStyle(value) {
+  return String(value == null ? '' : value).replace(/url\s*\(\s*(['"]?)([^'")]*)\1\s*\)/gi,
+    (whole, _quote, url) => mdPreviewUrl(url, true) ? whole : 'none');
+}
+
+function mdPreviewStyleText(value) {
+  return String(value == null ? '' : value)
+    .replace(/@import[^;]*;?/gi, '')
+    .replace(/url\s*\(\s*(['"]?)([^'")]*)\1\s*\)/gi, (whole, _quote, url) => mdPreviewUrl(url, true) ? whole : 'none');
+}
+
+/* Defense in depth, not the primary boundary: the fragment renderer escapes
+ * raw HTML already. This pass makes sure a future renderer change, a Mermaid
+ * SVG, or an image/link syntax cannot turn the widget into an active surface. */
+function sanitizeMarkdownPreview(root) {
+  for (const el of [...root.querySelectorAll('*')]) {
+    if (!root.contains(el)) continue;
+    const tag = el.localName.toLowerCase();
+    if (MD_PREVIEW_BLOCKED.has(tag)) { el.remove(); continue; }
+    if (tag === 'input') {
+      if (String(el.getAttribute('type') || '').toLowerCase() !== 'checkbox') { el.remove(); continue; }
+      el.setAttribute('disabled', '');
+    }
+    for (const attr of [...el.attributes]) {
+      const name = attr.name.toLowerCase();
+      const value = attr.value;
+      if (name.startsWith('on') || name === 'srcdoc' || name === 'formaction' || name === 'action' ||
+          name === 'ping' || name === 'http-equiv' || name === 'contenteditable' || name === 'autofocus' ||
+          name === 'tabindex' || name === 'target' || name === 'rel' || name === 'download' ||
+          name === 'referrerpolicy' || name === 'crossorigin' || name === 'integrity') {
+        el.removeAttribute(attr.name); continue;
+      }
+      if (name === 'href' || name === 'xlink:href') {
+        // Document links are intentionally inert: the first click on a preview
+        // belongs to "enter the block", not to the link.
+        let kept = '';
+        if (tag === 'use') kept = /^#/.test(String(value).trim()) ? String(value).trim() : '';
+        else if (tag === 'image') kept = mdPreviewImageSrc(value);
+        if (kept) el.setAttribute(attr.name, kept); else el.removeAttribute(attr.name);
+        continue;
+      }
+      if (name === 'src') {
+        const kept = (tag === 'img' || tag === 'image') ? mdPreviewImageSrc(value) : '';
+        if (kept) el.setAttribute(attr.name, kept); else el.removeAttribute(attr.name);
+        continue;
+      }
+      if (name === 'srcset' || name === 'poster' || name === 'background' || name === 'data') {
+        el.removeAttribute(attr.name); continue;
+      }
+      if (name === 'style') {
+        const kept = mdPreviewStyle(value);
+        if (kept) el.setAttribute('style', kept); else el.removeAttribute('style');
+      }
+    }
+    if (tag === 'style') {
+      // Mermaid puts its generated stylesheet inside the SVG. Any other style
+      // element is not produced by the fragment renderer, so it is not trusted.
+      if (!el.closest('.mp-mermaid')) { el.remove(); continue; }
+      el.textContent = mdPreviewStyleText(el.textContent);
+    }
+    if (tag === 'a') { /* href was removed above; text remains read-only */ }
+    /* A preview image is content, not a draggable file: dragging from it must
+       stay a text/selection gesture that can enter the source block. */
+    if (tag === 'img') el.setAttribute('draggable', 'false');
+    if (tag === 'img' && !el.getAttribute('src')) {
+      const alt = el.getAttribute('alt') || '';
+      const placeholder = document.createElement('span');
+      placeholder.className = 'mp-md-fence-img-alt';
+      placeholder.textContent = alt || '图片';
+      el.replaceWith(placeholder);
+    }
+    if (tag === 'image' && !el.getAttribute('href') && !el.getAttribute('xlink:href')) el.remove();
+  }
+}
+
+function renderMarkdownFenceFallback(box, source) {
+  const pre = document.createElement('pre');
+  pre.className = 'mp-md-fence-fallback';
+  const code = document.createElement('code');
+  code.textContent = String(source == null ? '' : source);
+  pre.appendChild(code);
+  box.replaceChildren(pre);
+  box.dataset.mpMdFenceState = 'fallback';
+}
+
+function renderMarkdownFenceHtml(fragment, svgs, lineAnchors = true) {
+  const api = typeof window !== 'undefined' ? window.mpExtras : null;
+  if (!api || typeof api.mdToHtml !== 'function') return null;
+  /* The caller prepares one public fragment and uses that same string for the
+   * Mermaid scan and the HTML projection. Fragment semantics mean no YAML
+   * front-matter stripping and no second public snapshot pass. Line anchors are
+   * disabled when a public snapshot could have removed source lines, so a click
+   * cannot be pointed at the wrong line; it falls back to the fragment's first. */
+  return api.mdToHtml(String(fragment == null ? '' : fragment),
+    { nested: true, math: true, mermaidSvgs: svgs, lineAnchors: lineAnchors === true });
+}
+
+class MarkdownFenceWidget extends WidgetType {
+  constructor(src, from, to, theme, region) {
+    super();
+    this.src = src;
+    this.from = from;
+    this.to = to;
+    this.theme = theme;
+    this.regionId = region?.id ?? null;
+    this.regionRevision = region?.revision ?? 0;
+    this.contextVersion = region?.contextVersion ?? 0;
+  }
+  /* All fields that affect rendering or bounds participate, so a reused widget
+     can never keep DOM from another source, theme, position or container. */
+  eq(other) {
+    return other.src === this.src && other.theme === this.theme &&
+      other.from === this.from && other.to === this.to &&
+      other.regionId === this.regionId && other.regionRevision === this.regionRevision &&
+      other.contextVersion === this.contextVersion;
+  }
+  toDOM(inputView) {
+    const box = document.createElement('div');
+    box.className = 'mp-md-fence';
+    box.dataset.mpFrom = String(this.from);
+    box.dataset.mpTo = String(this.to);
+    box.dataset.mpMdFence = this.theme + '|' + this.from + ':' + this.to + '|' + hash32(this.src);
+    let region = null;
+    try { region = inputView.state.field(regionIndexField, false)?.byId.get(this.regionId) || null; } catch { }
+    if (region) {
+      box.dataset.mpRegion = region.id;
+      bindContainer(box, region.context, true);
+    }
+    /* Fragment line 0 is the document line after the Markdown opening fence.
+       Click mapping uses this base plus the renderer's per-block line anchor. */
+    let bodyLine = 0;
+    try { bodyLine = inputView.state.doc.lineAt(this.from).number + 1; } catch { }
+    box.dataset.mpBodyLine = String(bodyLine);
+    const body = this.src;
+    const live = {
+      disposed: false, started: false, pending: 0, painted: false, retries: 0,
+      fragment: '', svgs: new Map(), theme: this.theme, sources: [], generation: 0,
+      anchors: !/<!--/.test(body), refreshTheme: () => {},
+    };
+    try { box.__mpMdFenceLive = live; } catch { }
+    mdFenceLiveWidgets.add(live);
+    watchMdFenceTheme();
+    const later = fn => typeof queueMicrotask === 'function' ? queueMicrotask(fn) : Promise.resolve().then(fn);
+    const requestMeasure = () => { try { inputView.requestMeasure(); } catch { /* 视图已销毁 */ } };
+    const rememberHeight = () => {
+      if (live.disposed || !box.isConnected) return;
+      try {
+        const rect = box.getBoundingClientRect(), h = rect.height;
+        if (!(h > 0)) return;
+        const width = box.clientWidth || rect.width || mdFenceWidthHint;
+        if (width > 0) mdFenceWidthHint = width;
+        mdFenceHeights.set(mdFenceHeightKey(body, this.theme, this.contextVersion, width || mdFenceWidthHint), h);
+        if (mdFenceHeights.size > MD_FENCE_HEIGHT_MAX) mdFenceHeights.delete(mdFenceHeights.keys().next().value);
+      } catch { /* 量不到就退化成无估计 */ }
+    };
+    /* After every DOM fill (initial, Mermaid backfill, image load/failure) the
+       block's real height changes. Update the estimate for future scroll-ins and
+       ask CM to measure this mounted box before the next paint. */
+    const measure = () => { if (live.disposed) return; rememberHeight(); requestMeasure(); };
+    const paint = () => {
+      if (live.disposed) return;
+      let html;
+      try { html = renderMarkdownFenceHtml(live.fragment, live.svgs, live.anchors); }
+      catch (error) {
+        mdFenceErrors += 1;
+        renderMarkdownFenceFallback(box, body);
+        requestMeasure();
+        return;
+      }
+      if (html == null) { renderMarkdownFenceFallback(box, body); requestMeasure(); return; }
+      const template = document.createElement('template');
+      template.innerHTML = String(html);
+      sanitizeMarkdownPreview(template.content);
+      const firstPaint = !live.painted;
+      box.replaceChildren(template.content);
+      box.dataset.mpMdFenceState = 'ready';
+      live.painted = true;
+      mdFenceRendered += 1;
+      /* First fill happens inside CM's render pass: do not force layout here.
+         A later fill (Mermaid backfill) must tell CM before the next paint. */
+      if (!firstPaint) requestMeasure();
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(measure);
+      else setTimeout(measure, 0);
+    };
+    /* Only the Mermaid color key triggers a repaint. New SVGs are collected
+       off-screen; the old preview stays until the new generation is complete,
+       so switching themes does not flash the source block. A newer theme change
+       invalidates older callbacks. No selection/transaction is touched. */
+    live.refreshTheme = (next) => {
+      if (live.disposed || next === live.theme) return;
+      live.theme = next;
+      if (!live.started || !live.sources.length) return;
+      mdFenceThemeRefreshes += 1;
+      const generation = ++live.generation;
+      const nextSvgs = new Map();
+      let remaining = live.sources.length;
+      live.pending = remaining;
+      for (const src of live.sources) {
+        requestMermaid(src, next, null, (svg) => {
+          if (live.disposed || generation !== live.generation) { mdFenceStaleDrops += 1; return; }
+          if (svg) nextSvgs.set(src, svg);
+          remaining -= 1;
+          live.pending = remaining;
+          if (remaining === 0) { live.svgs = nextSvgs; paint(); }
+        });
+      }
+    };
+    /* Images follow the same resource contract as native Markdown image
+       widgets; a failed load degrades to the alt placeholder. Both outcomes
+       change this block's height, so both re-measure it. */
+    const onMedia = (event) => {
+      if (live.disposed) return;
+      const img = event.target;
+      if (!img || img.tagName !== 'IMG') return;
+      if (event.type === 'error' && !img.dataset.mpMdFailed) {
+        img.dataset.mpMdFailed = '1';
+        const alt = img.getAttribute('alt') || '';
+        const placeholder = document.createElement('span');
+        placeholder.className = 'mp-md-fence-img-alt';
+        placeholder.textContent = alt || '图片加载失败';
+        img.replaceWith(placeholder);
+      }
+      measure();
+    };
+    box.addEventListener('load', onMedia, true);
+    box.addEventListener('error', onMedia, true);
+    const start = (attempt = 0) => {
+      if (live.disposed || live.started) return;
+      if (!window.mpExtras || typeof window.mpExtras.mdToHtml !== 'function') {
+        if (attempt >= 2) { renderMarkdownFenceFallback(box, body); requestMeasure(); return; }
+        live.retries = attempt + 1;
+        later(() => start(attempt + 1));
+        return;
+      }
+      live.started = true;
+      try { live.fragment = publicMarkdown(body); }
+      catch (error) { mdFenceErrors += 1; live.fragment = body; }
+      let sources = [];
+      try { sources = fragmentMermaidSources(live.fragment).filter(src => src.trim()); }
+      catch (error) { mdFenceErrors += 1; }
+      live.sources = sources;
+      const generation = ++live.generation;
+      paint();
+      if (!sources.length) return;
+      let remaining = sources.length, dirty = false;
+      live.pending = remaining;
+      for (const src of sources) {
+        requestMermaid(src, live.theme, null, (svg) => {
+          if (live.disposed || generation !== live.generation) { mdFenceStaleDrops += 1; return; }
+          if (svg) { live.svgs.set(src, svg); dirty = true; }
+          remaining -= 1;
+          live.pending = remaining;
+          if (remaining === 0 && dirty) paint();
+        });
+      }
+    };
+    /* A generated link must not own the first click; the same click is the
+       gesture that enters the source block through clickToSource. */
+    box.addEventListener('click', (event) => {
+      const anchor = event.target && event.target.closest ? event.target.closest('a') : null;
+      if (anchor) { event.preventDefault(); event.stopPropagation(); }
+    }, true);
+    start();
+    return box;
+  }
+  get estimatedHeight() {
+    const h = mdFenceHeights.get(mdFenceHeightKey(this.src, this.theme, this.contextVersion));
+    return typeof h === 'number' && h > 0 ? h : -1;
+  }
+  ignoreEvent() { return false; }
+  destroy(dom) {
+    const live = dom && dom.__mpMdFenceLive;
+    if (live) { live.disposed = true; mdFenceLiveWidgets.delete(live); }
+    try { if (dom) delete dom.__mpMdFenceLive; } catch { /* 忽略 */ }
+  }
+}
+
+function markdownFenceWidget(src, from, to, region) {
+  return new MarkdownFenceWidget(src, from, to, mermaidTheme(), region);
+}
+
+const markdownFenceBlocksField = StateField.define({
+  create(state) { mdFenceScanCount++; return scanMarkdownFenceBlocks(state.doc, state.field(markdownContext).blocks); },
+  update(value, tr) {
+    mdFenceUpdateCount++;
+    if (!tr.docChanged) return value;
+    const context = tr.state.field(markdownContext);
+    if (!context.rebuilt && tr.state.field(editPlan)) {
+      const touched = new Set();
+      tr.changes.iterChangedRanges((from, to) => { for (const b of rangesTouching(value, from, to)) touched.add(b); });
+      return value.map((b) => {
+        const mapped = { ...b, from: tr.changes.mapPos(b.from, 1), to: tr.changes.mapPos(b.to, -1) };
+        if (!touched.has(b)) return mapped;
+        mdFenceScanCount++;
+        const block = blockAt(context.blocks, mapped.from);
+        return (block && scanMarkdownFenceBlocks(tr.state.doc, [block])[0]) || mapped;
+      });
+    }
+    let touched = context.rebuilt;
+    tr.changes.iterChangedRanges((from, to) => {
+      if (value.some(b => from <= b.to && to >= b.from)) touched = true;
+    });
+    if (touched) { mdFenceScanCount++; return scanMarkdownFenceBlocks(tr.state.doc, context.blocks); }
+    return value.map(b => ({ ...b, from: tr.changes.mapPos(b.from, 1), to: tr.changes.mapPos(b.to, 1) }));
+  },
+});
+
+function buildMarkdownFenceDecorations(state) {
+  const out = [];
+  const index = state.field(regionIndexField, false);
+  if (!index) return Decoration.none;
+  for (const block of state.field(markdownFenceBlocksField, false) || []) {
+    const region = regionAt(index, block.from, 'markdown');
+    if (!region) continue;
+    if (state.selection.ranges.some(range => selectionTouchesRegion(region, range))) continue;
+    out.push(Decoration.replace({
+      widget: markdownFenceWidget(block.src, block.from, block.to, region),
+      block: true,
+    }).range(block.from, block.to));
+  }
+  return Decoration.set(out, true);
+}
+
+const markdownFenceDecorations = StateField.define({
+  create: buildMarkdownFenceDecorations,
+  update(value, tr) {
+    if (!tr.docChanged && !tr.selection &&
+        tr.startState.field(markdownFenceBlocksField) === tr.state.field(markdownFenceBlocksField) &&
+        tr.startState.field(regionIndexField) === tr.state.field(regionIndexField)) return value;
+    return buildMarkdownFenceDecorations(tr.state);
+  },
+  provide: f => EditorView.decorations.from(f),
+});
 
 function mathWidget(tex, display, live = false, selected = false, region = null) {
   const key = (live ? "L" : display ? "B" : "I") + (selected ? "S" : "") + region?.id + ':' + region?.contextVersion + ':' + tex;
@@ -1582,7 +2001,8 @@ const nativeVerticalIntent = EditorState.transactionExtender.of(tr => {
   return null;
 });
 
-/** 纵向移动进/出**图表块**（与 `verticalIntoMath` 同一套纪律，2026-10-11 补）
+/** 纵向移动进/出**整块渲染预览**（图表块与显式 Markdown 围栏；与 `verticalIntoMath`
+ *  同一套纪律，2026-10-11 补，Markdown 围栏沿用）
  *  为什么需要：块级 widget 是 replace 装饰 ⇒ CM6 的纵向落点在 widget 区域只映射到它的边界、
  *  不会进 span ✗。**实测基线**（`probe-mermaid-nav.cjs`，产物 6904e8e5b49e765f）：
  *   · 图表块下一行按 ↑ ⇒ 直接落到块**上一行**（整块跳过 ✗）；
@@ -1595,16 +2015,22 @@ const nativeVerticalIntent = EditorState.transactionExtender.of(tr => {
  *   · **目标列**用"经过前"的值（复用同一个 mathPass 记录 ⇒ 穿过图表块也不丢列 ✓）。
  *  闸门：仅折叠光标；仅当中间只有空白且不超过一个换行（真·视觉相邻）；否则返回 false 交回默认。
  *  性能：只读已有的 `mermaidBlocksField`（O(块数)）+ O(1) 文本判定，**不进每键路径** ✓。 */
-function verticalIntoMermaid(view, dir) {  const st = view.state;
+function verticalIntoRenderedBlock(view, dir) {  const st = view.state;
   const sel = st.selection.main;
   if (!sel.empty) return false;
   /* 【★ 值的形态·2026-10-11 实测打脸】我原先写成 `st.field(mermaidBlocksField, false)?.blocks` ✗ ——
      而这个字段的值**就是数组本身** ✓（`create` 返回 `scanMermaidBlocks(doc)` ✓，
      见 L366 `for (const b of state.field(mermaidBlocksField, false) || [])` ✓）。
      ⇒ `?.blocks` 恒 undefined ⇒ **整个函数在第一道闸门就 return false** ✗，
-     表现是"改了等于没改、读数一字未变" ✗（错-27 的指纹，错-35 的根因：照抄同族时没核对值的形态 ✓）。 */
-  const blocks = st.field(mermaidBlocksField, false);
-  if (!blocks || !blocks.length) return false;
+     表现是"改了等于没改、读数一字未变" ✗（错-27 的指纹，错-35 的根因：照抄同族时没核对值的形态 ✓）。
+     Markdown 围栏与图表块共用这一条落点纪律，只是块来源不同。 */
+  const mermaidBlocks = st.field(mermaidBlocksField, false) || [];
+  const markdownFences = st.field(markdownFenceBlocksField, false) || [];
+  const blocks = [
+    ...mermaidBlocks.map(b => ({ ...b, __previewKind: 'mermaid' })),
+    ...markdownFences.map(b => ({ ...b, __previewKind: 'markdown' })),
+  ].sort((a, b) => a.from - b.from);
+  if (!blocks.length) return false;
   const cur = st.doc.lineAt(sel.head);
   const col = sel.head - cur.from;
   /* 【"在块内"必须按**当下**判·2026-10-11 实测缺陷，最隐蔽的一处】
@@ -1710,6 +2136,7 @@ function verticalIntoMermaid(view, dir) {  const st = view.state;
      ⇒ 再 ↑ 目标列被重采成 17 ⇒ 一路带偏到 `1:4`，原列 0 永久丢失 ✗，与块公式"列不许被吃掉"的契约相反 ✗）。
      修法：进块时**把进块前的列记为 goalCol** ✓ ⇒ 出块时按原列落点 ✓（穿块前后逐位不丢 ✓）。 */
   mathPass = { spanFrom: best.from, goalCol: col, lastPos: pos };
+  try { window.__vBlockKind = best.__previewKind; } catch { }
   try {
     window.__navTrace = window.__navTrace || [];
     window.__navTrace.push({
@@ -1734,8 +2161,8 @@ function verticalIntoBlock(view, dir) {
   const a = verticalIntoMath(view, dir);
   try { if (a) { window.__vBlockHit = (window.__vBlockHit || 0) + 1; window.__vBlockLast = 'math'; } } catch { }
   if (a) return true;
-  const b = verticalIntoMermaid(view, dir);
-  try { if (b) { window.__vBlockHit = (window.__vBlockHit || 0) + 1; window.__vBlockLast = 'mermaid'; } } catch { }
+  const b = verticalIntoRenderedBlock(view, dir);
+  try { if (b) { window.__vBlockHit = (window.__vBlockHit || 0) + 1; window.__vBlockLast = window.__vBlockKind || 'rendered'; } } catch { }
   return b;
 }
 const blockVerticalKeys = Prec.high(keymap.of([
@@ -3844,11 +4271,11 @@ const headingDecorations = EditorView.decorations.compute(["selection", lineStyl
   // 同一块已有的开/闭围栏一起显形**。只看围栏行本身会让光标停在块内内容行时
   // 两侧围栏都消失（本任务修复的视觉缺陷）；正向/反向/多范围统一按半开源码
   // 区间重叠判断，直接复用 markdownContext.blocks 的 from/closeFrom，不扫描文档。
-  // 已闭合的 mermaid 块在未触及时会被整块 replace 成图表：不要再给它的围栏行挂
-  // mp-fence（那条规则会把整行及后代设成 transparent，可能连 SVG 一起吃掉）；
-  // 未闭合 mermaid 仍按普通源码块处理。
+  // 已闭合的图表块与显式 Markdown 围栏在未触及时会被整块 replace 成预览：
+  // 不要再给它们的围栏行挂 mp-fence（那条规则会把整行及后代设成 transparent，
+  // 可能连 SVG/预览一起吃掉）；未闭合块仍按普通源码块处理。
   const fenceBlocks = state.field(markdownContext).blocks.filter(
-    (b) => !(b.closeFrom != null && /^mermaid$/i.test(b.info || '')));
+    (b) => !(b.closeFrom != null && (/^mermaid$/i.test(b.info || '') || isMarkdownFence(b.info))));
   for (const from of hiddenFenceLines(fenceBlocks, state.selection.ranges)) {
     out.push(Decoration.line({ class: "mp-fence" }).range(from));
   }
@@ -4780,10 +5207,12 @@ const regionIndexField = createRegionIndex(state => {
     content: [m.image.src, m.image.alt, m.image.title, m.image.width, m.image.height, m.image.align],
     context: contextReader(m.from,null,base) });
   const diagrams = new Map(state.field(mermaidBlocksField).map(b => [b.from, b]));
+  const markdownFences = new Map(state.field(markdownFenceBlocksField).map(b => [b.from, b]));
   for (const b of blocks) {
-    const diagram = diagrams.get(b.from);
-    rows.push({ kind: diagram ? 'mermaid' : 'code', form: b.char,
-      from: b.from, to: b.to, data: diagram || b, sourceOwned: !diagram, content: diagram?.src ?? null, context: context(b.from) });
+    const diagram = diagrams.get(b.from), mdFence = markdownFences.get(b.from);
+    rows.push({ kind: diagram ? 'mermaid' : mdFence ? 'markdown' : 'code', form: b.char,
+      from: b.from, to: b.to, data: diagram || mdFence || b, sourceOwned: !diagram && !mdFence,
+      content: diagram?.src ?? mdFence?.src ?? null, context: context(b.from) });
   }
   for (const t of state.field(tableDataField)) rows.push({ kind: 'table', from: t.from, to: t.to,
     data: t, sourceOwned: true, content: null, context: context(t.from) });
@@ -5374,7 +5803,8 @@ function autoBreakCheck(v) {
  *  ⑤ 全不中 → null（调用方回退）。
  *  行末口径（2026-09-14 第7轮）：最后一个可见叶子字形整格 after 连右空白带 → 源码末尾，
  *  且压过命令规则。命令口径（第6轮）：tex[start]=='\\' 的 token 左右半都落 start+1
- *  （\ 与命令首字母之间——点 ∑ 落 \ 与 s 之间）。 */
+ *  （\ 与命令首字母之间）。display 模式的 \sum 大字没有自带映射时，按字形矩形
+ *  找到外层 .mop 容器，仍走本口径。 */
 function mathGlyphOffset(holder, event, tex) {
   const LOC = "[data-typora-source-start]";
   const containsPoint = (rect) => rect.width > 0 && rect.height > 0 &&
@@ -5400,6 +5830,9 @@ function mathGlyphOffset(holder, event, tex) {
       if (n) { const o = at(n, false); if (o != null) return o; }
     }
   }
+  /* display 模式的 \sum 大字没有自带标注（标注在外层 .mop 容器），\boxed 的
+     fbox 边框又会挡住命中。命中字形矩形且比既有叶子更小时并入同一 closest，
+     仍走 at(owner, false) 的既有命令/行末口径；同面积保留原叶子。 */
   let closest = null;
   for (const node of holder.querySelectorAll(LOC)) {
     if (node.querySelector(LOC)) continue;
@@ -5408,7 +5841,21 @@ function mathGlyphOffset(holder, event, tex) {
       if (containsPoint(rect) && (!closest || rect.width * rect.height < closest.rect.width * closest.rect.height)) closest = { node, rect };
     }
   }
-  if (closest) { const o = at(closest.node, half(closest.rect)); if (o != null) return o; }
+  if (tex.includes("\\sum")) {
+    for (const glyph of holder.querySelectorAll(".mop.op-symbol")) {
+      if (glyph.hasAttribute("data-typora-source-start")) continue;
+      const owner = glyph.closest(LOC);
+      if (!owner || !owner.classList || !owner.classList.contains("mop")) continue;
+      const s = Number(owner.getAttribute("data-typora-source-start"));
+      const e = Number(owner.getAttribute("data-typora-source-end"));
+      if (!Number.isInteger(s) || !Number.isInteger(e) || e <= s || e > tex.length) continue;
+      if (tex.slice(s, e) !== "\\sum") continue;
+      const rect = glyph.getBoundingClientRect();
+      if (!containsPoint(rect)) continue;
+      if (!closest || rect.width * rect.height < closest.rect.width * closest.rect.height) closest = { node: owner, rect, after: false };
+    }
+  }
+  if (closest) { const o = at(closest.node, closest.after ?? half(closest.rect)); if (o != null) return o; }
   const direct = event.target && event.target.closest ? event.target.closest(LOC) : null;
   if (direct && direct.children.length === 0 && (direct.textContent || "").length && containsPoint(direct.getBoundingClientRect())) {
     const o = at(direct, false); if (o != null) return o;
@@ -6068,6 +6515,7 @@ const readingCompartment = new Compartment();
 
 const clickToSource = EditorView.domEventHandlers({  mousedown(event, view) {
     view.__mpMermaidClick = null;
+    view.__mpMdFenceClick = null;
     const image = event.target?.closest?.('.mp-img[data-mp-region]');
     if (image) {
       view.__mpImageClick = null;
@@ -6084,6 +6532,34 @@ const clickToSource = EditorView.domEventHandlers({  mousedown(event, view) {
         top: shown.getBoundingClientRect().height ? shown.getBoundingClientRect().top : image.getBoundingClientRect().top,
         moved: false, serial: viewportIntent.serial(view), revision: r.revision, contextVersion: r.contextVersion };
       view.__mpRegionGesture = { phase: 'down', id: r.id, epoch: index.epoch, serial: viewportIntent.serial(view) };
+      return false;
+    }
+    /* 点击显式 Markdown 围栏的预览 = 进源码。和图表块同一套 click-vs-drag：
+       mousedown 只记录，mouseup 时位移 ≤4px 才落位。图内链接不参与点击：
+       预览里的 a 已去掉 href，首次点击属于“进块”。 */
+    const mdFence = event.target?.closest?.('.mp-md-fence[data-mp-region]');
+    if (mdFence) {
+      if (view.state.readOnly || event.button !== 0 || event.shiftKey || event.ctrlKey || event.metaKey ||
+          event.altKey || (event.detail || 1) >= 2) return false;
+      const index = view.state.field(regionIndexField), r = index.byId.get(mdFence.dataset.mpRegion);
+      if (r?.kind !== 'markdown') return false;
+      /* Land on the clicked block's source line when the fragment renderer
+         emitted an anchor (heading, paragraph, table row, formula, fenced code
+         or Mermaid). Everything else falls back to the fragment's first line;
+         Mermaid SVG internals are never mapped character by character. */
+      let fragmentLine = 0;
+      const anchorEl = event.target?.closest?.('[data-mp-src-line]');
+      if (anchorEl && mdFence.contains(anchorEl)) {
+        const raw = Number(anchorEl.dataset.mpSrcLine);
+        if (Number.isFinite(raw)) fragmentLine = raw;
+      }
+      const bodyLine = Number(mdFence.dataset.mpBodyLine) || 0;
+      let targetLine = bodyLine > 0 ? bodyLine + fragmentLine : view.state.doc.lineAt(r.from).number;
+      targetLine = Math.max(1, Math.min(view.state.doc.lines, targetLine));
+      const target = view.state.doc.line(targetLine);
+      const pos = Math.max(r.from, Math.min(r.to, target.from));
+      view.__mpMdFenceClick = { id: r.id, epoch: index.epoch, x: event.clientX, y: event.clientY, pos,
+        moved: false, serial: viewportIntent.serial(view), revision: r.revision, contextVersion: r.contextVersion };
       return false;
     }
     /* 点击已渲染的 Mermaid = 进源码；但只接**普通单击**。mousedown 只记录，
@@ -6165,9 +6641,27 @@ const clickToSource = EditorView.domEventHandlers({  mousedown(event, view) {
     if (image && (event.buttons & 1) && Math.abs(event.clientX - image.x) + Math.abs(event.clientY - image.y) > 4) image.moved = true;
     const mermaid = view.__mpMermaidClick;
     if (mermaid && (event.buttons & 1) && Math.abs(event.clientX - mermaid.x) + Math.abs(event.clientY - mermaid.y) > 4) mermaid.moved = true;
+    const mdFence = view.__mpMdFenceClick;
+    if (mdFence && (event.buttons & 1) && Math.abs(event.clientX - mdFence.x) + Math.abs(event.clientY - mdFence.y) > 4) mdFence.moved = true;
     return false;
   },
   mouseup(event, view) {
+    const mdFence = view.__mpMdFenceClick; view.__mpMdFenceClick = null;
+    if (mdFence) {
+      const index = view.state.field(regionIndexField), r = index.byId.get(mdFence.id);
+      const current = [...view.dom.querySelectorAll('.mp-md-fence[data-mp-region]')].find(n => n.dataset.mpRegion === mdFence.id);
+      const sameSource = r?.revision === mdFence.revision && r?.contextVersion === mdFence.contextVersion;
+      if ((event.detail || 1) === 1 && event.button === 0 && !mdFence.moved &&
+          !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey &&
+          index.epoch === mdFence.epoch && r && sameSource && mdFence.serial === viewportIntent.serial(view) &&
+          (!current || current.isConnected) &&
+          Math.abs(event.clientX - mdFence.x) + Math.abs(event.clientY - mdFence.y) <= 4) {
+        const pos = Math.max(r.from, Math.min(r.to, Number.isFinite(mdFence.pos) ? mdFence.pos : r.from));
+        view.dispatch({ selection: { anchor: pos }, userEvent: 'select.pointer', scrollIntoView: true });
+        view.focus();
+      }
+      return false;
+    }
     const mermaid = view.__mpMermaidClick; view.__mpMermaidClick = null;
     if (mermaid) {
       const index = view.state.field(regionIndexField), r = index.byId.get(mermaid.id);
@@ -7023,6 +7517,46 @@ html[data-mp-statusbar="1"] .mp-zoom-wrap { height: calc(100% - 24px); }
 .mp-mermaid { display: block; padding: 8px 0 12px; text-align: center; overflow-x: auto; }
 .mp-mermaid svg { max-width: 100%; height: auto; }
 .mp-mermaid[data-mp-mermaid]:empty::after { content: 'mermaid 图表（渲染中…）'; color: var(--mp-muted); font-size: 12px; }
+/* 【显式 Markdown 围栏预览·2026-11-16】整块替换成它自己的内容，不加卡片、边框、
+   按钮或切换壳；排版只用主题变量，与正文/公式/表格/图表同一套配色。
+   ⚠️ 本注释在 CSS 模板字符串体内，不许出现反引号。 */
+.mp-md-fence { display: block; padding: 2px 0 10px; cursor: text; white-space: normal; }
+.mp-md-fence > :first-child { margin-top: 0; }
+.mp-md-fence > :last-child { margin-bottom: 0; }
+.mp-md-fence p { margin: .42em 0; }
+.mp-md-fence h1, .mp-md-fence h2, .mp-md-fence h3,
+.mp-md-fence h4, .mp-md-fence h5, .mp-md-fence h6 {
+  margin: .8em 0 .35em; font-weight: 700; color: var(--mp-heading);
+  font-family: var(--mp-font-body); line-height: 1.3; }
+${MP_TYPO.headings.map((h) => `.mp-md-fence h${h.level} { font-size: ${h.size}px; }`).join('\n')}
+${MP_TYPO.headings.filter((h) => h.border).map((h) => `.mp-md-fence h${h.level} { border-bottom: 1px solid var(--mp-border); padding-bottom: .16em; }`).join('\n')}
+.mp-md-fence ul, .mp-md-fence ol { margin: .35em 0 .7em; padding-left: 1.7em; }
+.mp-md-fence li { margin: .12em 0; }
+.mp-md-fence li > p { margin: 0; }
+.mp-md-fence .mp-task-item { list-style: none; margin-left: -1.25em; }
+.mp-md-fence blockquote {
+  margin: .5em 0; padding: .12em 0 .12em .9em;
+  border-left: 3px solid var(--mp-quoteBar); background: var(--mp-quoteBg); color: var(--mp-muted);
+}
+.mp-md-fence pre {
+  margin: .5em 0; padding: .62em .8em; background: var(--mp-codeBg);
+  border-radius: 4px; overflow-x: auto; line-height: 1.55;
+}
+.mp-md-fence pre code { padding: 0; background: transparent; font-size: .9em; }
+.mp-md-fence code { font-family: var(--mp-font-mono); font-size: .9em; }
+.mp-md-fence table { margin: .5em 0; border-collapse: collapse; max-width: 100%; }
+.mp-md-fence th, .mp-md-fence td { border: 1px solid var(--mp-border); padding: .3em .65em; text-align: left; vertical-align: top; }
+.mp-md-fence th { background: var(--mp-capsule); font-weight: 600; }
+.mp-md-fence hr { margin: .8em 0; border: 0; border-top: 1px solid var(--mp-border); }
+.mp-md-fence a { color: var(--mp-primary); text-decoration: none; }
+.mp-md-fence img { max-width: 100%; height: auto; }
+.mp-md-fence .mp-mermaid { padding: 4px 0 6px; }
+.mp-md-fence .mp-math-block { margin: .55em 0; text-align: center; }
+.mp-md-fence .mp-md-fence-img-alt {
+  display: inline-block; padding: 0 .4em; border: 1px dashed var(--mp-border);
+  border-radius: 3px; color: var(--mp-muted); font-size: .88em;
+}
+.mp-md-fence-fallback { margin: 0; white-space: pre-wrap; }
 /* 【下划线 u 标签·2026-10-11 已落地】标签由 scanInlineMarks 的 hides（零宽 replace ✓）收掉，
    内文由下面这条类加下划线 ✓ —— 两者作用在不同字符上，互不干扰 ✓。
    .mp-u-tag **已废弃**（曾用于"把标签收成零宽"的旧方案 ✗，实测会留游离字形 ✗）⇒ 已删除 ✓，
@@ -7904,10 +8438,12 @@ function boot(content) {
         lineClassDecorations, // 行类派生（mp-h1..h6/mp-code/mp-quote → telari 版式）
         mermaidBlocksField, // 【mermaid·2026-10-11】图表块数据层（仅文档变化且含结构字符时重扫）
         mermaidDecorations, // 【mermaid】块级投影：光标入块显源码、离块渲染图表
+        markdownFenceBlocksField, // 【Markdown 围栏】仅显式 md/markdown 的已闭合块
         publicAnnotationsField, // 【3.6.21】公开文法注释/代码区间（state field 必须注册；须在 mathSpansField 后）
         inlineMarksField, // 行内标记数据层（**/`/~~/链接，仅文档变化重扫；须在 mathSpansField 后）
         regionIndexField,
         regionSessionField,
+        markdownFenceDecorations, // 【Markdown 围栏】region + selectionTouchesRegion → 整块原位预览
         protectImagePayloads(regionIndexField, transaction => imageRemoval.filter(transaction), () => suppressChange),
         imageSessionField,
         liveHistoryGuard.historyGuard(), // 外部/远端字节台账（撤销保护；见装配处注释）
@@ -8306,7 +8842,9 @@ function boot(content) {
       const math = fresh ? scanMathSpans(state.doc,blocks,context) : state.field(mathSpansField).spans;
       const inline = fresh ? scanInlineMarks(state.doc,math,blocks, analyzePublicAnnotations(state.doc, math, null)) : state.field(inlineMarksField);
       const styles = fresh ? { ...scanLineStyles(state.doc,blocks,context), tables: scanTables(state.doc,blocks) } : { ...state.field(lineStylesField), tables: state.field(tableDataField) };
-      return { blocks, math, inline, styles, mermaid: fresh ? scanMermaidBlocks(state.doc,blocks) : state.field(mermaidBlocksField) };
+      return { blocks, math, inline, styles,
+        mermaid: fresh ? scanMermaidBlocks(state.doc,blocks) : state.field(mermaidBlocksField),
+        markdownFences: fresh ? scanMarkdownFenceBlocks(state.doc, blocks) : state.field(markdownFenceBlocksField) };
     },
     _view: () => view, // 调试/取证通道
     /* 【脚注·只读/受控入口】索引、导航落点、扫描计数与同一套插入/跳转命令。
@@ -8379,6 +8917,40 @@ function boot(content) {
       纵向意图: { ...verticalIntentDiag },
       纵向轨迹: (window.__navTrace || []).slice(-12),
     }),
+    /* 【Markdown 围栏取证通道】只读：块清单、当前挂载的预览、异步回填/丢弃计数。
+       真实宿主验收用它判断“预览有没有挂上、Mermaid 有没有回填、进入源码后旧结果有没有被丢掉”。 */
+    __mdFence: () => {
+      const blocks = view ? (view.state.field(markdownFenceBlocksField, false) || []) : [];
+      const nodes = view ? [...view.dom.querySelectorAll('.mp-md-fence[data-mp-region]')] : [];
+      return {
+        块数: view ? blocks.length : -1,
+        块: blocks.map((b) => ({ from: b.from, to: b.to, lang: b.lang, srcLen: b.src.length, srcHead: b.src.slice(0, 32) })),
+        预览数: nodes.length,
+        预览: nodes.map((node) => {
+          let height = 0;
+          try { height = Math.round(node.getBoundingClientRect().height); } catch { }
+          return {
+            region: node.dataset.mpRegion || null,
+            from: Number(node.dataset.mpFrom),
+            to: Number(node.dataset.mpTo),
+            state: node.dataset.mpMdFenceState || '',
+            height,
+            mermaid: node.querySelectorAll('.mp-mermaid svg').length,
+            pending: node.__mpMdFenceLive?.pending ?? 0,
+            theme: node.__mpMdFenceLive?.theme ?? null,
+            mermaidSources: node.__mpMdFenceLive?.sources?.length ?? 0,
+          };
+        }),
+        高度缓存条数: mdFenceHeights.size,
+        累计重绘: mdFenceRendered,
+        旧结果丢弃: mdFenceStaleDrops,
+        渲染错误: mdFenceErrors,
+        主题刷新: mdFenceThemeRefreshes,
+        字段update次数: mdFenceUpdateCount,
+        字段重扫次数: mdFenceScanCount,
+        主题: mermaidTheme(),
+      };
+    },
     imagesInSelection: () => (view ? imagesInSelection(view.state) : []).map((im) => {
       const rec = imgBlobs.get(mpImgSrc(im.src));
       return { srcLen: im.src.length, mime: rec && rec !== 'pending' && rec !== null ? rec.mime : (rec === 'pending' ? 'pending' : 'none') };

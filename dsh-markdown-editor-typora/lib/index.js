@@ -41,6 +41,7 @@ import {
   localLiveSaveFailure, markLiveBoundaryFailure, markProviderWriterError,
 } from './save-failure.js';
 import { createSessionManager, allowedActions } from './document-sessions.js';
+import { createEditIsolation } from './edit-isolation.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize, sep, extname, basename, resolve as pathResolve, isAbsolute, relative as pathRelative }  from 'node:path';
 
@@ -334,7 +335,7 @@ const MODEL_TOOL = Symbol('markdown model tool');
 export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'reading', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'documents.session', 'documents.recoveryList', 'documents.recoveryRead', 'documents.recoveryDiscard', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'documents.captureSelection', 'documents.readSelection', 'documents.editSelection', 'diag']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'reading', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'documents.session', 'documents.recoveryList', 'documents.recoveryRead', 'documents.recoveryDiscard', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'documents.captureSelection', 'documents.readSelection', 'documents.editSelection', 'documents.editPrepare', 'documents.editArm', 'documents.editStatus', 'documents.editAbort', 'diag']);
 const SESSION_MUTATING_ENDPOINTS = new Set(['open', 'save', 'edit', 'live', 'docs/create', 'docs/saveAs', 'docs/archive', 'documents.applyEdits', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.undoGroups', 'documents.merge3', 'documents.reviewGroup', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftClear']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
@@ -955,6 +956,9 @@ export function createHost(options = {}) {
   function invalidateSessions() { sessionGeneration += 1; documentSessions.clear(); }
   /** Persisted-file notifications are scoped to the watched target. Unsaved edits use independent document leases. */
   const liveStreams = new Set();
+  // Mutable internals: `apply()` installs the pre-step edit-isolation service
+  // after createHost returns, and the route must see that exact instance.
+  const hostInternals = { watchers, liveStreams, lookupDocument, documents, fileIdentities, editIsolation: null };
 
   function watchKeyOf(target) {
     return String(target?.targetKey ?? target?.displayPath ?? '');
@@ -2067,6 +2071,22 @@ export function createHost(options = {}) {
         case 'documents.editSelection':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           return await documents.editSelection(payload, invocation, invocation?.policy, execution);
+        case 'documents.editPrepare':
+          if (authority === MODEL_TOOL) return badRequest('editPrepare is editor-only');
+          if (!hostInternals.editIsolation) return { ok: false, error: { code: 'MP_EDIT_UNAVAILABLE', message: '当前宿主未安装隔离修改服务' } };
+          return await hostInternals.editIsolation.prepare(payload);
+        case 'documents.editArm':
+          if (authority === MODEL_TOOL) return badRequest('editArm is editor-only');
+          if (!hostInternals.editIsolation) return { ok: false, error: { code: 'MP_EDIT_UNAVAILABLE', message: '当前宿主未安装隔离修改服务' } };
+          return await hostInternals.editIsolation.arm(payload);
+        case 'documents.editStatus':
+          if (authority === MODEL_TOOL) return badRequest('editStatus is editor-only');
+          if (!hostInternals.editIsolation) return { ok: false, error: { code: 'MP_EDIT_UNAVAILABLE', message: '当前宿主未安装隔离修改服务' } };
+          return hostInternals.editIsolation.status(payload);
+        case 'documents.editAbort':
+          if (authority === MODEL_TOOL) return badRequest('editAbort is editor-only');
+          if (!hostInternals.editIsolation) return { ok: false, error: { code: 'MP_EDIT_UNAVAILABLE', message: '当前宿主未安装隔离修改服务' } };
+          return hostInternals.editIsolation.abort(payload);
         case 'documents.read':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           return await documents.read(payload, invocation);
@@ -2327,7 +2347,7 @@ export function createHost(options = {}) {
 
   const hostToken = {};
   registerHost(hostToken);
-  return { route, dispatch, close, broadcastChange, _internals: { watchers, liveStreams, lookupDocument, documents, fileIdentities } };
+  return { route, dispatch, close, broadcastChange, _internals: hostInternals };
 }
 
 const WRITE_GUARD_DIRTY = 'MP_DOC_DIRTY';
@@ -2524,6 +2544,31 @@ export function apply(ctx, config = {}) {
   } catch (error) {
     log.warn?.('%s: host init failed: %s', name, String(error?.message ?? error));
     return;
+  }
+
+  // Isolated "修改此处": the UI prompt is a single marked Session submission;
+  // the pre-step listener consumes it and runs a history-free model call before
+  // the parent loop builds its request. No session log or surface is rewritten.
+  try {
+    const isolation = createEditIsolation({
+      ctx,
+      documents: host._internals.documents,
+      log,
+    });
+    host._internals.editIsolation = isolation;
+    if (typeof ctx.effect === 'function') {
+      ctx.effect(() => isolation.install(), 'dsh-markdown-editor-typora: isolated selection edit');
+    } else {
+      isolation.install();
+    }
+    if (isolation.installed !== true) {
+      // No pre-step listener means the marked submission would reach the
+      // parent model with full history. Fail closed instead.
+      host._internals.editIsolation = null;
+      log.warn?.('%s: edit isolation unavailable (ctx.on missing); isolated edit disabled', name);
+    }
+  } catch (error) {
+    log.warn?.('%s: edit isolation install failed: %s', name, String(error?.message ?? error));
   }
 
   // B2 write guard: shared rooms are only read (never created) from this path;
@@ -2903,6 +2948,7 @@ export function createMarkdownToolDefinition(dispatch) {
   return {
     name: 'markdown',
     description: [
+      'UI 已内联修改目标原文（消息中带 selectionId）时直接调用 editSelection；不要再 read/readSelection。',
       '读写 Markdown（及任意文本）文件。read 返回“当前正文”——包含用户在 MarkPilot 编辑器里尚未保存的修改；',
       'read 可带 fromLine/toLine/lineCount/maxBytes 做有界按行读取：1-based、含首尾行，返回 totalLines、窗口原文 text、每行绝对行号与 from/to/end 数值偏移、truncated/nextLine；不带这些参数时返回全文（全文超过单次显示预算时分页，见下）。',
       '每次 read 的可见文本总量有预算（8000 字符）：默认全文、行窗口和超长单行都切成能完整显示的分页，绝不会出现 nextLine 承诺了却没显示的行。续读时带 fromLine（行窗口）或 fromLine+fromColumn（超长单行），并回传上一页的 nextLine/nextColumn；续读建议同时传 baseVersion，正文已变化时返回 MP_DOC_STALE，避免把两版正文拼成一篇。',

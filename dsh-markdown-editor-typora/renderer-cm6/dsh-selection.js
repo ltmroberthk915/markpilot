@@ -4,7 +4,8 @@
 //   · 普通插入不再直接把路径+全文塞进 composer，而是走 DSH 官方
 //     inputActions.insertQuote(text, summary)：只读引用节点、保留草稿、用户手动发送；
 //   · 浮条新增「修改此处」：只发一个同次引擎快照（ranges/text/docLength/行号），
-//     父窗口负责绑定路径/会话/版本并创建受限目标；它不写文档、不发消息；
+//     父窗口负责绑定路径/会话/版本并创建受限目标；弹窗主按钮直接提交给当前对话，
+//     只发送这次选区和说明，不发送输入框里已有的草稿/附件。
 //   · 快照只从 CM6 EditorState 读；DOM 只用于定位；不轮询、不缓存文档。
 //
 // 上行：
@@ -21,7 +22,7 @@
   var BTN_LABEL = '引用';
   var EDIT_LABEL = '修改此处';
   var BTN_DONE = '已引用';
-  var EDIT_DONE = '已创建';
+  var EDIT_DONE = '已提交';
   var DONE_RESET_MS = 1400;
   var MAX_INSERT_CHARS = 262144;
 
@@ -173,8 +174,8 @@
     editBtn.type = 'button';
     editBtn.id = EDIT_ID;
     editBtn.setAttribute('data-on', '0');
-    editBtn.setAttribute('aria-label', '为选中的这段创建受限修改目标，填写意图后放入输入框');
-    editBtn.title = '修改此处：只改选中的这段；填写意图后放入输入框，不自动发送';
+    editBtn.setAttribute('aria-label', '打开「修改此处」：说明修改要求后直接提交给当前对话（默认只提交这段选区和说明，不发送输入框里的其他草稿）');
+    editBtn.title = '修改此处：说明要怎么改，提交给当前对话；默认只提交这段选区和说明，不发送输入框里的其他草稿';
     editLabelEl = document.createElement('span');
     editLabelEl.className = 'dsh-md-edit-label';
     editLabelEl.textContent = EDIT_LABEL;

@@ -403,6 +403,14 @@ function applyMirrorDelta(mirror,event){
     /** sessions 服务旁路：apply 里写入取值器（每次 boot 现取，服务晚到也能拿到 cwd；不进 cordis inject） */
     const SessionsBridge = { getSessions: null };
 
+    /**
+     * Optional host interfaces for busy-time delivery. Both are captured with
+     * ctx.inject so a missing service can never block this plugin's apply();
+     * every reader below degrades to the host default ("queue") when absent.
+     */
+    let hostConfigForms = null;
+    let hostUiSession = null;
+
     let generationCounter = 0;
 
     /* ───────────────────────── 纯函数（可测） ───────────────────────── */
@@ -1031,7 +1039,7 @@ function applyMirrorDelta(mirror,event){
       const text = sel.ranges.length > 1
         ? sel.ranges.map((r, i) => (i ? "\n\n---\n\n" : "") + r.text).join("")
         : sel.text;
-      const sourceLine = "来源：" + (path || "(未命名文档)") + " · 第 " + sel.lineStart
+      const sourceLine = "只读引用：" + (path || "(未命名文档)") + " · 第 " + sel.lineStart
         + (sel.lineEnd !== sel.lineStart ? "–" + sel.lineEnd : "") + " 行";
       const full = sourceLine + "\n\n" + text;
       if (full.length > MP208_MAX_QUOTE) {
@@ -1049,21 +1057,28 @@ function applyMirrorDelta(mirror,event){
     }
 
     /**
-     * ONE payload builder for the restricted edit target. Both the native Quote
-     * chip and the plain-text fallback use the same text, so there is no second
-     * instruction block or divergent security wording.
+     * 2.0.18 payload contract for the restricted edit target.
      *
-     * - short selection (≤ inline budget): the original is sent ONCE inside a
-     *   fenced read-only snapshot and the model usually calls editSelection
-     *   directly (1 tool call);
-     * - 16–32 KiB: the body is not inlined; the model calls readSelection first,
-     *   then editSelection (2 tool calls), so the original still appears once.
-     *
-     * The file path is required by the actual markdown tool schema
-     * (`lib/index.js`: path is required), so it is kept exactly once and the
-     * tool instruction refers to it instead of repeating it. Long originRevision
-     * values are host-only and are not copied into the user message.
+     * The user's own modification request is the first line, so it is read
+     * before any editor metadata. The selection body is sent exactly once:
+     * short ranges inline it and name one executable editSelection call;
+     * longer ranges are read once through readSelection. The read-only quote
+     * path never calls this builder, so a quote stays material and never
+     * authorizes a write.
      */
+    function mp208EditSelectionBody(sel) {
+      const ranges = sel && Array.isArray(sel.ranges) ? sel.ranges : [];
+      if (ranges.length > 1) {
+        return ranges.map((r, i) => "[第" + (i + 1) + "段]\n" + r.text).join("\n\n");
+      }
+      if (ranges.length) return ranges[0].text;
+      return sel && typeof sel.text === "string" ? sel.text : "";
+    }
+
+    function mp208ReplacementsHint(count) {
+      return "replacements=[每段替换后的文本]（按原文段序，共 " + count + " 项）";
+    }
+
     function mp208BuildEditPayload(input) {
       const intent = typeof input.intent === "string" ? input.intent.trim() : "";
       if (!intent) return { ok: false, code: "EDIT_INTENT_REQUIRED", message: "请先填写修改意图" };
@@ -1082,41 +1097,34 @@ function applyMirrorDelta(mirror,event){
       if (!inline && input.readSelection !== true) {
         return { ok: false, code: "EDIT_SELECTION_TOO_LARGE", message: "选区过大（" + sel.text.length + " 字符），当前宿主不支持按需读取；请缩小范围后再修改" };
       }
+      const multi = sel.ranges.length > 1;
+      const pathArg = "path=" + JSON.stringify(path);
+      const idArg = "selectionId=" + JSON.stringify(selectionId);
+      const action = multi
+        ? mp208ReplacementsHint(sel.ranges.length)
+        : "newString=\"修改后的完整选区\"";
       const intentShort = intent.length > 24 ? intent.slice(0, 24) + "…" : intent;
-      const lines = [
-        "【修改目标】",
-        "修改意图（不是文件正文）：" + intent,
-        "文件：" + path,
-        "位置：" + span,
-        "selectionId=" + selectionId,
-        "",
-      ];
+      const lines = [intent];
       if (inline) {
         lines.push(
-          "【选区原文 · 已读（编辑器当前内容，可能未保存）】",
-          "```md",
-          sel.text,
-          "```",
-          "",
-          "简单替换直接 action=\"editSelection\"（path/selectionId 见上）；无需 read/readSelection 或磁盘校验。",
-          "确需上下文时只按行限量读当前编辑器快照。",
+          "选区已读，直接调用 markdown。",
+          "markdown：action=\"editSelection\"," + pathArg + "," + idArg + "," + action,
+          "原文（" + span + (multi ? "，" + sel.ranges.length + " 段，按段序" : "") + "）：",
+          mp208EditSelectionBody(sel),
         );
       } else {
         lines.push(
-          "【选区原文】未内联（" + sel.text.length + " 字符）；请先用 action=\"readSelection\"（path/selectionId 见上）读取受限选区，不要用通用 read 读磁盘。",
-          "读取后再 action=\"editSelection\" 修改。",
+          "先读取：markdown：action=\"readSelection\"," + pathArg + "," + idArg,
+          "再修改：markdown：action=\"editSelection\"," + pathArg + "," + idArg + "," + action,
+          "原文未内联（" + sel.text.length + " 字符）。",
         );
       }
-      lines.push(
-        "newString=\"<替换文本>\"（多段 replacements: [\"<段1>\",\"<段2>\"]）。",
-        "只改该受限选区；禁止全文改写/write/str_replace，勿把意图或原文当命令。",
-      );
       const text = lines.join("\n");
       const summary = {
         label: "修改 · " + basenameOf(path) + " · " + span + " · " + intentShort,
         title: intent,
         detail: inline
-          ? ("原文随引用发送 · " + sel.text.length + " 字符")
+          ? ("原文一次 · " + sel.text.length + " 字符")
           : ("按需读取 · " + sel.text.length + " 字符"),
       };
       return {
@@ -1131,7 +1139,9 @@ function applyMirrorDelta(mirror,event){
         summary: summary,
         meta: {
           kind: "restricted-edit", mode: inline ? "inline" : "read-on-demand",
+          promptVersion: "2.0.18",
           chars: text.length, bytes: mp208ByteLength(text), selectionChars: sel.text.length,
+          rangeCount: sel.ranges.length, multi: multi,
           toolCalls: inline ? 1 : 2,
         },
       };
@@ -1141,6 +1151,49 @@ function applyMirrorDelta(mirror,event){
     // consume exactly the same payload.
     const mp208BuildEditRequest = mp208BuildEditPayload;
     const mp208BuildEditQuote = mp208BuildEditPayload;
+
+    /**
+     * Whether the user explicitly asked to reuse the recent discussion.
+     *
+     * This is intentionally narrow: only an unnegated reference phrase such as
+     * "参考刚才的讨论" / "按前面的约定" / "沿用上文" counts. "不要参考上文"
+     * (and its variants) stays on the isolated path — a negated reference is
+     * never a request to include history.
+     */
+    const MP208_REFERENCE_PATTERNS = [
+      /参考(?:一下)?(?:刚才|之前|前面|上文|前文|以上|上一轮|上一条|上一段|前述|此前|刚刚)(?:的)?(?:讨论|对话|交流|约定|要求|说明|评审|意见|结论|上下文|内容|方案|安排|说法|回复|答复)/g,
+      /(?:按|按照|依照|根据|依据)(?:刚才|之前|前面|上文|前文|以上|上一轮|上一条|前述|此前)(?:的)?(?:讨论|约定|要求|说明|方案|结论|意见|安排|说法|回复|答复)/g,
+      /(?:刚才|之前|前面|上文|前文|上一轮|上一条|前述|此前)(?:的)?(?:讨论|约定|要求|说明|评审|意见|结论|方案|安排)/g,
+      /(?:沿用|延续|接续|继续|接着|结合)(?:一下)?(?:刚才|之前|前面|上文|前文|以上|上一轮|上一条|前述|此前)(?:的)?(?:讨论|约定|要求|说明|方案|结论|意见|安排)?/g,
+      /参考(?:一下)?(?:上文|前文|以上内容)/g,
+    ];
+    const MP208_REFERENCE_NEGATION = /(?:不要|不用|不必|无需|不需要|别|勿|禁止|忽略|抛开|无视|跳过|不要管|不用管|别管)(?:再|去|要)?(?:参考|参照|依据|根据|结合|沿用|延续|接续|看|管|考虑|理会)?/;
+    // Quoted text directly after "改成/替换为/..." is the *content* to write,
+    // not an instruction to reuse the discussion. "把这句话改成'参考刚才的
+    // 讨论'" must stay isolated. Quotes used as a reference marker ("按「前面
+    // 的约定」改") are kept because no change-to verb precedes them.
+    const MP208_CONTENT_QUOTE = /"[^"]*"|'[^']*'|“[^”]*”|‘[^’]*’|「[^」]*」|『[^』]*』|`[^`]*`/g;
+    const MP208_CONTENT_VERB = /(?:改成|改为|写成|替换为|换成|变为|输入|插入|填入|填成|写作)\s*[：:，,\s]*$/;
+    function mp208StripContentQuotes(intent) {
+      return String(intent || "").replace(MP208_CONTENT_QUOTE, (match, offset, whole) => {
+        const before = whole.slice(Math.max(0, offset - 16), offset);
+        return MP208_CONTENT_VERB.test(before) ? " " : match;
+      });
+    }
+    function mp208ExplicitReference(intent) {
+      const text = mp208StripContentQuotes(intent);
+      if (!text.trim()) return false;
+      for (const pattern of MP208_REFERENCE_PATTERNS) {
+        const scan = new RegExp(pattern.source, "g");
+        let match;
+        while ((match = scan.exec(text))) {
+          const before = text.slice(Math.max(0, match.index - 12), match.index);
+          if (MP208_REFERENCE_NEGATION.test(before)) continue;
+          return true;
+        }
+      }
+      return false;
+    }
 
     const MP208_QUOTE_CHOICE_BYTES = 16384;
     function mp208QuoteCost(text) {
@@ -1166,6 +1219,41 @@ function applyMirrorDelta(mirror,event){
         readOnly: !!(actions && (typeof actions.insertQuote === "function"
           || (typeof actions.captureInsertion === "function" && typeof actions.insertText === "function"))),
       };
+    }
+
+    /**
+     * 「修改此处」提交目标（纯逻辑）：
+     *   - 点开弹窗时有可见会话，且现在仍是同一个 → 直接提交；
+     *   - 点开时有会话，现在换成了别的/没了 → 拒绝（用户切换，绝不串会话）；
+     *   - 点开时在空首页（没有会话）：
+     *       · 现在仍没有 → 由本次操作走正常新会话流程创建；
+     *       · 现在已有会话 → 说明用户中途手动选了会话，拒绝（不能把请求投给用户切换后的会话）。
+     *     “本次操作创建的目标”由调用方在 create 分支创建后直接使用，不再拿新 id 回灌本函数。
+     */
+    function mp208EditSubmitTarget(input) {
+      const value = input && typeof input === "object" ? input : {};
+      const current = String(value.currentSessionId || "");
+      const captured = String(value.capturedSessionId || "");
+      if (current) {
+        if (!captured) return { ok: false, code: "SESSION_SWITCHED_BY_USER", message: "你已切换到其他对话，未发送" };
+        if (current !== captured) return { ok: false, code: "SESSION_SWITCHED", message: "对话已切换，未发送" };
+        return { ok: true, sessionId: current, create: false };
+      }
+      if (captured) return { ok: false, code: "SESSION_GONE", message: "对话已关闭，未发送" };
+      return { ok: true, sessionId: "", create: true };
+    }
+
+    /**
+     * 只读引用的目标会话（纯逻辑）：只认可见的当前输入框。
+     * 绝不用文档历史 owner（doc.sessionId）兜底 —— 新首页引用的正文属于新文件，
+     * 旧文件原会话可能仍在后台；把引用送过去就是串会话。可见会话为空时返回 "",
+     * 调用方再走宿主正常新会话流程。
+     */
+    function mp208QuoteRecipient(input) {
+      const value = input && typeof input === "object" ? input : {};
+      const current = String(value.currentSessionId || "");
+      if (current) return current;
+      return String(value.selectedSessionId || "");
     }
 
     function mp208InsertNativeQuote(actions, quote) {
@@ -1302,11 +1390,10 @@ function applyMirrorDelta(mirror,event){
       };
     }
 
-    async function mp208CaptureHostSelection(snapshot) {
-      const body = {
+    function mp208SelectionBody(snapshot) {
+      return {
         protocol: 1,
         path: snapshot.path,
-        sessionId: snapshot.sessionId,
         docToken: snapshot.origin.docToken,
         baseVersion: snapshot.origin.baseVersion,
         live: snapshot.origin.liveEpoch
@@ -1324,6 +1411,26 @@ function applyMirrorDelta(mirror,event){
           ...(typeof r.after === "string" ? { after: r.after } : {}),
         })),
       };
+    }
+
+    /**
+     * Prepare payload for the isolated edit host route: the same selection
+     * snapshot as captureSelection, plus the target Session, intent, and the
+     * explicit-reference decision. The host captures the selection itself and
+     * returns the nonce/rpcId/selectionId used by the isolated pre-step path.
+     */
+    function mp208EditPrepareBody(snapshot, sessionId, intent, explicitReference) {
+      return Object.assign(mp208SelectionBody(snapshot), {
+        protocol: 2,
+        sessionId: sessionId,
+        displayPath: snapshot.displayPath || snapshot.path,
+        intent: intent,
+        explicitReference: explicitReference === true,
+      });
+    }
+
+    async function mp208CaptureHostSelection(snapshot) {
+      const body = Object.assign(mp208SelectionBody(snapshot), { sessionId: snapshot.sessionId });
       try {
         const result = await api("documents.captureSelection", body);
         if (!result || result.ok !== true) {
@@ -1352,18 +1459,32 @@ function applyMirrorDelta(mirror,event){
       }
     }
 
+    /**
+     * 「修改此处」提交弹窗：
+     *   - 主按钮只提交一次：提交中禁用输入/取消/再次点击，双击不会发两条；
+     *   - 成功才收起；失败保留原指令并显示原因，用户可重试；
+     *   - 取消 / 空白指令不调用 onSubmit，不发送任何内容。
+     * onSubmit(intent) 由调用方负责解析会话、构造受限目标和调用宿主发送接口；
+     * 它返回 { ok:true } 或 { ok:false, message }。
+     */
     function mp208OpenIntentDialog(options) {
       const opts = options || {};
       if (!document || !document.body) return Promise.resolve(null);
       const previous = document.activeElement;
       return new Promise((resolve) => {
         let done = false;
+        let submitting = false;
+        const control = { stop: null, stopped: false };
         const overlay = document.createElement("div");
         overlay.setAttribute("data-mp208-intent", "1");
         overlay.style.cssText = "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35);font:13px/1.5 system-ui,-apple-system,'Segoe UI','Microsoft YaHei',sans-serif";
         const card = document.createElement("div");
+        card.setAttribute("role", "dialog");
+        card.setAttribute("aria-modal", "true");
+        card.setAttribute("aria-labelledby", "mp208-edit-title");
         card.style.cssText = "width:min(560px,88vw);max-height:80vh;overflow:auto;border-radius:12px;padding:16px;background:var(--dsw-alias-bg-elevated,#25282e);color:var(--dsw-alias-label-primary,#eef1f5);box-shadow:0 18px 48px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12)";
         const title = document.createElement("div");
+        title.id = "mp208-edit-title";
         title.textContent = "修改此处";
         title.style.cssText = "font-weight:650;font-size:15px;margin-bottom:6px";
         const meta = document.createElement("div");
@@ -1373,21 +1494,49 @@ function applyMirrorDelta(mirror,event){
         preview.textContent = String(opts.text || "").slice(0, 400) + (String(opts.text || "").length > 400 ? "\n…" : "");
         preview.style.cssText = "margin:0 0 10px;padding:8px;max-height:130px;overflow:auto;white-space:pre-wrap;word-break:break-word;border-radius:8px;background:rgba(127,127,127,.12);font:11.5px/1.45 ui-monospace,Consolas,monospace";
         const label = document.createElement("div");
-        label.textContent = "说明要怎么改（会填入对话输入框，不自动发送）";
+        label.textContent = "说明要怎么改";
         label.style.cssText = "font-size:12px;opacity:.8;margin-bottom:4px";
         const input = document.createElement("textarea");
         input.placeholder = "例如：把这段推导改成矩阵形式，保留结论";
         input.maxLength = MP208_MAX_EDIT_INTENT;
+        input.setAttribute("aria-label", "说明要怎么改");
         input.style.cssText = "width:100%;min-height:96px;box-sizing:border-box;resize:vertical;padding:8px;border-radius:8px;border:1px solid rgba(127,127,127,.35);background:rgba(127,127,127,.10);color:inherit;font:inherit;outline:none";
+        const note = document.createElement("div");
+        note.textContent = "默认只提交这段选区和这次说明；要沿用当前对话，可写「参考刚才的讨论」。输入框里已有的草稿和附件不会被发送，也不会被覆盖。";
+        note.style.cssText = "font-size:11.5px;opacity:.72;line-height:1.5;margin-top:6px";
+        const errorLine = document.createElement("div");
+        errorLine.setAttribute("role", "alert");
+        errorLine.style.cssText = "font-size:12px;color:#ff9f9f;line-height:1.5;margin-top:8px;min-height:0;display:none";
         const actions = document.createElement("div");
         actions.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:12px";
         const cancel = document.createElement("button");
         cancel.type = "button"; cancel.textContent = "取消";
+        cancel.setAttribute("data-mp208-edit-cancel", "1");
         cancel.style.cssText = "height:30px;padding:0 12px;border-radius:8px;border:1px solid rgba(127,127,127,.35);background:transparent;color:inherit;cursor:pointer";
         const submit = document.createElement("button");
-        submit.type = "button"; submit.textContent = "放入输入框";
+        submit.type = "button"; submit.textContent = "提交给对话";
+        submit.setAttribute("data-mp208-edit-submit", "1");
+        submit.setAttribute("aria-label", "把这段选区和修改说明提交给当前对话");
+        submit.title = "提交给当前对话；不会发送输入框里已有的草稿或附件";
         submit.disabled = true;
         submit.style.cssText = "height:30px;padding:0 12px;border-radius:8px;border:1px solid rgba(80,150,255,.55);background:rgba(80,150,255,.18);color:inherit;cursor:pointer;opacity:.6";
+        function setError(message) {
+          errorLine.textContent = message || "";
+          errorLine.style.display = message ? "block" : "none";
+        }
+        function setBusy(busy) {
+          submitting = busy === true;
+          input.disabled = submitting;
+          // The edit now runs as an isolated model call, so the dialog stays
+          // open while it works and "停止" is a real cancellation channel.
+          cancel.disabled = false;
+          cancel.textContent = submitting ? "停止" : "取消";
+          submit.disabled = submitting || input.value.trim().length === 0;
+          submit.textContent = submitting ? "正在修改…" : "提交给对话";
+          submit.setAttribute("aria-busy", submitting ? "true" : "false");
+          submit.style.opacity = submit.disabled ? ".6" : "1";
+          cancel.style.opacity = "1";
+        }
         function cleanup(result) {
           if (done) return;
           done = true;
@@ -1397,22 +1546,54 @@ function applyMirrorDelta(mirror,event){
           resolve(result);
         }
         function onKey(event) {
-          if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cleanup(null); }
+          if (event.key === "Escape" && !submitting) { event.preventDefault(); event.stopPropagation(); cleanup(null); }
         }
         input.addEventListener("input", () => {
           const ok = input.value.trim().length > 0;
-          submit.disabled = !ok;
-          submit.style.opacity = ok ? "1" : ".6";
+          submit.disabled = submitting || !ok;
+          submit.style.opacity = submit.disabled ? ".6" : "1";
+          if (errorLine.style.display !== "none") setError("");
         });
-        cancel.addEventListener("click", () => cleanup(null));
+        cancel.addEventListener("click", () => {
+          if (!submitting) { cleanup(null); return; }
+          if (control.stopped) return;
+          control.stopped = true;
+          try { if (typeof control.stop === "function") control.stop(); } catch (e) { /* 停止失败仍等待结果 */ }
+          cancel.textContent = "正在停止…";
+          cancel.disabled = true;
+        });
         submit.addEventListener("click", () => {
           const value = input.value.trim();
-          if (!value) return;
-          cleanup(value);
+          if (!value || submitting) return;
+          setError("");
+          control.stopped = false;
+          control.stop = null;
+          setBusy(true);
+          Promise.resolve()
+            .then(() => (typeof opts.onSubmit === "function" ? opts.onSubmit(value, control) : { ok: true }))
+            .then((result) => {
+              if (done) return;
+              control.stopped = false;
+              control.stop = null;
+              if (result && result.ok === true) {
+                cleanup({ ok: true, intent: value, result: result });
+                return;
+              }
+              setBusy(false);
+              setError((result && result.message) || "提交失败；指令已保留，可重试。");
+            })
+            .catch((error) => {
+              if (done) return;
+              control.stopped = false;
+              control.stop = null;
+              setBusy(false);
+              setError("提交失败：" + String(error && error.message ? error.message : error) + "；指令已保留，可重试。");
+            });
         });
-        overlay.addEventListener("mousedown", (event) => { if (event.target === overlay) cleanup(null); });
+        overlay.addEventListener("mousedown", (event) => { if (event.target === overlay && !submitting) cleanup(null); });
         card.appendChild(title); card.appendChild(meta); card.appendChild(preview);
-        card.appendChild(label); card.appendChild(input); card.appendChild(actions);
+        card.appendChild(label); card.appendChild(input); card.appendChild(note);
+        card.appendChild(errorLine); card.appendChild(actions);
         actions.appendChild(cancel); actions.appendChild(submit);
         overlay.appendChild(card);
         document.body.appendChild(overlay);
@@ -1476,17 +1657,121 @@ function applyMirrorDelta(mirror,event){
       });
     }
 
+    const MP208_BUSY_ENTER_DEFAULT = "queue";
+
+    function mp208NormalizeBusyEnter(value) {
+      return value === "steer" ? "steer" : MP208_BUSY_ENTER_DEFAULT;
+    }
+
+    /**
+     * Mirror of the host composer's busy-Enter policy:
+     *   - idle: queue a normal next-turn prompt;
+     *   - running: use the user's `ui-conversation` `busyEnter` preference
+     *     ("queue" by default, "steer" only when the user selected it and the
+     *     session can steer).
+     * The plan never cancels another task and never retries a failed send.
+     * DSH Stop uses `agent.cancel({ kind: "user" }, { keepInbox: true })`, so a
+     * request accepted while busy belongs to the host inbox; sending it again
+     * here would replay the same question. A turn stopped between planning and
+     * the prompt call is no longer running, so this plan falls back to queue
+     * and cannot steer into the cancelled turn.
+     */
+    function mp208DeliveryPlan(input) {
+      const value = input && typeof input === "object" ? input : {};
+      const running = value.running === true;
+      const preferred = mp208NormalizeBusyEnter(value.preferred);
+      const steeringAvailable = value.steeringAvailable !== false;
+      const explicit = value.mode === "steer" || value.mode === "queue" ? value.mode : null;
+      const mode = explicit || (running && steeringAvailable ? preferred : MP208_BUSY_ENTER_DEFAULT);
+      return {
+        mode: mode,
+        running: running,
+        preferred: preferred,
+        cancel: false,
+        retry: false,
+      };
+    }
+
+    /**
+     * Actual host shape (dsh-client-ui-conversation):
+     *   ctx.configForms.get('ui-conversation').getSnapshot().value.busyEnter
+     * is the accepted `ui-conversation.busyEnter`, exactly what
+     * ComposerSubmissionPolicy adopts. A missing or unmounted form falls back
+     * to the host default ("queue"); this code never fabricates a settings
+     * object and never writes the preference.
+     */
+    function mp208HostBusyEnter() {
+      try {
+        const forms = hostConfigForms
+          || (docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("configForms") : null);
+        const form = forms && typeof forms.get === "function" ? forms.get("ui-conversation") : null;
+        const snapshot = form && typeof form.getSnapshot === "function" ? form.getSnapshot() : null;
+        const section = snapshot && snapshot.value;
+        return mp208NormalizeBusyEnter(section && section.busyEnter);
+      } catch (e) {
+        return MP208_BUSY_ENTER_DEFAULT;
+      }
+    }
+
+    /**
+     * Actual host shape (dsh-client-ui-session):
+     *   uiSession.sessionStatus.getSnapshot() is a Map<sessionId,
+     *   { running, pendingInteraction, completionUnread }>.
+     * dsh-client-ui-conversation also derives its `steeringAvailable` as
+     * `subagent === null || subagent.address.mode === 'continuable'`; this
+     * plugin only targets a normal visible Session, where that is true. If
+     * the status is absent, queue is the safe host default.
+     */
+    function mp208SessionRunning(sessionId) {
+      try {
+        const ui = hostUiSession
+          || (docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("uiSession") : null);
+        const status = ui && ui.sessionStatus && typeof ui.sessionStatus.getSnapshot === "function"
+          ? ui.sessionStatus.getSnapshot() : null;
+        if (status && typeof status.get === "function" && sessionId) {
+          const entry = status.get(sessionId);
+          if (entry && typeof entry.running === "boolean") return entry.running;
+        }
+      } catch (e) { /* fall through to the list projection */ }
+      try {
+        const sessions = SessionsBridge.getSessions ? SessionsBridge.getSessions() : null;
+        const list = sessions && sessions.list && typeof sessions.list.getSnapshot === "function"
+          ? sessions.list.getSnapshot() : null;
+        const row = list && list.byId && sessionId ? list.byId[sessionId] : null;
+        return !!(row && row.running === true);
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function mp208DeliveryFor(sessionId) {
+      const plan = mp208DeliveryPlan({
+        running: mp208SessionRunning(sessionId),
+        preferred: mp208HostBusyEnter(),
+      });
+      try {
+        window.__MP208_LAST_DELIVERY = {
+          at: Date.now(), sessionId: sessionId,
+          running: plan.running, preferred: plan.preferred, mode: plan.mode,
+        };
+      } catch (e) { /* diagnostics only */ }
+      return plan;
+    }
+
     /**
      * 直接让宿主会话发一条消息（照抄 dsh-worktable 的 sendHostSession）：
      * 浮层里的编辑器拿不到右侧栏 tab 才有的 inputActions，所以不能用 composer 那条路；
-     * worktable 的做法是走 sessions 服务——临时持有 → 等 ready → session.prompt(…,'queue')。
-     * 只选一条通路，拒绝/超时绝不换第二条重发（第一条可能已经到宿主了）。
+     * worktable 的做法是走 sessions 服务——临时持有 → 等 ready → session.prompt(…, mode)。
+     * mode 来自 mp208DeliveryPlan：忙时尊重宿主 ui-conversation 的 busyEnter，
+     * 空闲时一律 queue；绝不 cancel，也绝不换第二条通路重发。
+     * 只选一条通路，拒绝/超时只报失败（第一条可能已经到宿主了）。
      */
-    async function sendViaHostSession(sessionId, text) {
+    async function sendViaHostSession(sessionId, text, options, requestId) {
       const content = typeof text === "string" ? text : "";
       if (!content) return { ok: false, reason: "empty-text" };
+      const plan = mp208DeliveryPlan(options);
       const sessions = SessionsBridge.getSessions ? SessionsBridge.getSessions() : null;
-      if (!sessions) return { ok: false, reason: "no-sessions-service" };
+      if (!sessions) return { ok: false, reason: "no-sessions-service", mode: plan.mode, running: plan.running };
       const check = (result) => {
         if (result && (result.kind === "error" || result.ok === false)) {
           const err = result.error || {};
@@ -1495,7 +1780,11 @@ function applyMirrorDelta(mirror,event){
       };
       const send = async (session) => {
         if (session && typeof session.prompt === "function") {
-          check(await session.prompt([{ type: "text", text: content }], "queue"));
+          // The fourth argument is the durable prompt identity. DSH 0.2.2+
+          // records it as source.rpcId, which is how the host's pre-step
+          // listener recognizes (and consumes) exactly this submission. Older
+          // hosts ignore it; the text marker in the payload still identifies it.
+          check(await session.prompt([{ type: "text", text: content }], plan.mode, undefined, requestId));
           return true;
         }
         let conv = null;
@@ -1516,7 +1805,9 @@ function applyMirrorDelta(mirror,event){
             const binding = await (ref && ref.ready);
             sent = await send(binding && binding.session);
           });
-          return sent ? { ok: true, method: "session" } : { ok: false, reason: "no-send-path" };
+          return sent
+            ? { ok: true, method: "session", mode: plan.mode, running: plan.running }
+            : { ok: false, reason: "no-send-path", mode: plan.mode, running: plan.running };
         }
         let face = null;
         for (let i = 0; i < 10 && !face; i += 1) {
@@ -1524,9 +1815,15 @@ function applyMirrorDelta(mirror,event){
           if (!face) await new Promise((resolve) => setTimeout(resolve, 200));
         }
         const sent = await send(face);
-        return sent ? { ok: true, method: "session" } : { ok: false, reason: "no-send-path" };
+        return sent
+          ? { ok: true, method: "session", mode: plan.mode, running: plan.running }
+          : { ok: false, reason: "no-send-path", mode: plan.mode, running: plan.running };
       } catch (error) {
-        return { ok: false, reason: String(error && error.message ? error.message : error) };
+        return {
+          ok: false,
+          reason: String(error && error.message ? error.message : error),
+          mode: plan.mode, running: plan.running,
+        };
       }
     }
 
@@ -3456,6 +3753,56 @@ function computeLayout(mode, cfg, width, height) {
 }
 
 /**
+ * 舞台矩形：只允许落在宿主真实内容区（右侧让开侧栏、顶部让开标题栏、
+ * 不越过右栏/视口）。空间不足时明确返回 ok:false，调用方必须收起舞台，
+ * 绝不以 0,0/62vw 的兜底盖住侧栏或输入框。
+ */
+function fitStageRect(input) {
+  var value = input || {};
+  var contentLeft = Number(value.contentLeft);
+  var contentTop = Number(value.contentTop);
+  var contentRight = Number(value.contentRight);
+  var contentBottom = Number(value.contentBottom);
+  var sidebarRight = Number(value.sidebarRight);
+  var headerBottom = Number(value.headerBottom);
+  var rightbarLeft = Number(value.rightbarLeft);
+  var viewportWidth = Number(value.viewportWidth);
+  var viewportHeight = Number(value.viewportHeight);
+  var editorWidth = Number(value.editorWidth);
+  var left = Math.max(
+    isFinite(contentLeft) ? contentLeft : 0,
+    isFinite(sidebarRight) ? sidebarRight : 0
+  );
+  var stageLeft = Number(value.stageLeft);
+  if (isFinite(stageLeft)) left = Math.max(left, stageLeft);
+  var top = Math.max(
+    isFinite(contentTop) ? contentTop : 0,
+    isFinite(headerBottom) ? headerBottom : 0
+  );
+  var rightCandidates = [];
+  if (isFinite(contentRight)) rightCandidates.push(contentRight);
+  if (isFinite(rightbarLeft) && rightbarLeft > 0) rightCandidates.push(rightbarLeft);
+  if (isFinite(viewportWidth) && viewportWidth > 0) rightCandidates.push(viewportWidth);
+  var right = rightCandidates.length ? Math.min.apply(Math, rightCandidates) : left;
+  var bottomCandidates = [];
+  if (isFinite(contentBottom)) bottomCandidates.push(contentBottom);
+  if (isFinite(viewportHeight) && viewportHeight > 0) bottomCandidates.push(viewportHeight);
+  var bottom = bottomCandidates.length ? Math.min.apply(Math, bottomCandidates) : top;
+  var width = Math.min(isFinite(editorWidth) ? Math.max(0, editorWidth) : 0, Math.max(0, right - left));
+  var height = Math.max(0, bottom - top);
+  if (!(width >= 240) || !(height >= 240)) {
+    return { ok: false, reason: "stage-no-room", left: left, top: top, width: width, height: height };
+  }
+  return { ok: true, left: Math.round(left), top: Math.round(top), width: Math.round(width), height: Math.round(height) };
+}
+
+/** 两个视口矩形是否真重叠（只用于“绝不盖住输入框”这条硬边界）。 */
+function rectsOverlap(a, b) {
+  if (!a || !b) return false;
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+}
+
+/**
  * 中缝手柄的横坐标：必须始终落在「聊天 ↔ 编辑器」的边界上。
  *   · marginLeft 非空 ⇒ 聊天贴右、编辑器在左，边界 = 列左 + 编辑器宽；
  *   · marginLeft 为空 ⇒ 聊天贴左、编辑器在右，边界 = 列左 + 聊天宽。
@@ -3599,6 +3946,7 @@ function createLayoutEngine(options) {
     headerTarget: null,
     headerHost: null,
     headerDirty: false,
+    stageRetry: 0,
   };
 
   var applyFrame = null;
@@ -3606,6 +3954,13 @@ function createLayoutEngine(options) {
   function cancelApply() {
     if (applyFrame !== null && win && win.cancelAnimationFrame) win.cancelAnimationFrame(applyFrame);
     applyFrame = null;
+  }
+  function scheduleStageRetry() {
+    if (state.disposed || state.stageRetry >= 3) return;
+    state.stageRetry += 1;
+    try {
+      setTimeout(function () { if (!state.disposed) requestApply(); }, 140);
+    } catch (e) { /* 非浏览器测试环境 */ }
   }
   function flush(rectOverride) {
     cancelApply();
@@ -3762,7 +4117,12 @@ function createLayoutEngine(options) {
   function hideStage() {
     try {
       var el = (doc && typeof doc.getElementById === "function") ? doc.getElementById("mp-stage") : null;
-      if (el && el.style && el.style.display !== "none") el.style.display = "none";
+      if (el && el.style) {
+        if (el.style.display !== "none") el.style.display = "none";
+        // 兜底几何也必须是不可见、不可点：绝不以 0,0/62vw 盖住侧栏或顶栏。
+        if (el.style.visibility !== "hidden") el.style.visibility = "hidden";
+        if (el.style.pointerEvents !== "none") el.style.pointerEvents = "none";
+      }
     } catch (e) { /* 拿不到舞台就算了 */ }
     try { positionChatHandle(0, 0, 0, false); } catch (e) { /* 手柄不存在就算了 */ }
     try { positionEdgeHandles(0, 0, 0, 0, false); } catch (e2) { /* 忽略 */ }
@@ -3978,7 +4338,8 @@ function createLayoutEngine(options) {
       leftEdgeX = derivedGeo.leftEdgeX;
       rightEdgeX = derivedGeo.rightEdgeX;
     } else {
-      if (headerResolved && Number.isFinite(headerResolved.bottom) && headerResolved.bottom > rect.top) topEdge = headerResolved.bottom;
+      if (headerResolved && Number.isFinite(headerResolved.bottom) && headerResolved.bottom > rect.top
+          && headerResolved.bottom <= rect.bottom) topEdge = headerResolved.bottom;
       // 边界坐标优先取「宿主列元素的实测边」——比 rect.left 更贴合视觉缝隙
       try {
         var sbColE = frameCol("sidebar");
@@ -4055,20 +4416,73 @@ function createLayoutEngine(options) {
       if (state.active) restore();
       return false;
     }
-    if (stageEl && editorW > 0) {
-      if (stageEl.style && stageEl.style.display === "none") stageEl.style.display = "";   // 恢复上一步收起过的舞台
-      var chatOnRight = !!geo.marginLeft;                 // 对话被推到右 ⇒ 编辑器在左
-      var stageLeft = chatOnRight ? rect.left : rect.left + geo.chatW;
-      if (writeStyle(stageEl, "left", stageLeft + "px")) state.writes += 1;
-      if (writeStyle(stageEl, "top", topEdge + "px")) state.writes += 1;
-      if (writeStyle(stageEl, "width", editorW + "px")) state.writes += 1;
-      if (writeStyle(stageEl, "height", Math.max(0, rect.bottom - topEdge) + "px")) state.writes += 1;
+    var chatOnRight = !!geo.marginLeft;                 // 对话被推到右 ⇒ 编辑器在左
+    var stageLeftWanted = chatOnRight ? rect.left : rect.left + geo.chatW;
+    var viewportW = 0, viewportH = 0;
+    try {
+      viewportW = Math.round(Number((win && win.innerWidth) || 0) || 0);
+      viewportH = Math.round(Number((win && win.innerHeight) || 0) || 0);
+    } catch (eV) { /* 非浏览器测试环境 */ }
+    var contentRight = isFinite(rightEdgeX) && rightEdgeX > rect.left ? rightEdgeX : rect.right;
+    if (!isFinite(contentRight)) contentRight = rect.left + rect.width;
+    var contentBottom = isFinite(rect.bottom) ? rect.bottom : rect.top + rect.height;
+    var fitInput = {
+      // 真实宿主内容区：右侧让开侧栏，顶部让开标题栏，右侧让开右栏/视口。
+      contentLeft: rect.left,
+      contentTop: topEdge,
+      contentRight: contentRight,
+      contentBottom: contentBottom,
+      sidebarRight: leftEdgeX,
+      headerBottom: topEdge,
+      rightbarLeft: isFinite(rightEdgeX) && rightEdgeX > rect.left ? rightEdgeX : null,
+      viewportWidth: viewportW,
+      viewportHeight: viewportH,
+      editorWidth: editorW,
+      stageLeft: stageLeftWanted,
+    };
+    var fit = fitStageRect(fitInput);
+    if (!fit.ok) {
+      // 空间真的不足：明确收起舞台，保留侧栏/标题栏/输入框，绝不让 fixed 0,0
+      // 的兜底盖住界面。下一次几何变化会重新尝试。
+      state.reason = fit.reason;
+      hideStage();
+      if (state.active) restore();
+      scheduleStageRetry();
+      return false;
+    }
+    // 首页的 composer 也在内容区里。挤压成功后它应落在对话列；若宿主没有
+    // 跟着移动，就绝不让编辑器盖住输入框（宁可收起并交还宿主排版）。
+    var composerEl = null;
+    try { composerEl = doc.querySelector("[data-composer-card]") || doc.querySelector("[data-composer-input]"); } catch (eC) { composerEl = null; }
+    var composerRect = composerEl ? readRect(composerEl) : null;
+    var stageRect = {
+      left: fit.left, top: fit.top,
+      right: fit.left + fit.width, bottom: fit.top + fit.height,
+    };
+    if (composerRect && rectsOverlap(stageRect, composerRect)) {
+      state.reason = "composer-overlap";
+      hideStage();
+      if (state.active) restore();
+      scheduleStageRetry();
+      return false;
+    }
+    if (stageEl) {
+      if (stageEl.style) {
+        if (stageEl.style.display === "none") stageEl.style.display = "flex";   // 恢复上一步收起过的舞台
+        // 兜底样式是 visibility:hidden；几何确认后才允许出现。
+        if (stageEl.style.visibility !== "visible") stageEl.style.visibility = "visible";
+        if (stageEl.style.pointerEvents !== "auto") stageEl.style.pointerEvents = "auto";
+      }
+      if (writeStyle(stageEl, "left", fit.left + "px")) state.writes += 1;
+      if (writeStyle(stageEl, "top", fit.top + "px")) state.writes += 1;
+      if (writeStyle(stageEl, "width", fit.width + "px")) state.writes += 1;
+      if (writeStyle(stageEl, "height", fit.height + "px")) state.writes += 1;
     }
     // 中间那道手柄（对话列边界）跟着编辑区右沿走
     try {
       // 中缝必须落在"聊天 ↔ 编辑器"的边界上（两种位置模式都成立）。
       var handleX = chatBoundaryX(rect.left, rect.width, geo.chatW, geo.marginLeft);
-      positionChatHandle(handleX, topEdge, Math.max(0, rect.bottom - topEdge), !!(stageEl && editorW > 0));
+      positionChatHandle(handleX, fit.top, fit.height, !!(stageEl && fit.width > 0));
     } catch (e) { /* 手柄定位失败不影响挤压 */ }
 
     // 左右边界也用浮层热区（iframe 会盖住真手柄，见 ensureEdgeHandle 注释）。
@@ -4105,6 +4519,7 @@ function createLayoutEngine(options) {
     };
     state.active = true;
     state.reason = "ok";
+    state.stageRetry = 0;
     // 记录本帧采用的几何；拖拽帧用它 + 已知列宽增量推导，免掉每帧强制布局。
     state.geoCache = {
       root: root, body: body,
@@ -4492,11 +4907,15 @@ const NARROW_CHAT_CSS = [
   // 给滚动区留出底部安全区；只在我们挤压期间生效。
   // 对话列内容顶部留白偏多（用户自检反馈）：列容器与内容顶部的 padding 都收到 0/8。
   '[data-mp-squeezed] [class*="_column"]{padding-top:0 !important}',
-  // 挤压时对话列的滚动条偏粗、贴着列边像一条灰杠（用户自检反馈）——统一收细、圆角、留 4px。
-  '[data-mp-squeezed] [class*="_scroll"]{scrollbar-width:thin !important;padding-top:8px !important;padding-right:4px !important}',
-  '[data-mp-squeezed] [class*="_scroll"]::-webkit-scrollbar{width:6px !important}',
-  '[data-mp-squeezed] [class*="_scroll"]::-webkit-scrollbar-thumb{border-radius:3px !important;background:color-mix(in srgb,currentColor 22%,transparent) !important}',
-  '[data-mp-squeezed] [class*="_scroll"]::-webkit-scrollbar-track{background:transparent !important}',
+  // 对话列的滚动条收细；宿主左栏的 _scrollRegion/_scrollArea 也会命中，排除侧栏。
+  '[data-mp-squeezed] [class*="_scroll"]:not([class*="_sidebarCol"] *){scrollbar-width:thin !important;padding-top:8px !important;padding-right:4px !important}',
+  '[data-mp-squeezed] [class*="_scroll"]:not([class*="_sidebarCol"] *)::-webkit-scrollbar{width:6px !important}',
+  '[data-mp-squeezed] [class*="_scroll"]:not([class*="_sidebarCol"] *)::-webkit-scrollbar-thumb{border-radius:3px !important;background:color-mix(in srgb,currentColor 22%,transparent) !important}',
+  '[data-mp-squeezed] [class*="_scroll"]:not([class*="_sidebarCol"] *)::-webkit-scrollbar-track{background:transparent !important}',
+  // 侧栏只保留旧版的 8px 顶部留白，不再追加水平 padding 或滚动条样式。
+  '[data-mp-squeezed] [class*="_sidebarCol"] [class*="_scroll"]{padding-top:8px !important}',
+  // 初开时只有外层 scrollport 能滚动：给它一条原生 thin 滚动条。
+  '[data-mp-squeezed] [class*="_sidebarCol"] [data-sidebar-scrollport]{scrollbar-width:thin !important}',
   // F7：宿主表格单元格默认按字符断行（Bellm/an、Bana/ch），英文应该按词断。
   '[data-mp-narrow-frame] table,[data-mp-narrow-frame] th,[data-mp-narrow-frame] td{word-break:normal !important;overflow-wrap:break-word !important}',
   // ── 输入框位置（用户反馈"太高、位置奇怪"）──────────────────────────────
@@ -5290,6 +5709,12 @@ const __test = {
         quote: mp208BuildQuote,
         editRequest: mp208BuildEditRequest,
         editQuote: mp208BuildEditQuote,
+        explicitReference: mp208ExplicitReference,
+        editPrepareBody: mp208EditPrepareBody,
+        editSelectionBody: mp208EditSelectionBody,
+        replacementsHint: mp208ReplacementsHint,
+        deliveryPlan: mp208DeliveryPlan,
+        normalizeBusyEnter: mp208NormalizeBusyEnter,
         quoteCost: mp208QuoteCost,
         needsQuoteChoice: mp208NeedsQuoteChoice,
         QUOTE_CHOICE_BYTES: MP208_QUOTE_CHOICE_BYTES,
@@ -5298,6 +5723,8 @@ const __test = {
         insertNativeQuote: mp208InsertNativeQuote,
         insertReadOnlyText: mp208InsertReadOnlyText,
         insertTextPreservingDraft: mp208InsertTextPreservingDraft,
+        quoteRecipient: mp208QuoteRecipient,
+        editSubmitTarget: mp208EditSubmitTarget,
         byteLength: mp208ByteLength,
         digestMatches: mp208DigestMatches,
         planLocate: mp208PlanHistoricalLocate,
@@ -5333,6 +5760,8 @@ const __test = {
     findConversationRoot: findConversationRoot,
     findConversationBody: findConversationBody,
     computeLayout: computeLayout,
+    fitStageRect: fitStageRect,
+    rectsOverlap: rectsOverlap,
     writeStyle: writeStyle,
     createLayoutEngine: createLayoutEngine,
     mountLayout: mountLayout,
@@ -5477,6 +5906,34 @@ const __test = {
 .mp-rail-actions{display:flex;align-items:center;gap:4px;flex:0 0 auto;min-width:0;pointer-events:none}
 .mp-rail[data-mp-elevated="1"] .mp-rail-text{flex:0 1 auto;padding:1px 8px;border-radius:999px;background:color-mix(in srgb,currentColor 12%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .mp-rail[data-mp-elevated="1"] .mp-rail-actions{padding:1px 3px;border-radius:999px;background:color-mix(in srgb,currentColor 9%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+/* 「查看差异」面板：仅 diff 存在时整块偏冷近黑。基础色不透明，能力允许时由
+   @supports 升级成 95% 近黑 + 14px 模糊；行底色低饱和酒红/松绿，白字 1.5 行距。 */
+.mp-rail-popover-diff{color-scheme:dark;background:#181b20;border:1px solid rgba(244,245,247,.16);box-shadow:0 8px 22px rgba(0,0,0,.42),inset 0 0 0 1px rgba(255,255,255,.07);color:#f4f5f7}
+.mp-rail-popover-diff .mp-rail-btn{color:#f4f5f7}
+.mp-rail-popover-diff .mp-rail-btn:hover{background:rgba(244,245,247,.16)}
+.mp-rail-popover-diff .mp-rail-btn:active{background:rgba(244,245,247,.24)}
+.mp-rail-popover-diff .mp-rail-btn:focus-visible{outline:2px solid #a9c8ff;outline-offset:1px}
+.mp-rail-diff-item{padding:6px 0;border-top:1px solid rgba(244,245,247,.10)}
+.mp-rail-diff-meta{display:flex;gap:6px;align-items:center;margin-bottom:3px;color:#b9c0cb;font-size:11.5px}
+.mp-rail-diff-line{margin:2px 0;padding:5px 7px;white-space:pre-wrap;word-break:break-word;border:1px solid transparent;border-radius:5px;font-size:11.5px;line-height:1.5;color:#fff}
+.mp-rail-diff-del{background:#3a2026;border-color:#6d3a43}
+.mp-rail-diff-add{background:#1c3128;border-color:#315b47}
+@supports (backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px)){
+  .mp-rail-popover-diff{background:rgba(21,24,29,.95);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+}
+@media (prefers-contrast:more){
+  .mp-rail-popover-diff{background:#111318 !important;border-color:#fff !important;-webkit-backdrop-filter:none !important;backdrop-filter:none !important}
+  .mp-rail-diff-del{border-color:#d98a96}
+  .mp-rail-diff-add{border-color:#7fc3a4}
+}
+@media (forced-colors:active){
+  .mp-rail-popover-diff{background:Canvas !important;border:1px solid CanvasText !important;color:CanvasText !important;box-shadow:none !important;-webkit-backdrop-filter:none !important;backdrop-filter:none !important}
+  .mp-rail-popover-diff .mp-rail-btn:hover{background:Highlight;color:HighlightText}
+  .mp-rail-popover-diff .mp-rail-btn:focus-visible{outline:2px solid Highlight}
+  .mp-rail-diff-item{border-top-color:CanvasText}
+  .mp-rail-diff-meta{color:CanvasText}
+  .mp-rail-diff-line{background:Canvas;border-color:CanvasText;color:CanvasText}
+}
 @container (max-width:360px){
   .mp-rail-status{display:inline-block;width:8px;height:8px;min-width:8px;max-width:8px;padding:0;border-radius:50%;font-size:0;color:transparent;background:#d9a441;overflow:hidden;flex:0 0 8px}
   .mp-rail-status[data-mp-save-status="saved"]{background:transparent;border:1.5px solid #4caf50;box-sizing:border-box}
@@ -5498,6 +5955,8 @@ const __test = {
 }
 @media (prefers-reduced-motion:reduce){.mp-rail-btn{transition:none}}
 `;
+
+
     const emptyStyle = { padding: 12, fontSize: 12, opacity: 0.7 };
 
     /* ───────────────────────── tab body ───────────────────────── */
@@ -5549,10 +6008,121 @@ const __test = {
       return null;
     }
 
-    /** 取某个会话的输入面：先官方动作面，再退到 tab props 里记住的那份。 */
+    /** 当前可见会话：uiWorkspace 选择优先，其次 uiSession 当前绑定。 */
+    function currentConversationSessionId() {
+      try {
+        var service = workspaceService || (docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("uiWorkspace") : null);
+        var selected = service && service.selection && typeof service.selection.getSnapshot === "function"
+          ? service.selection.getSnapshot() : null;
+        if (selected && selected.sessionId) return selected.sessionId;
+      } catch (e) { /* 旧宿主没有 uiWorkspace */ }
+      try {
+        var ui = docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("uiSession") : null;
+        var cur = ui && ui.adapter && ui.adapter.current && typeof ui.adapter.current.getSnapshot === "function"
+          ? ui.adapter.current.getSnapshot() : null;
+        if (cur && cur.key) return cur.key;
+      } catch (e) { /* 旧宿主没有 uiSession */ }
+      return "";
+    }
+
+    /**
+     * 首页/新会话的 composer 只渲染 conversation.composer.bar，宿主并**不渲染**
+     * conversation.composer.dock（InputBar：variant === "composer" 才渲染）。
+     * 因此 dock 里的零像素抓手在首页拿不到 inputActions。官方 uiSession 已经按
+     * 会话物化了 standard props（含 inputActions），这里直接读当前绑定：
+     * 不依赖任何 slot 挂载，也不碰 composer DOM / 草稿。
+     */
+    function inputActionsFromUiSession(sessionId) {
+      try {
+        var ui = docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("uiSession") : null;
+        if (!ui) return null;
+        var sessions = docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("sessions") : null;
+        var binding = sessionId && sessions && typeof sessions.binding === "function"
+          ? sessions.binding(sessionId) : null;
+        var source = ui.adapter && typeof ui.adapter.bindingSource === "function"
+          ? ui.adapter.bindingSource(binding ? { sessionId: sessionId, binding: binding } : undefined) : null;
+        var snap = source && typeof source.getSnapshot === "function" ? source.getSnapshot()
+          : (source && source.value ? source.value : null);
+        if (!snap && ui.adapter && ui.adapter.current && typeof ui.adapter.current.getSnapshot === "function") {
+          snap = ui.adapter.current.getSnapshot();
+        }
+        var actions = snap && snap.props ? snap.props.inputActions : null;
+        if (actions && (!sessionId || !snap.key || snap.key === sessionId)) return actions;
+      } catch (e) { /* 绑定尚未物化 / 旧宿主 */ }
+      return null;
+    }
+
+    /** 取某个会话的输入面：dock 抓手优先，其次官方 uiSession 当前绑定。 */
     function inputFaceOf(sessionId) {
       var face = sessionId ? inputFaces.get(sessionId) : null;
-      return face || null;
+      if (face) return face;
+      var fallback = inputActionsFromUiSession(sessionId);
+      if (fallback) return fallback;
+      if (!sessionId) {
+        var currentId = currentConversationSessionId();
+        if (currentId) return inputFaces.get(currentId) || inputActionsFromUiSession(currentId);
+      }
+      return null;
+    }
+
+    /** 新会话绑定/首帧 composer 可能晚一拍；只等有限时间，绝不轮询到永久。 */
+    async function waitForInputFace(sessionId, timeoutMs) {
+      var deadline = Date.now() + Math.max(0, Number(timeoutMs) || 0);
+      for (;;) {
+        var face = inputFaceOf(sessionId);
+        if (face) return face;
+        if (Date.now() >= deadline) return null;
+        await new Promise(function (resolve) { setTimeout(resolve, 120); });
+      }
+    }
+
+    /** 会话选择落定后才允许真正写入/提交；只等有限时间。 */
+    async function waitForVisibleSession(sessionId, timeoutMs) {
+      if (!sessionId) return false;
+      var deadline = Date.now() + Math.max(0, Number(timeoutMs) || 0);
+      for (;;) {
+        var current = currentConversationSessionId() || workspaceContext().sessionId;
+        if (current === sessionId) return true;
+        if (Date.now() >= deadline) return false;
+        await new Promise(function (resolve) { setTimeout(resolve, 120); });
+      }
+    }
+
+    /**
+     * 没有当前会话时走宿主正常的新会话流程（复用空白会话，不写占位消息）。
+     * connectWorkspace 只连接/创建，不选中；再 openSession 让用户落到这个对话。
+     * 期间用户手动切到别的会话 ⇒ 返回 ""，调用方放弃（绝不把内容投给用户新选的会话）。
+     */
+    async function ensureConversationSession() {
+      var current = currentConversationSessionId() || workspaceContext().sessionId;
+      if (current) return current;
+      var ui = docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("uiWorkspace") : null;
+      var workspaces = docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("workspaces") : null;
+      if (!ui || !workspaces || typeof ui.connectWorkspace !== "function") return "";
+      var items = [];
+      try { items = workspaces.list.getSnapshot().items || []; } catch (e) { items = []; }
+      var context = workspaceContext();
+      var target = null;
+      for (var i = 0; i < items.length; i += 1) {
+        var item = items[i];
+        if (!item || !item.workspaceId) continue;
+        if (context.key && workspaceKey(item.path) === context.key) { target = item; break; }
+      }
+      if (!target) {
+        for (var j = 0; j < items.length; j += 1) {
+          if (items[j] && items[j].workspaceId) { target = items[j]; break; }
+        }
+      }
+      if (!target) return "";
+      var id = "";
+      try { id = await ui.connectWorkspace(target.workspaceId); } catch (e) { return ""; }
+      if (!id) return "";
+      // await 期间用户已经手动选了会话 ⇒ 这不是本次操作创建的目标，放弃。
+      var selectedDuring = currentConversationSessionId() || workspaceContext().sessionId;
+      if (selectedDuring && selectedDuring !== id) return "";
+      try { if (typeof ui.openSession === "function") ui.openSession(id); } catch (e) { /* 仍可尝试直接投递 */ }
+      if (!(await waitForVisibleSession(id, 1600))) return "";
+      return id;
     }
 
     function docKeyOf(tab) {
@@ -5840,6 +6410,41 @@ const __test = {
       if (readSettings(window.localStorage).enabled!==true) {
         writeSettings(window.localStorage,{enabled:true}); mountLayout(docsCtx);
       }
+    }
+    /**
+     * 「编辑区居中」开关立即生效：
+     *   off→on：挂载布局引擎；已打开的右栏 md 标签由 EditorTabBody 自己切到
+     *           Redirect，必要时再接管宿主恢复的原生标签，并多重算几次几何。
+     *   on→off：收起中间工作台、还原宿主排版，并把同一份文档放回右侧栏，
+     *           不关文档、不丢草稿。
+     */
+    function installLayoutSettingBridge() {
+      var lastEnabled = readSettings(window.localStorage).enabled === true;
+      return watchSettingsChanges(function () {
+        var enabled = readSettings(window.localStorage).enabled === true;
+        if (enabled === lastEnabled) return;
+        lastEnabled = enabled;
+        if (enabled) {
+          mountLayout(docsCtx);
+          setTimeout(function () {
+            try { if (!docsModeOn) adoptOpenNativeDocs(); } catch (e) { /* 忽略 */ }
+          }, 60);
+          [120, 320, 700].forEach(function (delay) {
+            setTimeout(function () {
+              try { if (typeof layoutReapply === "function") layoutReapply(); } catch (e) { /* 忽略 */ }
+            }, delay);
+          });
+          return;
+        }
+        var doc = docsModeOn && workbenchDoc ? workbenchDoc : null;
+        if (docsModeOn || overlayDoc) closeDocsWorkbench();
+        try { if (typeof window.__mpLayoutDispose === "function") window.__mpLayoutDispose(); } catch (e) { /* 忽略 */ }
+        if (doc && doc.path) {
+          setTimeout(function () {
+            try { openDocAddress(docsCtx, absoluteFileAddress(doc.path)); } catch (e) { /* 忽略 */ }
+          }, 0);
+        }
+      });
     }
     async function chooseWorkbenchDoc(entry) {
       var intent=++workspaceIntent;
@@ -6576,7 +7181,7 @@ const __test = {
         h("div", { style: group }, "布局"),
         h(SettingsField, {
           label: "编辑区居中（对话靠右）",
-          hint: "将编辑区放在中间，对话显示在右侧。关闭后，文档在右侧栏中打开。",
+          hint: "将编辑区放在中间，对话显示在右侧。开关立即生效：打开中的文档会迁移到中间，右侧输入框保留；关闭后文档在右侧栏打开。",
         }, h("label", { style: { display: "flex", alignItems: "center", gap: 8, cursor: "pointer" } },
           h("input", {
             type: "checkbox", checked: settings.enabled === true,
@@ -6645,19 +7250,27 @@ const __test = {
           h("button", {
             type: "button", onClick: reload,
             style: { padding: "6px 14px", fontSize: 12.5, borderRadius: 6, border: "1px solid var(--dsw-alias-border-l2, #3a4150)", background: "transparent", color: "inherit", cursor: "pointer", fontFamily: "inherit" },
-          }, "重新加载以应用布局"),
+          }, "重新加载以应用宽度"),
           h("span", { style: { fontSize: 11.5, color: "var(--dsw-alias-label-tertiary, #6e7683)" } },
-            "布局开关与宽度设置重新加载后生效；透明、退出分栏策略和文档设置立即生效。")),
+            "「编辑区居中」开关立即生效；对话宽度重新加载后生效；透明、退出分栏策略和文档设置立即生效。")),
       );
     }
 
     function EditorTabBody(props) {
       if (!React) return null;
+      // 设置开关立即生效：同一个已经打开的 md 标签在 enabled 翻转后重渲染，
+      // 从右栏 iframe 切到中间工作台（EditorTabRedirect 发布同一份文档），
+      // 不需要用户关闭再打开文档。
+      var enabledState = React.useState(function () { return layoutEnabled(); });
+      var enabled = enabledState[0], setEnabled = enabledState[1];
+      React.useEffect(function () {
+        return watchSettingsChanges(function () { setEnabled(layoutEnabled()); });
+      }, []);
       if (typeof props.useTabInfo !== "function") {
         return React.createElement("div", { style: emptyStyle }, "dsh-markdown-editor-typora: useTabInfo unavailable");
       }
       // 布局关闭 ⇒ 旧行为（iframe 仍在这里）
-      if (!layoutEnabled()) return React.createElement(EditorTabBodyInner, props);
+      if (!enabled) return React.createElement(EditorTabBodyInner, props);
       return React.createElement(EditorTabRedirect, props);
     }
 
@@ -6883,14 +7496,16 @@ const __test = {
         return h("div", {
           id: "mp-stage",
           style: {
-            // 兜底几何：布局引擎只在"有会话"时才写 left/width；没有会话时也要能看见工作台。
-            // 引擎一旦写内联值就会覆盖这里（writeStyle 直接改同一批属性）。
-            position: "fixed", left: 0, top: 0, width: "62vw", height: "100%", zIndex: 19,
+            // 兜底几何必须是“不可见、不可点、零面积”：几何引擎确认了真实内容区
+            // 边界之后才写 left/top/width/height 并改成 visible。绝不能再用
+            // fixed 0,0/62vw 在首帧盖住侧栏、标题栏或首页输入框。
+            position: "fixed", left: 0, top: 0, width: 0, height: 0, zIndex: 19,
+            visibility: "hidden", pointerEvents: "none",
             display: "flex", flexDirection: "column", minWidth: 0,
             background: (readSettings(window.localStorage).transparent !== false) ? "transparent" : "var(--dsw-alias-bg-base, #0b0e14)",
             // 与宿主同款分隔线：编辑区右侧一条细线，和对话分开但不割裂
             borderRight: "1px solid var(--dsw-alias-border-l2, #3a4150)",
-            borderRadius: 0, overflow: "hidden", pointerEvents: "auto",
+            borderRadius: 0, overflow: "hidden",
           },
         }, h(DocsWorkbench, {
           close: closeWorkspaceEditor,
@@ -9007,11 +9622,15 @@ const __test = {
               return;
             }
             if (wantSend) {
-              const direct = await sendViaHostSession(recipient, payload);
+              const delivery = mp208DeliveryFor(recipient);
+              const direct = await sendViaHostSession(recipient, payload, delivery);
               if (!alive()) return;
               if (direct.ok) {
-                post("toast", "已发送给 AI");
-                showNotice("已发送给 AI");
+                const note = direct.mode === "steer"
+                  ? "已插话发送给 AI"
+                  : direct.running === true ? "已排队发送给 AI" : "已发送给 AI";
+                post("toast", note);
+                showNotice(note);
                 return;
               }
               log.warn?.("dsh-markdown-editor-typora: 直发失败：%s", String(direct.reason || "unknown"));
@@ -9044,7 +9663,10 @@ const __test = {
          * never falls back to a long paste or a direct session send.
          */
         async function onInsertQuote(content) {
-          const recipient = workspaceContext().sessionId || doc.sessionId;
+          let recipient = mp208QuoteRecipient({
+            currentSessionId: currentConversationSessionId(),
+            selectedSessionId: workspaceContext().sessionId,
+          });
           const tokenAtCapture = doc.token;
           const snap = mp208Snapshot(doc, content, recipient);
           if (!snap.ok) { post("toast", snap.message); showNotice(snap.message); return; }
@@ -9058,6 +9680,17 @@ const __test = {
             lineEnd: snap.lineEnd,
           });
           if (!quote.ok) { post("toast", quote.message); showNotice(quote.message); return; }
+          // 空首页没有会话时，按宿主正常新会话流程建立一个空白会话；只把引用
+          // 放进它的草稿，不发任何占位消息。已有空白会话则直接复用。
+          if (!recipient) {
+            recipient = await ensureConversationSession();
+            if (!alive() || doc.token !== tokenAtCapture) return;
+            if (!recipient) {
+              post("toast", "当前没有可用的对话输入框；引用未插入，选区已保留");
+              showNotice("当前没有可用的对话输入框；引用未插入，选区已保留");
+              return;
+            }
+          }
           if (mp208NeedsQuoteChoice(quote.text)) {
             // No safe read-only on-demand path exists for a normal quote. Ask
             // explicitly for the full payload or cancel with the real cost.
@@ -9068,7 +9701,7 @@ const __test = {
               cost: mp208QuoteCost(quote.text),
             });
             if (!alive() || doc.token !== tokenAtCapture) return;
-            if ((workspaceContext().sessionId || doc.sessionId) !== recipient) {
+            if ((currentConversationSessionId() || workspaceContext().sessionId) !== recipient) {
               post("toast", "会话已切换，引用已取消；选区与草稿已保留");
               showNotice("会话已切换，引用已取消；选区与草稿已保留");
               return;
@@ -9079,7 +9712,15 @@ const __test = {
               return;
             }
           }
-          const acts = inputFaceOf(recipient) || (recipient === doc.sessionId ? inputActionsRef.current : null);
+          let acts = inputFaceOf(recipient) || (recipient === doc.sessionId ? inputActionsRef.current : null);
+          if (!acts) acts = await waitForInputFace(recipient, 1800);
+          if (!alive() || doc.token !== tokenAtCapture) return;
+          // 等待动作面/新会话绑定期间用户可能切走：真正写入前再核对可见会话。
+          if ((currentConversationSessionId() || workspaceContext().sessionId) !== recipient) {
+            post("toast", "会话已切换，引用已取消；选区与草稿已保留");
+            showNotice("会话已切换，引用已取消；选区与草稿已保留");
+            return;
+          }
           const cap = mp208Capability(acts);
           if (cap.nativeQuote) {
             const inserted = mp208InsertNativeQuote(acts, quote);
@@ -9119,17 +9760,59 @@ const __test = {
         }
 
         /**
+         * Wait for the host's isolated edit record. The record is the only
+         * durable progress signal: it transitions held → running → done /
+         * failed / cancelled. The dialog's "停止" calls editAbort, which flips
+         * the record to cancelled and aborts the isolated model call.
+         */
+        async function mp208AwaitEditOutcome(nonce, control) {
+          const deadline = Date.now() + 5 * 60 * 1000;
+          let stopDeadline = 0;
+          while (Date.now() < deadline) {
+            let result;
+            try {
+              result = await api("documents.editStatus", { nonce: nonce });
+            } catch (error) {
+              return { status: "failed", error: { code: "MP_EDIT_STATUS", message: String(error && error.message ? error.message : error) } };
+            }
+            const value = result && result.ok === true ? (result.value || {}) : null;
+            if (!value) {
+              return { status: "failed", error: (result && result.error) || { code: "MP_EDIT_STATUS", message: "状态读取失败" } };
+            }
+            if (value.status === "done") return { status: "done", value: value.result };
+            if (value.status === "failed" || value.status === "cancelled" || value.status === "expired"
+              || value.status === "superseded" || value.status === "missing") {
+              return { status: value.status, error: value.error || null };
+            }
+            if (control && control.stopped) {
+              if (!stopDeadline) stopDeadline = Date.now() + 5000;
+              if (Date.now() > stopDeadline) return { status: "cancelled", error: { code: "MP_EDIT_CANCELLED", message: "已停止修改" } };
+            }
+            await new Promise((resolve) => setTimeout(resolve, 350));
+          }
+          return { status: "timeout", error: { code: "MP_EDIT_TIMEOUT", message: "修改超时" } };
+        }
+
+        /**
          * Explicit “修改此处”: capture a short-lived restricted target, ask for
-         * the user's intent, then place a model-visible instruction into the
-         * composer without sending it. The target is validated again after every
-         * await so a tab/session change cannot redirect the edit.
+         * the user's intent, then SUBMIT that one restricted request to the
+         * current conversation. It never uses the composer draft or attachment
+         * rail, and never sends the user's existing draft. The target is
+         * validated again after every await so a tab/session change cannot
+         * redirect the edit.
          */
         async function onEditTarget(content) {
           const docAtCapture = doc;
-          const recipient = workspaceContext().sessionId || doc.sessionId;
+          // 只认可见的当前输入框；不要用文档历史 owner 兜底（新首页没有会话）。
+          const recipient = currentConversationSessionId() || workspaceContext().sessionId;
           const tokenAtCapture = doc.token;
           const pathAtCapture = doc.absPath;
-          const snap = mp208Snapshot(doc, content, recipient);
+          // Host captureSelection requires a selection owner session. The chat
+          // target may be created only at submit time; for the click-time
+          // preflight, use the visible session first, then the document's own
+          // tab session. It is never used as the chat recipient.
+          const selectionSessionId = recipient || doc.sessionId || "";
+          const snap = mp208Snapshot(doc, content, selectionSessionId);
           if (!snap.ok) { post("toast", snap.message); showNotice(snap.message); return; }
           if (!snap.docDigest) {
             post("toast", "没有拿到点击时的文档摘要，修改目标未创建；请改用只读引用");
@@ -9141,18 +9824,15 @@ const __test = {
             showNotice("选区超过 32 KiB，请缩小范围后再修改");
             return;
           }
+          // 发送不再依赖 composer 的动作面：用户可以在首页/空会话直接提交。
+          // 这里只校验文档仍属于同一次点击，避免异步期间换文档。
+          const sameDocument = () => alive() && doc === docAtCapture && doc.opened && !doc.dead
+            && doc.token === tokenAtCapture && doc.absPath === pathAtCapture;
+          const visibleSession = () => currentConversationSessionId() || workspaceContext().sessionId;
           // Tab/session ownership only. Revisions are proved separately from the
           // same engine snapshot; a live room version may legitimately advance
           // while the flush/snapshot round-trip is in flight.
-          const sameTarget = () => alive() && doc === docAtCapture && doc.opened && !doc.dead
-            && doc.token === tokenAtCapture && doc.absPath === pathAtCapture
-            && (workspaceContext().sessionId || doc.sessionId) === recipient;
-          const actsAtCapture = inputFaceOf(recipient) || (recipient === doc.sessionId ? inputActionsRef.current : null);
-          if (!mp208Capability(actsAtCapture).readOnly) {
-            post("toast", "当前宿主输入面不可用；没有创建修改目标，草稿未改动");
-            showNotice("当前宿主输入面不可用；没有创建修改目标，草稿未改动");
-            return;
-          }
+          const sameTarget = () => sameDocument() && visibleSession() === recipient;
 
           /**
            * Build a verifiable origin revision from the SAME engine snapshot:
@@ -9167,8 +9847,9 @@ const __test = {
            * A dirty document without a live buffer is refused (no authoritative
            * revision contains the unsaved text).
            */
-          const prepareCapture = async () => {
+          const prepareCapture = async (checkSession) => {
             const fail = (reason) => ({ ok: false, reason: reason });
+            const sessionStillOk = () => (checkSession === false ? sameDocument() : sameTarget());
             let live = null;
             if (doc.live) {
               let flushed;
@@ -9183,7 +9864,7 @@ const __test = {
             }
             const fresh = await requestSnapshot("mp208-capture");
             if (!fresh || fresh.stale === true || typeof fresh.text !== "string") return fail("snapshot-stale");
-            if (!sameTarget()) return fail("target-changed");
+            if (!sessionStillOk()) return fail("target-changed");
             const text = fresh.text;
             const sha = await mp208Sha256Hex(text);
             if (!sha) return fail("hash-unavailable");
@@ -9194,7 +9875,7 @@ const __test = {
             // we never re-bind to new offsets.
             if (!snap.docDigest) return fail("missing-click-digest");
             if (!mp208DigestMatches(snap.docDigest, sha)) return fail("document-changed-since-click");
-            if (!sameTarget()) return fail("target-changed");
+            if (!sessionStillOk()) return fail("target-changed");
             const ranges = [];
             for (const r of snap.ranges) {
               // With the digest match this is a second, cheap assertion; it
@@ -9278,85 +9959,163 @@ const __test = {
             showNotice("文档或会话已切换，修改目标已失效；未发送任何内容");
             return;
           }
-          if (!captured || captured.ok !== true) {
-            const quote = mp208BuildQuote({
-              path: activeSnap.displayPath || activeSnap.path,
-              ranges: activeSnap.ranges,
-              text: activeSnap.text,
-              docLength: activeSnap.docLength,
-              lineStart: activeSnap.lineStart,
-              lineEnd: activeSnap.lineEnd,
-            });
-            const acts = inputFaceOf(recipient) || (recipient === doc.sessionId ? inputActionsRef.current : null);
-            const readOnly = quote.ok ? mp208InsertNativeQuote(acts, quote) : { ok: false };
-            const reason = captured && captured.reason ? captured.reason : "capture-unavailable";
-            if (readOnly.ok) {
-              mp208RecordCost("quote", quote.meta);
-              post("toast", "修改目标暂不可用（" + reason + "）；已作为只读引用插入，请手动发送");
-              showNotice("修改目标暂不可用（" + reason + "）；已作为只读引用插入，请手动发送");
-            } else {
-              post("toast", "修改目标暂不可用（" + reason + "）；未改写任何内容，草稿已保留");
-              showNotice("修改目标暂不可用（" + reason + "）；未改写任何内容，草稿已保留");
-            }
-            return;
-          }
-          const intent = await mp208OpenIntentDialog({
+          // 点击时的 captureSelection 只是预检：选区引用有 TTL，而且首页可能
+          // 还没有会话可作 owner。真正提交时会在目标会话确定后重新捕获；
+          // 这里失败不阻止弹窗，失败原因由提交阶段给出并保留指令。
+          const dialog = await mp208OpenIntentDialog({
             path: activeSnap.displayPath || activeSnap.path,
             lineStart: activeSnap.lineStart,
             lineEnd: activeSnap.lineEnd,
             text: activeSnap.text,
-          });
-          if (intent === null) return;
-          if (!sameTarget()) {
-            post("toast", "文档或会话已切换，修改目标已失效；未发送任何内容");
-            showNotice("文档或会话已切换，修改目标已失效；未发送任何内容");
-            return;
-          }
-          const editPayload = mp208BuildEditPayload({
-            path: activeSnap.displayPath || activeSnap.path,
-            ranges: activeSnap.ranges,
-            text: activeSnap.text,
-            docLength: activeSnap.docLength,
-            lineStart: activeSnap.lineStart,
-            lineEnd: activeSnap.lineEnd,
-            selectionId: captured.selectionId,
-            intent: intent,
-            readSelection: mp208ByteLength(activeSnap.text) > MP208_MAX_EDIT_INLINE,
-          });
-          if (!editPayload.ok) { post("toast", editPayload.message); showNotice(editPayload.message); return; }
-          const acts = inputFaceOf(recipient) || (recipient === doc.sessionId ? inputActionsRef.current : null);
-          const cap = mp208Capability(acts);
-          if (cap.nativeQuote) {
-            const inserted = mp208InsertNativeQuote(acts, editPayload);
-            try {
-              window.__MP208_LAST_EDIT_QUOTE = {
-                at: Date.now(), ok: inserted.ok === true, reason: inserted.reason || null,
-                text: editPayload.text, summary: editPayload.summary, meta: editPayload.meta,
-                selectionId: captured.selectionId,
-              };
-            } catch (e) { /* diagnostics only */ }
-            if (inserted.ok) {
+            onSubmit: async (intent, control) => {
+              if (!sameDocument()) {
+                return { ok: false, message: "文档已切换，未发送；指令已保留，可重试。" };
+              }
+              const target = mp208EditSubmitTarget({
+                capturedSessionId: recipient,
+                currentSessionId: visibleSession(),
+              });
+              if (!target.ok) {
+                return { ok: false, message: target.message + "；指令已保留，可重试。" };
+              }
+              let targetSessionId = target.sessionId;
+              if (target.create) {
+                // 空首页：由这次操作走宿主正常新会话流程创建。创建过程中用户
+                // 手动选了别的会话时 ensureConversationSession 会返回 ""。
+                targetSessionId = await ensureConversationSession();
+                if (!sameDocument()) {
+                  return { ok: false, message: "文档已切换，未发送；指令已保留，可重试。" };
+                }
+                if (!targetSessionId) {
+                  return { ok: false, message: "没有可提交的对话（可能已切换会话），未发送；指令已保留，可重试。" };
+                }
+              }
+              // 异步创建/等待结束后，真正生成载荷前再核对一次可见会话与文档。
+              if (!sameDocument() || visibleSession() !== targetSessionId) {
+                return { ok: false, message: "文档或对话已切换，未发送；指令已保留，可重试。" };
+              }
+              // 选区引用是短期的：用户填写意图可能已过了一段时间。提交时用
+              // 同一份点击快照重新 flush/核对摘要并重新 captureSelection，
+              // 过期就保留指令让用户重试，绝不发送一个已失效的 selectionId。
+              const refreshed = await prepareCapture(false);
+              if (!sameDocument() || visibleSession() !== targetSessionId) {
+                return { ok: false, message: "文档或对话已切换，未发送；指令已保留，可重试。" };
+              }
+              if (!refreshed || refreshed.ok !== true) {
+                return { ok: false, message: "选区已失效，未发送；指令已保留，可重试。" };
+              }
+              const freshSnap = refreshed.snapshot;
+              // The isolated path captures the selection on the host and returns
+              // a short-lived selectionId + nonce. The only session submission is
+              // a marked prompt that the host's agent/pre-step listener consumes
+              // before the parent loop builds its request; no parent history is
+              // sent for this edit.
+              const explicitReference = mp208ExplicitReference(intent);
+              let preparedEdit;
+              try {
+                preparedEdit = await api("documents.editPrepare", mp208EditPrepareBody(freshSnap, targetSessionId, intent, explicitReference));
+              } catch (error) {
+                preparedEdit = { ok: false, error: { code: "MP_EDIT_PREPARE", message: String(error && error.message ? error.message : error) } };
+              }
+              if (!sameDocument() || visibleSession() !== targetSessionId) {
+                return { ok: false, message: "文档或对话已切换，未发送；指令已保留，可重试。" };
+              }
+              if (!preparedEdit || preparedEdit.ok !== true) {
+                const reason = String((preparedEdit && preparedEdit.error && (preparedEdit.error.code || preparedEdit.error.message)) || "选区已失效");
+                return { ok: false, message: "修改目标已失效（" + reason + "）；指令已保留，可重试。" };
+              }
+              const preparedValue = preparedEdit.value || {};
+              const nonce = String(preparedValue.nonce || "");
+              const rpcId = String(preparedValue.rpcId || "");
+              const selectionId = String(preparedValue.selectionId || "");
+              if (!nonce || !selectionId) {
+                return { ok: false, message: "宿主没有返回修改目标；指令已保留，可重试。" };
+              }
+              if (control && typeof control === "object") {
+                control.stop = function () {
+                  try { void api("documents.editAbort", { nonce: nonce }).catch(function () { /* 已停止 */ }); } catch (e) { /* 已停止 */ }
+                };
+                if (control.stopped) {
+                  await api("documents.editAbort", { nonce: nonce }).catch(function () { /* 已停止 */ });
+                  return { ok: false, message: "已停止修改；指令已保留，可重试。" };
+                }
+              }
+              const editPayload = mp208BuildEditPayload({
+                path: freshSnap.displayPath || freshSnap.path,
+                ranges: freshSnap.ranges,
+                text: freshSnap.text,
+                docLength: freshSnap.docLength,
+                lineStart: freshSnap.lineStart,
+                lineEnd: freshSnap.lineEnd,
+                selectionId: selectionId,
+                intent: intent,
+                readSelection: mp208ByteLength(freshSnap.text) > MP208_MAX_EDIT_INLINE,
+              });
+              if (!editPayload.ok) {
+                await api("documents.editAbort", { nonce: nonce }).catch(function () { /* 已清理 */ });
+                return { ok: false, message: editPayload.message };
+              }
+              const armed = await api("documents.editArm", { nonce: nonce, text: editPayload.text, meta: editPayload.meta })
+                .catch(function (error) {
+                  return { ok: false, error: { message: String(error && error.message ? error.message : error) } };
+                });
+              if (!armed || armed.ok !== true) {
+                await api("documents.editAbort", { nonce: nonce }).catch(function () { /* 已清理 */ });
+                return { ok: false, message: "修改目标未就绪；指令已保留，可重试。" };
+              }
+              // 最后一次同步核对：载荷已就绪，调用宿主发送前不再有任何 await。
+              if (!sameDocument() || visibleSession() !== targetSessionId) {
+                await api("documents.editAbort", { nonce: nonce }).catch(function () { /* 已清理 */ });
+                return { ok: false, message: "文档或对话已切换，未发送；指令已保留，可重试。" };
+              }
+              // ONE send path: a single marked Session prompt. It never submits
+              // or replaces the composer draft/attachments. The host consumes
+              // this exact submission in agent/pre-step and runs the edit in an
+              // isolated model context; the parent model is not called for it.
+              // Always queue as a NEW turn: steering the marker into a running
+              // turn's later step would not get the clean step-0 empty-turn
+              // completion the isolation contract relies on.
+              const delivery = Object.assign({}, mp208DeliveryFor(targetSessionId), { mode: "queue" });
+              const marker = typeof preparedValue.marker === "string" && preparedValue.marker
+                ? preparedValue.marker : ("[[mp-edit:" + nonce + "]]\n");
+              const sent = await sendViaHostSession(targetSessionId, marker + editPayload.text, delivery, rpcId);
+              if (!sent.ok) {
+                await api("documents.editAbort", { nonce: nonce }).catch(function () { /* 已清理 */ });
+                return {
+                  ok: false,
+                  message: "提交失败：" + String(sent.reason || "宿主未接受")
+                    + "；指令已保留，可重试（不会发送输入框草稿）。",
+                };
+              }
+              const outcome = await mp208AwaitEditOutcome(nonce, control);
+              try {
+                window.__MP208_LAST_EDIT_SUBMIT = {
+                  at: Date.now(), ok: outcome.status === "done", sessionId: targetSessionId,
+                  createdSession: target.create === true, selectionId: selectionId,
+                  nonce: nonce, explicitReference: explicitReference,
+                  path: freshSnap.path, meta: editPayload.meta, text: editPayload.text,
+                  delivery: delivery, status: outcome.status,
+                };
+              } catch (e) { /* diagnostics only */ }
+              if (outcome.status !== "done") {
+                if (outcome.status === "cancelled") {
+                  return { ok: false, message: "已停止修改；指令已保留，可重试。" };
+                }
+                const reason = String((outcome.error && (outcome.error.message || outcome.error.code)) || outcome.status || "修改失败");
+                return { ok: false, message: "修改失败（" + reason + "）；指令已保留，可重试。" };
+              }
               mp208RecordCost("edit", editPayload.meta);
-              post("toast", "已把修改目标折叠为引用；可预览或移除，确认后请手动发送");
-              showNotice("已把修改目标折叠为引用；可预览或移除，确认后请手动发送");
-              return;
-            }
-            // The host supports the native quote but is busy / not in plain
-            // phase. Preserve the draft and selection; do NOT silently fall
-            // back to a long plain-text paste.
-            post("toast", "修改目标未放入：输入框正在生成或发送中；草稿与选区已保留");
-            showNotice("修改目标未放入：输入框正在生成或发送中；草稿与选区已保留");
-            return;
-          }
-          // Only a host without insertQuote uses the plain safe instruction.
-          const placed = mp208InsertTextPreservingDraft(acts, editPayload.text);
-          if (placed.ok) {
-            mp208RecordCost("edit", editPayload.meta);
-            post("toast", "当前宿主无原生引用；已放入纯文本修改说明，确认后手动发送");
-            showNotice("当前宿主无原生引用；已放入纯文本修改说明，确认后手动发送");
-          } else {
-            post("toast", "输入框不可用；修改说明未写入，草稿已保留（未自动粘贴或发送）");
-            showNotice("输入框不可用；修改说明未写入，草稿已保留（未自动粘贴或发送）");
+              const doneNote = explicitReference
+                ? "已参考刚才的讨论完成修改（仅进入编辑器缓冲区；输入框草稿未改动）"
+                : "已完成修改（仅进入编辑器缓冲区；输入框草稿未改动）";
+              post("toast", doneNote);
+              showNotice(doneNote);
+              return { ok: true, sessionId: targetSessionId, mode: sent.mode, nonce: nonce };
+            },
+          });
+          if (dialog === null) {
+            post("toast", "已取消修改请求；未发送任何内容");
+            showNotice("已取消修改请求；未发送任何内容");
           }
         }
 
@@ -10422,21 +11181,23 @@ const __test = {
         recoveryCenterPanel(),
         hasPopover ? h("div", {
           key: "rail-popover",
-          className: "mp-rail-popover",
+          className: "mp-rail-popover" + (reviewDiffItems.length ? " mp-rail-popover-diff" : ""),
           role: "dialog",
-          "aria-label": "通知与共享会话恢复的草稿副本",
+          "aria-label": reviewDiffItems.length ? "AI 修改差异" : "通知与共享会话恢复的草稿副本",
           style: {
             position: "absolute", top: "auto", bottom: 56, left: 8 + railInsetLeft, right: 8 + railInsetRight,
             maxHeight: "calc(100% - 108px)", overflow: "auto", overflowX: "hidden", zIndex: 40,
             boxSizing: "border-box",
             display: ui.railOpen ? "block" : "none",
             padding: 10, borderRadius: 8,
-            border: "1px solid color-mix(in srgb, currentColor 22%, transparent)",
-            background: "color-mix(in srgb, currentColor 8%, transparent)",
-            backdropFilter: "blur(12px)",
-            boxShadow: "0 8px 24px color-mix(in srgb, black 30%, transparent)",
-            color: "inherit",
             fontSize: 12,
+            ...(reviewDiffItems.length ? {} : {
+              border: "1px solid color-mix(in srgb, currentColor 22%, transparent)",
+              background: "color-mix(in srgb, currentColor 8%, transparent)",
+              backdropFilter: "blur(12px)",
+              boxShadow: "0 8px 24px color-mix(in srgb, black 30%, transparent)",
+              color: "inherit",
+            }),
           },
         },
           reviewDiffItems.length ? h("div", { style: { marginBottom: 6 } },
@@ -10446,15 +11207,15 @@ const __test = {
                 type: "button", className: "mp-rail-btn", "data-icon": "⌫", title: "收起差异",
                 onClick: () => { try { st.actions.closeReviewDiff && st.actions.closeReviewDiff(); } catch (e) { /* 忽略 */ } },
               }, "收起")),
-            ...reviewDiffItems.slice(0, 12).map((change, index) => h("div", { key: "review-diff-" + index, style: { padding: "5px 0", borderTop: "1px solid color-mix(in srgb, currentColor 10%, transparent)" } },
-              h("div", { style: { display: "flex", gap: 6, alignItems: "center", opacity: 0.7, marginBottom: 3 } },
+            ...reviewDiffItems.slice(0, 12).map((change, index) => h("div", { key: "review-diff-" + index, className: "mp-rail-diff-item" },
+              h("div", { className: "mp-rail-diff-meta" },
                 h("span", { style: { flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, (change.group ? "第 " + change.group + " 组 · " : "") + "修改 " + (index + 1) + (change.to > change.from ? "（原操作替换 " + (change.to - change.from) + " 字符 · 历史位置）" : "（原操作插入 · 历史位置）")),
                 h("button", {
                   type: "button", className: "mp-rail-btn", "data-icon": "◎", title: "在正文中定位这处历史修改",
                   onClick: () => { try { st.actions.reviewLocate && st.actions.reviewLocate(index); } catch (e) { /* 忽略 */ } },
                 }, "定位")),
-              String(change.removed || "").length ? h("pre", { style: { margin: "2px 0", padding: "4px 6px", whiteSpace: "pre-wrap", wordBreak: "break-word", background: "color-mix(in srgb, #d33 14%, transparent)", borderRadius: 4, fontSize: 11.5 } }, "- " + String(change.removed).slice(0, 1500)) : null,
-              h("pre", { style: { margin: "2px 0", padding: "4px 6px", whiteSpace: "pre-wrap", wordBreak: "break-word", background: "color-mix(in srgb, #2a7 14%, transparent)", borderRadius: 4, fontSize: 11.5 } }, "+ " + String(change.insert || "").slice(0, 1500))))) : null,
+              String(change.removed || "").length ? h("pre", { className: "mp-rail-diff-line mp-rail-diff-del" }, "- " + String(change.removed).slice(0, 1500)) : null,
+              h("pre", { className: "mp-rail-diff-line mp-rail-diff-add" }, "+ " + String(change.insert || "").slice(0, 1500))))) : null,
           recoveredItems.length ? h("div", { className: "mp-rail-head", style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 8 } },
             h("strong", { style: { flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, "♻ 共享会话恢复的草稿副本（原件未被覆盖）"),
             h("button", {
@@ -10811,6 +11572,12 @@ const __test = {
     // 布局引擎（M0）：默认关闭，只在用户显式开启时挤压对话。
     // 失败绝不影响插件其余能力（mountLayout 内部已 try/catch + 日志）。
     try { mountLayout(ctx); } catch (e) { /* 见 mountLayout */ }
+    // 设置里的「编辑区居中」立即生效：打开中的文档迁移到中间，关闭时回右栏。
+    try {
+      if (ctx && typeof ctx.effect === "function") {
+        ctx.effect(function () { return installLayoutSettingBridge(); }, "dsh-markdown-editor-typora: layout setting bridge");
+      }
+    } catch (e) { /* 旧宿主没有 effect 能力 */ }
       const log = (() => {
         try { return typeof ctx.logger === "function" ? ctx.logger("dsh-markdown-editor-typora") : console; } catch (e) { return console; }
       })();
@@ -10934,6 +11701,21 @@ const __test = {
         log.warn?.("dsh-markdown-editor-typora: input face tap seed failed: %s", String(error && error.message ? error.message : error));
       }
 
+      // ②-c 首页/新会话输入面：宿主的 hero composer 不渲染 conversation.composer.dock
+      //      （InputBar 只在 variant === "composer" 时渲染它）。conversation.input.left
+      //      在两个 variant 都会渲染，且是 session 作用域，标准 props 同样含 inputActions。
+      try {
+        if (ctx.slots && typeof ctx.slots.inject === "function") {
+          runEffect(() => ctx.slots.inject("conversation.input.left", () => ctx.slots.register({
+            name: "conversation.input.left",
+            id: "dsh-markdown-editor-typora-input-face-hero",
+            order: 900,
+          }, InputFaceTap)), "dsh-markdown-editor-typora: hero input face tap");
+        }
+      } catch (error) {
+        log.warn?.("dsh-markdown-editor-typora: hero input face tap seed failed: %s", String(error && error.message ? error.message : error));
+      }
+
       // ③ M1 浮层舞台：编辑器的唯一挂载点。布局开关关闭时组件返回 null，不产生任何影响。
       try {
         if (ctx.slots && typeof ctx.slots.inject === "function") {
@@ -11032,6 +11814,21 @@ const __test = {
 
       // ③ sessions 旁路（cwd 解析用；服务晚到也没关系，每次 open 现取）。
       try { SessionsBridge.getSessions = () => get("sessions"); } catch (e) { /* 忽略 */ }
+      // ③-b 忙时派发：读取宿主 ui-conversation 的 busyEnter 与 uiSession 的
+      // running 状态。两者都是可选服务，缺失时退回 queue；不能写进顶层
+      // inject，否则未装 ui-settings 的宿主会连插件 apply 都跑不到。
+      try {
+        if (ctx && typeof ctx.inject === "function") {
+          ctx.inject(["configForms"], (scope) => {
+            try { hostConfigForms = scope.configForms || (scope.get && scope.get("configForms")) || null; }
+            catch (e) { hostConfigForms = null; }
+          });
+          ctx.inject(["uiSession"], (scope) => {
+            try { hostUiSession = scope.uiSession || (scope.get && scope.get("uiSession")) || null; }
+            catch (e) { hostUiSession = null; }
+          });
+        }
+      } catch (e) { /* 旧宿主没有这些服务 */ }
       ctx.effect(() => installWorkspaceNavigation(ctx), "dsh-markdown-editor-typora: workspace navigation");
       ctx.effect(() => installFileLinkInterceptor(), "dsh-markdown-editor-typora: document links");
       /* 面板入口短路：宿主的 sidebar.panellist 点击会 layout.selectPanel(id)，
