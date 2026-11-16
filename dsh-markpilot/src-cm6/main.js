@@ -64,6 +64,7 @@ import { imageInsertions, cancelImageInsertions } from './image-insertion.js';
 import { mappedMathSource, mathSourcePosition } from './math-source-map.js';
 import { mappedCellSource, cellSourceOffset, cellTextOffset, cellTextChange, encodeCellText, cellContentSpan, cellCaretEdge } from './cell-source-map.js';
 import { cellMathTarget, placeCellMathPreview, cellPreviewLocal, cellPreviewInteractive, cellPreviewRenderKey, cellPreviewIsCurrent, cellPreviewOnscreen } from './cell-math-preview.js';
+import { CELL_ATOM_CLASS, CELL_OPEN_ALL, cellMathParts, atomizedParts, openMathIndex, texOffsetToCell, cellSurfacePlan, surfaceMatches, planSlice } from './cell-math-projection.js';
 import { installSplit } from "./splitview.js";
 import { isEmbeddedImage, embeddedImages, protectedPayloadDecoration, protectImagePayloads, safeImagePayloadPosition } from './image-payload.js';
 import { createImageRemovalGate } from './image-removal.js';
@@ -2507,6 +2508,12 @@ const activeCellField = StateField.define({
 });
 let cellEdit = null; // { text, from, to }：活动格当前镜像（模块级，跨 widget 生命周期）
 let cellComposing = false;
+/* 【组字交接】A 格还在组词未上屏时点了真实的 B 格：共享覆盖层会立刻显示 B，而 Chromium
+ *  不会把 compositionend 送到 A（A 的编辑面被复用/失焦）⇒ cellComposing 永远停在 true，
+ *  A、B 两格都收不到那段中文，随后连 ASCII 也进不去（实测 ime-new2/ime-old2）。
+ *  这里记录"组字属于哪一格、提交函数是谁、是否已收尾"，交接前必须先按**原格**安全收尾。
+ *  纪律：只对**仍是当前**的这一笔组字收尾一次（防重复提交）；stale / 已取消的组字不提交。 */
+let cellCompositionSession = null; // { rowFrom, col, from, to, edit, commit, done, cancelled }
 let activeCellLayout = null, cellPositionFrame = 0, cellRevealIntent = null, cellMeasureIntent = null;
 const cellPositionMeasureKey = {};
 function renderedCellLayout(inputView, rowFrom, col, source) {
@@ -2524,7 +2531,8 @@ function updateCellSizer(edit) {
   if (!cellEdit || edit !== cellOverlay?.querySelector('.mp-cell-overlay-text') ||
       cellEdit.epoch !== view?.state.field(regionIndexField).epoch) return;
   const size = activeCellDOM()?.querySelector('.mp-cell-source-size');
-  if (size && size.textContent !== edit.textContent) { size.textContent = edit.textContent; view.requestMeasure(); }
+  const plain = cellEditPlainText(edit);
+  if (size && size.textContent !== plain) { size.textContent = plain; view.requestMeasure(); }
 }
 function scheduleCellOverlay(revealCaret = false) {
   if (!view || !cellEdit) return;
@@ -3068,7 +3076,7 @@ function beginCellPointerSelection(event, inputView) {
       owner.epoch === epoch && owner.from === from && owner.to === to && owner.rowFrom === rowFrom && owner.col === col &&
       active?.rowFrom === rowFrom && active.col === col && inputView.dom.isConnected && edit.isConnected &&
       cellOverlay?.style.display !== 'none' && document.hasFocus() && document.activeElement === edit &&
-      edit.textContent === text && selected?.anchor === anchor &&
+      cellEditPlainText(edit) === text && selected?.anchor === anchor &&
       state.selection.ranges.length === 1 && state.selection.main.from >= from && state.selection.main.to <= to;
   };
   if (!current()) return;
@@ -3093,9 +3101,8 @@ function beginCellPointerSelection(event, inputView) {
     const y = Math.max(rect.top + .5, Math.min(e.clientY, rect.bottom - .5));
     const hit = document.caretRangeFromPoint(x, y);
     if (!hit || !edit.contains(hit.startContainer)) { stop(); return; }
-    const prefix = document.createRange();
-    prefix.selectNodeContents(edit); prefix.setEnd(hit.startContainer, hit.startOffset);
-    const head = prefix.toString().length;
+    const head = cellPlainOffsetAt(edit, hit.startContainer, hit.startOffset);
+    if (head == null) { stop(); return; }
     if (head === lastHead) return;
     if (!current()) { stop(); return; }
     setCellDOMSelection(edit, anchor, head);
@@ -3124,33 +3131,571 @@ function beginCellPointerSelection(event, inputView) {
   listen(edit, 'compositionstart', stop);
   listen(window, 'blur', stop);
 }
-/** DOM selection boundaries, including mixed text nodes created by paste. */
+/* ══ 活动格混排投影：文字＝源码、未打开公式＝KaTeX 原子、打开的那一条＝源码 ═══════════
+ * 【根因】旧实现把整格文本一把写进 contenteditable（div.textContent = 格文本），于是混排格
+ * （`前文 $a_1$ 中间 $b^2$ 尾文`）里每条公式都只能以 `$…$` 字面出现 —— 用户可见现象就是
+ * "点这一格的文字，整格公式全露出"。
+ * 【为什么不能直接塞 KaTeX DOM】`textContent`（镜像 diff / sizer / 陈旧判定都读它）会把渲染
+ * 出来的字形一起算进源码坐标 ⇒ 打字时源码被 KaTeX 字形污染（把一个格写成 `x+1` 之类）。
+ * 【本方案】未打开的公式在编辑面里是**一个** `span.mp-cell-atom`（contenteditable=false），
+ * 它自己的 Markdown 存在 `data-mp-cell-src`，KaTeX DOM 只住在这个 span 里面：
+ *   · 读文本走 cellEditPlainText：文字按字符、atom 按它自己的 Markdown 长度 ⇒
+ *     **纯文本坐标与旧实现的 textContent 逐字节相同**，选区/镜像/撤销/IME 全部沿用原管道；
+ *   · 打开的那一条换成纯文本源码（可编辑），其余保持排版 ⇒ 只在真正编辑公式时才露源码；
+ *   · 纯文本格（无 `$`、无 atom）零开销：仍是一句 `textContent`，不建任何节点。 */
+const CELL_ATOM_SELECTOR = '.' + CELL_ATOM_CLASS;
+
+function isCellAtomNode(node) {
+  return !!node && node.nodeType === 1 && !!node.classList && node.classList.contains(CELL_ATOM_CLASS);
+}
+/** 这条已排版公式**自己**的 Markdown（`$…$` / `$$…$$`）；KaTeX 子树里的字形永不读。 */
+function cellAtomSource(node) {
+  const raw = node && node.getAttribute ? node.getAttribute('data-mp-cell-src') : null;
+  return raw == null ? (node && node.textContent) || '' : raw;
+}
+/** 一个节点在编辑面"纯文本坐标"里占的长度：文字＝字符数、atom＝它的 Markdown 长度。 */
+function cellPlainLength(node) {
+  if (!node) return 0;
+  if (node.nodeType === 3) return node.nodeValue.length;
+  if (node.nodeType === 1) {
+    if (isCellAtomNode(node)) return cellAtomSource(node).length;
+    let n = 0;
+    for (let child = node.firstChild; child; child = child.nextSibling) n += cellPlainLength(child);
+    return n;
+  }
+  return 0;
+}
+/** 从编辑面起点到 node 起点之间的纯文本长度（同级前兄弟 + 各层祖先的前兄弟）。 */
+function cellPlainStart(edit, node) {
+  let n = 0;
+  for (let at = node; at && at !== edit; at = at.parentNode) {
+    for (let prev = at.previousSibling; prev; prev = prev.previousSibling) n += cellPlainLength(prev);
+  }
+  return n;
+}
+/** 编辑面 → 纯文本。**纯文本格快路径**：没有 atom 时就是一句 textContent（零建节点）。
+ *  【每键成本】三档，越靠前越便宜（纯文本格永远命中第一档）：
+ *   ① 账本明确 hasAtoms === false（播种时写定）⇒ 一句 textContent，零遍历、零查询、零 Range；
+ *   ② 账本明确 hasAtoms === true ⇒ 直接走 atom 遍历，不再多查一次 DOM；
+ *   ③ 账本未知（外部夹具 / 旧对象）⇒ 先做**一次** atom 探测，没有 atom 就按纯文本读并记账。
+ *  ③ 只发生在"没有播种账本"的场合，普通格第二次起就落到 ①。 */
+function cellEditPlainText(edit, owner = cellEdit) {
+  if (!edit) return '';
+  /* 没有 querySelector 的宿主（非 Element 的编辑面替身、极简夹具）不可能挂着 atom：
+     直接按纯文本读，绝不因为"探测手段缺失"就返回空串（那会静默清空镜像 diff）。 */
+  if (!edit.querySelector) return edit.textContent || '';
+  if (owner && owner.hasAtoms === false) return edit.textContent || '';
+  if (!(owner && owner.hasAtoms === true)) {
+    if (!edit.querySelector(CELL_ATOM_SELECTOR)) {
+      if (owner) owner.hasAtoms = false;   // 记账：后续每键直接命中 ①
+      return edit.textContent || '';
+    }
+  }
+  let out = '';
+  const walk = node => {
+    for (let child = node.firstChild; child; child = child.nextSibling) {
+      if (child.nodeType === 3) out += child.nodeValue;
+      else if (isCellAtomNode(child)) out += cellAtomSource(child);
+      else if (child.nodeType === 1) walk(child);
+    }
+  };
+  walk(edit);
+  return out;
+}
+/** DOM 位置（node, offset）→ 纯文本坐标。落进公式内部时按"是否已过起点"归到公式两端
+ *  （atom 不可编辑，光标只能停在它两侧；点公式内部由 cellAtomPointer 单独换算精确 tex 位）。 */
+function cellPlainOffsetAt(edit, node, at) {
+  if (!edit || !node || (node !== edit && !edit.contains(node))) return null;
+  const atomOf = n => {
+    const el = n && n.nodeType === 1 ? n : n && n.parentElement;
+    return el && el.closest ? el.closest(CELL_ATOM_SELECTOR) : null;
+  };
+  const atom = atomOf(node);
+  if (atom && edit.contains(atom)) {
+    const base = cellPlainStart(edit, atom), len = cellAtomSource(atom).length;
+    return at > 0 ? base + len : base;
+  }
+  if (node.nodeType === 3) {
+    return cellPlainStart(edit, node) + Math.max(0, Math.min(node.nodeValue.length, at));
+  }
+  let n = cellPlainStart(edit, node), index = 0;
+  for (let child = node.firstChild; child && index < at; child = child.nextSibling, index++) n += cellPlainLength(child);
+  return n;
+}
+/** 纯文本坐标 → DOM 位置。落在公式源码中间时贴左/贴右（preferAfter），绝不停在 KaTeX 子树里。 */
+function cellPlainBoundary(edit, plain, preferAfter = true) {
+  let rest = Math.max(0, Math.round(Number(plain) || 0));
+  let fallback = [edit, 0];
+  const walk = parent => {
+    const kids = parent.childNodes;
+    for (let i = 0; i < kids.length; i++) {
+      const child = kids[i];
+      if (child.nodeType === 1 && isCellAtomNode(child)) {
+        const len = cellAtomSource(child).length;
+        if (rest <= 0) return [parent, i];
+        if (rest < len) return preferAfter ? [parent, i + 1] : [parent, i];
+        rest -= len; fallback = [parent, i + 1]; continue;
+      }
+      if (child.nodeType === 3) {
+        if (rest <= child.nodeValue.length) return [child, rest];
+        rest -= child.nodeValue.length; fallback = [child, child.nodeValue.length]; continue;
+      }
+      if (child.nodeType === 1) {
+        const len = cellPlainLength(child);
+        if (rest < len) { const hit = walk(child); if (hit) return hit; }
+        rest -= len; fallback = [parent, i + 1]; continue;
+      }
+    }
+    return null;
+  };
+  return walk(edit) || fallback;
+}
+/** DOM selection boundaries in **plain-text** coordinates (atoms contribute their own source). */
 function cellDOMSelection(edit) {
   const sel = getSelection();
   if (!sel || !edit.contains(sel.anchorNode) || !edit.contains(sel.focusNode)) return null;
-  const offset = (node, at) => {
-    const range = document.createRange();
-    range.selectNodeContents(edit); range.setEnd(node, at);
-    return range.toString().length;
-  };
-  return { anchor: offset(sel.anchorNode, sel.anchorOffset), head: offset(sel.focusNode, sel.focusOffset) };
+  const anchor = cellPlainOffsetAt(edit, sel.anchorNode, sel.anchorOffset);
+  const head = cellPlainOffsetAt(edit, sel.focusNode, sel.focusOffset);
+  if (anchor == null || head == null) return null;
+  return { anchor, head };
 }
 function setCellDOMSelection(edit, anchor, head) {
-  const boundary = offset => {
-    const walker = document.createTreeWalker(edit, NodeFilter.SHOW_TEXT);
-    let node, last = null;
-    while ((node = walker.nextNode())) {
-      last = node;
-      if (offset <= node.nodeValue.length) return [node, Math.max(0, offset)];
-      offset -= node.nodeValue.length;
-    }
-    return last ? [last, last.nodeValue.length] : [edit, 0];
-  };
-  const a = boundary(anchor), h = boundary(head);
+  if (anchor === head || !Number.isFinite(head - anchor)) {
+    const a = cellPlainBoundary(edit, anchor, true);
+    getSelection()?.setBaseAndExtent(a[0], a[1], a[0], a[1]);
+    return;
+  }
+  const a = cellPlainBoundary(edit, anchor, false), h = cellPlainBoundary(edit, head, true);
   getSelection()?.setBaseAndExtent(a[0], a[1], h[0], h[1]);
+}
+
+/* ── 投影播种与刷新 ─────────────────────────────────────────── */
+function cellRenderableMath(tex, display) { return renderMathHTML(tex, display) != null; }
+/** 一条已排版公式的 DOM 原子：外面是可识别的 leaf，里面是与正文同一个 KaTeX 渲染。
+ *  原子的 `data-mp-cell-src` 是它自己的 Markdown；KaTeX 子树里的字形**永不**参与源码坐标。 */
+/* 【节点缓存只存**与位置无关**的东西】`tex` 与"距本公式开头的局部字形偏移"在节点的整个
+ *  生命周期里都不变；**绝不能**缓存 `part.from` 这类绝对格内偏移 —— 在前文插字后公式源码
+ *  不变 ⇒ sameCellSurface 保留原节点（这是设计要求：普通输入不重建节点），此时旧的
+ *  absolute from 已经过期。真实点击时用"该实节点在当前格源序列中的起点"（cellPlainStart，
+ *  按 DOM 兄弟的源码长度累加，含 rendered atom，不读 KaTeX textContent）+ 局部偏移即可。
+ *  这样两个完全相同的公式天然各自正确，也不需要搜索公式字符串。 */
+const cellAtomParts = new WeakMap();
+function cellAtomNode(source, part) {
+  const span = document.createElement('span');
+  span.className = CELL_ATOM_CLASS + (part.display ? ' mp-cell-atom-display' : '');
+  span.setAttribute('contenteditable', 'false');
+  span.setAttribute('data-mp-cell-src', source);
+  span.setAttribute('aria-label', source);
+  renderMathDOM(span, part.tex, part.display);
+  /* 只记 tex/display —— 位置信息一律在点击时现算。 */
+  cellAtomParts.set(span, { tex: part.tex, display: !!part.display });
+  return span;
+}
+/** 按"文字源码 + 已排版公式原子"重铺编辑面。openIndex：摊成源码的那一条
+ *  （-1＝一条都不摊、CELL_OPEN_ALL＝全摊）。
+ *  内容一律由纯模块的 cellSurfacePlan 决定（同一份规则被单测钉住），这里只做 DOM 落地：
+ *  atom → 一个 contenteditable=false 的 span（内含 KaTeX），text → 一个文本节点。 */
+function seedCellEditSurface(edit, text, openIndex) {
+  /* 重铺期间关掉"DOM 选区 → 源码选区"的回灌：换节点后 DOM 选区会短暂落在临时位置，
+     放任它回灌就会写错 CM 选区、还会与 selectionchange 互相触发。 */
+  const wasProjecting = cellProjecting;
+  cellProjecting = true;
+  try {
+    return seedCellEditSurfaceInner(edit, text, openIndex);
+  } finally {
+    cellProjecting = wasProjecting;
+  }
+}
+function seedCellEditSurfaceInner(edit, text, openIndex) {
+  /* 计划与 parts 用**同一个** renderable 判定：否则"能不能排版"两处会各说一套，
+     原子与 tex 错位（把不可渲染的公式喂给 KaTeX、或该排版的没排）。 */
+  const parts = cellMathParts(text, cellRenderableMath);
+  const atoms = atomizedParts(parts, openIndex);
+  const plan = cellSurfacePlan(text, openIndex, cellRenderableMath);
+  edit.textContent = '';
+  const frag = document.createDocumentFragment();
+  let hasAtoms = false;
+  let cursor = 0;
+  plan.forEach(segment => {
+    if (segment.kind !== 'atom') { frag.appendChild(document.createTextNode(segment.src)); return; }
+    hasAtoms = true;
+    while (cursor < atoms.length && !(atoms[cursor].atom && atoms[cursor].from === segment.from)) cursor++;
+    frag.appendChild(cellAtomNode(segment.src, atoms[cursor]));
+  });
+  edit.appendChild(frag);
+  if (cellEdit) {
+    cellEdit.hasAtoms = hasAtoms;
+    cellEdit.surface = { open: openIndex, parts: atoms };
+  }
+  return parts;
+}
+/* 【最近一次解析复用】同一个活动格、同一份文本，在一次输入事件里会被问两次
+ *  （cellProjectionOpen 一次、随后的 atom 列表一次；rAF 里又可能再来一次）。
+ *  扫描器本身是纯函数，结果只取决于 text ⇒ 只要"文本字符串相同"就直接复用，
+ *  存 **1 条**就够（无全表缓存、无跨格共享）。文本一变立刻失效，天然正确。 */
+let cellPartsCache = { text: null, parts: null };
+function cellPartsOf(text) {
+  const source = String(text ?? '');
+  if (cellPartsCache.text === source && cellPartsCache.parts) return cellPartsCache.parts;
+  const parts = cellMathParts(source, cellRenderableMath);
+  cellPartsCache = { text: source, parts };
+  return parts;
+}
+/** 光标该打开哪一条：指针点进公式内部/键盘走进公式边界才打开，点公式右侧的文字不打开
+ *  （"点文字一律露出所有公式"的修复点，见 cell-math-projection.openMathIndex）。 */
+function cellProjectionOpen(text, head, pointer) {
+  if (head == null || !text.includes('$')) return -1;
+  return openMathIndex(cellPartsOf(text), head, { includeStart: !pointer });
+}
+/** 当前 DOM 里每个已排版公式携带的 Markdown（按文档序）。这就是"该不该重铺"的对账依据：
+ *  与偏移无关 ⇒ 在公式前面插普通字不会误判成"原子变了"（否则每键重建全部 KaTeX）。 */
+function cellLiveAtoms(edit) {
+  if (!edit || !edit.querySelectorAll) return [];
+  const out = [];
+  for (const node of edit.querySelectorAll(CELL_ATOM_SELECTOR)) out.push(cellAtomSource(node));
+  return out;
+}
+/** 投影是否已经是最新：打开的是同一条，且**原子源码值逐条一致**。 */
+function sameCellSurface(owner, edit, open, atoms) {
+  const surface = owner?.surface;
+  if (!surface || surface.open !== open) return false;
+  return surfaceMatches(open, cellLiveAtoms(edit), open, atoms);
+}
+/** 选区落定后的投影校正（rAF 合并 + 状态守卫）。
+ *  selectionchange 在一次点击/一次方向键里可能连发多次，且我们重铺时也会触发它 ⇒
+ *  这里合并成一帧、并在"折叠位置没变"时直接返回，不做任何 DOM 写。 */
+let cellProjectionFrame = 0, cellProjectionLastHead = -1;
+function scheduleCellProjectionRefresh(edit) {
+  if (cellProjectionFrame) return;
+  cellProjectionFrame = requestAnimationFrame(() => {
+    cellProjectionFrame = 0;
+    if (!view || !cellEdit || cellProjecting) return;
+    const target = cellOverlay?.querySelector('.mp-cell-overlay-text');
+    if (!target || target !== edit || !target.isConnected) return;
+    if (cellComposing || view.composing || document.activeElement !== target || !document.hasFocus()) return;
+    const dom = cellDOMSelection(target);
+    if (!dom) return;
+    /* 折叠光标：位置没变就不动（这是自激的主要入口）。有选区时按 head 走同一条。 */
+    if (dom.head === cellProjectionLastHead && dom.anchor === dom.head) return;
+    cellProjectionLastHead = dom.head;
+    refreshCellProjection(target);
+  });
+}
+function resetCellProjectionState() {
+  if (cellProjectionFrame) { cancelAnimationFrame(cellProjectionFrame); cellProjectionFrame = 0; }
+  cellProjectionLastHead = -1;
+  cellProjecting = false;
+}
+/** 光标/文本变化后校正投影：只有"该打开的是另一条"或"原子集合变了"才重铺 DOM。
+ *  · 组字中、有选区（拖选）时一律不动 DOM（保住原生 IME 与拖选）；
+ *  · 普通键入不重铺（原子集合不变）⇒ 每键零 KaTeX、零节点重建；
+ *  · 重铺期间用 `cellProjecting` 挡住 syncCellSelection / selectionchange 的回灌，避免自激循环。 */
+let cellProjecting = false;
+function refreshCellProjection(edit, { pointer = false, force = false } = {}) {
+  const owner = cellEdit;
+  if (!owner || !view || !edit || edit !== cellOverlay?.querySelector('.mp-cell-overlay-text')) return false;
+  if (cellProjecting || cellComposing || view.composing || view.state.readOnly) return false;
+  /* 【纯文本格快路径】没有 `$` 也没挂过 atom ⇒ 这条格永远不需要投影：一次 textContent 即返回，
+     连选区（cellDOMSelection 的 Range 往返）都不做。 */
+  const text = cellEditPlainText(edit);
+  if (!text.includes('$') && !owner.hasAtoms) return false;
+  const dom = cellDOMSelection(edit);
+  if (!dom) return false;
+  /* 拖选：DOM 归浏览器，不重铺；但"选区里已经没有公式打开"时仍要收掉投影，否则
+     从公式拖到纯文字后公式会一直敞着（用户可见：选区到前文、`$b^2$` 还露源码）。 */
+  if (dom.anchor !== dom.head) {
+    if (owner.surface?.open != null && owner.surface.open >= 0) refreshCellProjectionQuiet(edit, owner, text);
+    return false;
+  }
+  const open = cellProjectionOpen(text, dom.head, pointer);
+  const atoms = text.includes('$')
+    ? atomizedParts(cellPartsOf(text), open).filter(a => a.atom).map(a => text.slice(a.from, a.to))
+    : [];
+  if (!force && sameCellSurface(owner, edit, open, atoms)) { owner.hasAtoms = atoms.length > 0; return false; }
+  seedCellEditSurface(edit, text, open);
+  setCellDOMSelection(edit, dom.head, dom.head);
+  return true;
+}
+/** 选区落在文字上时静默收掉投影（不重排其它原子，也不回灌选区）。 */
+function refreshCellProjectionQuiet(edit, owner, text) {
+  const open = -1;
+  const atoms = text.includes('$')
+    ? atomizedParts(cellPartsOf(text), open).filter(a => a.atom).map(a => text.slice(a.from, a.to))
+    : [];
+  if (sameCellSurface(owner, edit, open, atoms)) return false;
+  const dom = cellDOMSelection(edit);
+  seedCellEditSurface(edit, text, open);
+  if (dom && dom.anchor === dom.head) setCellDOMSelection(edit, dom.anchor, dom.head);
+  return true;
+}
+
+/* ── 点击已排版公式：字形 → 精确源码位 ───────────────────────── */
+/** 点中的那个公式原子（含越出原子盒 1px 的 KaTeX 溢出字形，与正文 elementsFromPoint 兜底同法）。 */
+function cellAtomHit(div, x, y) {
+  const stack = document.elementsFromPoint ? document.elementsFromPoint(x, y) : [];
+  for (const el of stack) {
+    if (!el || !el.closest) continue;
+    const atom = el.closest(CELL_ATOM_SELECTOR);
+    if (atom && div.contains(atom)) return atom;
+  }
+  return null;
+}
+/** 视口坐标 → 格纯文本坐标（点公式内部 = 精确 tex 位；点两侧文字 = 该字符边界）。
+ *  口径与正文点渲染公式完全一致：mathGlyphOffset 的五级判定 + tex→源码映射。
+ *  【位置一律现算】atom 节点上只缓存 tex（与位置无关）；它在当前格源序列里的起点由
+ *  `cellPlainStart` 按 DOM 兄弟的源码长度累加得出（含 rendered atom，不读 KaTeX
+ *  textContent）。于是"前文插/删字后公式源码不变 ⇒ 节点被复用"也不会算错，
+ *  两个完全相同的公式也各自落到自己那一段。 */
+function cellPointerTextPosition(div, x, y) {
+  const atom = cellAtomHit(div, x, y);
+  if (atom) {
+    const cached = cellAtomParts.get(atom);
+    if (cached) {
+      const glyphs = mathGlyphOffset(atom, { clientX: x, clientY: y,
+        target: document.elementFromPoint ? document.elementFromPoint(x, y) : null }, cached.tex);
+      /* 节点起点（现算）+ 该节点内局部字形偏移 = 格内纯文本坐标。
+         局部偏移由 texOffsetToCell 在同一进程里给出（它按 atom 自身边界钳制）。 */
+      const local = texOffsetToCell({ from: 0, to: cellAtomSource(atom).length, tex: cached.tex,
+        display: cached.display }, glyphs == null ? 0 : glyphs);
+      return cellPlainStart(div, atom) + local;
+    }
+  }
+  const hit = document.caretRangeFromPoint(x, y);
+  if (!hit || !div.contains(hit.startContainer)) return null;
+  return cellPlainOffsetAt(div, hit.startContainer, hit.startOffset);
+}
+/** 活动格内按下已排版公式：先记录，抬起且没拖动才落精确位（拖选仍归浏览器原生）。
+ *  与正文 clickToSource 的 click-vs-drag 同一纪律：不抢拖拽，只改单击落点。 */
+let cellAtomGesture = null;
+function stopCellAtomGesture() {
+  const gesture = cellAtomGesture;
+  cellAtomGesture = null;
+  if (gesture) gesture.cancel();
+}
+function cellAtomPointer(event) {
+  if (event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+  const div = event.currentTarget;
+  if (!div || !cellEdit) return;
+  if (!cellAtomHit(div, event.clientX, event.clientY)) return;
+  stopCellAtomGesture();
+  const gesture = { div, x: event.clientX, y: event.clientY, moved: false };
+  const remove = [];
+  const listen = (target, type, fn) => { target.addEventListener(type, fn, true); remove.push(() => target.removeEventListener(type, fn, true)); };
+  const cancel = () => {
+    if (cellAtomGesture === gesture) cellAtomGesture = null;
+    while (remove.length) remove.pop()();
+  };
+  gesture.cancel = cancel;
+  const move = e => {
+    if (!(e.buttons & 1)) return;
+    if (Math.abs(e.clientX - gesture.x) + Math.abs(e.clientY - gesture.y) > 4) gesture.moved = true;
+  };
+  /* 只有"真单击"才接管落点：拖动、修饰键、新输入、失焦、滚动一律让位（拖选/IME 完全原生）。 */
+  const up = e => {
+    const trustedLeftUp = e.isTrusted && e.type === 'mouseup' && e.button === 0;
+    const moved = gesture.moved || Math.abs(e.clientX - gesture.x) + Math.abs(e.clientY - gesture.y) > 4;
+    cancel();
+    if (!trustedLeftUp || moved) return;
+    if (!div.isConnected || !document.hasFocus() || document.activeElement !== div ||
+        cellComposing || view?.composing || view?.state.readOnly || cellEdit?.surface == null) return;
+    const pos = cellPointerTextPosition(div, gesture.x, gesture.y);
+    if (pos == null) return;
+    const text = cellEditPlainText(div, cellEdit);
+    const open = cellProjectionOpen(text, pos, true);
+    if (open !== cellEdit.surface.open) seedCellEditSurface(div, text, open);
+    setCellDOMSelection(div, pos, pos);
+    syncCellSelection(div);
+    noteCellMathInput();
+  };
+  listen(document, 'mousemove', move);
+  for (const type of ['keydown', 'wheel', 'pointercancel', 'touchcancel', 'dragstart', 'contextmenu']) listen(document, type, cancel);
+  listen(document, 'mouseup', up);
+  listen(div, 'blur', cancel);
+  listen(div, 'compositionstart', cancel);
+  cellAtomGesture = gesture;
+}
+/** 选区里碰到 atom 时，复制/剪切一律给**原始 Markdown**（与正文复制口径一致）：
+ *  浏览器默认会把 KaTeX 子树复制成字形文本（`$a_1$` → `a1`），那是转写不是源码。 */
+/* 【共享序列化】选区 → 原始 Markdown。copy 与 cut 走**同一条**规则，绝不各写一份。
+ *  必须自己按纯文本坐标走，不能用 `range.cloneContents()`：DOM 会把"只覆盖 atom 一半"的选区
+ *  克隆成**整个 atom 元素**，`textContent` 于是给出 KaTeX 字形（`$a_1$` → `a1`）；
+ *  而只取 `toString()` 又会把被部分覆盖的公式整条丢掉。所以按 [from,to) 与每段的交集拼接：
+ *    · 文字段：取交集子串（与原字符逐字节一致）；
+ *    · atom：**交集非空就整条**给出它的源码（公式是原子，半条公式没有意义）。
+ *  返回值同时告诉调用方"选区覆盖到的纯文本区间"，cut 用它决定删什么。 */
+function cellPlainSelection(div, range) {
+  const anchor = cellPlainOffsetAt(div, range.startContainer, range.startOffset);
+  const head = cellPlainOffsetAt(div, range.endContainer, range.endOffset);
+  if (anchor == null || head == null) return null;
+  const from = Math.min(anchor, head), to = Math.max(anchor, head);
+  if (!(to > from)) return null;
+  /* 规则只有一份：纯模块的 planSlice。这里只负责"把 DOM 读成当前计划"，不重写拼接规则
+     （copy / cut / 单测共用同一条口径）。当前计划 = 当前界面：打开的是 surface.open，
+     其余公式都是 atom。 */
+  const text = cellEditPlainText(div);
+  const plan = cellSurfacePlan(text, cellEdit?.surface?.open ?? -1, cellRenderableMath);
+  return { text: planSlice(plan, from, to), from, to };
+}
+function cellSelectionTouchesAtom(div, range) {
+  for (const atom of div.querySelectorAll(CELL_ATOM_SELECTOR)) {
+    if (range.intersectsNode(atom)) return true;
+  }
+  return false;
+}
+/** 把源码写进剪贴板（text/plain + 带来源标记的 text/html）。**返回是否真的写成功**：
+ *  宿主两种格式都拒绝时返回 false ⇒ 调用方据此**不删**任何东西（剪贴失败不能毁文档）。 */
+function cellPlainWriteClipboard(clipboardData, text) {
+  if (!clipboardData) return false;
+  let wrote = false;
+  try { clipboardData.setData('text/plain', text); wrote = true; } catch { /* 宿主禁止 */ }
+  try {
+    const html = '<div data-markpilot-source="markdown">' +
+      text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+    clipboardData.setData('text/html', html); wrote = true;
+  } catch { /* 宿主禁止 */ }
+  return wrote;
+}
+/** 【混排格·复制/剪切原始 Markdown】atom 里是 KaTeX DOM，浏览器默认只会给出渲染字形
+ *  （`$a_1$` → `a1`）。copy 与 **cut** 共用这里：同一套序列化、同一套门禁、同一条删除路径。
+ *
+ *  门禁与优先级（每条都对应一个真实后果）：
+ *    · 选区必须在活动格内且**跨到 atom**；纯文字选区照旧交给浏览器（原有行为不变）。
+ *    · 事件**不可取消**（cancelable=false）⇒ 完全不接管：那时 preventDefault 无效，
+ *      浏览器默认行为照样发生，我们再动手只会造成二次删除。交给浏览器原生路径，
+ *      它触发的 input 事件仍会被既有镜像管道接住。
+ *    · **只读 / IME 组字中只限制剪切，不限制复制**：复制是读操作，只要有活跃投影就必须
+ *      能给出源码；而"删掉内容"属编辑，只读态与组字中途绝不能发生。
+ *    · 剪切必须**先写剪贴板、写成功才删**：写失败（宿主拒绝/无 clipboardData）时
+ *      仍然 preventDefault —— 命中 atom 的剪切语义已由我们接管，不拦的话浏览器会
+ *      自己删掉选区，结果就是"内容没了、剪贴板也没有"。
+ *    · 删除用与复制**同一个 slice 区间**（不重新按 DOM 推断，避免两套口径）。
+ *    · 删除后把光标放到被剪起点，并标成 delete 类历史 ⇒ 剪切是**独立的一次可撤销**操作
+ *      （不会被并进前一段键入里）。 */
+function cellOverlayCopyAtoms(event) {
+  const div = event.currentTarget;
+  if (!div || !cellEdit || !div.contains(event.target)) return;
+  /* 不可取消：不接管（见上）。放在最前面，避免任何"以为拦住了其实没拦住"的路径。 */
+  if (event.cancelable === false) return;
+  const sel = typeof getSelection === 'function' ? getSelection() : null;
+  if (!sel || sel.isCollapsed || !sel.rangeCount || !div.contains(sel.anchorNode)) return;
+  const range = sel.getRangeAt(0);
+  if (!cellSelectionTouchesAtom(div, range)) return;    // 纯文字选区：照旧交给浏览器
+  const slice = cellPlainSelection(div, range);
+  if (!slice) return;
+  const cutting = event.type === 'cut';
+  const cuttingAllowed = !!view && !view.state.readOnly && !cellComposing && !view.composing;
+  /* 先写剪贴板：复制与剪切都要给源码。返回值决定剪切能不能删。 */
+  const wrote = cellPlainWriteClipboard(event.clipboardData, slice.text);
+  if (!cutting) { if (wrote) event.preventDefault(); return; }
+  if (!cuttingAllowed || !wrote) {
+    /* 只读 / 组字中 / 写剪贴板失败：**一律不删**。已经接管了这段选区的剪切语义，
+       就必须把默认删除也拦下来，否则文档被改而剪贴板为空。 */
+    event.preventDefault();
+    return;
+  }
+  event.preventDefault();
+  deleteCellPlainRange(div, slice.from, slice.to);
+  /* 光标落在被剪起点（与浏览器剪切同一直觉）。注意 setCellDOMSelection 没有返回值，
+     所以这里不做分支判断；后续镜像 diff 只看纯文本，光标位置由 syncCellSelection 带上。 */
+  setCellDOMSelection(div, slice.from, slice.from);
+  div.__mpCellInputType = 'deleteByCut';    // 归到 delete 类：独立撤销组，不并进前一段键入
+  syncCellEdit(div);
+  refreshCellProjection(div, { force: true });
+}
+/* ── 组字交接：把"未上屏的组字"按**原格**安全收尾，再允许切换格/切文档 ─────────────
+ *  背景（实测 qa/ime-new2.json、ime-old2.json）：A 格组词未上屏时点真实 B 格 TD
+ *  ⇒ 共享覆盖层立刻显示 B，而 Chromium **不会**把 compositionend 送给 A（编辑面被复用/失焦）
+ *  ⇒ cellComposing 永远 true、桥的 isComposing 一直 true；A、B 都收不到那段中文，
+ *  随后连 ASCII 两格也都不进。
+ *
+ *  为什么自己收尾而不是等 compositionend：实测那个事件不会来。规范给的出口是**提交当前候选**
+ *  —— 让原编辑面失焦，Chromium 会把在途组字提交成 input 再派发 compositionend。
+ *  这里按这个次序做，每一步都受会话身份与"只收尾一次"保护。 */
+/** 仍在进行中的组字会话（未收尾、未取消、且仍在组字中）。 */
+function liveCellComposition() {
+  const session = cellCompositionSession;
+  if (!session || session.done || session.cancelled) return null;
+  if (!cellComposing) return null;
+  return session;
+}
+/** 收尾这一次组字：提交 → 镜像进源码 → 清账。
+ *  · `done` 先置位 ⇒ 重复调用（stale compositionend / 交接与事件双双抵达）只提交一次；
+ *  · 只写回**会话自己那一格**（用会话记下的 from/to 校验源码没被别人改过）；
+ *  · `cancelled` 时清账但**不提交**，绝不把取消的空候选写进文档。 */
+function settleCellComposition() {
+  const session = cellCompositionSession;
+  if (!session || session.done) { cellComposing = false; return false; }
+  session.done = true;
+  const cancelled = session.cancelled === true;
+  cellCompositionSession = null;
+  cellComposing = false;
+  window.__dshBridge?.composition?.(false);
+  if (cancelled) return false;                    // 取消：不提交、不镜像
+  const edit = session.edit, owner = cellEdit;
+  /* 【stale 守卫】只有"还是同一格、源码区间没变"才把编辑面镜像回源码。
+     否则说明文档已被别的路径改过（换格/换文档/外部 sync）⇒ 宁可丢弃这一笔，
+     也不能写到错误位置。 */
+  if (!edit || !edit.isConnected || !owner || !view || view.state.readOnly) return false;
+  if (owner.rowFrom !== session.rowFrom || owner.col !== session.col ||
+      owner.from !== session.from || owner.to !== session.to) return false;
+  session.commit?.(edit);
+  return true;
+}
+/** 组字被取消（Chromium 在无候选时派发 data === '' 的 compositionend）时调用：清账不提交。 */
+function cancelCellComposition() {
+  if (!cellCompositionSession || cellCompositionSession.done) return false;
+  cellCompositionSession.cancelled = true;
+  return settleCellComposition();
+}
+/** 【交接门禁】在改活动格/改焦点/换文档之前调用。
+ *  有在途组字时：先在**原格**上触发真实提交（blur 让 Chromium 上屏），再收尾一次。
+ *  返回 true 表示"确实收尾了一笔"（调用方据此知道状态已被改动）。 */
+function handoffCellComposition() {
+  const session = liveCellComposition();
+  if (!session) return false;
+  const edit = session.edit;
+  /* 顺序要紧：blur 会把在途候选提交成 input（可能同时派发 compositionend）；
+     无论事件到没到，随后都由 settleCellComposition 收尾一次（重复调用无副作用）。 */
+  try { if (edit && edit.isConnected && typeof edit.blur === 'function') edit.blur(); } catch { /* 宿主禁止 */ }
+  settleCellComposition();
+  return true;
+}
+/** 从投影里删掉 [from, to) 这段纯文本：文字按字符删，atom **整条**删（与 Typora 的
+ *  内联公式当整体删除同语义；半条公式留在源码里没有意义）。 */
+function deleteCellPlainRange(edit, from, to) {
+  if (!(to > from)) return;
+  let pos = 0;
+  const remove = [];
+  const walk = parent => {
+    for (let child = parent.firstChild; child;) {
+      const next = child.nextSibling;
+      if (child.nodeType === 3) {
+        const len = child.nodeValue.length;
+        const a = Math.max(from, pos) - pos, b = Math.min(to, pos + len) - pos;
+        if (b > a) remove.push({ text: child, from: a, to: b });
+        pos += len;
+      } else if (isCellAtomNode(child)) {
+        const len = cellAtomSource(child).length;
+        /* 【与复制同一条规则】交集非空就整条删：planSlice 对部分覆盖的 atom 也是整条给出，
+           两边若不一致，就会出现"复制到 2 条、只删掉 1 条"这类剪贴板与原文对不上的情况。 */
+        if (pos < to && pos + len > from) remove.push({ node: child });
+        pos += len;
+      } else if (child.nodeType === 1) walk(child);
+      child = next;
+    }
+  };
+  walk(edit);
+  for (const item of remove) {
+    if (item.node) { if (item.node.parentNode) item.node.parentNode.removeChild(item.node); continue; }
+    const value = item.text.nodeValue;
+    item.text.nodeValue = value.slice(0, item.from) + value.slice(item.to);
+  }
 }
 function syncCellSelection(edit) {
   if (!view || !cellEdit) return;
+  /* 【防自激】重铺投影时我们自己会改 DOM 选区 ⇒ 那一次 selectionchange 不许回灌源码选区，
+     否则"重铺 → 选区变化 → syncCellSelection → dispatch → selectionchange"会打转。 */
+  if (cellProjecting) return;
   const dom = cellDOMSelection(edit);
   if (!dom) return;
   const mapped = mappedCellSource(view.state.doc.sliceString(cellEdit.from, cellEdit.to));
@@ -3166,7 +3711,7 @@ function syncCellEdit(edit) {
   if (!view || !cellEdit) return;
   /* 【#26 第二道门】只读态下覆盖层任何 DOM 变化都不许镜像进源码（含程序化 execCommand）。 */
   if (view.state.readOnly) return;
-  const newText = edit.textContent || '';
+  const newText = cellEditPlainText(edit);
   const source = view.state.doc.sliceString(cellEdit.from, cellEdit.to);
   /* 【#62-U2R-3】覆盖层打开期间文档可能被**其它路径**改写（典型：位图粘贴异步 commit 插到表格上方
      ⇒ 表格整体右移）。旧代码直接把镜像文本写回 `cellEdit.from/to` ⇒ 覆写到错误区间（实测把表头
@@ -3179,7 +3724,9 @@ function syncCellEdit(edit) {
   const guarded = newText.endsWith('\\') && view.state.doc.sliceString(cellEdit.to, cellEdit.to + 1) === '|';
   const nextText = guarded ? newText + ' ' : newText;
   if (guarded) {
-    edit.textContent = nextText;
+    /* 末尾的 `\` 会把格尾管道转义掉 ⇒ 补一个空格（原有口径）。这里**只追加一个文本节点**，
+       绝不重写整面 textContent：重写会把已排版公式的 atom 全丢掉（混排格会闪回源码）。 */
+    edit.appendChild(document.createTextNode(' '));
     if (dom) setCellDOMSelection(edit, dom.anchor, dom.head);
   }
   const change = cellTextChange(source, nextText);
@@ -3255,10 +3802,12 @@ function resyncCellEdit(edit) {
   }
   const mapped = mappedCellSource(view.state.doc.sliceString(from, to));
   Object.assign(cellEdit, { from, to, text: mapped.text, rowFrom: active.rowFrom, col: active.col, cols: ranges.length });
-  if (edit.textContent !== mapped.text) edit.textContent = mapped.text;
+  /* 撤销/重做后按新光标重新投影：光标所在那条公式摊成源码，其余保持排版。 */
+  const caret = cellTextOffset(mapped, sel.head - from);
+  seedCellEditSurface(edit, mapped.text, cellProjectionOpen(mapped.text, caret, false));
   updateCellSizer(edit);
   edit.focus({ preventScroll: true });
-  setCellDOMSelection(edit, cellTextOffset(mapped, sel.anchor - from), cellTextOffset(mapped, sel.head - from));
+  setCellDOMSelection(edit, cellTextOffset(mapped, sel.anchor - from), caret);
   positionCellOverlay();
 }
 function cellHistory(edit, command) {
@@ -3347,8 +3896,20 @@ function ensureCellOverlay() {
           selection.main.from < cellEdit.from || selection.main.to > cellEdit.to) return;
       const line = view.state.doc.lineAt(cellEdit.from), range = cellRangesOf(line)[cellEdit.col];
       if (line.from !== cellEdit.rowFrom || !range || range[0] !== cellEdit.from || range[1] !== cellEdit.to ||
-          mappedCellSource(view.state.doc.sliceString(cellEdit.from,cellEdit.to)).text !== edit.textContent) return;
+          mappedCellSource(view.state.doc.sliceString(cellEdit.from,cellEdit.to)).text !== cellEditPlainText(edit)) return;
       syncCellSelection(edit);
+    });
+    /* 【活动格混排投影·真实点击/方向键】原生在同一个 contenteditable 内点一下，只会改 DOM 选区，
+       不派发 input ⇒ 只靠 input 校正投影的话，"从公式拖到/点到纯文字"后公式会一直敞着
+       （真机实测：点「前文」后选区已到文字，`$b^2$` 仍露源码）。
+       这里在**选区落定后**校正一次：折叠且不在该公式里 ⇒ 收掉投影回到排版。
+       三重守卫避免自激：cellProjecting（我们自己改选区时）、选区没变（同一状态不重复）、
+       rAF 合并（一次手势只算一次）。 */
+    document.addEventListener('selectionchange', () => {
+      if (!cellEdit) return;
+      const edit = cellOverlay?.querySelector('.mp-cell-overlay-text');
+      if (!edit || !edit.isConnected || document.activeElement !== edit) return;
+      scheduleCellProjectionRefresh(edit);
     });
     /* 【活动格公式预览·光标跟随】箭头/Home/End/鼠标落点/拖拽都会改 DOM 选区；这里只做
        "读光标→比公式"，命中同一公式就只跟随重定位，纯文本格直接提前返回
@@ -3368,8 +3929,30 @@ function ensureCellOverlay() {
   div.contentEditable = "true";
   div.spellcheck = false;
   box.appendChild(div);
-  div.addEventListener("compositionstart", () => { syncCellSelection(div); cellComposing = true; window.__dshBridge?.composition?.(true); });
-  div.addEventListener("compositionend", () => { cellComposing = false; syncCellEdit(div); noteCellMathInput(); window.__dshBridge?.composition?.(false); });
+  /* 【组字会话】compositionstart 记下"这一笔属于哪一格/哪一份编辑面"，compositionend 只认它。
+     会话身份保证三件事：①只收尾一次（重复的 compositionend / stale 事件不再提交）；
+     ②收尾指向**原格**而不是"当前覆盖层那格"；③取消时清账、不诈提交。 */
+  div.addEventListener("compositionstart", () => {
+    syncCellSelection(div);
+    cellComposing = true;
+    cellCompositionSession = cellEdit ? {
+      rowFrom: cellEdit.rowFrom, col: cellEdit.col, from: cellEdit.from, to: cellEdit.to,
+      edit: div, done: false, cancelled: false,
+      /* 提交动作固定指向"这一次组字所在的编辑面"，与之后覆盖层显示哪一格无关。 */
+      commit: node => { syncCellEdit(node); noteCellMathInput(); },
+    } : null;
+    window.__dshBridge?.composition?.(true);
+  });
+  div.addEventListener("compositionend", event => {
+    /* 只认**自己那一笔**。Chromium 在无候选时派发 data === '' 的 compositionend ⇒ 取消。
+       编辑面被复用过（已切到别的格）时，这个事件属于旧会话，不能拿去提交新格的内容。 */
+    if (cellCompositionSession && cellCompositionSession.edit === div &&
+        cellCompositionSession.done === false && event && event.data === '') {
+      cancelCellComposition();
+      return;
+    }
+    settleCellComposition();
+  });
   div.addEventListener('beforeinput', e => {
     if (e.inputType === 'historyUndo' || e.inputType === 'historyRedo') {
       e.preventDefault(); cellHistory(div, e.inputType === 'historyUndo' ? undo : redo); return;
@@ -3379,12 +3962,20 @@ function ensureCellOverlay() {
     if (!cellComposing) syncCellSelection(div);
   });
   div.addEventListener("input", () => {
-    if (!cellComposing) syncCellEdit(div);
+    if (!cellComposing) { syncCellEdit(div); refreshCellProjection(div); }
     else { updateCellSizer(div); scheduleCellOverlay(true); noteCellMathInput(); }
   });
   // Native scrolling belongs to the scroll host; modifier-wheel belongs to view.dom capture.
   /* 【N1】copy 必须挂在覆盖层自己身上：它挂 body、事件在 contentDOM 之外，CM6 的处理器收不到。 */
   div.addEventListener("copy", cellOverlayCopy);
+  /* 【混排格·复制原始 Markdown】atom 里是 KaTeX DOM，浏览器默认复制会给出渲染字形
+     （`$a_1$` → `a1`）。只要选区碰到 atom，就按**源码**写剪贴板（与正文复制口径一致）。 */
+  div.addEventListener("copy", cellOverlayCopyAtoms);
+  div.addEventListener("cut", cellOverlayCopyAtoms);
+  /* 【混排格·点公式】atom 是 contenteditable=false 的叶子：浏览器原生落位只会停在它两侧，
+     而且会把它当整体选中。这里自己换算"点了 KaTeX 的哪个字形" → 格源码坐标，
+     与正文点渲染体同一套 mathGlyphOffset/mathSourcePosition 口径（详见 cellAtomPointer）。 */
+  div.addEventListener("mousedown", cellAtomPointer, true);
   div.addEventListener("blur", () => {
     const owner = view, edit = cellEdit;
     if (!owner || !edit || edit.navigating) return;
@@ -3424,7 +4015,9 @@ function ensureCellOverlay() {
     if (cellEdit && !e.altKey && (e.key === "Home" || e.key === "End")) {
       const dom = cellDOMSelection(div);
       if (dom) {
-        const caret = cellCaretEdge(div.textContent || '', e.key, e.shiftKey, dom.anchor);
+        /* 纯文本坐标口径：atom 按它自己的 Markdown 长度计入（cellEditPlainText），
+           不能用 div.textContent —— 那里面是 KaTeX 字形，会把可见边界算错。 */
+        const caret = cellCaretEdge(cellEditPlainText(div), e.key, e.shiftKey, dom.anchor);
         setCellDOMSelection(div, caret.anchor, caret.head);
         syncCellSelection(div);
         e.preventDefault();
@@ -3605,18 +4198,29 @@ let cellMathState = { key: '', tex: '', display: false, dom: null, rendered: fal
   natural: null, visible: false };
 let cellMathFrame = 0;
 /** 活动格当前该预览哪条公式（纯逻辑在 cell-math-preview.js，与正文共用 inline-format 扫描器）。
- *  【普通格快路径】先读一次 textContent：不含 `$` 的格直接返回，**不碰 DOM 选区**
- *  （cellDOMSelection 要建 Range + toString，是每键路径上最贵的一步）。取出的一次文本
- *  就交给 cellMathTarget 复用，不再第二次读 textContent。 */
+ *  【普通格快路径】先读一次纯文本：不含 `$` 的格直接返回，**不碰 DOM 选区**
+ *  （cellDOMSelection 是每键路径上最贵的一步）。取出的一次文本就交给 cellMathTarget 复用。
+ *  【混排格】格内公式已经是**排版原子**，源码只在打开的那一条上出现 ⇒ 卡片不再重复预览
+ *  正在编辑的那条公式；光标落在已排版公式上时卡片由投影的 atom 自己承担（同一套 KaTeX 渲染）。 */
 function cellMathCaret() {
   const edit = cellOverlay?.querySelector('.mp-cell-overlay-text');
   if (!cellEdit || !edit || !edit.isConnected) return null;
-  const text = edit.textContent || '';
+  const text = cellEditPlainText(edit);
   if (!text.includes('$')) return null; // 普通格：无公式 ⇒ 零 Range/零 offset/零目标判定
   const dom = cellDOMSelection(edit);
   // 有选区时不判定：与正文"只展开 head 所在那一个"同源，这里不叠卡片（也避免选区内反复重排）。
   if (!dom || dom.head !== dom.anchor) return null;
-  return cellMathTarget(text, dom.head);
+  const target = cellMathTarget(text, dom.head);
+  if (!target) return null;
+  /* 打开的那一条公式本身就是源码 + 浮卡（既有"格内预览"）；而**已排版**的公式不再叠一张
+     同内容浮卡（会与 atom 的渲染重复、还挡住相邻格）。 */
+  const open = cellEdit.surface?.open ?? -1;
+  if (open >= 0) {
+    const surface = cellEdit.surface?.parts?.[open];
+    if (surface && surface.kind === 'math' && target.from === surface.from && target.to === surface.to) return target;
+    if (surface && surface.from === target.from) return target;
+  }
+  return null;
 }
 function ensureCellMathPreview() {
   if (!cellOverlay) return null;
@@ -3815,10 +4419,18 @@ function activateCellOverlay(rowFrom, col, cols, from, to, caretOffset, selectAl
   const box = ensureCellOverlay();
   const div = box.querySelector(".mp-cell-overlay-text");
   const mapped = mappedCellSource(view ? view.state.doc.sliceString(from, to) : "");
-  div.textContent = mapped.text;
-  cellEdit = { text: mapped.text, from, to, col, cols, rowFrom, navigating: false, epoch: view.state.field(regionIndexField).epoch };
+  /* 【混排格】播种＝"文字照源码 + 未打开的公式照排版"，**不是**整格 textContent：
+     旧实现把 `前文 $a_1$ 中间 $b^2$ 尾文` 全写成字面 ⇒ 用户看到"整格公式全露出"。
+     打开哪一条由落点决定：指针落点（下面按坐标解析）先进公式就打开那一条，
+     命令/搜索带来的源码落点同理；两端兜底与 cellMathTarget 同源。 */
+  cellEdit = { text: mapped.text, from, to, col, cols, rowFrom, navigating: false,
+    epoch: view.state.field(regionIndexField).epoch, hasAtoms: false, surface: null };
+  const initialCaret = typeof caretOffset === 'number' ? cellTextOffset(mapped, Math.round(caretOffset))
+    : (sourceSelection ? cellTextOffset(mapped, sourceSelection.head - from) : null);
+  seedCellEditSurface(div, mapped.text, selectAll ? CELL_OPEN_ALL : cellProjectionOpen(mapped.text, initialCaret, false));
   const edit = cellEdit, ownedDoc = view?.state.doc;
   box.style.display = "block";
+  resetCellProjectionState();
   updateCellSizer(div);
   positionCellOverlay();
   const focusIt = () => {
@@ -3831,38 +4443,38 @@ function activateCellOverlay(rowFrom, col, cols, from, to, caretOffset, selectAl
       return;
     }
     const rng = document.createRange();
-    if (pointer && div.firstChild) {
+    if (pointer) {
       const r = div.getBoundingClientRect();
       const x = Math.max(r.left + .5, Math.min(pointer.x, r.right - .5));
       const y = Math.max(r.top + .5, Math.min(pointer.y, r.bottom - .5));
-      const hit = document.caretRangeFromPoint(x, y);
-      if (hit && div.contains(hit.startContainer)) {
-        const s = getSelection(); s.removeAllRanges(); s.addRange(hit); syncCellSelection(div); return;
+      /* 点中的可能是**已排版公式**里的某个字形：先按正文同一套 tex→源码口径换算成格源码
+         坐标（公式内部 → 精确 tex 位；公式两侧文字 → 该字符边界），再决定打开哪一条。
+         公式原子不可编辑，所以绝不能把光标停进 KaTeX 子树里。 */
+      const pos = cellPointerTextPosition(div, x, y);
+      if (pos != null) {
+        const open = cellProjectionOpen(mapped.text, pos, true);
+        if (open !== edit.surface?.open) seedCellEditSurface(div, mapped.text, open);
+        setCellDOMSelection(div, pos, pos);
+        syncCellSelection(div);
+        return;
       }
     }
     // Command offsets are source coordinates; pointer entry uses the live DOM
     // above. Convert command offsets with the same escaped-pipe source codec.
-    const node = div.firstChild;
-    const len = node && node.nodeType === 3 ? node.nodeValue.length : 0;
-    if (typeof caretOffset === "number" && node && node.nodeType === 3) {
-      rng.setStart(node, Math.max(0, Math.min(len, cellTextOffset(mapped, Math.round(caretOffset)))));
-      rng.collapse(true);
-    } else if (selectAll) {
+    if (selectAll) {
       /* 【β1】Ctrl+E / 递进第 1 级：**全选**格内文本（不折叠）。
-         折叠到末尾是"点格落点"口径，与"选格"是两件事 —— 判据锚 getSelection().toString() == 该格源码。 */
-      rng.selectNodeContents(div);
-    } else if (node && node.nodeType === 3) {
+         折叠到末尾是"点格落点"口径，与"选格"是两件事 —— 判据锚 getSelection().toString() == 该格源码。
+         混排格必须先摊成纯源码（上面已按 CELL_OPEN_ALL 播种），否则选区里会混进公式原子。 */
+      setCellDOMSelection(div, 0, mapped.text.length);
+    } else if (typeof caretOffset === "number") {
+      const at = cellTextOffset(mapped, Math.round(caretOffset));
+      setCellDOMSelection(div, at, at);
+    } else {
       /* 【editing-3616】默认落点＝**可见内容末尾**，不是格源码段的原始末尾：尾部填充空白不可见，
          落在它后面再退格会吃空白。坐标与播种文本 mapped.text 同一映射口径。 */
-      rng.setStart(node, cellContentSpan(mapped.text).end);
-      rng.collapse(true);
-    } else {
-      rng.selectNodeContents(div);
-      rng.collapse(false);
+      const at = cellContentSpan(mapped.text).end;
+      setCellDOMSelection(div, at, at);
     }
-    const sel = getSelection();
-    sel.removeAllRanges();
-    sel.addRange(rng);
     syncCellSelection(div);
   };
   focusIt();
@@ -3871,13 +4483,20 @@ function activateCellOverlay(rowFrom, col, cols, from, to, caretOffset, selectAl
   noteCellMathInput();
 }
 function deactivateCellOverlay() {
+  /* 【组字交接】收掉覆盖层 = 把编辑面从用户手里拿走。A 格若还在组词未上屏，
+     必须先按原格安全收尾（否则这段中文永远不会上屏，cellComposing 也会卡在 true）。
+     放在最前面：此时 cellEdit 还是原格，会话里的 from/to 校验才成立。 */
+  handoffCellComposition();
   stopCellPointerSelection();
+  stopCellAtomGesture();
+  resetCellProjectionState();
   if (cellOverlay) cellOverlay.style.display = "none";
   clearCellMathPreview();
   if (cellMathFrame) { cancelAnimationFrame(cellMathFrame); cellMathFrame = 0; }
   cellEdit = null;
   activeCellLayout = null;
   cellComposing = false;
+  cellCompositionSession = null;
   overlayStyledFor = "";
   cellMeasureIntent = null;
   cellRevealIntent = null;
@@ -4398,7 +5017,7 @@ const cellBackgroundClick = ViewPlugin.fromClass(class {
       if (!active || active.rowFrom !== edit.rowFrom || active.col !== edit.col ||
           edit.epoch !== owner.state.field(regionIndexField).epoch || selection.ranges.length !== 1 ||
           selection.main.from < edit.from || selection.main.to > edit.to ||
-          mappedCellSource(owner.state.doc.sliceString(edit.from, edit.to)).text !== div.textContent) return;
+          mappedCellSource(owner.state.doc.sliceString(edit.from, edit.to)).text !== cellEditPlainText(div, edit)) return;
       const cell = activeCellDOM(), row = cell?.closest('table.mp-row');
       if (!row || !owner.contentDOM.contains(row)) return;
       const sr = sc.getBoundingClientRect(), z = sr.height / sc.offsetHeight;
@@ -4453,6 +5072,8 @@ const tableCellClick = EditorView.domEventHandlers({
       cell = best;
     }
     if (!cell) return false;
+    /* 【只在这里取"稳定目标"】rowFrom/col 来自 DOM dataset，是渲染时的文档位置，**只用于定位目标**；
+       真正的格区间必须等交接之后再从当前 doc 重新取（见下）。 */
     const rowFrom = Number(cell.dataset.mpRow);
     const col = Number(cell.dataset.mpCol);
     if (!Number.isFinite(rowFrom) || !Number.isFinite(col)) return false;
@@ -4468,17 +5089,117 @@ const tableCellClick = EditorView.domEventHandlers({
     // Same-cell composition and right-click retain the native editor; never reseed an in-flight composition.
     if (cellEdit && cellEdit.rowFrom === rowFrom && cellEdit.col === realCol &&
         ((cellComposing || view.composing) || event.button !== 0)) return true;
+    /* 【普通点击 vs 真实 IME 跨格】
+       普通点击：直接复用这次 pointerdown 已从 table DOM 解析好的 parsed —— **零追踪、零额外
+       dispatch、零表扫描**。只有"此刻确实有一笔未上屏的组字（A 格）"时才建立一次性源坐标
+       映射：交接会在 A 上真正 dispatch 一次事务，那次事务的 ChangeDesc 才能把 B 的行首从
+       改动前坐标搬到改动后坐标（ChangeDesc.mapPos）。拿不到可信终态就安全退出，
+       绝不按行号/相同文本/X/Y 回找。 */
+    const parsedTarget = { rowFrom, ranges, range: r };
+    const target = liveCellComposition()
+      ? cellTargetAcrossComposition(view, line.from, realCol, parsedTarget)
+      : parsedTarget;
+    if (!target) return true;
+    /* 【唯一入口】激活用的 row/区间/列数**只能**来自 target（交接后的当前 doc），
+       绝不再碰手边交接前的 rowFrom/ranges/r（真机回归点：那正是吞掉竖线的来源）。 */
     primeTableGeometry(view, cell);
     /* 【β1】点新格 ⇒ 清掉表级选择状态（行/列/整表高亮不该跨格留着） */
-    view.dispatch({ effects: [setActiveCell.of({ rowFrom, col: realCol }), setTableSel.of(null)] });
+    view.dispatch({ effects: [setActiveCell.of({ rowFrom: target.rowFrom, col: realCol }), setTableSel.of(null)] });
     // Activation measures the current source layout before mapping this pointer;
     // the rendered cell may have been detached by the active-cell transaction.
-    activateCellOverlay(rowFrom, realCol, ranges.length, r[0], r[1], undefined, false, undefined,
-      { x: event.clientX, y: event.clientY });
+    activateCellOverlay(target.rowFrom, realCol, target.ranges.length, target.range[0], target.range[1],
+      undefined, false, undefined, { x: event.clientX, y: event.clientY });
     beginCellPointerSelection(event, view);
     return true;
   },
 });
+/** 【一次性源坐标映射】只在"真实 IME 跨格"这一刻使用：A 格还在组字，用户点了 B 格。
+ *
+ *  为什么需要映射：交接（blur 让 Chromium 上屏）会在 A 上真正 dispatch 事务，A 里插入
+ *  字符 ⇒ A 及其后所有源码偏移都变，B 的行首也不例外。
+ *
+ *  为什么这是最优取法（而不是行号/文本回找）：
+ *    · 提交那次事务的 `ChangeDesc` **就是**坐标变换本身 —— `mapPos` 把 B 的行首搬到改动后
+ *      坐标，再 `cellRangesOf` 取当前列的新范围；插入/替换/删除/等长替换/首行边界全对。
+ *    · 闭环条件（任一不满足即**作废这次激活**，不写任何东西）：
+ *        ① 必须来自真实的 `ViewUpdate`：`u.startState.doc === appliedDoc`（同一对象链）
+ *           且随后 `appliedDoc = u.state.doc`，保证映射链是连续的、不跳版；
+ *        ② `ownerView === view`、`regionIndexField.epoch` 未换；
+ *        ③ 交接返回时 `ownerView.state.doc === appliedDoc`（映射终态就是当前文档，
+ *           不允许"settled 过一次就返回"）；
+ *        ④ 改动必须**落在 A 格范围内**（用会话自带的 from/to 判定）。与 A 无关的目标行
+ *           删除/替换即使碰巧还是同列数表行，也作废；
+ *        ⑤ 只允许一笔原格提交：出现第二次独立 docChanged ⇒ 立即作废（不维护历史）。
+ *    · 生命周期只有这一次：`try/finally` 清掉回调，不留全局修订日志、不手算 delta。 */
+function cellTargetAcrossComposition(ownerView, targetFrom, realCol, parsed) {
+  const session = liveCellComposition();
+  if (!session || !ownerView) return null;
+  const startDoc = ownerView.state.doc;
+  const epoch = ownerView.state.field(regionIndexField, false)?.epoch;
+  const probe = {
+    owner: ownerView, epoch, startDoc, from: targetFrom, col: realCol,
+    /* 目标行原有列数：映射后必须一致（交接只往 A 格里插字，不改表格结构）。 */
+    cols: parsed && parsed.ranges ? parsed.ranges.length : 0,
+    /* 提交允许落在的源码范围：会话记下的原格 A 的实际区间。 */
+    allowFrom: session.from, allowTo: session.to,
+    appliedDoc: startDoc,          // 同步到"最近一次已应用"的文档对象
+    result: null, settled: false, cancelled: false, updates: 0,
+  };
+  compositionTargetProbe = probe;
+  try {
+    handoffCellComposition();
+    /* ⑤ 出现第二次独立 docChanged ⇒ 有多笔改动，映射链不再可信，保守取消。 */
+    if (probe.cancelled) return null;
+    /* 没有任何已应用改动 ⇒ 文档必须仍是起始对象，直接复用解析结果。 */
+    if (!probe.settled) return ownerView.state.doc === startDoc ? parsed : null;
+    /* ③ 映射终态必须就是当前文档（不接受"settled 即返回"）。 */
+    if (ownerView.state.doc !== probe.appliedDoc) return null;
+    if (ownerView !== view) return null;
+    if (ownerView.state.field(regionIndexField, false)?.epoch !== epoch) return null;
+    return probe.result;
+  } finally {
+    if (compositionTargetProbe === probe) compositionTargetProbe = null;
+  }
+}
+/** 既有 updateListener 里调用：把**真实已应用**的累积 changes 交给在等的那一次映射。
+ *  只有 owner、epoch 对得上，且 `u.startState.doc` 就是上次同步到的 appliedDoc 才继续；
+ *  否则作废（防止拿旧映射去写新文档）。 */
+function noteCompositionTargetUpdate(update) {
+  const probe = compositionTargetProbe;
+  if (!probe || probe.cancelled) return;
+  if (update.view !== probe.owner) return;
+  if (update.state.field(regionIndexField, false)?.epoch !== probe.epoch) { probe.cancelled = true; return; }
+  /* ① 连续性：这一次更新的起点必须正是我们记着的已应用文档对象。 */
+  if (update.startState.doc !== probe.appliedDoc) { probe.cancelled = true; return; }
+  probe.updates += 1;
+  /* ⑤ 最多一笔原格提交；第二笔独立改动一律作废（不维护修订历史）。 */
+  if (probe.settled) { probe.cancelled = true; probe.result = null; return; }
+  /* ④ 只接受**落在 A 格范围内**的改动。与 A 无关的目标行删除/替换即使仍解析成同列数
+     表行，也要作废 —— 用 iterChangedRanges 拿到真实改动区间再与 [allowFrom, allowTo] 比。 */
+  let inside = false, outside = false;
+  update.changes.iterChangedRanges((fromA, toA) => {
+    if (fromA >= probe.allowFrom && toA <= probe.allowTo) inside = true;
+    else outside = true;
+  });
+  if (outside || !inside) { probe.cancelled = true; probe.result = null; return; }
+  probe.settled = true;
+  try {
+    const mapped = update.changes.mapPos(probe.from, probe.from === 0 ? 1 : -1);
+    const doc = update.state.doc;
+    if (mapped < 0 || mapped > doc.length) { probe.result = null; return; }
+    const line = doc.lineAt(mapped);
+    const ranges = cellRangesOf(line);
+    if (!ranges.length || ranges.length !== probe.cols) { probe.result = null; return; }
+    const range = ranges[probe.col];
+    if (!range) { probe.result = null; return; }
+    probe.result = { rowFrom: line.from, ranges, range };
+  } catch {
+    probe.result = null;
+  } finally {
+    probe.appliedDoc = update.state.doc;
+  }
+}
+let compositionTargetProbe = null;
 const headingDecorations = EditorView.decorations.compute(["selection", lineStylesField, markdownContext], (state) => {
   const out = [];
   const { headings, hrs } = state.field(lineStylesField);
@@ -7489,6 +8210,21 @@ table.mp-row th { background: var(--mp-capsule); font-weight: 500; }
 .mp-cell-layout > div { grid-area: 1 / 1; min-width: 0; align-self: center; }
 .mp-cell-source-size { white-space: pre-wrap; word-break: break-all; min-height: 1.3em; }
 .mp-cell-editing { outline: 1px solid color-mix(in srgb, var(--mp-primary) 45%, transparent); outline-offset: -1px; }
+/* 【活动格混排投影】未打开的公式在编辑面里是一个排版原子（见 cell-math-projection.js）：
+   · inline-block + contenteditable=false：占一个内联盒、光标只能停在它两侧，不会被拆开编辑；
+   · vertical-align:baseline 让它的基线与会话正文一致，行高由本格自己的行高决定；
+   · user-select:none 只影响**拖选落点**，不改复制口径（复制仍由 cellOverlayCopyAtoms 给源码）；
+   · .mp-cell-atom-display 是整格 $$…$$：独占一行、可横向滚动。
+   ⚠️ 本注释在注入 CSS 的模板体内，不许出现反引号。 */
+.mp-cell-atom {
+  display: inline-block; vertical-align: baseline; max-width: 100%;
+  white-space: nowrap; overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none; user-select: none; cursor: text;
+}
+.mp-cell-atom::-webkit-scrollbar { height: 0; width: 0; }
+.mp-cell-atom .katex { font-size: 1em; }
+.mp-cell-atom .katex-display { margin: 0; text-align: left; }
+.mp-cell-atom.mp-cell-atom-display { display: block; white-space: nowrap; }
 /* 活动格公式预览卡片：贴本格的一张浮卡，绝对定位在覆盖层盒子里 ⇒ 不占排版流、表格零跳动。
    表面**与正文公式浮框同一套变量**（--mp-float-tint / --mp-float-alpha / --mp-float-blur）：
    设置里调"公式预渲染框"的透明度/模糊，表格卡片跟着一起变，不出现"唯独表格不随"。
@@ -8792,6 +9528,9 @@ function boot(content) {
         statusBarPlugin,    // 底部状态栏（零每键 DOM 操作，见 ViewPlugin 注释）
         zoomKeys,           // Ctrl+= / Ctrl+- / Ctrl+0 → 只缩放内容区（工具岛大小独立）
         EditorView.updateListener.of((u) => {
+          /* 【一次性源坐标映射】真实 IME 跨格时，等 A 的提交事务**已应用**之后再交付
+             累积 changes（u.changes）给在等的那一次映射。没有等待者时这里是空操作。 */
+          if (u.docChanged) noteCompositionTargetUpdate(u);
           const beforeSession=u.docChanged&&window.__dshBridge?.publishUpdate
             ? {epoch:u.startState.field(regionIndexField).epoch,sourceRevision}:null;
           if (u.docChanged) sourceRevision++;

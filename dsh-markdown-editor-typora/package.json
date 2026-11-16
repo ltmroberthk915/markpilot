@@ -1,7 +1,7 @@
 {
   "name": "dsh-markdown-editor-typora",
-  "version": "2.0.21",
-  "description": "MarkPilot CM6 3.6.25 Markdown editor for the DeepSeek Harness sidebar: a compact split workbench that keeps the session title, view tabs and header tools on one readable row and opens the editor without remounting the conversation, with version-guarded atomic saves and durable draft recovery.",
+  "version": "2.0.22",
+  "description": "MarkPilot CM6 3.6.26 Markdown editor for the DeepSeek Harness sidebar: a compact split workbench that keeps the session title, view tabs and header tools on one readable row and opens the editor without remounting the conversation, with version-guarded atomic saves and durable draft recovery.",
   "license": "MIT",
   "type": "module",
   "main": "./lib/index.js",
@@ -66,7 +66,7 @@
     "url": "git+https://github.com/ltmroberthk915/markpilot.git",
     "directory": "dsh-markdown-editor-typora"
   },
-  "homepage": "https://github.com/ltmroberthk915/markpilot/tree/dsh-markdown-editor-typora-v2.0.21/dsh-markdown-editor-typora",
+  "homepage": "https://github.com/ltmroberthk915/markpilot/tree/dsh-markdown-editor-typora-v2.0.22/dsh-markdown-editor-typora",
   "bugs": {
     "url": "https://github.com/ltmroberthk915/markpilot/issues"
   }

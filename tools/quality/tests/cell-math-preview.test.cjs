@@ -238,8 +238,16 @@ test('滚动/尺寸变化只在有卡片时跟随重定位（无卡片零成本�
   assert.match(main, /function followCellMathPreview\(\)\s*\{\s*if \(cellMathState\.rendered \|\| cellMathState\.visible\) scheduleCellMathPreview\(\);/);
   // 滚动监听器必须把卡片跟随接上（只加在既有合并钩子里，不新增监听器）。
   assert.match(main, /scrollDOM\.addEventListener\("scroll", \(\) => \{ positionTableBar\(\); followCellMathPreview\(\); \}/);
-  // 覆盖层收起时必须丢掉节点（否则下次入口白排一帧、旧公式还会闪一帧）。
-  assert.match(main, /function deactivateCellOverlay\(\)[\s\S]{0,300}clearCellMathPreview\(\)/);
+  /* 覆盖层收起时必须丢掉节点（否则下次入口白排一帧、旧公式还会闪一帧）。
+     改动只加前置语句、不改这个语义 ⇒ 断言改成"函数体内必须调用 clearCellMathPreview"，
+     不再依赖它出现在开头多少字符内（那是对语句位置的静态耦合，不是行为）。 */
+  const deactivate = main.slice(main.indexOf('function deactivateCellOverlay()'),
+    main.indexOf('function deactivateCellOverlay()') + 2000);
+  const body = deactivate.slice(0, deactivate.indexOf('\n}'));
+  assert.match(body, /clearCellMathPreview\(\)/, 'dropping the overlay must drop the preview card');
+  // 而且必须在把 cellEdit 置空**之前**（否则清卡片时已经找不到活动格）。
+  assert.ok(body.indexOf('clearCellMathPreview()') < body.indexOf('cellEdit = null;'),
+    'the preview must be cleared while the cell is still owned');
 });
 
 test('溢出才可交互：普通公式保持穿透（不劫持编辑），长公式放行滚动条', async () => {
@@ -298,9 +306,63 @@ test('普通格快路径：不含 $ 就不做 DOM 选区计算（每键路径零
   const range = fn.indexOf('cellDOMSelection(edit)');
   assert(gate > 0, 'plain cells must be rejected by a text test before touching the selection');
   assert(range > gate, 'cellDOMSelection must come after the $ gate, never before');
-  // 取出的文本要复用给 cellMathTarget，不能第二次读 textContent（一次读取一次判定）。
-  assert.equal((fn.match(/textContent/g) || []).length, 1, 'read the cell text once and reuse it');
-  assert.match(fn, /return cellMathTarget\(text, dom\.head\)/);
+  /* 文本经投影读取器取一次、复用给 cellMathTarget（混排格里 DOM 文本不再是纯 textContent，
+     所以"只读一次"的口径改由读取器承担；这里断言**真实**的读取次数，而不是数字面量）。 */
+  assert.equal((fn.match(/cellEditPlainText\(/g) || []).length, 1, 'read the cell text once and reuse it');
+  assert.match(fn, /const text = cellEditPlainText\(edit\);/);
+  assert.match(fn, /cellMathTarget\(text, dom\.head\)/, 'the same text is reused for the target decision');
+
+  /* 真实行为：把**产品自己的**读取器解出来，用一个会计数的假编辑面量每键成本。
+     纯文本格必须"恰好一次 textContent、零 querySelector、零 Range/零 offset"。 */
+  const pickFn = (source, name) => {
+    const at = source.indexOf('function ' + name + '(');
+    assert.ok(at > 0, 'missing function ' + name);
+    const rest = source.slice(at + 1);
+    const next = rest.indexOf('\nfunction ');
+    return next > 0 ? source.slice(at, at + 1 + next) : source.slice(at);
+  };
+  const readerScope = ['isCellAtomNode', 'cellAtomSource', 'cellPlainLength', 'cellEditPlainText']
+    .map(name => pickFn(main, name)).join('\n');
+  const cellEditPlainText = new Function('CELL_ATOM_CLASS', 'CELL_ATOM_SELECTOR',
+    readerScope + '\nreturn cellEditPlainText;')('mp-cell-atom', '.mp-cell-atom');
+  const textNode = value => ({ nodeType: 3, nodeValue: value });
+  const atomNode = src => ({
+    nodeType: 1, textContent: 'KATEXGLYPHS',
+    classList: { contains: name => name === 'mp-cell-atom' },
+    getAttribute: name => (name === 'data-mp-cell-src' ? src : null),
+  });
+  const editWith = (children, atomHit = null) => {
+    let reads = 0, queries = 0;
+    const nodes = children.slice();
+    nodes.forEach((node, i) => { node.nextSibling = nodes[i + 1] || null; });
+    return {
+      edit: {
+        nodeType: 1, firstChild: nodes[0] || null,
+        get textContent() { reads++; return nodes.map(n => (n.nodeType === 3 ? n.nodeValue : 'KATEXGLYPHS')).join(''); },
+        querySelector(selector) { queries++; assert.equal(selector, '.mp-cell-atom'); return atomHit; },
+      },
+      reads: () => reads,
+      queries: () => queries,
+    };
+  };
+  const plain = editWith([textNode('ab')]);
+  assert.equal(cellEditPlainText(plain.edit, { hasAtoms: false }), 'ab');
+  assert.equal(plain.reads(), 1, 'a plain cell reads textContent exactly once per key');
+  assert.equal(plain.queries(), 0, 'a warm plain cell does no atom probing at all');
+  // 账本未知（外部夹具/旧对象）：探测一次就记账，之后仍是"一次读取、零探测"。
+  const cold = editWith([textNode('ab')]), coldOwner = {};
+  assert.equal(cellEditPlainText(cold.edit, coldOwner), 'ab');
+  assert.equal(cold.queries(), 1);
+  assert.equal(cold.reads(), 1);
+  assert.equal(coldOwner.hasAtoms, false, 'the probe result is remembered');
+  cellEditPlainText(cold.edit, coldOwner);
+  assert.equal(cold.queries(), 1, 'the probe must not repeat on the next key');
+  assert.equal(cold.reads(), 2);
+  // 含 atom 的格：KaTeX 字形永不进入源码坐标，只读 atom 自己的 Markdown。
+  const withAtom = editWith([textNode('x '), atomNode('$a$')], true);
+  assert.equal(cellEditPlainText(withAtom.edit, { hasAtoms: true }), 'x $a$');
+  assert.equal(withAtom.reads(), 0, 'rendered glyphs must never be read into source coordinates');
+
   // 触发入口同样受此快路径保护：普通格连 frame 都不排。
   assert.match(main, /if \(cellMathCaret\(\)\) scheduleCellMathPreview\(\);/);
   // selectionchange 监听先判活动格，再碰 DOM。

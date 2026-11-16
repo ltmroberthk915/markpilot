@@ -1,4 +1,4 @@
-**Downloads** · [Windows desktop 3.6.25](https://github.com/ltmroberthk915/markpilot/releases/tag/v3.6.25) · [DSH plugin 2.0.21](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-editor-typora-v2.0.21). Preview formulas while editing table cells and jump between footnotes and their references. The DSH editor opens in the center by default and can export PDF directly.
+**Downloads** · [Windows desktop 3.6.26](https://github.com/ltmroberthk915/markpilot/releases/tag/v3.6.26) · [DSH plugin 2.0.22](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-editor-typora-v2.0.22). In a table cell only the formula you click opens as source, clicking nearby text no longer reveals every formula, switching cells mid-composition no longer drops the word, and copy/cut yield the Markdown source.
 
 > **Renamed in 1.4.0:** the package is now **`dsh-markdown-editor-typora`** (was `dsh-markdown-typora`). Install/upgrade with `dsh plugin --profile desktop add dsh-markdown-editor-typora@1.4.0`; the old package stays at 1.3.x and is no longer updated. Older entries below keep their historical package names.
 
