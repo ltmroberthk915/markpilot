@@ -1,4 +1,5 @@
-/* CM6 引擎扩展包：更多菜单（快捷键设置/主题/表情/关于/帮助）、大纲、导出、表格行列与复制。
+/* CM6 引擎扩展包：更多菜单（文档操作 / 编辑器设置 / 帮助 / 关于）、大纲、导出、表格行列与复制。
+ * 持续性偏好只在「编辑器设置」里：主题与字体、页面、界面与大纲、阅读、图片、快捷键。
  * 设计纪律：
  *  · 引擎核心（main.js）不动数据层：本模块只读 mathSpansField/lineStylesField，写文档一律用一次 dispatch（一次 Ctrl+Z 可退）。
  *  · 主题与颜色走 CSS 变量（--mp-*），不写死色值；面板/弹层用 absolute 挂在编辑面上，不占排版流。
@@ -52,6 +53,8 @@ const CSS = `
    本文件早先另写了一份 width:fit-content + margin:auto，在引擎的 position:fixed;left:0;right:0
    之下不生效、却又能盖掉引擎新写的半透明底（后注入同权重胜出），是"岛做好了"假绿的成因之一。 */
 .mp-toolbar .mp-tb-sep { margin: 0 6px; }
+/* 【键盘焦点·2026-11-16】图标按钮没有文字，焦点必须看得见；颜色由主题 token 派生，明暗自适应。 */
+.mp-toolbar .mp-tb-item:focus-visible { outline: 2px solid var(--mp-primary); outline-offset: 1px; border-radius: 6px; }
 /* ② 弹层/面板：统一观感
  * 【zoom 安全·2026-10-06】弹层挂 cm-editor（host() 返回的 view.dom）之内，而内容缩放是
  * .cm-editor 上的 CSS zoom。position:absolute 的 left/top 是**文档坐标**，会被 zoom 再乘一遍：
@@ -59,12 +62,18 @@ const CSS = `
  * 用户点不到「设置」等任何一项（这条同时是"设置面板打不开/滑杆假"的路径之一）。
  * 改 position:fixed：left/top 用**视口坐标**，不受 zoom 缩放；坐标来源 getBoundingClientRect
  * 本来也是视口坐标 ⇒ 两边同一坐标系。 */
-.mp-pop { position: fixed; z-index: 60; min-width: 190px; /* 【普查实测·2026-10-10】60vh 太矮：更多菜单内容 625px / 可视 442px，底部项要滚动才够得到。 */ max-height: min(72vh, calc(100vh - 96px)); overflow: auto;
+.mp-pop { position: fixed; z-index: 60; min-width: 190px; /* 【普查实测·2026-10-10】60vh 太矮：更多菜单内容 625px / 可视 442px，底部项要滚动才够得到。 */ max-height: min(72vh, calc(100vh - 96px)); overflow: auto; overscroll-behavior: contain;
   background: var(--mp-bg); border: 1px solid var(--mp-border); border-radius: 10px;
   box-shadow: 0 8px 28px rgba(0,0,0,.22); padding: 6px; font: 13px/1.7 var(--mp-font-body); color: var(--mp-fg); }
 .mp-pop-item { display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 5px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
 .mp-pop-item:hover { background: color-mix(in srgb, var(--mp-bg) 78%, var(--mp-fg)); }
+/* 【防拉伸·2026-11-16】状态栏开启时 main.js 给 .mp-pop 写了 bottom:24px；弹层全部是 top 定位，
+   top+bottom 同时存在会把面板拉满（实测「更多」5 项从 y=105 铺到 y=968）。同权重覆盖为 auto；
+   openPop 再按落点计算 max-height，只有视口不足时才滚动。本段是模板字符串，注释里不许出现反引号。 */
+html[data-mp-statusbar="1"] .mp-pop { bottom: auto; }
+/* 【菜单键盘焦点·2026-11-16】菜单项是 div + tabindex，方向键走位后必须看得见当前项。 */
+.mp-pop-item:focus-visible { outline: 2px solid var(--mp-primary); outline-offset: -2px; background: color-mix(in srgb, var(--mp-bg) 78%, var(--mp-fg)); }
 .mp-pop-item .k { color: var(--mp-muted); font-size: 12px; }
 /* 【右键菜单透明度·2026-10-10 用户要求】菜单底色单独可调（设置 → 界面透明度 → 右键菜单）。
    双类名选择器 .mp-pop.mp-pop-menu 优先级高于 .mp-pop，覆盖不会失效；
@@ -90,6 +99,19 @@ const CSS = `
 .mp-dlg .close:hover { background: color-mix(in srgb, var(--mp-bg) 74%, var(--mp-fg)); color: var(--mp-fg); }
 .mp-dlg h3 { padding-right: 32px; }
 .mp-pop-sep { height: 1px; background: var(--mp-border); margin: 5px 4px; }
+/* 【更多面板密度·2026-11-16】「更多」只有一行小标题、五项和两条分隔线，套通用 .mp-pop 的
+   1.7 行距与 6px 尾部内边距会显得空（实测整高 227px、末项盒底到边框 7px）。
+   这里只收「更多」自己——面板由 openMore 挂上 mp-pop-more 类名，其余弹层一个字都不动：
+   · 项行高 1.7 改为 1.45（行盒 22.1 降到 18.9，加 10px 内边距 = 28.9px 点击行，焦点环仍在盒内）；
+   · 标题上下内边距 4/6 改为 2/4，行高 1.4（12px 字 = 16.8 行盒）；只改上下，右侧 30px 避让关闭键保持；
+   · 分隔线上下外边距 5 改为 3（含 1px 线共 7px）；
+   · 尾部内边距 6 改为 2（加 1px 边框 = 末项盒底到边框 3px）；顶部仍留 6px 给关闭键。
+   五项合计约 191px；高度依旧由内容决定，不写死数值。
+   本段在模板字符串里，注释不许出现反引号。 */
+.mp-pop.mp-pop-more { padding-bottom: 2px; }
+.mp-pop.mp-pop-more .mp-pop-title { padding-top: 2px; padding-bottom: 4px; line-height: 1.4; }
+.mp-pop.mp-pop-more .mp-pop-item { line-height: 1.45; }
+.mp-pop.mp-pop-more .mp-pop-sep { margin: 3px 4px; }
 .mp-emoji-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; }
 .mp-emoji-grid button { font-size: 17px; line-height: 1.4; background: transparent; border: 0; border-radius: 6px; cursor: pointer; padding: 2px 0; }
 .mp-emoji-grid button:hover { background: color-mix(in srgb, var(--mp-bg) 76%, var(--mp-fg)); }
@@ -122,19 +144,29 @@ const CSS = `
 .mp-key { display: inline-block; min-width: 58px; padding: 1px 7px; border: 1px solid var(--mp-border); border-radius: 5px;
   background: color-mix(in srgb, var(--mp-bg) 86%, var(--mp-fg)); font: 12px/1.6 var(--mp-font-mono); cursor: pointer; }
 .mp-key.editing { border-color: var(--mp-primary); color: var(--mp-primary); }
-.mp-settings { width:min(760px,calc(100vw - 48px)); box-sizing:border-box; overflow:hidden; }
-.mp-settings-body { display:grid; grid-template-columns:130px minmax(0,1fr); height:min(540px,58vh); min-height:220px; }
-.mp-settings-nav { display:flex; flex-direction:column; gap:4px; padding:4px 12px 4px 0; border-right:1px solid var(--mp-border); overflow:auto; }
+/* 【编辑器设置·2026-11-16】小窗也能用：面板自身可滚、左右两列各自滚；
+   高度按视口收（不写死 540px 的旧上限），极矮时外层滚动而不是把内容裁掉。 */
+.mp-settings { width:min(760px,calc(100vw - 48px)); box-sizing:border-box; overflow:auto; max-height:calc(100vh - 16px); }
+.mp-settings-body { display:grid; grid-template-columns:130px minmax(0,1fr); height:min(540px,calc(100vh - 132px)); min-height:180px; }
+.mp-settings-nav { display:flex; flex-direction:column; gap:4px; padding:4px 12px 4px 0; border-right:1px solid var(--mp-border); overflow:auto; min-height:0;
+  overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--mp-border) transparent; }
 .mp-settings-nav button { text-align:left; padding:7px 10px; border:0; border-radius:6px; background:transparent; color:var(--mp-fg); font:inherit; cursor:pointer; }
 .mp-settings-nav button[aria-selected="true"] { background:var(--mp-codeBg); color:var(--mp-primary); }
-.mp-settings-content { overflow:auto; min-width:0; padding:0 12px; }
+.mp-settings-nav button:focus-visible, .mp-settings .mp-key:focus-visible { outline:2px solid var(--mp-primary); outline-offset:1px; }
+.mp-settings-content { overflow:auto; min-width:0; min-height:0; padding:0 12px;
+  overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:var(--mp-border) transparent; }
 .mp-settings-content [hidden] { display:none !important; }
+.mp-settings-content h4 { margin:2px 0 8px; }
 .mp-settings .k { color:color-mix(in srgb,var(--mp-fg) 80%,var(--mp-bg)); }
 .mp-settings-content input[data-font-role] { box-sizing:border-box; width:100%; padding:5px 7px; border:1px solid var(--mp-border); border-radius:5px; background:var(--mp-bg); color:var(--mp-fg); font:13px system-ui,sans-serif; }
 .mp-settings-content :disabled { cursor:not-allowed; opacity:.6; }
 .mp-settings-content td:first-child { min-width:90px; }
 .mp-settings-content .mp-key { color:var(--mp-fg); }
+.mp-settings-nav::-webkit-scrollbar, .mp-settings-content::-webkit-scrollbar { width:8px; height:8px; background:transparent; }
+.mp-settings-nav::-webkit-scrollbar-thumb, .mp-settings-content::-webkit-scrollbar-thumb { background:var(--mp-border); border-radius:99px; }
+.mp-settings-nav::-webkit-scrollbar-track, .mp-settings-content::-webkit-scrollbar-track { background:transparent; }
 @media(max-width:540px) { .mp-settings-body { grid-template-columns:100px minmax(0,1fr); } .mp-settings-content { padding:0 6px; } .mp-settings-content td { display:block; } }
+@media(max-height:520px) { .mp-settings-body { height:calc(100vh - 118px); min-height:150px; } .mp-settings-nav { padding-right:6px; } .mp-settings-nav button { padding:5px 7px; } }
 /* 【导出后可点链接·2026-10-09】提示条里的"打开所在文件夹"：跟主题色走，可点区域够大。 */
 .mp-toast-link { color: var(--mp-primary); text-decoration: underline; cursor: pointer; margin-left: 4px; }
 .mp-toast-link:hover { text-decoration: none; }
@@ -421,7 +453,7 @@ export function installExtras(deps) {
   }
 
   /* ── 主题调色盘（单一渲染事务） ────────────────────────────────────────────
-   * 原先 --mp-* 上坐着**四个互不认识的写者**：引擎 applyEditorTheme、本函数、工具栏 theme-toggle、
+   * 原先 --mp-* 上坐着**四个互不认识的写者**：引擎 applyEditorTheme、本函数、明暗切换（现居设置）、
    * EXE 壳 host.js applyTheme，靠"谁后写"定胜负。实测病象：github-dark 后点一次工具栏「切换明暗」
    * → 整页翻成 telari-light，而 localStorage 写成 editor-theme=telari-light 且 dark=true 自相矛盾，
    * 菜单却仍显示「GitHub 深色 · 当前」。
@@ -479,6 +511,13 @@ export function installExtras(deps) {
     else { left = Math.max(6, hr.width - 240); top = 8; }
     pop.style.left = left + 'px';
     pop.style.top = top + 'px';
+    /* 【按内容定高·2026-11-16】main.js 在状态栏开启时给 .mp-pop 写了 bottom:24px。
+       固定定位同时有 top 与 bottom ⇒ 面板被拉满（实测 5 项「更多」从 y=105 铺到 y=968）。
+       这里显式 bottom:auto，高度只由内容决定；max-height 量完再按“落点以下还剩多少”设，
+       只在视口不足时出现滚动，长面板行为不变。 */
+    pop.style.bottom = 'auto';
+    pop.style.height = 'auto';
+    pop.style.maxHeight = '';
     build(pop);
     /* 【关闭按钮·2026-10-09 用户要求】**凡是弹出面板，右上角常住一个 ✕**。
        为什么必须在这里做：弹层有十几个入口（更多/表格/主题配色/表情/大纲…），
@@ -490,15 +529,29 @@ export function installExtras(deps) {
       x.className = 'mp-pop-close';
       x.textContent = '✕';
       x.title = '关闭（Esc）';
+      x.setAttribute('role', 'button');
+      x.setAttribute('aria-label', '关闭');
+      x.tabIndex = 0;
       x.onclick = (e) => { e.stopPropagation(); closePanel(panel, true); };
+      x.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); x.click(); } };
       pop.insertBefore(x, pop.firstChild);
     }
     h.appendChild(pop);
-    /* 建完再夹一次：菜单可能比视口高（更多菜单有滑杆 + 三档配色）⇒ 底部越界时整体上移。 */
+    /* 建完再夹一次：先在当前落点量内容高度；放不下就整体上移，再按最终落点设 max-height。
+       内容比视口矮时 max-height 不生效（height:auto）⇒ 不会产生空白拉伸。
+       底边留出状态栏高度（main.js 的 statusbar 规则是 24px）：面板可以接近底边，但不压状态栏；
+       这个值只参与“可用高度”计算，不再用 CSS bottom 去拉伸面板。 */
     try {
       const pr = pop.getBoundingClientRect();
-      if (pr.bottom > hr.bottom - 4) pop.style.top = Math.max(4, (top - (pr.bottom - hr.bottom) - 4)) + 'px';
-      if (pr.right > hr.right - 4) pop.style.left = Math.max(4, (hr.right - 4 - pr.width) - hr.left) + 'px';
+      const gap = 4;
+      const statusbarInset = (() => { try { return document.documentElement.dataset.mpStatusbar === '1' ? 24 : 0; } catch { return 0; } })();
+      const bottomLimit = hr.bottom - Math.max(gap, statusbarInset);
+      let topPx = top;
+      const roomBelow = bottomLimit - topPx;
+      if (pr.height > roomBelow) topPx = Math.max(hr.top + gap, Math.min(topPx, bottomLimit - pr.height));
+      pop.style.top = topPx + 'px';
+      pop.style.maxHeight = Math.max(140, Math.floor(bottomLimit - topPx)) + 'px';
+      if (pr.right > hr.right - gap) pop.style.left = Math.max(gap, (hr.right - gap - pr.width) - hr.left) + 'px';
     } catch { /* 量不到就保持初值 */ }
     const panel = pop, lifecycle = panelLifecycles.get(panel);
     const away = e => { if (panel.isConnected && !panel.contains(e.target) && e.target !== anchor) closePanel(panel); };
@@ -509,7 +562,7 @@ export function installExtras(deps) {
   /* ── 快捷键设置（Compartment 重配 keymap；白名单动作） ── */
   /* 【Typora 口径·2026-10-10 用户报障补齐】默认表对齐 Typora 的常用格式键：
    *   Ctrl+B 加粗 / Ctrl+I 斜体 / Ctrl+U 下划线（存 `<u>…</u>`）/ Alt+Shift+5 删除线。
-   *  Ctrl+Shift+X 仍可用（用户可在「设置 → 快捷键设置…」里改成它）——原值写死成默认值。
+   *  Ctrl+Shift+X 仍可用（用户可在「编辑器设置 → 快捷键」里改成它）——原值写死成默认值。
    *  ⚠️ `Mod-i` 撞车记录：@codemirror/commands 的 **defaultKeymap**（由 basicSetup 装上）
    *  把 `Mod-i` 绑给 `selectParentSyntax`（选中语法父节点），且它带 `preventDefault`。
    *  本表的 compartment 原先是裸 `keymap.of(...)`（默认优先级）⇒ **被它抢先**，于是 Ctrl+I
@@ -1593,13 +1646,36 @@ export function installExtras(deps) {
       d.close();
     } catch { /* 弹窗可能已被用户关掉 */ }
   }
-  async function buildPluginPrintHtml() {
+  async function buildPluginPrintHtml(options = {}) {
+    const forPdf = options && options.forPdf === true;
     const v = getView();
     if (!v) throw new Error('没有打开的文档');
     const md = v.state.doc.toString();
     if (md.length > PLUGIN_PRINT_MAX) throw new Error('文档过大：请改用「单文件 HTML」导出后打印');
     /* 【公开快照】插件打印页 / 「另存为 PDF」同样是公开产物：注释不进打印 HTML。 */
     const pub = publicMarkdown(md);
+    /* 【图片内联·与 exportHtml 同一条受支持读图链】打印 HTML 写到临时目录后，
+       相对的 `![](chart.png)` 会以临时目录为基准而丢图。这里先按当前文档目录
+       解析引用，再走宿主的 `readFileBase64`（DSH 桥接的是既有 /img/ 路由），
+       把本地图片变成 data URL；不把 file: 交给任意 HTML 去读机器文件。
+       PDF 差一张图就失败（不静默输出缺图 PDF）；独立打印页保留原有降级。 */
+    const directory = window.__mpDocDir || null;
+    let images = { map: null, summary: { images: 0, embedded: 0, existing: 0, remote: 0, failed: 0, bytes: 0, failures: [] } };
+    try {
+      images = await embedImageRefs(collectImageRefs(pub), directory, async (url, maxBytes) => {
+        if (!hostReadable()) return { ok: false, error: '当前宿主不支持读取本地图片' };
+        return window.mpHost.readFileBase64(fileUrlToPath(url), { maxBytes });
+      });
+    } catch (error) {
+      images = { map: null, summary: { images: 0, embedded: 0, existing: 0, remote: 0, failed: 1, bytes: 0, failures: [{ reason: String((error && error.message) || error) }] } };
+    }
+    /* 【与 EXE 同口径】远程图不等、也不阻断导出：EXE 的打印层只等本地
+       file:/data:/blob: 图片，外链图单独计数后照常打印（export-pdf.js
+       waitForImages 的 includeRemote=false 分支）。这里同样只内联能读到的
+       本地图，外链/离线不可用的图保留原 src 并在结果里报告；绝不能因为
+       一篇带 GitHub 远程截图的 README 就取消整篇 PDF。
+       临时打印页仍由宿主 CSP 限制为 img-src data:，所以外链不会从打印
+       窗口偷偷联网，也不会出现“打印页加载了未内联资源”。 */
     let mathCss = '';
     try { if (mathApi) mathCss = await buildMathCss(); } catch { /* 公式样式失败不阻断打印 */ }
     let mermaidStat = null;
@@ -1607,10 +1683,10 @@ export function installExtras(deps) {
     const title = mdTitle(pub);
     let head = htmlHead(title, mathCss);
     head = head.replace('</head>', `<style>${cssRawText(PLUGIN_PRINT_CSS)}</style>\n</head>`);
-    const body = mdToHtml(pub, { publicized: true, math: true, footnotes: true, mermaidSvgs: mermaidStat?.svgs });
-    const hint = '<div class="mp-print-hint">正在打开系统打印对话框。若没有弹出，请按 Ctrl+P'
+    const body = mdToHtml(pub, { publicized: true, math: true, footnotes: true, srcMap: images.map, mermaidSvgs: mermaidStat?.svgs });
+    const hint = forPdf ? '' : '<div class="mp-print-hint">正在打开系统打印对话框。若没有弹出，请按 Ctrl+P'
       + '（或浏览器菜单 → 打印），目标选择“另存为 PDF”。</div>\n';
-    return { html: head + hint + body + HTML_TAIL, title, mermaidStat };
+    return { html: head + hint + body + HTML_TAIL, title, mermaidStat, forPdf, images: images.summary };
   }
   async function waitPopupReady(win) {
     try {
@@ -1749,11 +1825,31 @@ export function installExtras(deps) {
       toast('正在导出 PDF…');
       try {
         const r = await h.exportPdf({});
-        if (r && r.ok === false) toast(`导出 PDF 失败：${r.error || '未知错误'}`);
-        else if (r && (r.path || r.file)) toastExported('已导出 PDF', r.path || r.file);   // 【可点链接】打开所在文件夹
+        if (r && r.canceled) { toast('已取消导出 PDF'); lastExport = r; return r; }
+        /* 外链图/离线不可用的图按 EXE 口径略过，但结果和提示要交代清楚：
+           普通 README 里的 GitHub 远程截图不应再取消整篇 PDF。 */
+        const skipped = [];
+        if (r && r.images) {
+          if (r.images.remote) skipped.push(`${r.images.remote} 张外链图片离线略过`);
+          if (r.images.failed) skipped.push(`${r.images.failed} 张本地图片未能内联`);
+        }
+        const note = skipped.length ? `；${skipped.join('，')}` : '';
+        if (r && r.ok === false) {
+          /* 宿主能打印但当前没有真实 PDF 通道（例如 Web 版没有 Save-As）：
+             明确退回原有的独立打印页，不把“没有文件”说成成功。 */
+          if (r.fallback === 'print') return exportPdfViaPrint();
+          const message = r.error && typeof r.error === 'object' ? (r.error.message || r.error.code) : r.error;
+          toast(`导出 PDF 失败：${message || '未知错误'}`);
+        } else if (r && r.mode === 'download') {
+          toast(`已下载 PDF：${r.file || 'MarkPilot.pdf'}${note}`);
+        } else if (r && (r.path || r.file)) {
+          if (note) toast(`已导出 PDF：${r.path || r.file}${note}`);
+          else toastExported('已导出 PDF', r.path || r.file);   // 【可点链接】打开所在文件夹
+        }
+        lastExport = r;
         return r;
       }
-      catch (e) { toast('导出 PDF 失败：' + String((e && e.message) || e)); return { ok: false }; }
+      catch (e) { toast('导出 PDF 失败：' + String((e && e.message) || e)); const failed = { ok: false }; lastExport = failed; return failed; }
     }
     return exportPdfViaPrint();
   }
@@ -1767,7 +1863,7 @@ export function installExtras(deps) {
     const printPdf = !nativePdf && pluginPrintAvailable();
     const pdf = nativePdf || printPdf;
     const pdfDesc = nativePdf
-      ? '打印级排版；暗色主题自动转白纸黑字。会先让你选保存位置。'
+      ? '生成真实 PDF（A4 排版）；桌面版会先让你选保存位置，浏览器版直接下载。'
       : printPdf
         ? '打开独立打印页；在系统打印对话框选择「另存为 PDF」即可，无需安装额外组件。'
         : '需要桌面版或支持打印的浏览器宿主。';
@@ -2983,82 +3079,90 @@ export function installExtras(deps) {
   const prefWrite = (id, v) => { if (window.mpEngine && window.mpEngine.setPref) window.mpEngine.setPref(id, v); };
   // 中置编辑区方案已撤回（外壳未给 main 面板渲染槽位的能力）⇒ 清掉可能残留的模式键。
   try { localStorage.removeItem('mp-panel-mode'); } catch { /* 忽略 */ }
+  /* 【编辑器设置·2026-11-16】持久偏好的**唯一入口**（岛上「更多 → 编辑器设置…」）。
+     七个域按设置的心智模型排列：常规与保存 / 主题与字体 / 页面 / 界面与大纲 / 阅读 / 图片 / 快捷键。
+     每个域只放本域控件：主题配色、阅读配色、快捷键不再各开一个弹层。
+     旧调用 settingsDialog('fonts') 继续可用（别名到 theme），外部 API 与偏好键都不变。 */
+  const SETTINGS_SECTION_ALIAS = { fonts: 'theme' };
   function settingsDialog(section = 'general') {
-    const rows = SURFACES.map((s) => {
+    section = SETTINGS_SECTION_ALIAS[section] || section;
+    const pv = prefsRead();
+    const surfaceRows = (s) => {
       const body = s.items.map((it) => {
         const cur = surfaceSaved(s.key, it.id, it.def);
         return `<tr><td style="white-space:nowrap">${it.label}</td><td style="width:100%">`
           + `<input class="mp-rng" type="range" data-s="${s.key}" data-i="${it.id}" min="${it.min}" max="${it.max}" value="${cur}" `
-          + `style="width:190px;vertical-align:middle;accent-color:var(--mp-primary)">`
+          + `style="width:190px;vertical-align:middle;accent-color:var(--mp-primary)" aria-label="${it.label}">`
           + `<span class="mp-num" data-n="${s.key}-${it.id}" style="margin-left:8px;color:var(--mp-muted);font:12px var(--mp-font-mono)">${it.fmt(cur)}</span>`
           + `</td></tr>`;
       }).join('');
-      const avoidance = s.key === 'float' ? `<tr><td>正文避让</td><td><label style="cursor:pointer"><input id="mp-pref-float-avoidance" type="checkbox"${prefsRead().floatAvoidance !== 0 ? ' checked' : ''} style="accent-color:var(--mp-primary)"> 就近避让正文</label><div class="k">关闭后，预览直接显示在公式源码下方。</div></td></tr>` : '';
-      return `<p class="k" style="margin:12px 0 4px"><b style="color:var(--mp-fg)">${s.name}</b> · ${s.hint}</p><table>${body}${avoidance}</table>`;
-    }).join('');
-    const outlineSec = `<p class="k" style="margin:12px 0 4px"><b style="color:var(--mp-fg)">大纲</b> · 展示形式（两种并存，随时可换）</p>`
+      const avoidance = s.key === 'float' ? `<tr><td>正文避让</td><td><label style="cursor:pointer"><input id="mp-pref-float-avoidance" type="checkbox"${pv.floatAvoidance !== 0 ? ' checked' : ''} style="accent-color:var(--mp-primary)"> 就近避让正文</label></td></tr>` : '';
+      return `<p class="k" style="margin:12px 0 4px" title="${s.hint}"><b style="color:var(--mp-fg)">${s.name}</b></p><table>${body}${avoidance}</table>`;
+    };
+    const interfaceSec = `<p class="k" style="margin:0 0 4px"><b style="color:var(--mp-fg)">大纲</b></p>`
       + `<table><tr><td style="white-space:nowrap">样式</td><td>`
       + [['float', '浮层（挂左上角）'], ['left', '靠左停靠'], ['right', '靠右停靠']].map(([v, label]) =>
         `<label style="margin-right:14px;cursor:pointer;white-space:nowrap"><input type="radio" name="mp-outline-mode" value="${v}"${outlineMode() === v ? ' checked' : ''} style="accent-color:var(--mp-primary)"> ${label}</label>`).join('')
-      + `</td></tr></table>`;
-    /* 【版式】页面宽度 / 内容缩放 / 工具岛尺寸 / 状态栏：与透明度面板同一套 registry 驱动写法 */
-    const pv = prefsRead();
-    const layoutSec = `<p class="k" style="margin:12px 0 4px"><b style="color:var(--mp-fg)">版式</b> · 页面宽度、内容缩放、工具岛尺寸各自独立</p>`
-      + `<table>${LAYOUT_ITEMS.map((it) => `<tr><td style="white-space:nowrap">${it.label}</td><td style="width:100%">`
-        + `<input class="mp-rng" type="range" data-p="${it.id}" min="${it.min}" max="${it.max}" step="${it.step}" value="${pv[it.id]}" `
-        + `style="width:190px;vertical-align:middle;accent-color:var(--mp-primary)">`
-        + `<span class="mp-num" data-pn="${it.id}" style="margin-left:8px;color:var(--mp-muted);font:12px var(--mp-font-mono)">${it.fmt(pv[it.id])}</span>`
-        + `<div class="k" style="margin-top:2px">${it.hint}</div></td></tr>`).join('')}`
-      + `<tr><td style="white-space:nowrap">底部状态栏</td><td><label style="cursor:pointer"><input type="checkbox" id="mp-pref-statusbar"${pv.statusbar ? ' checked' : ''} style="accent-color:var(--mp-primary)"> 显示（右下角可直接输入缩放百分比，回车生效）</label></td></tr>`
-      /* 【task-17】图片策略：插图和粘贴位图都按它决定"落盘 assets 还是内联 data URI"。
-         文档头部写了 mp-image-mode 时以文档为准（偏好只是没写时的默认）。
-         【2026-10-09】默认翻成 assets（依据见本文件 imageModePref 上方注释）；inline 保留为显式选项，
-         文案里明说它的代价（平台不渲染 + 单行超长）。 */
-      + `<tr><td style="white-space:nowrap">图片策略</td><td>`
-      + [['assets', '落盘 assets/ + 相对路径（推荐）'], ['inline', '内联 data URI（换目录仍显示，但 GitHub/GitLab 不渲染、那行会很长）']].map(([v, label]) =>
-        `<label style="margin-right:14px;cursor:pointer;white-space:nowrap"><input type="radio" name="mp-image-pref" value="${v}"${imageModePref() === v ? ' checked' : ''} style="accent-color:var(--mp-primary)"> ${label}</label>`).join('')
-      + `<div class="k" style="margin-top:2px">「图片」按钮插入与粘贴位图都按这里；文档头部写了 mp-image-mode 时以文档为准。「更多 → 抽出到 assets」可把已经内联进文档的图一次性落盘。</div></td></tr>`
-      /* 【排版美化·2026-10-09】功能名统一叫「排版美化」：阅读模式下的段落断行方式。
-         默认「浏览器两端对齐」；选 Knuth–Plass 才做整段最优断行（只在阅读模式 + 小文档生效）。 */
-      + `<tr><td style="white-space:nowrap">排版美化</td><td>`
-      + [['css', '浏览器两端对齐（默认）'], ['kp', 'Knuth–Plass 整段最优断行（仅阅读模式 + 小文档）']].map(([v, label]) =>
-        `<label style="margin-right:14px;cursor:pointer;white-space:nowrap"><input type="radio" name="mp-typo-pref" value="${v}"${typographyMode() === v ? ' checked' : ''} style="accent-color:var(--mp-primary)"> ${label}</label>`).join('')
-      + `<div class="k" style="margin-top:2px">阅读模式下可按 <b>Ctrl+Alt+K</b> 或点右上角「排版美化」按钮一键切换；超过 30 万字符的文档自动保持两端对齐（不做整段重排）。测量与排版都跟随你的字体/字号设置，自定义 CSS 改字号后断行会重算。</div></td></tr>`
-      /* 【Typora 社区主题·2026-10-09】用户可以直接装 Typora 的主题 CSS（改写与桥接见上方实现段）。 */
-      /* 【启动打开上次的文件·2026-10-10 用户要求】设置项在壳层（settings.json 的 restoreLast），
-         渲染侧经白名单通道读写；勾选状态异步取回后回填。 */
-      + `<tr><td style="white-space:nowrap">启动</td><td>`
-      + `<label style="cursor:pointer"><input type="checkbox" id="mp-restore-last"> 打开上次的文件</label>`
-      + `<div class="k" style="margin-top:2px">打开应用时自动接着上次的文件；关掉则每次开空白文档。上次的文件若已被移走，则自动往后找最近一个仍在的。</div></td></tr>`
-      + `<tr><td style="white-space:nowrap">保存</td><td>`
+      + `</td></tr></table>`
+      + SURFACES.map(surfaceRows).join('')
+      + `<p><button class="mp-key" data-act="reset">恢复版式与界面默认</button></p>`;
+    const layoutSec = `<table>${LAYOUT_ITEMS.map((it) => `<tr><td style="white-space:nowrap" title="${it.hint}">${it.label}</td><td style="width:100%">`
+      + `<input class="mp-rng" type="range" data-p="${it.id}" min="${it.min}" max="${it.max}" step="${it.step}" value="${pv[it.id]}" `
+      + `style="width:190px;vertical-align:middle;accent-color:var(--mp-primary)" aria-label="${it.label}">`
+      + `<span class="mp-num" data-pn="${it.id}" style="margin-left:8px;color:var(--mp-muted);font:12px var(--mp-font-mono)">${it.fmt(pv[it.id])}</span>`
+      + `</td></tr>`).join('')}`
+      + `<tr><td style="white-space:nowrap" title="右下角可直接输入缩放百分比，回车生效">底部状态栏</td><td><label style="cursor:pointer"><input type="checkbox" id="mp-pref-statusbar"${pv.statusbar ? ' checked' : ''} style="accent-color:var(--mp-primary)"> 显示</label></td></tr>`
+      + `</table>`;
+    const generalSec = `<table>`
+      + `<tr><td style="white-space:nowrap" title="上次的文件若已被移走，则自动往后找最近一个仍在的">启动</td><td>`
+      + `<label style="cursor:pointer"><input type="checkbox" id="mp-restore-last"> 打开上次的文件</label></td></tr>`
+      + `<tr><td style="white-space:nowrap" title="默认手动保存，按 Ctrl+S 写入文件；未命名文档需先另存为">保存</td><td>`
       + `<label style="cursor:pointer"><input type="checkbox" id="mp-autosave" disabled> 自动保存</label>`
-      + `<label style="margin-left:14px">间隔 <input id="mp-autosave-seconds" type="number" min="1" max="3600" step="1" value="30" disabled style="width:72px"> 秒</label>`
-      + `<div class="k" style="margin-top:2px">默认手动保存，按 Ctrl+S 写入文件。开启后按间隔保存有修改的文件；未命名文档需先另存为。</div></td></tr>`
-      + `<tr><td style="white-space:nowrap">Typora 主题</td><td>`
+      + `<label style="margin-left:14px">间隔 <input id="mp-autosave-seconds" type="number" min="1" max="3600" step="1" value="30" disabled style="width:72px" aria-label="自动保存间隔（秒）"> 秒</label></td></tr>`
+      + `</table>`;
+    const curTheme = PALETTES.find(p => p.id === currentPalette) || PALETTES[0];
+    const themeSec = `<p><label>内置配色 <select id="mp-settings-palette" title="导入的 CSS 主题会覆盖内置配色">${PALETTES.map(p => `<option value="${p.id}"${p.id === curTheme.id ? ' selected' : ''}>${p.name}</option>`).join('')}</select></label></p>`
+      + `<table>`
+      + `<tr><td style="white-space:nowrap" title="与壳层菜单的明暗切换同一份实现；切到同族浅色或深色主题">明暗</td><td>`
+      + [['light', '浅色'], ['dark', '深色']].map(([v, label]) =>
+        `<label style="margin-right:14px;cursor:pointer;white-space:nowrap"><input type="radio" name="mp-theme-mode" value="${v}"${(v === 'dark') === !!curTheme.dark ? ' checked' : ''} style="accent-color:var(--mp-primary)"> ${label}</label>`).join('')
+      + `</td></tr>`
+      + `<tr><td style="white-space:nowrap">CSS 主题</td><td>`
       + `<button class="mp-key" id="mp-theme-install">导入 .css…</button>`
       + `<span class="k" style="margin-left:8px">当前：<b id="mp-theme-name">${esc(userThemeName() || '未导入')}</b><span id="mp-theme-bytes">${currentUserTheme ? `（${themeSizeLabel()}）` : ''}</span></span>`
       + `<button class="mp-key" id="mp-theme-remove" style="margin-left:10px"${userThemeCss() ? '' : ' disabled'}>移除</button>`
-      + `<div class="k" style="margin-top:2px">导入会把 CSS 复制到 MarkPilot 自己的主题目录。原文件移动或删除不影响使用，重新导入才会更新副本。CSS 引用的相对字体、图片文件不会自动复制。</div></td></tr>`
-      + `</table>`;
-    const sections = [['general','常规与保存'],['theme','主题'],['fonts','字体'],['layout','页面与缩放'],['reading','阅读与排版'],['images','图片'],['interface','界面与大纲'],['keys','快捷键']];
-    dialog('设置', `<div class="mp-settings-body"><nav class="mp-settings-nav" role="tablist" aria-label="设置分类">${sections.map(([id,label]) => `<button type="button" role="tab" id="mp-settings-tab-${id}" data-settings-tab="${id}" aria-controls="mp-settings-panel-${id}">${label}</button>`).join('')}</nav><div class="mp-settings-content">`
-      + sections.map(([id,label]) => `<section role="tabpanel" id="mp-settings-panel-${id}" data-settings-panel="${id}" aria-labelledby="mp-settings-tab-${id}"><h4>${label}</h4>${id === 'layout' ? layoutSec : id === 'interface' ? outlineSec + rows : ''}</section>`).join('')
-      + `</div></div><p class="k">修改立即生效并保存。</p>`);
+      + `</td></tr></table>`;
+    const fontOptions = [['','默认'],['SimSun','宋体'],['Microsoft YaHei','微软雅黑'],['KaiTi','楷体'],['Arial','Arial'],['Georgia','Georgia'],['Consolas','Consolas'],['serif','系统衬线'],['sans-serif','系统无衬线'],['__custom','自定义']];
+    const fontsSec = `<p class="k" style="margin:12px 0 4px"><b style="color:var(--mp-fg)">字体</b></p>`
+      + `<p id="mp-font-hint" class="k"></p><table>${FONT_ROLES.map(r => `<tr><td><label for="mp-font-${r.id}">${r.label}</label></td><td><select data-font-preset="${r.id}" aria-label="${r.label}常用字体">${fontOptions.map(([v,n])=>`<option value="${v}">${n}</option>`).join('')}</select><input id="mp-font-${r.id}" data-font-role="${r.id}" placeholder="默认或自定义字体" aria-label="${r.label}字体"></td></tr>`).join('')}</table><p><button class="mp-key" id="mp-font-reset">恢复默认字体</button></p>`;
+    const imageSec = `<table><tr><td style="white-space:nowrap">保存方式</td><td>`
+      + [['assets', '落盘 assets/（相对路径）'], ['inline', '内联 data URI']].map(([v, label]) =>
+        `<label style="margin-right:14px;cursor:pointer;white-space:nowrap" title="${v === 'assets' ? '推荐：图片单独成文件，仓库友好' : '换目录仍显示，但 GitHub/GitLab 不渲染，文档行会很长'}"><input type="radio" name="mp-image-pref" value="${v}"${imageModePref() === v ? ' checked' : ''} style="accent-color:var(--mp-primary)"> ${label}</label>`).join('')
+      + `</td></tr></table>`;
+    const readingPal = readingPalette();
+    const readingSec = `<table>`
+      + `<tr><td style="white-space:nowrap">配色</td><td>`
+      + READING_PALETTES.map((p) => `<label style="margin-right:14px;cursor:pointer;white-space:nowrap" title="${p.desc}"><input type="radio" name="mp-reading-palette" value="${p.id}"${p.id === readingPal ? ' checked' : ''} style="accent-color:var(--mp-primary)"> ${p.name}</label>`).join('')
+      + `</td></tr>`
+      + `<tr><td style="white-space:nowrap">排版</td><td>`
+      + [['css', '浏览器两端对齐'], ['kp', 'Knuth–Plass 断行']].map(([v, label]) =>
+        `<label style="margin-right:14px;cursor:pointer;white-space:nowrap" title="${v === 'css' ? '默认' : '仅阅读模式 + 小文档生效；Ctrl+Alt+K 也可切换'}"><input type="radio" name="mp-typo-pref" value="${v}"${typographyMode() === v ? ' checked' : ''} style="accent-color:var(--mp-primary)"> ${label}</label>`).join('')
+      + `</td></tr></table>`;
+    const keysSec = `<table id="mp-keys" title="点击键位后按下新组合键；Esc 取消，退格恢复默认">${shortcutRowsHtml()}</table>`;
+    const sections = [
+      ['general', '常规与保存', generalSec],
+      ['theme', '主题与字体', themeSec + fontsSec],
+      ['layout', '页面', layoutSec],
+      ['interface', '界面与大纲', interfaceSec],
+      ['reading', '阅读', readingSec],
+      ['images', '图片', imageSec],
+      ['keys', '快捷键', keysSec],
+    ];
+    dialog('编辑器设置', `<div class="mp-settings-body"><nav class="mp-settings-nav" role="tablist" aria-label="设置分类">${sections.map(([id,label]) => `<button type="button" role="tab" id="mp-settings-tab-${id}" data-settings-tab="${id}" aria-controls="mp-settings-panel-${id}">${label}</button>`).join('')}</nav><div class="mp-settings-content">`
+      + sections.map(([id,label,html]) => `<section role="tabpanel" id="mp-settings-panel-${id}" data-settings-panel="${id}" aria-labelledby="mp-settings-tab-${id}"><h4>${label}</h4>${html}</section>`).join('')
+      + `</div></div>`);
     const d = dlgEl; if (!d) return;
     d.classList.add('mp-settings');
-    const panel = id => d.querySelector(`[data-settings-panel="${id}"]`);
-    const moveRow = (selector,id) => {
-      const row = d.querySelector(selector)?.closest('tr'); if (!row) return;
-      let table = panel(id).querySelector('table'); if (!table) { table = document.createElement('table'); panel(id).appendChild(table); }
-      table.appendChild(row);
-    };
-    moveRow('#mp-restore-last','general'); moveRow('#mp-autosave','general'); moveRow('#mp-theme-install','theme');
-    moveRow('input[name="mp-image-pref"]','images'); moveRow('input[name="mp-typo-pref"]','reading');
-    panel('theme').insertAdjacentHTML('afterbegin', `<p><label>内置配色 <select id="mp-settings-palette">${PALETTES.map(p => `<option value="${p.id}"${p.id === currentPalette ? ' selected' : ''}>${p.name}</option>`).join('')}</select></label></p><p class="k">导入的 CSS 会覆盖内置配色；移除 CSS 后显示所选内置配色。</p>`);
-    const fontOptions = [['','默认'],['SimSun','宋体'],['Microsoft YaHei','微软雅黑'],['KaiTi','楷体'],['Arial','Arial'],['Georgia','Georgia'],['Consolas','Consolas'],['serif','系统衬线'],['sans-serif','系统无衬线'],['__custom','自定义']];
-    panel('fonts').insertAdjacentHTML('beforeend', `<p id="mp-font-hint" class="k"></p><table>${FONT_ROLES.map(r => `<tr><td><label for="mp-font-${r.id}">${r.label}</label></td><td><select data-font-preset="${r.id}" aria-label="${r.label}常用字体">${fontOptions.map(([v,n])=>`<option value="${v}">${n}</option>`).join('')}</select><input id="mp-font-${r.id}" data-font-role="${r.id}" placeholder="默认或自定义字体" aria-label="${r.label}字体"></td></tr>`).join('')}</table><p><button class="mp-key" id="mp-font-reset">恢复默认字体</button></p><p class="k">选择常用字体，或输入字体名称后按回车。只影响文档内容。</p>`);
-    panel('keys').insertAdjacentHTML('beforeend', '<p>查看、录入组合键，或恢复默认快捷键。</p><button class="mp-key" data-act="keys">快捷键设置…</button>');
-    panel('interface').insertAdjacentHTML('beforeend', '<p><button class="mp-key" data-act="reset">恢复版式与界面默认</button></p>');
     const showSection = id => {
       if (!sections.some(([key]) => key === id)) id = 'general';
       d.dataset.section = id;
@@ -3075,7 +3179,41 @@ export function installExtras(deps) {
       };
     });
     showSection(section);
-    d.querySelector('#mp-settings-palette').onchange = event => applyPalette(event.target.value);
+    /* 打开后焦点交给当前分类：键盘用户不用先 Tab 过整页；Esc/关闭仍回到编辑器。 */
+    const activeTab = d.querySelector('[data-settings-tab][aria-selected="true"]');
+    if (activeTab) { try { activeTab.focus({ preventScroll: true }); } catch { activeTab.focus(); } }
+    const syncThemeControls = () => {
+      const pal = PALETTES.find(p => p.id === currentPalette) || PALETTES[0];
+      const sel = d.querySelector('#mp-settings-palette'); if (sel) sel.value = pal.id;
+      d.querySelectorAll('input[name="mp-theme-mode"]').forEach((el) => { el.checked = (el.value === 'dark') === !!pal.dark; });
+    };
+    d.querySelector('#mp-settings-palette').onchange = event => { applyPalette(event.target.value); syncThemeControls(); };
+    /* 【明暗·2026-11-16】与壳层菜单/外部命令同一份实现：委托 window.mpTheme（唯一写者），
+       语义＝翻到同族明暗邻居；无邻居的两套回落到宋韵（mpTheme.sibling 定义）。不新增偏好键。 */
+    d.querySelectorAll('input[name="mp-theme-mode"]').forEach((el) => {
+      el.onchange = () => {
+        const wantDark = el.value === 'dark';
+        const pal = PALETTES.find(p => p.id === currentPalette) || PALETTES[0];
+        if (!!pal.dark === wantDark) return;
+        if (window.mpTheme && window.mpTheme.apply) window.mpTheme.apply(window.mpTheme.sibling(currentPalette));
+        else if (window.mpEngine && window.mpEngine.setTheme) window.mpEngine.setTheme(wantDark ? 'telari-dark' : 'telari-light');
+        syncThemeControls();
+      };
+    });
+    /* 【阅读配色·2026-11-16】原「阅读配色与排版…」弹层的两个选择并入本页：直接改、立即可见，
+       不再有第二个入口；选配色时若不在阅读模式就顺带进入（与原弹层语义一致）。 */
+    d.querySelectorAll('input[name="mp-reading-palette"]').forEach((el) => {
+      el.onchange = () => {
+        try { localStorage.setItem('mp-reading-palette', el.value); } catch { }
+        if (!readingOn()) toggleReading(true); else applyReading();
+      };
+    });
+    /* 主题可能从壳层菜单/快捷键在别处切换：跟着单一真源回显，避免本页单选与画面不一致。 */
+    try {
+      const themeMo = new MutationObserver(syncThemeControls);
+      themeMo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-mode', 'data-editor-theme'] });
+      panelLifecycles.get(d).cleanup.add(() => themeMo.disconnect());
+    } catch { /* 没有 MutationObserver：至少初次正确 */ }
     d.querySelectorAll('[data-font-role]').forEach(el => {
       el.onchange = () => { void setFontPreference({ [el.dataset.fontRole]:el.value }); };
       el.onkeydown = event => { if (event.key === 'Enter') { event.preventDefault(); el.blur(); } };
@@ -3201,8 +3339,8 @@ export function installExtras(deps) {
       if (window.mpEngine && window.mpEngine.applyPrefs) window.mpEngine.applyPrefs();
       applySurfaces(); settingsDialog(d.dataset.section);
     };
-    const ko = d.querySelector('[data-act="keys"]');
-    if (ko) ko.onclick = () => { closeDlg(); shortcutDialog(); };
+    /* 快捷键在本页直接录入：完成/取消都留在本页（Esc 由 closePopOnEsc 先取消录制）。 */
+    bindShortcutTable(d);
   }
 
   // 启动即把保存过的表面参数写回 :root。**必须放在 SURFACES / surfaceStore 这些 const 之后**：
@@ -3371,7 +3509,7 @@ export function installExtras(deps) {
     const bytes = d.querySelector('#mp-theme-bytes'); if (bytes) bytes.textContent = currentUserTheme ? '（' + themeSizeLabel() + '）' : '';
     const remove = d.querySelector('#mp-theme-remove'); if (remove) remove.disabled = !currentUserTheme;
     const locked = fontsLocked();
-    const hint = d.querySelector('#mp-font-hint'); if (hint) hint.textContent = locked ? '当前 CSS 主题固定了字体，字体修改已停用。移除主题后会恢复你保存的字体设置。' : '留空使用默认字体。标题、正文、斜体、粗体与代码各自独立；可输入系统字体名称或字体列表。';
+    const hint = d.querySelector('#mp-font-hint'); if (hint) hint.textContent = locked ? '当前 CSS 主题固定了字体，字体修改已停用' : '留空使用默认字体';
     for (const el of d.querySelectorAll('[data-font-role]')) {
       el.disabled = locked;
       if (document.activeElement !== el) el.value = fontPreferences[el.dataset.fontRole] || '';
@@ -3643,22 +3781,6 @@ export function installExtras(deps) {
     if (next) toast('已进入阅读模式：Esc 或右上角胶囊退出');
     else toast('已退出阅读模式');
   }
-  function readingPaletteDialog() {
-    const cur = readingPalette();
-    dialog('阅读模式', `<p class="k">版式（行距/版心）与配色分开：配色默认跟随主题，也可以单独选一套阅读配色。</p>`
-      + `<table>${READING_PALETTES.map((p) => `<tr><td style="white-space:nowrap"><button class="mp-key" data-rp="${p.id}"${p.id === cur ? ' style="outline:1px solid var(--mp-primary)"' : ''}>${p.name}</button></td><td class="k">${p.desc}${p.id === cur ? '（当前）' : ''}</td></tr>`).join('')}</table>`
-      + `<p style="margin-top:10px"><button class="mp-key" data-act="toggle">${readingOn() ? '退出阅读模式' : '进入阅读模式'}</button></p>`);
-    const d = dlgEl; if (!d) return;
-    d.querySelectorAll('[data-rp]').forEach((el) => {
-      el.onclick = () => {
-        try { localStorage.setItem('mp-reading-palette', el.dataset.rp); } catch { }
-        if (!readingOn()) toggleReading(true); else applyReading();
-        closeDlg(); readingPaletteDialog();
-      };
-    });
-    const tg = d.querySelector('[data-act="toggle"]');
-    if (tg) tg.onclick = () => { toggleReading(); closeDlg(); };
-  }
   // 退出胶囊：工具栏在阅读态是藏起来的，所以必须留一条看得见的出口
   (function installReadingPill() {
     /* 【排版美化·2026-10-09】右上角改成**一簇**：上＝排版美化开关，下＝退出阅读模式。
@@ -3694,7 +3816,12 @@ export function installExtras(deps) {
     armPanel(dlgEl, onClose);
     dlgEl.innerHTML = `<span class="close">✕</span><h3>${title}</h3>${bodyHtml}`;
     const panel = dlgEl;
-    dlgEl.querySelector('.close').onclick = () => closePanel(panel, true);
+    const closeBtn = dlgEl.querySelector('.close');
+    closeBtn.setAttribute('role', 'button');
+    closeBtn.setAttribute('aria-label', '关闭');
+    closeBtn.tabIndex = 0;
+    closeBtn.onclick = () => closePanel(panel, true);
+    closeBtn.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); closeBtn.click(); } };
     h.appendChild(dlgEl);
   }
   async function about() {
@@ -3711,20 +3838,24 @@ export function installExtras(deps) {
     const cfg = keyConfig();
     const rows = Object.entries(cfg).map(([a, c]) => `<tr><td>${({ bold: '加粗', italic: '斜体', underline: '下划线', strike: '删除线', code: '行内代码', inlineMath: '行内公式', blockMath: '块公式', codeBlock: '代码块', quote: '引用', list: '无序列表', save: '保存', outline: '大纲', export: '导出 HTML', footnote: '脚注（插入/跳转）' })[a] || a}</td><td><span class="mp-key">${c.replace('Mod', 'Ctrl')}</span></td></tr>`).join('');
     dialog('帮助 · 快捷键', `
-      <p class="k">快捷键可在「更多 → 快捷键设置」里点键位直接改。</p>
+      <p class="k">快捷键可在「编辑器设置 → 快捷键」里点键位直接改。</p>
       <table>${rows}</table>
       <p class="k" style="margin-top:10px">脚注：正文上标点一下就跳到对应定义；定义左侧的 ↩ 回到**本次触发的那一处**引用（同一条脚注被引用多次也不会串位）。新增脚注定义写在文末；文中已有的定义保持原位置不动。Ctrl+Alt+Enter 在引用/定义上跳转与返回，Alt+点击上标可只改源码。</p>
       <p class="k" style="margin-top:10px">表格：在表格内右键可插入/移动/删除行列、复制表格到 Excel。键位 —— Enter（下移一格，末行补行）、Shift+Enter（格内换行）、Tab / Shift+Tab（逐格前后，跨行）、Ctrl+E（选格）、Ctrl+A（格→行→列→整表→全篇）、Ctrl+Enter（下插行）、Ctrl+Shift+Enter（上插行）、Alt+↑/↓（上移/下移该行）、Alt+←/→（左移/右移该列，**移动**）、Ctrl+Alt+←/→（插列，**新增**）、Ctrl+Shift+Backspace（删行）、Ctrl+Alt+Delete（删列）。</p>
       <p class="k">公式：光标进公式会展开源码并浮出预渲染预览；点渲染体任意位置可精确落位。行中段直接打 $$…$$，收笔会自动独占一行。</p>
       <p class="k">复制：选中含公式/表格的内容，剪贴板里是标准 Markdown 源码，粘到 Typora/Obsidian/GitHub 都能正常渲染。</p>`);
   }
-  function shortcutDialog() {
-    const cfg = keyConfig();
-    const names = { bold: '加粗', italic: '斜体', underline: '下划线', strike: '删除线', code: '行内代码', inlineMath: '行内公式', blockMath: '块公式', codeBlock: '代码块', quote: '引用', list: '无序列表', save: '保存文件', outline: '大纲面板', export: '导出 HTML', footnote: '脚注（插入/跳转）' };
-    dialog('快捷键设置', `<p class="k">点右侧键位后按下新组合键（Esc 取消，退格恢复默认）。</p><table id="mp-keys">` +
-      Object.entries(cfg).map(([a, c]) => `<tr><td>${names[a] || a}</td><td><span class="mp-key" data-a="${a}">${showCombo(c)}</span></td></tr>`).join('') + '</table>');
-    const lifecycle = panelLifecycles.get(dlgEl);
-    dlgEl.querySelectorAll('.mp-key').forEach((el) => {
+  const SHORTCUT_NAMES = { bold: '加粗', italic: '斜体', underline: '下划线', strike: '删除线', code: '行内代码', inlineMath: '行内公式', blockMath: '块公式', codeBlock: '代码块', quote: '引用', list: '无序列表', save: '保存文件', outline: '大纲面板', export: '导出 HTML', footnote: '脚注（插入/跳转）' };
+  /** 快捷键表：设置页与独立的快捷键弹层共用**同一份行模板**（按钮可键盘激活）。 */
+  function shortcutRowsHtml(cfg = keyConfig()) {
+    return Object.entries(cfg).map(([a, c]) =>
+      `<tr><td>${SHORTCUT_NAMES[a] || a}</td><td><button type="button" class="mp-key" data-a="${a}" title="点击修改「${SHORTCUT_NAMES[a] || a}」的快捷键" aria-label="更改「${SHORTCUT_NAMES[a] || a}」的快捷键">${showCombo(c)}</button></td></tr>`).join('');
+  }
+  /** 录入器：在同一面板里把键位按钮变成录制态；Esc 取消、退格恢复默认，完成后仍留在原面板。 */
+  function bindShortcutTable(root) {
+    const lifecycle = panelLifecycles.get(root) || panelLifecycles.get(dlgEl);
+    if (!lifecycle) return;
+    root.querySelectorAll('.mp-key[data-a]').forEach((el) => {
       el.onclick = () => {
         lifecycle.recording?.();
         el.classList.add('editing'); el.textContent = '按下组合键…';
@@ -3755,7 +3886,7 @@ export function installExtras(deps) {
             const isFn = /^F([1-9]|1[0-9]|2[0-4])$/.test(combo);
             if (!hasMod && !isFn) { toast('快捷键需要 Ctrl / Alt 等修饰键（纯字母会吞掉正文输入）'); return; }
             const dup = Object.entries(keyConfig()).find(([a, c]) => a !== el.dataset.a && c === combo);
-            if (dup) { toast('该组合键已绑定「' + (names[dup[0]] || dup[0]) + '」，请换一个'); return; }
+            if (dup) { toast('该组合键已绑定「' + (SHORTCUT_NAMES[dup[0]] || dup[0]) + '」，请换一个'); return; }
             setKey(el.dataset.a, combo); el.textContent = showCombo(combo);
           }
           finish();
@@ -3764,6 +3895,11 @@ export function installExtras(deps) {
         document.addEventListener('keydown', onKey, true);
       };
     });
+  }
+  /** 外部 API 用的独立弹层；设置页的「快捷键」域直接用同一份模板与录入器，不依赖本弹层。 */
+  function shortcutDialog() {
+    dialog('快捷键设置', `<p class="k">点右侧键位后按下新组合键（Esc 取消，退格恢复默认）。</p><table id="mp-keys">${shortcutRowsHtml()}</table>`);
+    if (dlgEl) bindShortcutTable(dlgEl);
   }
 
   /* ── 表格快捷键（与 v2.3.3 的教训对齐：绝不用 Ctrl+= / Ctrl+-，那两条让给缩放） ──
@@ -3816,16 +3952,22 @@ export function installExtras(deps) {
     { key: 'Mod-Alt-Delete', run: tableKey('col-delete') },
   ]));
 
-  /* ── 工具栏按钮路由（toolbar.js 里所有点击先过这里；返回 true 表示已处理） ── */
-  function toolbarClick(id, anchor) {
-    return window.mpEngine.commands.run(() => toolbarCommand(id,anchor), { focus: 'control' });
+  /* ── 工具栏按钮路由（toolbar.js 里所有点击先过这里；返回 true 表示已处理） ──
+     【入口收敛·2026-11-16】偏好类 id 不再各开弹层：主题配色 / 明暗 / 字体 / 页面 / 界面 /
+     阅读配色 / 快捷键全部落到「编辑器设置」的对应域。这些 id 保留路由，外部调用与右键菜单的
+     契约不变；岛上可见槽位由 toolbar.js 的 ITEMS 决定。 */
+  function toolbarClick(id, anchor, opts = {}) {
+    return window.mpEngine.commands.run(() => toolbarCommand(id, anchor, opts), { focus: 'control' });
   }
-  function toolbarCommand(id, anchor) {
+  function toolbarCommand(id, anchor, opts = {}) {
     switch (id) {
       case 'outline': toggleOutline(anchor); return true;
       case 'emoji': openEmoji(anchor); return true;
-      case 'theme-settings': openTheme(anchor); return true;
-      case 'more': openMore(anchor); return true;
+      case 'theme-settings': settingsDialog('theme'); return true;
+      /* 明暗切换已收进「编辑器设置 → 主题与字体」，但外部命令/快捷键继续可用：
+         直接复用工具栏动作表里的同一份实现（不另写第二套）。 */
+      case 'theme-toggle': return TOOLBAR_ACTIONS['theme-toggle'] ? (TOOLBAR_ACTIONS['theme-toggle'](getView()), true) : false;
+      case 'more': openMore(anchor, opts); return true;
       case 'split': {
         // 双开（形态 B）：主视图＝渲染编辑面，从视图＝同一份文档的只读源码。实例由 boot() 挂到 window.mpSplit。
         const s = window.mpSplit;
@@ -3835,9 +3977,9 @@ export function installExtras(deps) {
         return true;
       }
       case 'document-export': exportDialog(); return true;
-      case 'surface-settings': settingsDialog(); return true;
+      case 'surface-settings': settingsDialog('interface'); return true;
       case 'reading-mode': toggleReading(); return true;
-      case 'reading-palette': readingPaletteDialog(); return true;
+      case 'reading-palette': settingsDialog('reading'); return true;
       case 'fullscreen': {
         // 桌面版：壳层切全屏；插件（iframe 未授权 allowfullscreen）如实说明，不假装成功。
         const h = window.mpHost;
@@ -3856,19 +3998,34 @@ export function installExtras(deps) {
         pickAndInsertImages().catch((e) => toast('插入图片失败：' + ((e && e.message) || e)));
         return true;
       }
+      /* 【脚注】岛上 x¹ 按钮的唯一实现：插入 / 跳到定义 / 返回引用三态由 runFootnote 判定
+         （与正文上标、定义回链共用 footnotes-view.js 的导航）。 */
+      case 'footnote': runFootnote(); return true;
       default: return false;
     }
   }
-  function openTheme(anchor) {
-    openPop(anchor, (p) => {
-      const t = document.createElement('div'); t.className = 'mp-pop-title'; t.textContent = '主题配色'; p.appendChild(t);
-      for (const pal of PALETTES) {
-        const d = document.createElement('div'); d.className = 'mp-pop-item';
-        d.innerHTML = `<span>${pal.name}</span><span class="k">${pal.dark ? '深' : '浅'}${currentPalette === pal.id ? ' · 当前' : ''}</span>`;
-        d.onclick = () => { applyPalette(pal.id); closePop(); };
-        p.appendChild(d);
+  /* 【菜单键盘走位·2026-11-16】菜单项是 div + tabindex：Enter/Space 激活，
+     上下/Home/End 在项间移动。键盘激活会留一个来源标记，供下一步弹层决定是否接焦点。 */
+  function bindMenuKeyboard(panel, el) {
+    el.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        el.dataset.mpKeyActivate = '1';
+        el.click();
+        return;
       }
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') return;
+      event.preventDefault();
+      const items = [...panel.querySelectorAll('.mp-pop-item')];
+      if (!items.length) return;
+      const at = items.indexOf(el);
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
+        : (at + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+      items[next]?.focus();
     });
+  }
+  function focusFirstMenuItem(panel) {
+    setTimeout(() => { try { if (panel.isConnected) panel.querySelector('.mp-pop-item')?.focus({ preventScroll: true }); } catch { /* 面板已关 */ } }, 0);
   }
   function openEmoji(anchor) {
     openPop(anchor, (p) => {
@@ -3878,42 +4035,50 @@ export function installExtras(deps) {
       p.appendChild(g);
     });
   }
-  function openMore(anchor) {
+  /* 【更多·2026-11-16】只留三类：尚未常驻的文档操作、唯一的「编辑器设置」、帮助/关于。
+     单入口的组不再写同名小标题：用分隔线分组，避免“设置／编辑器设置”“帮助／帮助”两行重复。
+     格式命令、阅读模式、导出都已在岛上；主题/字体/页面/界面/阅读配色/快捷键全部收进设置页。 */
+  function openMore(anchor, opts = {}) {
     openPop(anchor, p => {
+      /* 「更多」专属的稳定类名：密度收敛只认它（见样式段的 mp-pop-more 一组），
+         别在别处按结构或文案去挑面板。 */
+      p.classList.add('mp-pop-more');
       p.classList.add('mp-pop-keep');
-      const heading = label => { const el = document.createElement('div'); el.className = 'mp-pop-title'; el.textContent = label; p.appendChild(el); };
+      p.setAttribute('role', 'menu');
+      p.setAttribute('aria-label', '更多');
+      const heading = label => { const el = document.createElement('div'); el.className = 'mp-pop-title'; el.setAttribute('role', 'presentation'); el.textContent = label; p.appendChild(el); };
+      const sep = () => { const el = document.createElement('div'); el.className = 'mp-pop-sep'; el.setAttribute('role', 'separator'); p.appendChild(el); };
       const add = (label, fn, hint = '') => {
         const el = document.createElement('div'); el.className = 'mp-pop-item'; el.tabIndex = 0; el.setAttribute('role','menuitem');
         el.innerHTML = `<span>${label}</span><span class="k">${hint}</span>`;
-        el.onclick = () => { closePop(); fn(); };
-        el.onkeydown = event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); el.click(); } };
+        el.onclick = () => { closePop(); fn(el); };
+        bindMenuKeyboard(p, el);
         p.appendChild(el);
       };
       heading('文档');
-      add('脚注', () => runFootnote(), '插入 / 跳到定义 / 返回引用');
-      add('导出…', exportDialog, 'PDF / HTML / 复制');
       add('重新加载', reloadDoc, '从磁盘重读');
-      add('图片操作…', () => openImageActions(anchor), '网址 / 批量转换');
-      heading('外观与设置');
-      add('主题…', () => settingsDialog('theme'), userThemeName() ? 'CSS 已导入' : '配色 / 导入 CSS');
-      add('字体…', () => settingsDialog('fonts'), '正文 / 标题 / 斜体');
-      add('页面与缩放…', () => settingsDialog('layout'));
-      add('界面与大纲…', () => settingsDialog('interface'), '透明度 / 停靠');
-      add('设置', () => settingsDialog('general'), '启动 / 保存 / 更多');
-      add('快捷键设置…', shortcutDialog);
-      heading('阅读');
-      add(readingOn() ? '退出阅读模式' : '进入阅读模式', () => toggleReading(!readingOn()), 'Esc 退出');
-      add('阅读配色与排版…', readingPaletteDialog, '跟随主题 / 米色 / 淡绿');
-      heading('帮助'); add('帮助', help); add('关于', about);
+      add('图片操作…', el => openImageActions(anchor, { keyboard: el.dataset.mpKeyActivate === '1' }), '网址 / 批量转换');
+      sep();
+      add('编辑器设置…', () => settingsDialog('general'), '主题 / 页面 / 阅读 / 快捷键');
+      sep();
+      add('帮助', help); add('关于', about);
+      /* 鼠标打开不抢首项焦点（否则会出现无意义的蓝色焦点框）；键盘打开才接。 */
+      if (opts.keyboard) focusFirstMenuItem(p);
     });
   }
-  function openImageActions(anchor) {
+  function openImageActions(anchor, opts = {}) {
     openPop(anchor, p => {
-      const title = document.createElement('div'); title.className = 'mp-pop-title'; title.textContent = '图片操作'; p.appendChild(title);
-      for (const [label, action] of [['从网址插入图片…',openImageFromUrl],['内联全部图片',inlineAllImages],['抽出到 assets',extractImagesToAssets],['图片保存设置…',()=>settingsDialog('images')]]) {
-        const el = document.createElement('div'); el.className = 'mp-pop-item'; el.textContent = label; el.tabIndex=0; el.setAttribute('role','menuitem');
-        el.onclick=()=>{closePop();action();}; el.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();el.click();}};p.appendChild(el);
+      p.setAttribute('role', 'menu');
+      p.setAttribute('aria-label', '图片操作');
+      const title = document.createElement('div'); title.className = 'mp-pop-title'; title.setAttribute('role', 'presentation'); title.textContent = '图片操作'; p.appendChild(title);
+      /* 只留图片**操作**；图片保存偏好已在「编辑器设置 → 图片」，不在这里重复。 */
+      for (const [label, action] of [['从网址插入图片…', openImageFromUrl], ['内联全部图片', inlineAllImages], ['抽出到 assets', extractImagesToAssets]]) {
+        const el = document.createElement('div'); el.className = 'mp-pop-item'; el.textContent = label; el.tabIndex = 0; el.setAttribute('role', 'menuitem');
+        el.onclick = () => { closePop(); action(); };
+        bindMenuKeyboard(p, el);
+        p.appendChild(el);
       }
+      if (opts.keyboard) focusFirstMenuItem(p);
     });
   }
   function insertText(text) {
@@ -5391,7 +5556,7 @@ export function installExtras(deps) {
         outlineRefreshTimer = setTimeout(refreshOutline, 150);
       })] : [])],
     toast, /* 【#38】块级命令的表内拒绝提示与引擎其他提示同一条通道（toolbar.js 调用） */
-    toolbarClick, applyPalette, toggleOutline, refreshOutline, exportHtml, exportFolder, copyRich, copyTable, tableOp, setAlign, alignAt, about, help, shortcutDialog, rebindKeys, PALETTES,
+    toolbarClick, applyPalette, toggleOutline, refreshOutline, exportHtml, exportFolder, exportPdf, buildPrintHtml: buildPluginPrintHtml, copyRich, copyTable, tableOp, setAlign, alignAt, about, help, shortcutDialog, rebindKeys, PALETTES,
     /* 【大纲公式显示】只读取证通道（mathCssStat 同款范式）：缓存真实命中/未命中与占用，探针读它，不另造状态。 */
     outlineMathStat: () => ({ items: outlineMathCache.size, bytes: outlineMathBytes, hits: outlineMathHits, misses: outlineMathMisses }),
     /* 【Typora 社区主题】安装/移除/读数：`installTyporaThemeFromText` 是**核心**（对话框与探针同源），

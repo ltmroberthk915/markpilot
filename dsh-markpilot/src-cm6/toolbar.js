@@ -1,17 +1,16 @@
-/** CM6 工具栏（对齐 v2.3.3 的可见集合，架构走 CM6 原生事务）。
+/** CM6 工具栏（架构走 CM6 原生事务）。
  *
- *  口径（用户 2026-10-07 裁定·方案 B）：**按钮全摆上**；CM6 已实现的一律接线，
- *  未实现的**置灰 + 悬停标注「CM6 暂未实现（原因）」**，不给"点了没反应"的空按钮。
+ *  信息架构·2026-11-16：**一个功能一个入口**。
+ *    · 岛上只放高频直达命令与模式开关（格式、插入、查找、图片、表格、全屏、双开、
+ *      阅读模式、导出、更多、折叠）；
+ *    · 撤销/重做与上/下插空行**不再占可见槽位**：命令仍在 ACTIONS / 右键菜单 / 键盘里
+ *      （Mod-z、Mod-Shift-z、Mod-y 由 main.js 的最高优先级 keymap 收口）；
+ *    · 持续性偏好统一收进「更多 → 编辑器设置」：主题配色、字体、页面、界面与大纲、
+ *      阅读配色、图片策略、快捷键不再各摆一个入口；
+ *    · 脚注（插入 / 跳转 / 返回）沿用扩展包的 runFootnote，占原先插空行两颗按钮的位置。
  *
- *  与 vditor 侧按钮一一对应（顺序同 renderer/js/toolbar.js:71 起）：
- *    outline / theme-settings / reading-palette / emoji / headings / bold / italic / strike /
- *    find-replace / link │ list / ordered-list / check / outdent / indent │ quote / line / code /
- *    inline-code / insert-before / insert-after │ upload / table │ undo / redo │
- *    fullscreen / shortcut-settings / edit-mode / source-toggle / reading-mode / document-export /
- *    more(surface) │ theme-toggle / toolbar-fold
- *    （「重新加载」2026-10-09 收进「更多」菜单，不再占工具栏槽位）
- *
- *  实现纪律：所有动作走 `view.dispatch`（撤销栈/版本守卫/桥同步自动成立），不碰 DOM 文本。
+ *  实现纪律：所有动作走 `view.dispatch`（撤销栈/版本守卫/桥同步自动成立），不碰 DOM 文本；
+ *  按钮创建期间**不得调用 toolbarClick**（它执行用户命令，会在重开文档时产生点击副作用）。
  */
 
 import { undo, redo, isolateHistory } from "@codemirror/commands";
@@ -54,17 +53,15 @@ function blockedBlockCommand(view) {
   return false;
 }
 
-/** 未实现的按钮为什么没实现——悬停标注用（用户要求"置灰并标注"）。 */
 /** 由扩展包（extras.js）接管的按钮 id：判定"已实现"用静态集合，不看运行时的 window.mpExtras。
- *  【2026-10-08】`surface-settings` 与 `reading-palette` 已从工具栏**移除**（用户要求收进「更多」菜单），
- *  所以这里不再登记——登记着却没有对应按钮只会让"已实现集合"与实际槽位对不上。 */
-const EXTRAS_IDS = new Set(["more", "outline", "emoji", "theme-settings", "document-export", "shortcut-settings", "split", "fullscreen", "reading-mode", "theme-toggle",
-  /* 【2026-10-09 接上】upload（图片）：由扩展包的 toolbarClick 接管 —— 单一语义＝只弹原生文件选择器。
-     登记在这里才会走"已实现"分支（否则 done=false ⇒ 置灰 + is-todo + 不挂监听 = 点了没反应）。 */
-  "upload"]);
+ *  集合只登记**岛上真实存在的槽位**：主题配色 / 明暗 / 字体 / 页面 / 界面 / 阅读配色 / 快捷键等
+ *  偏好入口已统一到「更多 → 编辑器设置」，不再登记；toolbarClick 里保留它们的路由，外部调用可用。 */
+const EXTRAS_IDS = new Set(["more", "outline", "emoji", "document-export", "split", "fullscreen", "reading-mode",
+  /* upload（图片）＝只弹原生文件选择器；footnote＝扩展包的 runFootnote（插入 / 跳转 / 返回）。 */
+  "upload", "footnote"]);
 
 const NOT_YET = {
-  // 【已接】reading-mode / fullscreen / theme-toggle 不再列在这里（见 EXTRAS_IDS）
+  // 【已接】reading-mode / fullscreen / footnote 不再列在这里（见 EXTRAS_IDS）
   // 【2026-10-09 已接】upload（图片）：接上扩展包的文件选择器（单一语义）；
   //                    reload（重新加载）：**不再占工具栏槽位**，改为「更多」菜单项 + 壳侧 file:reload 上行。
   // 【删掉的死按钮】edit-mode / source-toggle：CM6 的文档**本来就是 markdown 源文本直编**，
@@ -73,12 +70,6 @@ const NOT_YET = {
 
 const ITEMS = [
   { id: "outline", tip: "大纲", icon: svg("M4 6h16M4 12h10M4 18h13") },
-  { id: "theme-settings", tip: "主题", icon: svg("M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 0v18") },
-  /* 【明暗切换·2026-10-08】① 位置：紧跟在「主题」之后（两者相邻，间距＝岛上标准间距）；
-     ② 图标改成**太阳/月亮二态**，跟随当前明暗自动换：暗色主题显示"太阳"（点它变亮）、
-        亮色主题显示"月亮"（点它变暗）——图标本身就是"点下去会得到什么"。
-        图标在 setThemeIcon() 里按 dataset.mpDark 切换，主题一变（applyEditorTheme / mpTheme.apply）就刷新。 */
-  { id: "theme-toggle", tip: "切换明暗（浅色 / 深色）", icon: svg("M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z") },
   { id: "emoji", tip: "Emoji", icon: svg("M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM9 10h.01M15 10h.01M8.5 14.5a4 4 0 0 0 7 0") },
   { id: "headings", tip: "标题（循环 H1→H6→正文）", icon: svg("M6 5v14M18 5v14M6 12h12") },
   { id: "bold", tip: "加粗 Ctrl+B", icon: svg("M7 5h6a3.5 3.5 0 0 1 0 7H7Zm0 7h7a3.5 3.5 0 0 1 0 7H7Z") },
@@ -100,14 +91,13 @@ const ITEMS = [
   { id: "line", tip: "分割线", icon: svg("M4 12h16M7 8h10M7 16h10") },
   { id: "code", tip: "代码块", icon: svg("M9 6 4 12l5 6M15 6l5 6-5 6") },
   { id: "inline-code", tip: "行内代码", icon: svg("M10 6 8 18M16 6l-2 12M5 10h14M5 14h14") },
-  { id: "insert-before", tip: "在光标行之前插入空行", icon: svg("M12 4v16M8 8l4-4 4 4") },
-  { id: "insert-after", tip: "在光标行之后插入空行", icon: svg("M12 4v16M8 16l4 4 4-4") },
+  /* 【脚注·2026-11-16】形如 x¹ 的原生图标：左下 x（两笔交叉）＋右上标 1（斜起笔＋竖）。
+     位置＝原先「上/下插空行」两颗按钮处；行为直接复用 extras.js 的 runFootnote
+     （插入引用 / 跳到定义 / 返回引用三种上下文同一个动作），不再在「更多」里重复一条。 */
+  { id: "footnote", tip: "脚注：插入、跳转或返回", icon: svg("M4 9.6L9.4 15.4M9.4 9.6L4 15.4M13.4 6.4L15.6 4.2V10.6") },
   { sep: true },
   { id: "upload", tip: "图片", icon: svg("M4 6h16v12H4zM8 12l3 3 2-2 3 3M9 9h.01") },
   { id: "table", tip: "表格", icon: svg("M4 5h16v14H4zM4 10h16M10 5v14") },
-  { sep: true },
-  { id: "undo", tip: "撤销 Ctrl+Z", icon: svg("M9 8H5V4M5 8a8 8 0 1 1-1 7") },
-  { id: "redo", tip: "重做 Ctrl+Y", icon: svg("M15 8h4V4M19 8a8 8 0 1 0 1 7") },
   { sep: true },
   { id: "fullscreen", tip: "全屏", icon: svg("M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5") },
   /* 【双开 vs 阅读模式·2026-10-08 图标重画】两者原先都是"左右两块面板"，缩到 24px 剪影几乎一样
@@ -118,7 +108,7 @@ const ITEMS = [
      不靠颜色也能分辨；线宽 1.7、viewBox 24、与岛上其它图标同一套（同一个 svg() 助手）。 */
   { id: "split", tip: "双开：左侧渲染编辑面 + 右侧同文档只读源码（滚动/点击双向跟随）", icon: svg("M4 5h7v14H4zM13 5h7v14h-7z") },
   { id: "reading-mode", tip: "阅读模式", icon: svg("M12 7.4C10.2 5.9 7.6 5.2 4.6 5.2v11.2c3 0 5.6.7 7.4 2.2 1.8-1.5 4.4-2.2 7.4-2.2V5.2c-3 0-5.6.7-7.4 2.2ZM12 7.4v11.2") },
-  { id: "document-export", tip: "导出", icon: svg("M14 4h6v6M20 4l-9 9M18 14v5H5V6h5") },
+  { id: "document-export", tip: "导出（PDF / HTML / 复制）", icon: svg("M14 4h6v6M20 4l-9 9M18 14v5H5V6h5") },
   /* 【2026-10-09 撤出工具栏】reload（重新加载）已收进「更多」菜单（低频动作不占槽位），
      而且它的上行这次真接上了（壳侧 file:reload）—— 原来它是置灰的 is-todo 死按钮。 */
   /* 【「更多」挪到最右·2026-10-08】用户要求汉堡菜单从工具栏**最左**挪到**最右**：
@@ -126,7 +116,7 @@ const ITEMS = [
      收起后仍是最右边那颗小圆岛（J3 判据要求"靠右、右缝≈12"）——即：
        … 双开 │ 阅读模式 │ 导出 │ **更多** │ 折叠　（重新加载 2026-10-09 已收进「更多」菜单）
      "更多在最右"与"折叠永远可点"两条同时成立。 */
-  { id: "more", tip: "更多（导出 / 设置 / 界面透明度 / 阅读模式 / 帮助 / 关于）", icon: svg("M6 12h.01M12 12h.01M18 12h.01") },
+  { id: "more", tip: "更多（重新加载 / 图片操作 / 编辑器设置 / 帮助）", icon: svg("M6 12h.01M12 12h.01M18 12h.01") },
   { id: "toolbar-fold", tip: "收起工具栏", icon: svg("m7 13 5-5 5 5M7 18l5-5 5 5"), fold: true },
 ];
 
@@ -498,42 +488,6 @@ function setFolded(bar, v) {
   try { localStorage.setItem(FOLD_KEY, v ? "1" : "0"); } catch { }
 }
 
-/* ── 明暗切换图标（太阳/月亮二态）────────────────────────────────────────────
- *  为什么跟随状态：图标＝"点下去会得到什么"。当前是**深色** ⇒ 显示**太阳**（点它变亮）；
- *  当前是**浅色** ⇒ 显示**月亮**（点它变暗）。
- *  判定源：`html[data-mode]`（`themeApply()` 写的单一真源，值就是 'dark'/'light'）+ `data-editor-theme`。
- *  用 MutationObserver 盯这两个属性 ⇒ 不管主题从工具栏、设置面板还是壳层菜单切的，图标都会跟上。
- *  （比"点击时自己翻转"可靠：主题应用的唯一写者不是工具栏。） */
-const SUN_PATH = "M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z";
-const MOON_PATH = "M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1Z";
-function isDarkNow() {
-  try {
-    const root = document.documentElement;
-    const mode = root.dataset.mode;
-    if (mode === 'dark') return true;
-    if (mode === 'light') return false;
-    const id = root.dataset.editorTheme || '';
-    if (/-dark$/.test(id)) return true;
-    if (/-light$/.test(id)) return false;
-    // 兜底：按主题登记表问一次（它才是"当前配色"的权威）
-    const mt = window.mpTheme;
-    if (mt && mt.current && mt.byId) { const p = mt.byId(mt.current()); if (p) return !!p.dark; }
-    // 最后兜底：底色的明度（白底=浅色）
-    const bg = getComputedStyle(root).getPropertyValue('--mp-bg').trim();
-    const m = /^#([0-9a-f]{6})$/i.exec(bg);
-    if (m) { const n = parseInt(m[1], 16); const lum = ((n >> 16) & 255) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114; return lum < 140; }
-  } catch { /* 读不到就按深色（默认主题是深色） */ }
-  return true;
-}
-function setThemeIcon(btn) {
-  if (!btn) return;
-  const dark = isDarkNow();
-  btn.innerHTML = svg(dark ? SUN_PATH : MOON_PATH);
-  btn.title = dark ? '切换到浅色模式（当前：深色）' : '切换到深色模式（当前：浅色）';
-  btn.setAttribute('aria-label', btn.title);
-  btn.dataset.mpDarkNow = dark ? '1' : '0';
-}
-
 /** 建工具栏并挂到 iframe 顶部；返回卸载函数。 */
 /* 【正文右键菜单复用·2026-10-10】把编辑动作表导出去：菜单与工具栏必须是**同一批实现**，
    否则就会出现"工具栏点了有用、菜单点了没反应"（实测根因：菜单走的是 toolbarClick，
@@ -553,20 +507,25 @@ export function installToolbar(view) {
     btn.className = "mp-tb-item" + (item.fold ? " mp-tb-fold" : "");
     btn.dataset.mpId = item.id;
     btn.innerHTML = item.icon;
-    const ext = window.mpExtras && window.mpExtras.toolbarClick ? window.mpExtras.toolbarClick(item.id, btn) : false;
-    // 【纪律】不能在这里调用 toolbarClick 判定"是否已实现"：按钮创建那一刻 window.mpExtras
-    // 还没挂上（installExtras 在 installToolbar 之后跑），"更多"会被误判成未实现而置灰（实测踩坑）。
+    /* 【热路径纪律·2026-11-16】这里**只建 DOM**，绝不调用 toolbarClick：
+       它是"执行用户命令"的入口（打开更多/导出/切换大纲…），而 installToolbar 在每次重开文档时
+       都会再跑一遍 ⇒ 创建即触发会变成"菜单自己弹出、导出框自开"的点击副作用。
+       是否已实现只看静态集合（ACTIONS / EXTRAS_IDS），与运行时的 window.mpExtras 无关。 */
     const done = !!ACTIONS[item.id] || EXTRAS_IDS.has(item.id);
     if (done) {
       btn.title = item.tip;
-      const runItem = () => {
-        if (window.mpExtras && window.mpExtras.toolbarClick(item.id, btn)) return;
+      btn.setAttribute("aria-label", item.tip);
+      if (item.id === "more") btn.setAttribute("aria-haspopup", "menu");
+      const runItem = (keyboard = false) => {
+        /* 第三参是“激活来源”提示（弹层用它决定要不要把焦点交给首项），不是命令参数；
+           外部调用仍可只传 (id, anchor)。 */
+        if (window.mpExtras && window.mpExtras.toolbarClick(item.id, btn, { keyboard })) return;
         TOOLBAR_ACTIONS[item.id]?.(view);
       };
       btn.addEventListener("mousedown", (e) => {
         if (e.button !== 0) return;
         e.preventDefault(); e.stopPropagation();
-        runItem();
+        runItem(false);
       });
       /* 【键盘可达修复·2026-10-10（第三波 a11y-keyboard 族：31/32 按钮键盘不可达 ✗）】
          原来只绑 mousedown，而键盘激活 <button>（Enter/Space）走的是 **click** ⇒ 键盘用户把焦点
@@ -576,7 +535,7 @@ export function installToolbar(view) {
       btn.addEventListener("click", (e) => {
         if (e.detail !== 0) return;
         e.preventDefault(); e.stopPropagation();
-        runItem();
+        runItem(true);
       });
     } else {
       btn.disabled = true;
@@ -602,23 +561,10 @@ export function installToolbar(view) {
         setFolded(bar, !bar.classList.contains("is-folded"));
       });
     }
-    if (item.id === "theme-toggle") {
-      btn.setAttribute("aria-label", "切换明暗");
-      setThemeIcon(btn);
-      btn.addEventListener("mousedown", () => { setTimeout(() => setThemeIcon(btn), 0); });
-    }
     bar.appendChild(btn);
   }
   setFolded(bar, isFolded());   // 恢复上次的折叠态（在挂载前设好，避免首帧"先展开再收起"的跳变）
   document.body.appendChild(bar);
-  /* 明暗图标的跟随：盯主题的单一真源回显（`html[data-mode]` / `html[data-editor-theme]`）。 */
-  const themeBtn = bar.querySelector('.mp-tb-item[data-mp-id="theme-toggle"]');
-  let mo = null;
-  try {
-    mo = new MutationObserver(() => setThemeIcon(themeBtn));
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-mode", "data-editor-theme"] });
-  } catch { /* 没有 MutationObserver：至少初次正确 */ }
-  setThemeIcon(themeBtn);
   /* ── 展开态"能不能单行"：按真实宽度分档，带迟滞 ──────────────────────────────
    * 岛是 fit-content + 居中：宽度每跨一次换行阈值，整行按钮就会横向重排（居中的行
    * 变宽/变窄都会让按钮左右跳）。拖动分隔条时宽度连续变化，临界点附近
@@ -682,7 +628,6 @@ export function installToolbar(view) {
     try { if (rafSync) cancelAnimationFrame(rafSync); } catch { }
     try { window.removeEventListener("resize", onWinResize); } catch { }
     try { if (ro) ro.disconnect(); } catch { }
-    try { if (mo) mo.disconnect(); } catch { }
     try { document.documentElement.style.removeProperty("--mp-toolbar-h"); } catch { }
     try { bar.remove(); } catch { }
   };

@@ -39,6 +39,10 @@ async function cell(text,anchor,head=anchor) {
     cellDOMSelection:()=>({anchor:div.caret,head:div.caret}),
     setCellDOMSelection:(_node,_anchor,end)=>{div.caret=end;},syncCellSelection:noOp,updateCellSizer:noOp,
     scheduleCellOverlay:noOp,deactivateCellOverlay:noOp,regionIndexField:0,embeddedImages:()=>[],
+    /* syncCellEdit 收尾会调用活动格公式预览的输入入口（cell-math-preview.js 的控制器）。
+       本夹具只切 syncCellEdit 这一段源码，不需要公式卡片本身，所以按"其它预览依赖"同款
+       方式给一个 no-op 替身；它不改变被断言的行为（镜像 diff / 选区 / 撤销全部走真实实现）。 */
+    noteCellMathInput:noOp,
     moveActiveCellByKey:run=>run(),resyncCellEdit:()=>{div.textContent=codec.mappedCellSource(view.state.sliceDoc(owner.from,owner.to)).text;},
   };
   const sync=bind(fragment(declaration('syncCellEdit'))+'; return syncCellEdit',bindings);

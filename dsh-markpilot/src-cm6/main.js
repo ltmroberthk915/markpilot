@@ -63,6 +63,7 @@ import { beginNativeImageTransfer, sourceImageTicket } from './image-transfer.js
 import { imageInsertions, cancelImageInsertions } from './image-insertion.js';
 import { mappedMathSource, mathSourcePosition } from './math-source-map.js';
 import { mappedCellSource, cellSourceOffset, cellTextOffset, cellTextChange, encodeCellText, cellContentSpan, cellCaretEdge } from './cell-source-map.js';
+import { cellMathTarget, placeCellMathPreview, cellPreviewLocal, cellPreviewInteractive, cellPreviewRenderKey, cellPreviewIsCurrent, cellPreviewOnscreen } from './cell-math-preview.js';
 import { installSplit } from "./splitview.js";
 import { isEmbeddedImage, embeddedImages, protectedPayloadDecoration, protectImagePayloads, safeImagePayloadPosition } from './image-payload.js';
 import { createImageRemovalGate } from './image-removal.js';
@@ -3182,7 +3183,7 @@ function syncCellEdit(edit) {
     if (dom) setCellDOMSelection(edit, dom.anchor, dom.head);
   }
   const change = cellTextChange(source, nextText);
-  if (!change) { syncCellSelection(edit); updateCellSizer(edit); scheduleCellOverlay(true); return; }
+  if (!change) { syncCellSelection(edit); updateCellSizer(edit); scheduleCellOverlay(true); noteCellMathInput(); return; }
   const mapped = mappedCellSource(change.source);
   const from = cellEdit.from;
   const selection = dom ? {
@@ -3217,8 +3218,10 @@ function syncCellEdit(edit) {
   }
   /* 【A7-(b)】这里原先每次输入都刷一次格内预览（含一次 cellHTML 渲染比较）。已按决定删除：
      预览卡片与"不遮住下一行"在相邻行上结构性互斥（可用带宽 2px vs 卡片 30px+），
-     而去掉它同时最贴 Typora、并在每键路径上**净省**一次 innerHTML 写入 + 一次渲染比较。 */
-  updateCellSizer(edit); scheduleCellOverlay(true);
+     而去掉它同时最贴 Typora、并在每键路径上**净省**一次 innerHTML 写入 + 一次渲染比较。
+     【活动格公式预览】现在只维护**光标所在那一条公式**的一张浮卡：另一条独立路径，纯文本格
+     直接命中 null 提前返回，不重扫表格、不重渲其它格。 */
+  updateCellSizer(edit); scheduleCellOverlay(true); noteCellMathInput();
 }
 /** 撤销后外向同步：源码 → 编辑面 */
 function resyncCellEdit(edit) {
@@ -3347,6 +3350,16 @@ function ensureCellOverlay() {
           mappedCellSource(view.state.doc.sliceString(cellEdit.from,cellEdit.to)).text !== edit.textContent) return;
       syncCellSelection(edit);
     });
+    /* 【活动格公式预览·光标跟随】箭头/Home/End/鼠标落点/拖拽都会改 DOM 选区；这里只做
+       "读光标→比公式"，命中同一公式就只跟随重定位，纯文本格直接提前返回
+       ⇒ 不扫表格、不重渲任何格（长表格滚动路径零新增工作）。
+       先判 cellEdit 再碰 DOM：没有活动格时连 querySelector 都不做。 */
+    document.addEventListener('selectionchange', () => {
+      if (!cellEdit) return;
+      const edit = cellOverlay?.querySelector('.mp-cell-overlay-text');
+      if (!edit || !edit.isConnected || document.activeElement !== edit) return;
+      noteCellMathInput();
+    });
   }
   const box = document.createElement("div");
   box.className = "mp-cell-overlay";
@@ -3356,7 +3369,7 @@ function ensureCellOverlay() {
   div.spellcheck = false;
   box.appendChild(div);
   div.addEventListener("compositionstart", () => { syncCellSelection(div); cellComposing = true; window.__dshBridge?.composition?.(true); });
-  div.addEventListener("compositionend", () => { cellComposing = false; syncCellEdit(div); window.__dshBridge?.composition?.(false); });
+  div.addEventListener("compositionend", () => { cellComposing = false; syncCellEdit(div); noteCellMathInput(); window.__dshBridge?.composition?.(false); });
   div.addEventListener('beforeinput', e => {
     if (e.inputType === 'historyUndo' || e.inputType === 'historyRedo') {
       e.preventDefault(); cellHistory(div, e.inputType === 'historyUndo' ? undo : redo); return;
@@ -3367,7 +3380,7 @@ function ensureCellOverlay() {
   });
   div.addEventListener("input", () => {
     if (!cellComposing) syncCellEdit(div);
-    else { updateCellSizer(div); scheduleCellOverlay(true); }
+    else { updateCellSizer(div); scheduleCellOverlay(true); noteCellMathInput(); }
   });
   // Native scrolling belongs to the scroll host; modifier-wheel belongs to view.dom capture.
   /* 【N1】copy 必须挂在覆盖层自己身上：它挂 body、事件在 contentDOM 之外，CM6 的处理器收不到。 */
@@ -3570,7 +3583,218 @@ function ensureCellOverlay() {
   cellOverlay = box;
   return box;
 }
-function positionCellOverlay(){if(!view||!cellOverlay)return;const active=view.state.field(activeCellField,false),cell=active&&activeCellDOM(),source=cell?.querySelector('.mp-cell-source-size');const p=cell&&source&&readCellOverlayPlacement(view,cellOverlay,cell,source,mpZoomOf(view.scrollDOM));if(!p){cellOverlay.style.display='none';return;}if(cellOverlay.style.display!=='block')cellOverlay.style.display='block';const key=[active.rowFrom,active.col,p.width,p.height,p.sx,p.sy].join(':');if(overlayStyledFor!==key){overlayStyledFor=key;const cs=getComputedStyle(cell);for(const name of ['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing','textAlign','color'])if(cellOverlay.style[name]!==cs[name])cellOverlay.style[name]=cs[name];}applyCellOverlayPlacement(cellOverlay,p);}
+/* ══ 活动格公式预览 ══════════════════════════════════════════════════════════════
+ *  正在编辑的格子里，光标所在的 `$…$` / 整格 `$$…$$` 渲染成一张贴本格的卡片；光标走到纯文本
+ *  或离开格子，卡片立刻收掉。与格源文本、光标、IME、撤销、Tab/换行、表格几何**完全解耦**：
+ *    · 格内仍是原生 contenteditable 源码（不改 DOM 文本、不插节点、不动选区）；
+ *    · 卡片挂在覆盖层盒子里（body 上的绝对定位层），不占排版流 ⇒ 表格不会因为它出现/消失跳动；
+ *    · 渲染走正文同一个 renderMathHTML（同一份 tex→HTML 缓存），这里不写第二套渲染器。
+ *  性能纪律（长表格滚动的既有契约不动）：
+ *    · 只在**活动格 + 文本/光标真的变了**时重算；命中同一 tex 直接复用已挂的 KaTeX DOM；
+ *    · 普通文本格、滚动、几何变化只做"跟随重定位"（改两个 style 值）或什么都不做；
+ *      `cellMathState.tex` 为空时连 frame 都不排，全表零成本。
+ *  与正文一致的两点：光标紧跟在收尾 `$` 之后（截图里"刚写完公式"的那一笔）认这条公式；
+ *  移动到纯文本处不留下过期预览（cellMathTarget 对纯文本光标返回 null）。 */
+const CELL_PREVIEW_MARGIN = 6;
+/* 卡片状态（模块级，跨覆盖层生命周期）：
+ *   key/tex/display —— 当前挂的是哪条公式；dom —— 已挂渲染的卡片元素本身（身份判定用它，
+ *   不看父节点：父节点永远命中不了，那会让每帧都重建 KaTeX）；
+ *   natural —— 该公式的**自然尺寸**（CSS 像素，量一次缓存到公式变化为止，绝不每帧写 max-content）；
+ *   visible —— 卡片当前是否可 Visibility:visible。 */
+let cellMathState = { key: '', tex: '', display: false, dom: null, rendered: false,
+  natural: null, visible: false };
+let cellMathFrame = 0;
+/** 活动格当前该预览哪条公式（纯逻辑在 cell-math-preview.js，与正文共用 inline-format 扫描器）。
+ *  【普通格快路径】先读一次 textContent：不含 `$` 的格直接返回，**不碰 DOM 选区**
+ *  （cellDOMSelection 要建 Range + toString，是每键路径上最贵的一步）。取出的一次文本
+ *  就交给 cellMathTarget 复用，不再第二次读 textContent。 */
+function cellMathCaret() {
+  const edit = cellOverlay?.querySelector('.mp-cell-overlay-text');
+  if (!cellEdit || !edit || !edit.isConnected) return null;
+  const text = edit.textContent || '';
+  if (!text.includes('$')) return null; // 普通格：无公式 ⇒ 零 Range/零 offset/零目标判定
+  const dom = cellDOMSelection(edit);
+  // 有选区时不判定：与正文"只展开 head 所在那一个"同源，这里不叠卡片（也避免选区内反复重排）。
+  if (!dom || dom.head !== dom.anchor) return null;
+  return cellMathTarget(text, dom.head);
+}
+function ensureCellMathPreview() {
+  if (!cellOverlay) return null;
+  let card = cellOverlay.querySelector('.mp-cell-math-preview');
+  if (!card) {
+    card = document.createElement('div');
+    card.className = 'mp-cell-math-preview';
+    card.setAttribute('aria-hidden', 'true');
+    card.setAttribute('contenteditable', 'false');
+    card.addEventListener('mousedown', cellOverlayMathPointer, true);
+    cellOverlay.appendChild(card);
+  }
+  return card;
+}
+/** 溢出卡片上的按下：只放行卡片**自己的滚动条**那一条，其余一律 preventDefault
+ *  ⇒ 源码的焦点/光标/选区原地不动（不劫持编辑），而长公式仍能靠拖它自己的滚动条看全。
+ *  非溢出卡片 pointer-events:none，根本进不来这里（普通公式不劫持编辑）。 */
+function cellOverlayMathPointer(event) {
+  const card = event.currentTarget;
+  if (!card?.classList.contains('is-interactive') || event.button !== 0) return;
+  const rect = card.getBoundingClientRect();
+  const zoom = mpZoomOf(card) || 1;
+  // 滚动条占位＝视觉尺寸 − 内容盒（clientWidth/Height 是未缩放的 CSS 像素）。
+  const gutterY = Math.max(0, rect.height - card.clientHeight * zoom);
+  const gutterX = Math.max(0, rect.width - card.clientWidth * zoom);
+  const onVertical = gutterX > 0 && event.clientX >= rect.right - gutterX - 1;
+  const onHorizontal = gutterY > 0 && event.clientY >= rect.bottom - gutterY - 1;
+  if (onVertical || onHorizontal) {
+    // 拖动滚动条：保住源码焦点与选区（滚动条天然不抢焦点，这里只兜一手）。
+    const edit = cellOverlay?.querySelector('.mp-cell-overlay-text');
+    if (edit && document.activeElement !== edit) edit.focus({ preventScroll: true });
+    return;
+  }
+  // 点在公式字形上：源码才是编辑面 ⇒ 不动焦点、不移光标。
+  event.preventDefault();
+  const edit = cellOverlay?.querySelector('.mp-cell-overlay-text');
+  if (edit && document.activeElement !== edit) edit.focus({ preventScroll: true });
+}
+function hideCellMathPreview() {
+  const card = cellMathState.dom || cellOverlay?.querySelector('.mp-cell-math-preview');
+  if (card) {
+    // 隐形时收回交互权：卡片一旦不可见就绝不能再吃掉格子上的点击。
+    if (card.classList.contains('is-interactive')) card.classList.remove('is-interactive');
+    if (card.style.visibility !== 'hidden') card.style.visibility = 'hidden';
+  }
+  cellMathState.visible = false;
+}
+/** 目标消失（光标落到纯文本/选区/离开格）：隐藏并**丢弃**渲染节点。
+ *  与"滚出可见带"分开：那种情况只隐藏、节点留着，滚回来仅重定位；
+ *  这里是"这条公式不再被编辑"，留着节点只会让入口每次都白排一帧。 */
+function clearCellMathPreview() {
+  hideCellMathPreview();
+  const card = cellMathState.dom || cellOverlay?.querySelector('.mp-cell-math-preview');
+  if (card && card.firstChild) card.textContent = '';
+  cellMathState = { key: '', tex: '', display: false, dom: null, rendered: false, natural: null, visible: false };
+}
+/** 卡片内容：key 变了才碰 KaTeX；同一公式重复进入只是"重新可见"，已挂的渲染节点原样保留。 */
+function paintCellMathPreview(card, target) {
+  const key = cellPreviewRenderKey(target);
+  if (cellPreviewIsCurrent(cellMathState, key, card)) return false;
+  card.textContent = '';
+  card.classList.toggle('mp-cell-math-preview-display', target.display);
+  const html = renderMathHTML(target.tex, target.display);
+  if (html == null) {
+    // 解析失败：退回源码（与正文同口径），不缓存、也不当作已渲染。
+    card.textContent = target.tex;
+    cellMathState = { key: '', tex: target.tex, display: target.display, dom: null,
+      rendered: false, natural: null, visible: cellMathState.visible };
+    return true;
+  }
+  const template = document.createElement('template');
+  template.innerHTML = html;
+  card.appendChild(template.content.cloneNode(true));
+  cellMathState = { key, tex: target.tex, display: target.display, dom: card,
+    rendered: !!card.firstChild, natural: null, visible: cellMathState.visible };
+  return true;
+}
+/** 自然尺寸量一次即可：公式不变 + 缩放不变时内容尺寸不变。
+ *  测量用 max-content，量完立刻还原（单帧内一次读写，不进每帧路径）；缩放变了才重量。
+ *  返回值是**视觉像素**（getBoundingClientRect 口径，已含卡片自身的 zoom），与落位同单位。 */
+function cellMathNaturalSize(card, zoom) {
+  const cached = cellMathState.natural;
+  if (cached && cached.zoom === zoom) return cached;
+  const width = card.style.width, maxHeight = card.style.maxHeight;
+  card.style.width = 'max-content';
+  card.style.maxHeight = 'none';
+  const rect = card.getBoundingClientRect();
+  card.style.width = width;
+  card.style.maxHeight = maxHeight;
+  const natural = { zoom, width: Math.max(1, rect.width), height: Math.max(1, rect.height) };
+  cellMathState.natural = natural;
+  return natural;
+}
+/** 量一次并落位。所有矩形先读齐，再写样式。
+ *  公式没变时：零 KaTeX 工作、零重排（自然尺寸取自 cellMathState.natural 缓存，不再写 max-content）。
+ *  只有两种情况只隐藏不清节点：整格滚出可见带（滚回来/改尺寸仅重定位）、临时失焦。 */
+function previewCellMath() {
+  cellMathFrame = 0;
+  if (!view || !cellOverlay || cellOverlay.style.display === 'none') { clearCellMathPreview(); return; }
+  const edit = cellOverlay?.querySelector('.mp-cell-overlay-text');
+  // 失焦/组字：连节点一起收掉。半截 TeX 不该预览，也不该每键解析一次
+  // （组字收尾由 compositionend 重算；失焦本身随后就会收场覆盖层）。
+  if (!cellEdit || !edit || !document.hasFocus() || document.activeElement !== edit ||
+      cellComposing || view.composing) { clearCellMathPreview(); return; }
+  const target = cellMathCaret();
+  if (!target) { clearCellMathPreview(); return; } // 纯文本光标/选区中：不留过期预览
+  const cell = activeCellDOM();
+  if (!cell) { clearCellMathPreview(); return; }
+  const sc = view.scrollDOM, zoom = mpZoomOf(sc);
+  const bounds = scrollViewportBounds(sc, zoom);
+  const rect = cell.getBoundingClientRect();
+  const frame = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+  // 整格滚出可见带：只隐藏，渲染节点留着（滚回来/改尺寸时仅重定位，不重解析）。
+  if (!cellPreviewOnscreen(frame, bounds)) { hideCellMathPreview(); return; }
+  const column = previewColumnFrame(sc, view.contentDOM, zoom);
+  if (!(column.right > column.left)) { hideCellMathPreview(); return; }
+  const card = ensureCellMathPreview();
+  if (!card) { clearCellMathPreview(); return; }
+  paintCellMathPreview(card, target);
+  const natural = cellMathNaturalSize(card, zoom);
+  // 卡片挂在覆盖层盒子里（.cm-scroller 内 ⇒ 同样在 CSS zoom 上下文里），
+  // 所以它和格子矩形的单位一致，都是**视觉像素**：直接喂给落位，不再换算。
+  const placement = placeCellMathPreview({
+    cell: frame,
+    bounds: { top: bounds.top + CELL_PREVIEW_MARGIN, bottom: bounds.bottom - CELL_PREVIEW_MARGIN },
+    column,
+    width: natural.width,
+    height: natural.height,
+  });
+  if (!placement) { hideCellMathPreview(); return; }
+  positionCellMathPreview(card, placement, zoom);
+}
+/** 可写区域：编辑带内、版心正文列（与正文浮动预览同一侧边留白口径）。 */
+function previewColumnFrame(sc, content, zoom) {
+  const sr = sc.getBoundingClientRect(), cr = content.getBoundingClientRect();
+  const cs = getComputedStyle(content);
+  const px = name => parseFloat(cs[name]) || 0;
+  const left = Math.max(sr.left + sc.clientLeft * zoom,
+    cr.left + (px('paddingLeft') + px('borderLeftWidth')) * zoom) + CELL_PREVIEW_MARGIN;
+  const right = Math.min(sr.left + (sc.clientLeft + sc.clientWidth) * zoom,
+    cr.right - (px('paddingRight') + px('borderRightWidth')) * zoom) - CELL_PREVIEW_MARGIN;
+  return { left, right };
+}
+function positionCellMathPreview(card, placement, zoom) {
+  const box = cellOverlay.getBoundingClientRect();
+  const local = cellPreviewLocal(placement, { left: box.left, top: box.top }, zoom);
+  if (!local) { clearCellMathPreview(); return; }
+  const styles = {
+    left: local.left + 'px', top: local.top + 'px',
+    width: local.width + 'px', maxHeight: local.maxHeight + 'px',
+    overflowX: placement.scrollX ? 'auto' : 'hidden',
+    overflowY: placement.scrollY ? 'auto' : 'hidden',
+  };
+  for (const [key, value] of Object.entries(styles)) if (card.style[key] !== value) card.style[key] = value;
+  /* 溢出才可交互（拖滚动条看全长公式）；不溢出保持穿透，普通公式不劫持编辑。
+     这一帧本来就要读布局（格/卡片矩形），所以顺带量一次滚动余量不需要额外强制重排。 */
+  const interactive = cellPreviewInteractive(placement, card);
+  if (card.classList.contains('is-interactive') !== interactive) card.classList.toggle('is-interactive', interactive);
+  if (card.style.visibility !== 'visible') card.style.visibility = 'visible';
+  cellMathState.visible = true;
+}
+function scheduleCellMathPreview() {
+  if (cellMathFrame) return;
+  cellMathFrame = requestAnimationFrame(previewCellMath);
+}
+/** 输入/选区变化入口：合并成一次 rAF。普通格（无 `$`）连 frame 都不排。
+ *  有卡片在屏幕上时无条件重算（公式可能被删/光标移走 ⇒ 该收掉），由 previewCellMath 清理。 */
+function noteCellMathInput() {
+  if (!view || !cellEdit) return;
+  if (cellMathState.rendered || cellMathState.visible) { scheduleCellMathPreview(); return; }
+  // 无卡片：一次 includes 判定即返回；有公式才进一步读光标并排帧。
+  if (cellMathCaret()) scheduleCellMathPreview();
+}
+/** 滚动/几何变化入口：只在**有卡片时**跟随重定位（无卡片时零成本，长表格滚动路径不变）。 */
+function followCellMathPreview() {
+  if (cellMathState.rendered || cellMathState.visible) scheduleCellMathPreview();
+}
+function positionCellOverlay(){if(!view||!cellOverlay)return;const active=view.state.field(activeCellField,false),cell=active&&activeCellDOM(),source=cell?.querySelector('.mp-cell-source-size');const p=cell&&source&&readCellOverlayPlacement(view,cellOverlay,cell,source,mpZoomOf(view.scrollDOM));if(!p){cellOverlay.style.display='none';hideCellMathPreview();return;}if(cellOverlay.style.display!=='block')cellOverlay.style.display='block';const key=[active.rowFrom,active.col,p.width,p.height,p.sx,p.sy].join(':');if(overlayStyledFor!==key){overlayStyledFor=key;const cs=getComputedStyle(cell);for(const name of ['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing','textAlign','color'])if(cellOverlay.style[name]!==cs[name])cellOverlay.style[name]=cs[name];}applyCellOverlayPlacement(cellOverlay,p);followCellMathPreview();}
 /** 激活/切换活动格：建覆盖层、播种源码文本、落焦点 */
 function activateCellOverlay(rowFrom, col, cols, from, to, caretOffset, selectAll, sourceSelection, pointer) {
   stopCellPointerSelection();
@@ -3642,10 +3866,15 @@ function activateCellOverlay(rowFrom, col, cols, from, to, caretOffset, selectAl
     syncCellSelection(div);
   };
   focusIt();
+  /* 【首帧预览】点格/键盘换格时 DOM 选区是程序化设的，selectionchange 不保证在
+     覆盖层落位之后到；这里显式排一次，保证"点进去就在公式上"时卡片同帧出现。 */
+  noteCellMathInput();
 }
 function deactivateCellOverlay() {
   stopCellPointerSelection();
   if (cellOverlay) cellOverlay.style.display = "none";
+  clearCellMathPreview();
+  if (cellMathFrame) { cancelAnimationFrame(cellMathFrame); cellMathFrame = 0; }
   cellEdit = null;
   activeCellLayout = null;
   cellComposing = false;
@@ -7260,6 +7489,54 @@ table.mp-row th { background: var(--mp-capsule); font-weight: 500; }
 .mp-cell-layout > div { grid-area: 1 / 1; min-width: 0; align-self: center; }
 .mp-cell-source-size { white-space: pre-wrap; word-break: break-all; min-height: 1.3em; }
 .mp-cell-editing { outline: 1px solid color-mix(in srgb, var(--mp-primary) 45%, transparent); outline-offset: -1px; }
+/* 活动格公式预览卡片：贴本格的一张浮卡，绝对定位在覆盖层盒子里 ⇒ 不占排版流、表格零跳动。
+   表面**与正文公式浮框同一套变量**（--mp-float-tint / --mp-float-alpha / --mp-float-blur）：
+   设置里调"公式预渲染框"的透明度/模糊，表格卡片跟着一起变，不出现"唯独表格不随"。
+   默认 pointer-events:none ⇒ 卡片永不抢源码的焦点/选区/IME；只有真的溢出（要拖滚动条才能看全）
+   时 JS 加 .is-interactive 才可点，而且点击只落在卡片自身的滚动条区域（见 cellOverlayMathPointer）。
+   宽度/高度由 JS 按可用列宽写，这里只给排版、边框盒与溢出行为。
+   ⚠️ 本注释在注入 CSS 的模板体内，不许出现反引号。 */
+.mp-cell-math-preview {
+  --mp-float-tint: color-mix(in srgb, var(--mp-bg) 84%, var(--mp-fg));
+  position: absolute; z-index: 2; visibility: hidden; pointer-events: none;
+  box-sizing: border-box; display: block;
+  padding: 2px 4px; border-radius: 4px;
+  font-size: 93%; line-height: 1.2; text-align: left;
+  border: 1px solid var(--mp-border);
+  border-color: color-mix(in srgb, var(--mp-border) 82%, var(--mp-fg));
+  background: var(--mp-codeBg);
+  background: var(--mp-float-tint);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--mp-fg) 12%, transparent),
+              0 0 0 1px color-mix(in srgb, var(--mp-fg) 5%, transparent);
+  white-space: nowrap; /* 长公式向右滚（overflow-x），不做不可读的折行 */
+}
+/* 与 .mp-inline-float 完全同一条毛玻璃配方（同两个 token、同一 fallback 顺序）。 */
+@supports ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  .mp-cell-math-preview {
+    background: color-mix(in srgb, var(--mp-float-tint) var(--mp-float-alpha), transparent);
+    -webkit-backdrop-filter: blur(var(--mp-float-blur)) saturate(1.05);
+    backdrop-filter: blur(var(--mp-float-blur)) saturate(1.05);
+  }
+}
+/* 只有溢出的卡片才可交互（拖它自己的滚动条读数）；普通公式保持穿透，绝不劫持编辑。 */
+.mp-cell-math-preview.is-interactive { pointer-events: auto; }
+.mp-cell-math-preview .katex { font-size: 1em; }
+.mp-cell-math-preview .katex-display { margin: 0; text-align: left; }
+.mp-cell-math-preview .katex-display > .katex { text-align: left; }
+.mp-cell-math-preview::-webkit-scrollbar { height: 3px; width: 3px; }
+.mp-cell-math-preview::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.mp-cell-math-preview::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--mp-fg) 5%, transparent);
+  border-radius: 2px;
+}
+.mp-cell-math-preview::-webkit-scrollbar-thumb {
+  background: var(--mp-border);
+  background: color-mix(in srgb, var(--mp-fg) 28%, transparent);
+  border-radius: 2px; min-width: 24px;
+}
+.mp-cell-math-preview::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--mp-fg) 42%, transparent);
+}
 /* 【β2 表格工具栏】浮在表格上方空行里，不占排版流（出现/消失时正文与表格一个像素都不动）。
    z-index 48 = 盖住格编辑覆盖层(30)、被右键菜单(60)/补全(50)盖住；表面语言与工具岛同源（不写死色值）。
    【⑥ 实底不透明·2026-10-08】用户实测：条是半透明浮层，表格内容从底下透出来 ⇒ 观感"条压住了表头"。
@@ -8796,8 +9073,12 @@ function boot(content) {
     if ((event.ctrlKey || event.metaKey) && /^(?:z|y)$/i.test(event.key)) cancelPendingImageInsertions(view);
   }, true);
   // 表格格编辑覆盖层随滚动重定位
-  /* 【β2】滚动钩子合并：先覆盖层、再表格工具栏（监听器数量不变，rAF 数量不增）。 */
-  view.scrollDOM.addEventListener("scroll", () => { positionTableBar(); }, { passive: true });
+  /* 【β2】滚动钩子合并：先覆盖层、再表格工具栏（监听器数量不变，rAF 数量不增）。
+     活动格公式卡片挂在覆盖层盒子里，跟着盒子一起滚；这里只做"滚出编辑带就隐藏、滚回来重新落位"，
+     而且**只在有卡片时**排一帧（无公式格零成本，长表格滚动路径一个字节都不加）。 */
+  view.scrollDOM.addEventListener("scroll", () => { positionTableBar(); followCellMathPreview(); }, { passive: true });
+  // 窗口尺寸/缩放变化：卡片宽度与可用列宽都变了，重落位一次（同样只在有卡片时）。
+  window.addEventListener("resize", () => { followCellMathPreview(); }, { passive: true });
   /* Ctrl+滚轮 ＝ 内容缩放（Typora/v2.3.3 同款手感）：只在指针位于**编辑面**内时接管，
      按 10% 一档、与快捷键共用同一个 setter；`passive:false` 才能 preventDefault 掉页面缩放。
      注意方向：deltaY < 0（向上滚）＝放大。 */
@@ -8810,7 +9091,7 @@ function boot(content) {
   }, { passive: false, capture: true });
   // 版心/缩放随窗口尺寸变化重算（rAF 合并，无每键成本）
   try {
-    if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => schedulePageWidth()).observe(document.getElementById("editor"));
+    if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => { schedulePageWidth(); followCellMathPreview(); }).observe(document.getElementById("editor"));
   } catch { /* 已有 window.resize 兜底 */ }
   schedulePageWidth();
   mpApplyHostDocDir();   // 首帧就用壳层给的文档目录设好 base（相对路径图首屏即正确）
@@ -8873,6 +9154,25 @@ function boot(content) {
           payload: r.payload, editFrom: r.editFrom, revision: r.revision, contextVersion: r.contextVersion, context: r.context })) };
     },
     __renderMathHTML: renderMathHTML, // 取证通道：导出公式排版复用同一个渲染器（A/B 注入实测用）
+    /* 【活动格公式预览·只读取证口】卡片挂的是哪条公式、可不可见、落位与溢出状态、交互性，
+       以及它是否与正文共用同一份 tex→HTML 缓存（键命中即"没重解析"）。 */
+    __cellMathPreview: () => ({
+      key: cellMathState.key,
+      tex: cellMathState.tex,
+      display: cellMathState.display,
+      rendered: cellMathState.rendered,
+      visible: cellMathState.visible,
+      natural: cellMathState.natural && { zoom: cellMathState.natural.zoom, width: cellMathState.natural.width, height: cellMathState.natural.height },
+      interactive: !!cellMathState.dom?.classList.contains('is-interactive'),
+      placement: cellMathState.dom && {
+        left: cellMathState.dom.style.left, top: cellMathState.dom.style.top,
+        width: cellMathState.dom.style.width, maxHeight: cellMathState.dom.style.maxHeight,
+        overflowX: cellMathState.dom.style.overflowX, overflowY: cellMathState.dom.style.overflowY,
+        visibility: cellMathState.dom.style.visibility,
+      },
+      cached: !!cellMathState.key && htmlCache.has(cellMathState.key),
+      katexNodes: cellMathState.dom ? cellMathState.dom.querySelectorAll('.katex').length : 0,
+    }),
     /* 外观偏好读写（设置面板 / 状态栏 / 取证共用同一条通道；值域见 MP_PREFS） */
     prefs: () => mpPrefsAll(),
     setPref: (id, v) => { mpSetPref(id, v); return mpPrefsAll(); },

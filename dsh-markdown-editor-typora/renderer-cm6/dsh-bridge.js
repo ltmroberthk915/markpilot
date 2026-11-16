@@ -280,6 +280,10 @@
     // 只认"盘符绝对目录"：`.` / 相对形态 / 空串一律当作没有目录（directoryOf("a.md") 会给 "."，
     // 那种情况设 base 反而会静默落到 img/./ 上）。UNC 目录暂不支持（未实测，宁可不设）。
     if (!/^[A-Za-z]:(\/|$)/.test(dir)) dir = '';
+    /* 引擎的导出/粘贴/图片内联都读 `window.__mpDocDir`（EXE 由壳层写）。
+       这里同步一份原生目录（正斜杠）；没有目录就写空串，绝不让旧目录留在
+       新文档上。相对图片仍由下面那个 /img/ base 负责显示。 */
+    try { window.__mpDocDir = dir; } catch (ignored) { /* 无 window 时忽略 */ }
     var href = dir ? IMG_ROUTE + encodeLocalDir(dir) + '/' : './';
     try {
       // 只改写**自己**那个 base：引擎的 `base[data-mp-docbase]` 一旦出现（它插在 head.firstChild）
@@ -748,15 +752,16 @@
   // 宿主能力调用（协议 v1 的 host-invoke 上行；父窗口以 host-result 应答）。
   // 引擎当前不消费 hostApi，保留为宿主演进位；超时兜底避免永久挂起。
   window.hostApi = {
-    invoke: function (cmd, args) {
+    invoke: function (cmd, args, timeoutMs) {
       if (cmd === 'toolbar-height') return Promise.resolve(null);
       if (cmd === 'app-info') return Promise.resolve({ name: 'dsh-markdown-editor-typora for DSH', version: '0.1.0', host: 'dsh' });
+      var wait = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000;
       return new Promise(function (resolve, reject) {
         var id = 'dshhost-' + (++hostSequence);
         var timer = setTimeout(function () {
           hostPending.delete(id);
           reject(new Error('宿主未响应：' + cmd));
-        }, 10000);
+        }, wait);
         hostPending.set(id, {
           resolve: function (value) { clearTimeout(timer); resolve(value); },
           reject: function (error) { clearTimeout(timer); reject(error); },
@@ -765,6 +770,67 @@
       });
     },
   };
+
+  /* 本地图片读取：引擎的导出/公式/粘贴路径只认 window.mpHost.readFileBase64。
+   * DSH 不在 iframe 里暴露 fs；这里转给父窗口，父窗口走插件既有的 /img/ 路由
+   * （只接受图片扩展名、绝对路径、认证栅栏），不会把任意 file: 交给 HTML。 */
+  (function installHostFileRead() {
+    var host = window.mpHost;
+    if (!host || (typeof host !== 'object' && typeof host !== 'function')) host = window.mpHost = {};
+    if (typeof host.readFileBase64 === 'function') return;
+    host.readFileBase64 = function (path, opts) {
+      return window.hostApi.invoke('read-file-base64', {
+        path: String(path == null ? '' : path),
+        maxBytes: opts && opts.maxBytes,
+      }, 30000);
+    };
+  })();
+
+  /* PDF 导出：DSH 桌面宿主提供 dshDesktop.files.save（原生另存为/替换/取消），
+   * 但 iframe 里拿不到它；这里只把渲染侧的 HTML 交给父窗口，父窗口走
+   * host-invoke → 宿主路由 → headless Chromium → 原生保存对话框。
+   * 引擎的 exportPdf() 会优先调用 window.mpHost.exportPdf（与 EXE 同名契约）；
+   * 父窗口若没有真实保存通道会回 {ok:false,fallback:'print'}，引擎再退回原来的
+   * 独立打印页——绝不把“没有文件”报告成成功。 */
+  (function installExportPdfHost() {
+    var host = window.mpHost;
+    if (!host || (typeof host !== 'object' && typeof host !== 'function')) host = window.mpHost = {};
+    if (typeof host.exportPdf === 'function') return;
+    host.exportPdf = function () {
+      var api = window.mpExtras;
+      if (!api || typeof api.buildPrintHtml !== 'function') {
+        return Promise.resolve({ ok: false, error: 'print-html-unavailable' });
+      }
+      return Promise.resolve().then(function () {
+        return api.buildPrintHtml({ forPdf: true });
+      }).then(function (built) {
+        try {
+          if (!built || typeof built.html !== 'string' || !built.html) {
+            return { ok: false, error: 'print-html-empty' };
+          }
+          var jobId = 'dshpdf-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+          return window.hostApi.invoke('export-pdf', {
+            html: built.html,
+            title: built.title || 'MarkPilot',
+            name: built.title || 'MarkPilot',
+            jobId: jobId,
+            /* 结果要给用户/QA 交代：外链图与读不到的本地图各有多少，
+               但绝不因为 remote>0 取消整篇（与 EXE 同口径）。 */
+            images: built.images || null,
+          }, 180000);
+        } finally {
+          try {
+            if (built && built.mermaidStat && built.mermaidStat.svgs && built.mermaidStat.svgs.clear) built.mermaidStat.svgs.clear();
+          } catch (error) { /* cache cleanup only */ }
+        }
+      }, function (error) {
+        return { ok: false, error: String((error && error.message) || error) };
+      });
+    };
+    host.exportPdfCancel = function (jobId) {
+      return window.hostApi.invoke('export-pdf-cancel', { jobId: jobId });
+    };
+  })();
 
   // 诊断/取证位（只读快照；dsh-selection 与 Electron 验收都从这里读）。
   window.__dshBridge = {

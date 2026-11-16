@@ -1,3 +1,9 @@
+# MarkPilot for DSH 2.0.21
+
+编辑器默认居中，左边选文件，右边聊 AI。点任意表格单元格编辑公式时可就地对照排版，工具岛上的脚注按钮可在引用与定义之间跳转。主题、页面、阅读和快捷键集中在「更多 → 编辑器设置」。
+
+在「导出」中选择 PDF，即可将正文、表格、公式和流程图保存为 A4 文档。安装正式版请运行 `dsh plugin --profile desktop add dsh-markdown-editor-typora@2.0.21`。
+
 > 自 1.4.0 起，插件包名为 **`dsh-markdown-editor-typora`**。安装 2.0.20 正式版可运行 **`dsh plugin --profile desktop add dsh-markdown-editor-typora@2.0.20`**。旧包 `dsh-markdown-typora` 停留在 1.3.x。
 
 # dsh-markdown-typora

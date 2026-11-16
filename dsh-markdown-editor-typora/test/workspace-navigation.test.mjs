@@ -194,6 +194,13 @@ test('a passive native Markdown tab opens in the workbench by default',async()=>
   assert.ok(tree.find(x=>x&&x.props&&x.props['data-mp-rail-action']==='close'),'the floating close button is rendered');
   assert.ok(tree.find(x=>x&&x.props&&x.props['data-mp-rail-action']==='toggle'),'the list toggle is rendered');f.dispose();
  });
+test('first run: an opened Markdown tab lands in the middle workbench',async()=>{
+  const f=make({noSettingsKey:true}),signal=new AbortController().signal;
+  const tab={id:'md-first',contentId:'dsh-resource://file/absolute/D%3A/A/first.md',visible:true,navigation:{revision:1},signal};
+  f.render(f.W.EditorTabRedirect,{sessionId:'A',useTabInfo:()=>({tab})});await drain();
+  assert.equal(f.W.state().docsModeOn,true,'首次打开不得留在右侧栏');
+  assert.equal(f.W.state().workbenchDoc.path,'D:/A/first.md');f.dispose();
+ });
 test('the overlay setting keeps a passive native tab full-width',async()=>{
   const f=make({settings:{passiveOpenMode:'overlay'}}),signal=new AbortController().signal;
   const tab={id:'native-md',contentId:'dsh-resource://file/absolute/D%3A/A/native.md',visible:true,navigation:{revision:1},signal};
@@ -268,9 +275,80 @@ test('an absolute Markdown path chip is recognised, other text is not',()=>{
   assert.equal(p.docPathFromChipText('README.md'),'');
   assert.equal(p.docPathFromChipText('点这里'),'');
  });
-test('a link-opened local document lands in the workbench',async()=>{
-  const f=make();f.storage.set('dsh.markpilot.layout.v1',JSON.stringify({enabled:true}));
+test('a link-opened local document lands in the workbench on first run',async()=>{
+  const f=make({noSettingsKey:true});
   const ok=f.W.openLocalDoc('D:/A/AGENTS.md');await drain();
   assert.equal(ok,true);assert.equal(f.W.state().docsModeOn,true);
   assert.equal(f.W.state().workbenchDoc.path,'D:/A/AGENTS.md');f.dispose();
+ });
+test('an old auto-materialized center+false still opens links in the workbench',async()=>{
+  const f=make({settings:{enabled:false,mode:'center'}});
+  const ok=f.W.openLocalDoc('D:/A/AGENTS.md');await drain();
+  assert.equal(ok,true,'2.0.20 自动物化的 false+center 应按新默认生效');
+  assert.equal(f.W.state().docsModeOn,true);
+  assert.equal(f.W.state().workbenchDoc.path,'D:/A/AGENTS.md');f.dispose();
+ });
+test('an explicit close keeps links and restored tabs out of the workbench',async()=>{
+  const f=make({settings:{enabled:false,mode:'center',enabledExplicit:true}});
+  assert.equal(f.W.openLocalDoc('D:/A/AGENTS.md'),false);
+  const signal=new AbortController().signal;
+  const tab={id:'native-md',contentId:'dsh-resource://file/absolute/D%3A/A/native.md',visible:true,navigation:{revision:1},signal};
+  f.W.publishOverlayDoc({tab,sessionId:'A'});
+  assert.equal(f.W.routePassiveNativeDoc(tab,'A'),false,'显式关闭后被动标签也不进工作台');
+  f.setOpenTabs([{sessionId:'A',tabId:'t1',kind:'text',contentId:'dsh-resource://file/absolute/D%3A/A/native.md'}]);
+  assert.equal(f.W.adoptOpenNativeDocs(),false,'显式关闭后恢复的 .md 不接管');
+  assert.equal(f.W.state().docsModeOn,false);f.dispose();
+ });
+test('an explicit close survives an automatic workspace switch',async()=>{
+  const f=make({settings:{enabled:false,mode:'center',enabledExplicit:true}});
+  const stop=f.W.installWorkspaceNavigation(f.ctx);await drain();
+  f.setCwd('A','D:/B');f.setActive('B');await drain();
+  assert.equal(f.W.state().docsModeOn,false,'切目录不得把显式关闭的工作台重新打开');
+  assert.equal(f.W.state().workbenchDoc,null);
+  stop();f.dispose();
+ });
+test('an explicit sidebar open after a close still works and re-enables',async()=>{
+  const f=make({settings:{enabled:false,mode:'center',enabledExplicit:true}});
+  f.setFetch(()=>({ok:true,value:{items:['D:/A/a.md']}}));
+  await f.W.openWorkspace(f.context());await drain();
+  assert.equal(f.W.state().docsModeOn,true,'用户主动点 Markdown 仍可打开工作台');
+  assert.equal(f.W.state().workbenchDoc.path,'D:/A/a.md');
+  assert.equal(JSON.parse(f.storage.get('dsh.markpilot.settings.v1')).enabled,true,'主动开启应写回开启');
+  try{f.window.__mpLayoutDispose?.();}catch(e){/* 忽略 */}
+  f.dispose();
+ });
+test('an explicit close while an automatic recent query is pending cancels the open',async()=>{
+  const f=make();
+  let release=null;
+  f.setFetch(()=>new Promise(resolve=>{release=()=>resolve({ok:true,value:{items:['D:/A/a.md']}});}));
+  const pending=f.W.openWorkspace(f.context(),{auto:true});
+  await drain();
+  assert.ok(release,'recent query should be in flight');
+  const s={getItem:k=>f.storage.get(k)??null,setItem:(k,v)=>f.storage.set(k,v)};
+  const stop=f.W.installLayoutSettingBridge();
+  const beforeIntent=f.W.state().workspaceIntent;
+  f.W.writeSettings(s,{enabled:false});
+  f.window.dispatchEvent({type:'dsh-markdown-editor-typora:settings-changed'});
+  assert.equal(f.W.state().workspaceIntent,beforeIntent+1,'明确关闭必须使待处理的自动恢复立即失效');
+  release();
+  await pending;await drain();
+  assert.equal(f.W.state().docsModeOn,false,'明确关闭后不得落地自动恢复');
+  assert.equal(f.W.state().workbenchDoc,null);
+  assert.equal(JSON.parse(f.storage.get('dsh.markpilot.settings.v1')).enabled,false,'不得被 enableWorkbench 写回 true');
+  stop();f.dispose();
+ });
+test('an automatic open revalidates enabled at landing even without the bridge event',async()=>{
+  const f=make();
+  let release=null;
+  f.setFetch(()=>new Promise(resolve=>{release=()=>resolve({ok:true,value:{items:['D:/A/a.md']}});}));
+  const pending=f.W.openWorkspace(f.context(),{auto:true});
+  await drain();
+  const s={getItem:k=>f.storage.get(k)??null,setItem:(k,v)=>f.storage.set(k,v)};
+  f.W.writeSettings(s,{enabled:false});
+  release();
+  await pending;await drain();
+  assert.equal(f.W.state().docsModeOn,false,'落地前必须重验实际生效值');
+  assert.equal(f.W.state().workbenchDoc,null);
+  assert.equal(JSON.parse(f.storage.get('dsh.markpilot.settings.v1')).enabled,false,'不得被自动路径写回 true');
+  f.dispose();
  });

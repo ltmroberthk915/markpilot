@@ -1,3 +1,5 @@
+**新版下载**　[Windows 桌面版 3.6.25](https://github.com/ltmroberthk915/markpilot/releases/tag/v3.6.25) · [DSH 插件 2.0.21](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-editor-typora-v2.0.21)。表格公式可边写边预览，脚注可双向跳转；DSH 默认用中间栏编辑，支持直接导出 PDF。
+
 > **更名（1.4.0 起）：** 插件包名从 `dsh-markdown-typora` 改为 **`dsh-markdown-editor-typora`**。安装/升级：`dsh plugin --profile desktop add dsh-markdown-editor-typora@1.4.0`；旧包停在 1.3.x，不再更新。下文旧版本记录里的旧包名保留原样。
 
 # MarkPilot · 万可百律

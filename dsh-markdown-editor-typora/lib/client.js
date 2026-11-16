@@ -3304,7 +3304,7 @@ function applyMirrorDelta(mirror,event){
  *   · 只写宿主会话内容区的 margin-left / margin-right 与一个 CSS 变量；
  *   · 不搬节点、不改宿主 grid、不碰 iframe、不动宿主 layoutInfo；
  *   · 全部写操作经 writeStyle()，值没变不碰 DOM（= 回归场景 8 的前提）；
- *   · 关闭默认：localStorage["dsh.markpilot.layout.v1"].enabled === true 才启动。
+ *   · 默认开启居中；只有显式关闭（enabled:false 且带意图标记）才回右侧栏。
  *
  * 依据：设计 draft-2 §3.3 / §3.4 / §3.6。最关键的一条是 §3.6：
  *   宽度变量必须写在 **会话内容区** 上，不能写在会话根上 —— 宿主的
@@ -3314,7 +3314,7 @@ function applyMirrorDelta(mirror,event){
 
 const LAYOUT_STORAGE_KEY = "dsh.markpilot.layout.v1";
 const LAYOUT_MODES = ["center", "right", "dock", "focus"];
-const LAYOUT_DEFAULTS = { enabled: false, mode: "center", chatWidth: 420 };
+const LAYOUT_DEFAULTS = { enabled: true, mode: "center", chatWidth: 420 };
 const LAYOUT_MIN_CHAT = 220;   // 对话列下限：220 时宿主内部（composer/卡片）会塌成竖条，300 是实测稳定值
 const LAYOUT_EDITOR_MIN = 420;   // 编辑区最小可读宽：右侧栏一开，中间列可能只剩几百像素
 const LAYOUT_GAP = 8;
@@ -3507,7 +3507,10 @@ function watchSettingsChanges(callback) {
   };
 }
 const SETTINGS_DEFAULTS = {
-  enabled: false,
+  enabled: true,
+  // 用户是否亲手改过「编辑区居中」开关。旧版（≤2.0.20）会把默认 false+center
+  // 随任意设置写入；没有这个标记就无法区分「没选过」和「亲手关闭」。
+  enabledExplicit: false,
   mode: "center",
   chatWidth: 420,
   docsFolder: "",
@@ -3531,10 +3534,53 @@ const SETTINGS_DEFAULTS = {
 const RIGHTBAR_MIN = 300;
 const RIGHTBAR_MAX = 900;
 
-/** 读设置：旧键铺底 → 新键覆盖；任何异常都回默认。 */
+/**
+ * 布局三字段的唯一合并口：旧键铺底 → 新键逐字段覆盖（纯读，不落盘）。
+ * 返回**迁移前**的原值：新键缺的字段由旧键补齐，不能只看新键。
+ * 归一化与实际生效判断在 readLayoutFields；迁移判断直接复用这里的合并结果。
+ */
+function mergeLayoutFields(storage) {
+  var out = {
+    enabled: LAYOUT_DEFAULTS.enabled,
+    mode: LAYOUT_DEFAULTS.mode,
+    chatWidth: LAYOUT_DEFAULTS.chatWidth,
+    explicit: false,
+  };
+  if (!storage) return out;
+  function merge(raw) {
+    if (!raw) return;
+    var s;
+    try { s = JSON.parse(raw); } catch (e) { return; }
+    if (!s || typeof s !== "object") return;
+    if (typeof s.enabled === "boolean") out.enabled = s.enabled;
+    if (LAYOUT_MODES.indexOf(s.mode) >= 0) out.mode = s.mode;
+    if (typeof s.chatWidth === "number") out.chatWidth = Math.round(layoutClamp(s.chatWidth, LAYOUT_MIN_CHAT, 900));
+    if (s.enabledExplicit === true) out.explicit = true;
+  }
+  try { merge(storage.getItem(LAYOUT_STORAGE_KEY)); } catch (e) { /* 旧键不可读 */ }
+  try { merge(storage.getItem(SETTINGS_KEY)); } catch (e) { /* 新键不可读 */ }
+  return out;
+}
+
+/**
+ * 实际生效判断：旧版（≤2.0.20）会把默认 enabled:false + mode:"center" 随任意
+ * 设置写入（拖对话宽、保存文档文件夹都会触发 writeSettings）。单看 enabled
+ * 无法区分「从未选择」与「亲手关闭」，所以这里只做一处兼容解释：
+ *   · 无意图标记（enabledExplicit）的 center+false ⇒ 视为从未选择，按新默认开启；
+ *   · 带标记的 false，或 right/dock/focus 等非默认布局 ⇒ 原样保留。
+ * 落盘由 apply 时的 migrateLayoutDefaults 一次性完成，避免读路径产生写副作用。
+ */
+function readLayoutFields(storage) {
+  var out = mergeLayoutFields(storage);
+  if (!out.explicit && out.enabled === false && out.mode === "center") out.enabled = true;
+  return out;
+}
+
+/** 读设置：沿用布局三字段的统一解析，再补文档/外观字段；任何异常都回默认。 */
 function readSettings(storage) {
   var out = {
     enabled: SETTINGS_DEFAULTS.enabled,
+    enabledExplicit: SETTINGS_DEFAULTS.enabledExplicit,
     mode: SETTINGS_DEFAULTS.mode,
     chatWidth: SETTINGS_DEFAULTS.chatWidth,
     docsFolder: SETTINGS_DEFAULTS.docsFolder,
@@ -3551,19 +3597,17 @@ function readSettings(storage) {
     sidebarMin: SETTINGS_DEFAULTS.sidebarMin,
     rightbarMin: SETTINGS_DEFAULTS.rightbarMin,
   };
-  var legacy = readLayoutConfig(storage);
-  out.enabled = legacy.enabled;
-  out.mode = legacy.mode;
-  out.chatWidth = legacy.chatWidth;
+  var layout = readLayoutFields(storage);
+  out.enabled = layout.enabled;
+  out.enabledExplicit = layout.explicit;
+  out.mode = layout.mode;
+  out.chatWidth = layout.chatWidth;
   try {
     if (!storage) return out;
     var raw = storage.getItem(SETTINGS_KEY);
     if (!raw) return out;
     var s = JSON.parse(raw);
     if (!s || typeof s !== "object") return out;
-    if (typeof s.enabled === "boolean") out.enabled = s.enabled;
-    if (LAYOUT_MODES.indexOf(s.mode) >= 0) out.mode = s.mode;
-    if (typeof s.chatWidth === "number") out.chatWidth = Math.round(layoutClamp(s.chatWidth, LAYOUT_MIN_CHAT, 900));
     if (typeof s.docsFolder === "string") out.docsFolder = s.docsFolder;
     if (["recent", "files", "blank"].includes(s.workspaceOpenMode)) out.workspaceOpenMode=s.workspaceOpenMode;
     if (["files", "blank"].includes(s.workspaceEmptyMode)) out.workspaceEmptyMode=s.workspaceEmptyMode;
@@ -3585,7 +3629,9 @@ function readSettings(storage) {
 /** 写设置：合并 → 落新键 → 布局三字段同步回旧键。返回写后的完整设置，失败返回 null。 */
 function writeSettings(storage, patch) {
   var next = readSettings(storage);
+  var choseEnabled = false;
   if (patch && typeof patch === "object") {
+    choseEnabled = Object.prototype.hasOwnProperty.call(patch, "enabled");
     for (var k in patch) {
       if (Object.prototype.hasOwnProperty.call(patch, k)) next[k] = patch[k];
     }
@@ -3593,6 +3639,10 @@ function writeSettings(storage, patch) {
   next.chatWidth = Math.round(layoutClamp(next.chatWidth, LAYOUT_MIN_CHAT, 900));
   if (LAYOUT_MODES.indexOf(next.mode) < 0) next.mode = "center";
   next.enabled = next.enabled === true;
+  // 任何显式写 enabled 的调用（设置页开关、打开工作台）都记录意图；
+  // 只改其他设置时沿用已有标记，避免把「亲手关闭」冲成默认值。
+  if (choseEnabled) next.enabledExplicit = true;
+  else next.enabledExplicit = next.enabledExplicit === true;
   if (!["recent", "files", "blank"].includes(next.workspaceOpenMode)) next.workspaceOpenMode="recent";
   if (!["files", "blank"].includes(next.workspaceEmptyMode)) next.workspaceEmptyMode="files";
   if (!["follow", "keep"].includes(next.workspaceSwitchMode)) next.workspaceSwitchMode="follow";
@@ -3613,34 +3663,10 @@ function writeSettings(storage, patch) {
   return next;
 }
 
-/** 读配置：任何异常都回默认，绝不把坏存档抛到启动路径上。 */
+/** 读配置：布局三字段走同一解析口；任何异常都回默认，绝不把坏存档抛到启动路径上。 */
 function readLayoutConfig(storage) {
-  var out = { enabled: LAYOUT_DEFAULTS.enabled, mode: LAYOUT_DEFAULTS.mode, chatWidth: LAYOUT_DEFAULTS.chatWidth };
-  if (!storage) return out;
-  // 以设置键为准（设置页写的就是它），旧键仅作兼容回退。
-  // 直接解析 JSON 而不调 readSettings —— 后者会回调本函数，构成递归。
-  try {
-    var rawNew = storage.getItem(SETTINGS_KEY);
-    if (rawNew) {
-      var s = JSON.parse(rawNew);
-      if (s && typeof s === "object") {
-        out.enabled = s.enabled === true;
-        out.mode = LAYOUT_MODES.indexOf(s.mode) >= 0 ? s.mode : "center";
-        if (typeof s.chatWidth === "number") out.chatWidth = Math.round(layoutClamp(s.chatWidth, LAYOUT_MIN_CHAT, 900));
-        return out;
-      }
-    }
-  } catch (e) { /* 新键坏了就继续读旧键 */ }
-  try {
-    var raw = storage.getItem(LAYOUT_STORAGE_KEY);
-    if (!raw) return out;
-    var saved = JSON.parse(raw);
-    if (!saved || typeof saved !== "object") return out;
-    out.enabled = saved.enabled === true;
-    out.mode = LAYOUT_MODES.indexOf(saved.mode) >= 0 ? saved.mode : "center";
-    out.chatWidth = Math.round(layoutClamp(saved.chatWidth, LAYOUT_MIN_CHAT, 900));
-  } catch (e) { /* 坏存档 = 默认值 */ }
-  return out;
+  var fields = readLayoutFields(storage);
+  return { enabled: fields.enabled, mode: fields.mode, chatWidth: fields.chatWidth };
 }
 
 function saveLayoutConfig(storage, cfg) {
@@ -3652,6 +3678,33 @@ function saveLayoutConfig(storage, cfg) {
       chatWidth: Math.round(layoutClamp(cfg.chatWidth, LAYOUT_MIN_CHAT, 900)),
     }));
     return true;
+  } catch (e) { return false; }
+}
+
+/**
+ * 一次性迁移 2.0.20 及更早版本「自动物化」的 center+false。
+ *
+ * 旧版从未选择布局的用户也会在拖对话宽 / 保存其它设置时被写入
+ * enabled:false + mode:"center"；这类记录没有意图标记，按新默认改写成开启。
+ * 带标记的显式关闭、以及 right/dock/focus 等非 center 布局原样保留。
+ * 只对合并后的迁移前值确实为 false+center 写一次；写后条件不再成立。
+ */
+function migrateLayoutDefaults(storage) {
+  try {
+    if (!storage) return false;
+    // 新键存在但坏掉时不要迁移：writeSettings 会覆盖它，先保住原档。
+    var rawNew = null;
+    try { rawNew = storage.getItem(SETTINGS_KEY); } catch (e) { rawNew = null; }
+    if (rawNew) {
+      var parsedNew = JSON.parse(rawNew);
+      if (!parsedNew || typeof parsedNew !== "object") return false;
+    }
+    // 用合并后的迁移前值判断：旧键 mode=right + 新键缺 mode 仍是 right，不得迁成 center。
+    var fields = mergeLayoutFields(storage);
+    if (fields.explicit) return false;
+    if (fields.enabled !== false) return false;
+    if (fields.mode !== "center") return false;
+    return !!writeSettings(storage, { enabled: true });
   } catch (e) { return false; }
 }
 
@@ -5194,6 +5247,8 @@ function mountLayout(ctx, overrides) {
             }
           } catch (e) { /* 忽略 */ }
         }, 250);
+        // Node 测试/无宿主环境不吊住事件循环；浏览器 setInterval 返回数字，无 unref。
+        try { if (watchTimer && typeof watchTimer.unref === "function") watchTimer.unref(); } catch (eU) { /* 忽略 */ }
       } catch (e) { /* 忽略 */ }
 
       // 订阅宿主 layout 面板状态：右栏开合/面板切换都会改列宽 → 立刻重算
@@ -5757,6 +5812,7 @@ const __test = {
     },
     readLayoutConfig: readLayoutConfig,
     saveLayoutConfig: saveLayoutConfig,
+    migrateLayoutDefaults: migrateLayoutDefaults,
     findConversationRoot: findConversationRoot,
     findConversationBody: findConversationBody,
     computeLayout: computeLayout,
@@ -5856,12 +5912,197 @@ const __test = {
         } else if (cmd === "open-external") {
           try { window.open(String(args.url == null ? "" : args.url), "_blank", "noopener"); } catch (e) { /* 拦截器拒绝 */ }
           done(true);
+        } else if (cmd === "export-pdf") {
+          exportPdfViaHost(args).then(done, fail);
+        } else if (cmd === "export-pdf-cancel") {
+          api("export/pdfCancel", { jobId: args.jobId }).then(done, fail);
+        } else if (cmd === "read-file-base64") {
+          readFileBase64ViaImageRoute(args).then(done, fail);
         } else {
           done(null);
         }
       } catch (error) {
         fail(error);
       }
+    }
+
+    /** 保存对话框只接受用户可读的文件名；路径永远由 Chromium 原生另存为决定。 */
+    function pdfSafeName(value) {
+      let base = String(value == null ? "" : value)
+        .replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!base) base = "MarkPilot";
+      base = base.replace(/\.pdf$/i, "").trim().slice(0, 120).trim() || "MarkPilot";
+      if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(base)) base = "_" + base;
+      return base + ".pdf";
+    }
+
+    function pdfBytesFromBase64(value) {
+      const bin = atob(String(value || ""));
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+      return bytes;
+    }
+
+    /** Native image path → the plugin's existing auth-fenced /img/ route.
+     *  Only image bytes are exposed; no arbitrary file: URL reaches the temp HTML. */
+    function imageRouteForPath(value) {
+      const raw = String(value == null ? "" : value).replace(/\\/g, "/");
+      if (!raw) return null;
+      let prefix = "";
+      let rest = raw;
+      if (rest.startsWith("//")) { prefix = "//"; rest = rest.slice(2); }
+      else rest = rest.replace(/^\/+/, "");
+      const parts = rest.split("/").filter(Boolean).map((part) => encodeURIComponent(part));
+      if (!parts.length) return null;
+      return "/dsh-markdown-editor-typora/img/" + prefix + parts.join("/");
+    }
+
+    function bytesToBase64(bytes) {
+      let out = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        out += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      }
+      return btoa(out);
+    }
+
+    async function readFileBase64ViaImageRoute(args) {
+      const route = imageRouteForPath(args && args.path);
+      if (!route) return { ok: false, error: "bad-image-path" };
+      const maxBytes = Number.isSafeInteger(args.maxBytes) && args.maxBytes > 0 ? args.maxBytes : 16 * 1024 * 1024;
+      const controller = typeof AbortController === "function" ? new AbortController() : null;
+      const timer = controller ? setTimeout(() => { try { controller.abort(); } catch (e) { /* 已结束 */ } }, 20000) : null;
+      try {
+        const res = await fetch(route, {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+          ...(controller ? { signal: controller.signal } : {}),
+        });
+        if (!res.ok) return { ok: false, error: "image-" + res.status };
+        const type = String(res.headers.get("content-type") || "").split(";", 1)[0].trim();
+        if (!/^image\//i.test(type)) return { ok: false, error: "not-an-image" };
+        const length = Number(res.headers.get("content-length"));
+        if (Number.isFinite(length) && length > maxBytes) return { ok: false, error: "image-too-large" };
+        const buffer = await res.arrayBuffer();
+        if (buffer.byteLength > maxBytes) return { ok: false, error: "image-too-large" };
+        return {
+          ok: true,
+          base64: bytesToBase64(new Uint8Array(buffer)),
+          mime: type,
+          bytes: buffer.byteLength,
+        };
+      } catch (error) {
+        return { ok: false, error: String((error && error.message) || error) };
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    }
+
+    function downloadPdfBlob(blob, name) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      a.rel = "noopener";
+      (document.body || document.documentElement).appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) { /* 已释放 */ } }, 60000);
+    }
+
+    /**
+     * Real PDF path for DSH:
+     *   1) ask the host to render the engine's export HTML with headless Chromium
+     *      (A4/EXE print CSS, KaTeX/table/Mermaid and inlined document images), then
+     *   2) hand the actual PDF bytes to DSH's supported native Save-As IPC
+     *      (`dshDesktop.files.save`, mode "saveAs"): it owns the path choice,
+     *      overwrite confirmation and cancel result.
+     * Browser-only DSH (no desktop bridge) downloads the same real PDF Blob;
+     * it never falls back to "printed but no file" as success.
+     * The host never writes the user's target; only the native save dialog or
+     * the browser download does.
+     */
+    async function exportPdfViaHost(args) {
+      const desktop = typeof window !== "undefined" ? window.dshDesktop : null;
+      const save = desktop && desktop.files && desktop.files.save;
+      const html = args && typeof args.html === "string" ? args.html : "";
+      if (!html) return { ok: false, error: "print-html-empty" };
+      const imageSummary = args && args.images && typeof args.images === "object" ? args.images : null;
+      const fileName = pdfSafeName(args.name || args.title || "MarkPilot");
+      let rendered;
+      try {
+        rendered = await api("export/pdf", {
+          html: html,
+          title: String(args.title || args.name || "MarkPilot"),
+          name: fileName,
+          jobId: typeof args.jobId === "string" ? args.jobId : undefined,
+        });
+      } catch (error) {
+        const message = String((error && error.message) || error);
+        return /HTTP (404|405)/.test(message)
+          ? { ok: false, error: "pdf-endpoint-unavailable" }
+          : { ok: false, error: message };
+      }
+      if (!rendered || rendered.ok !== true) {
+        const err = rendered && rendered.error;
+        return {
+          ok: false,
+          ...(rendered && rendered.canceled ? { canceled: true } : {}),
+          error: (err && (err.message || err.code)) || "pdf-render-failed",
+          ...(rendered && rendered.fallback ? { fallback: rendered.fallback } : {}),
+        };
+      }
+      let bytes;
+      try { bytes = pdfBytesFromBase64(rendered.pdfBase64); }
+      catch (error) { return { ok: false, error: "pdf-decode-failed" }; }
+      if (!bytes.length) return { ok: false, error: "pdf-empty" };
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const outName = rendered.name || fileName;
+      if (typeof save !== "function") {
+        downloadPdfBlob(blob, outName);
+        return {
+          ok: true,
+          mode: "download",
+          file: outName,
+          bytes: rendered.bytes || bytes.length,
+          pages: rendered.pages,
+          engine: rendered.engine,
+          ...(imageSummary ? { images: imageSummary } : {}),
+          ...(rendered.tempPathLeaked ? { tempPathLeaked: true } : {}),
+        };
+      }
+      const url = URL.createObjectURL(blob);
+      let saved;
+      try {
+        saved = await save({
+          url: url,
+          name: outName,
+          mediaType: "application/pdf",
+          mode: "saveAs",
+        });
+      } catch (error) {
+        return { ok: false, error: String((error && error.message) || error) };
+      } finally {
+        try { URL.revokeObjectURL(url); } catch (e) { /* 已释放 */ }
+      }
+      if (saved && saved.status === "cancelled") {
+        return { ok: false, canceled: true, error: "已取消导出 PDF" };
+      }
+      if (!saved || saved.status !== "saved" || typeof saved.path !== "string" || !saved.path) {
+        return { ok: false, error: "save-failed" };
+      }
+      return {
+        ok: true,
+        mode: "file",
+        file: saved.path,
+        bytes: rendered.bytes || bytes.length,
+        pages: rendered.pages,
+        engine: rendered.engine,
+        ...(imageSummary ? { images: imageSummary } : {}),
+        ...(rendered.tempPathLeaked ? { tempPathLeaked: true } : {}),
+      };
     }
 
     /* ───────────────────────── 样式 ───────────────────────── */
@@ -6221,12 +6462,12 @@ const __test = {
       recomputeOverlayDoc();
     }
 
-    function layoutEnabled() {
+    /** 实际生效判断：与 readSettings/readLayoutConfig 共用同一解析口，不再只读旧键。 */
+    function layoutEnabled(storage) {
       try {
-        var raw = window.localStorage ? window.localStorage.getItem("dsh.markpilot.layout.v1") : null;
-        if (!raw) return false;
-        return JSON.parse(raw).enabled === true;
-      } catch (e) { return false; }
+        var store = storage === undefined ? window.localStorage : storage;
+        return readSettings(store).enabled === true;
+      } catch (e) { return SETTINGS_DEFAULTS.enabled === true; }
     }
 
     function publishOverlayDoc(next) {
@@ -6436,6 +6677,8 @@ const __test = {
           });
           return;
         }
+        // 明确关闭：即使当前没有已打开文档，也要让正在等待的自动恢复/链接接管失效。
+        ++workspaceIntent;
         var doc = docsModeOn && workbenchDoc ? workbenchDoc : null;
         if (docsModeOn || overlayDoc) closeDocsWorkbench();
         try { if (typeof window.__mpLayoutDispose === "function") window.__mpLayoutDispose(); } catch (e) { /* 忽略 */ }
@@ -6477,6 +6720,8 @@ const __test = {
     async function openWorkspace(context, options) {
       var auto=!!(options && options.auto);
       var intent=++workspaceIntent, cfg=readSettings(window.localStorage);
+      // 自动恢复（切会话/切目录）必须尊重显式关闭；显式点 Markdown 仍可打开工作台。
+      if (auto && cfg.enabled !== true) return;
       const current=()=>intent===workspaceIntent && workspaceContext().sessionId===context.sessionId && workspaceContext().key===context.key;
       if (!context.sessionId || !context.key) { if(!auto) workspaceMessage("请先选择有工作目录的会话。"); return; }
       try {
@@ -6532,6 +6777,8 @@ const __test = {
         }
         if (!entry) return;
         if (entry.draft && !pendingWorkspaceDraft(context,entry)) throw new Error("无法保留空白草稿，请检查本机存储空间。");
+        // 明确关闭可能发生在 await 期间（recent 查询/离开守卫）；自动路径落地前重验。
+        if (auto && readSettings(window.localStorage).enabled !== true) return;
         workbenchDoc=entry; workspaceNotice=""; docsModeOn=true; clearClosedOverlayKeys();
         setWorkspaceAutoOpenSuppressed(context.key,false);
         enableWorkbench(); bumpOverlay();
@@ -6566,7 +6813,6 @@ const __test = {
     function openLocalDoc(path) {
       try {
         if (!path || !layoutEnabled()) return false;
-        if (readSettings(window.localStorage).enabled !== true) return false;
         var wctx = workspaceContext();
         void chooseWorkbenchDoc({ path: path, address: absoluteFileAddress(path), workspace: wctx.cwd || "", sessionId: wctx.sessionId || "" });
         return true;
@@ -7181,7 +7427,7 @@ const __test = {
         h("div", { style: group }, "布局"),
         h(SettingsField, {
           label: "编辑区居中（对话靠右）",
-          hint: "将编辑区放在中间，对话显示在右侧。开关立即生效：打开中的文档会迁移到中间，右侧输入框保留；关闭后文档在右侧栏打开。",
+          hint: "默认开启：首次打开 Markdown 会在中间编辑区打开，对话在右侧。关闭后文件链接和恢复的文档回到右侧栏，重新打开应用仍保持关闭；点击侧栏 Markdown 仍可主动打开工作台。",
         }, h("label", { style: { display: "flex", alignItems: "center", gap: 8, cursor: "pointer" } },
           h("input", {
             type: "checkbox", checked: settings.enabled === true,
@@ -7308,6 +7554,7 @@ const __test = {
     /** 被动打开的 .md（文件链接 / 切会话恢复）接进工作台；受「被动打开」设置与关闭记忆约束。 */
     function routePassiveNativeDoc(tab, sessionId, force) {
       try {
+        if (!layoutEnabled()) return false;
         if (readSettings(window.localStorage).passiveOpenMode === "overlay") return false;
         var key = docKeyOf(tab);
         if (!force && (!key || !overlayDocs.has(key))) return false;   // 未公布，或已被用户显式关闭
@@ -7328,7 +7575,7 @@ const __test = {
      */
     function adoptOpenNativeDocs() {
       try {
-        if (readSettings(window.localStorage).enabled !== true) return false;
+        if (!layoutEnabled()) return false;
         if (readSettings(window.localStorage).passiveOpenMode === "overlay") return false;
         if (docsModeOn) return false;
         var sr = hostSidebarRight || (docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("sidebarRight") : null);
@@ -11569,7 +11816,10 @@ const __test = {
     try { if (typeof window.__mpHandleLifecycleDispose === "function") window.__mpHandleLifecycleDispose(); } catch (e) { /* 忽略 */ }
     try { if (typeof window.__mpHandleFloorDispose === "function") window.__mpHandleFloorDispose(); } catch (e) { /* 忽略 */ }
     try { installHandleLifecycle(ctx); } catch (e) { /* 忽略 */ }
-    // 布局引擎（M0）：默认关闭，只在用户显式开启时挤压对话。
+    // 旧版自动物化的 enabled:false+center 在这里一次性改写为新默认（只写一次）；
+    // 带意图标记的关闭与非 center 布局不动。
+    try { migrateLayoutDefaults(window.localStorage); } catch (e) { /* 忽略 */ }
+    // 布局引擎（M0）：默认开启居中；只有显式关闭时才回到右侧栏。
     // 失败绝不影响插件其余能力（mountLayout 内部已 try/catch + 日志）。
     try { mountLayout(ctx); } catch (e) { /* 见 mountLayout */ }
     // 设置里的「编辑区居中」立即生效：打开中的文档迁移到中间，关闭时回右栏。

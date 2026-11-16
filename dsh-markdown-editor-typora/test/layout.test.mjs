@@ -312,10 +312,10 @@ test('引擎：给根打上 data-mp-layout 标记（供 CSS 隐藏宿主宽度�
 
 /* ── 配置 ────────────────────────────────────────────────────────── */
 
-test('配置：缺省关闭（不影响现有用户）', async () => {
+test('配置：缺省开启居中（首次打开默认生效）', async () => {
   const L = await getLayout();
   const cfg = L.readLayoutConfig(null);
-  assert.equal(cfg.enabled, false);
+  assert.equal(cfg.enabled, true);
   assert.equal(cfg.mode, 'center');
   assert.equal(cfg.chatWidth, 420);
 });
@@ -323,7 +323,7 @@ test('配置：缺省关闭（不影响现有用户）', async () => {
 test('配置：坏 JSON / 脏值回默认并钳制', async () => {
   const L = await getLayout();
   const bad = { getItem: () => '{not json' };
-  assert.equal(L.readLayoutConfig(bad).enabled, false);
+  assert.equal(L.readLayoutConfig(bad).enabled, true);
 
   const dirty = { getItem: () => JSON.stringify({ enabled: true, mode: 'sideways', chatWidth: 99999 }) };
   const cfg = L.readLayoutConfig(dirty);
@@ -346,10 +346,14 @@ test('配置：存取往返 + 钳制', async () => {
   assert.equal(back.chatWidth, 900);
 });
 
-test('mountLayout：未开启时不启动、返回 null', async () => {
+test('mountLayout：显式关闭时不启动、返回 null', async () => {
   const L = await getLayout();
-  // 无 window.localStorage ⇒ readLayoutConfig 回默认 enabled:false
-  assert.equal(L.mountLayout({}), null);
+  const storage = {
+    getItem: (k) => (k === 'dsh.markpilot.settings.v1'
+      ? JSON.stringify({ enabled: false, mode: 'center', enabledExplicit: true })
+      : null),
+  };
+  assert.equal(L.mountLayout({}, { storage }), null);
 });
 
 /* ── 等根出现再激活（真实缺陷回归）────────────────────────────────── */
@@ -417,9 +421,32 @@ test('mountLayout：开启但暂无会话根时返回引擎并挂上等待器', 
 
 test('mountLayout：关闭时不启动', async () => {
   const L = await getLayout();
-  const storage = { getItem: () => null, setItem: () => {} };
+  const storage = {
+    getItem: (k) => (k === 'dsh.markpilot.settings.v1'
+      ? JSON.stringify({ enabled: false, mode: 'center', enabledExplicit: true })
+      : null),
+    setItem: () => {},
+  };
   const doc = { querySelectorAll: () => [], body: makeEl('div') };
   assert.equal(L.mountLayout({}, { doc, win: {}, storage, limitMs: 1000 }), null);
+});
+
+test('默认开启但没有打开文档时不挤压对话（无文档不占对话空间）', async () => {
+  const L = await getLayout();
+  L.setSqueezeForTests(false);   // 前面的引擎测试开过测试旁路，这里必须回到真实门控
+  const { doc, body } = makeHost();
+  const store = new Map();   // 没有任何配置 = 新默认
+  const storage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, v) };
+  const win = {};
+  const engine = L.mountLayout({}, { doc, win, storage, limitMs: 1000 });
+  try {
+    assert.ok(engine, '默认开启时布局引擎应存在');
+    engine.flush();
+    assert.equal(body.style.getPropertyValue('margin-left'), '', '没有文档时不得挤压对话');
+    assert.equal(engine.snapshot().active, false, '没有文档时引擎不得激活');
+  } finally {
+    if (typeof win.__mpLayoutDispose === 'function') win.__mpLayoutDispose();
+  }
 });
 test('锚点：hero 态（根只有 1 个子元素且无 data-conversation-content）不得挤压头部', async () => {
   const L = await getLayout();

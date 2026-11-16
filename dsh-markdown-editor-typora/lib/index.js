@@ -34,6 +34,11 @@ import rawDiskStore from '../host/document-store.js';
 import rawLiveStore from '../host/live-documents.js';
 import rawTextCodec from '../host/text-codec.js';
 import rawReadingStore from '../host/reading-position-store.js';
+/* PDF 打印层：无状态、只碰私有临时目录；A4/页边距/打印 CSS 复用
+ * MarkPilot-CM6/export-pdf.js 的同一组参数。放在 lib/（.cjs）而不是
+ * host/：host/ 由 sync-host 从 MarkPilot-CM6/shell 逐文件同步，DSH 专属
+ * 模块不能混进去破坏 check:host。 */
+import pdfExport from './pdf-export.cjs';
 import {
   createDocumentsService, parseDocumentBlocks, countDocumentLines, findDocumentLine, MAX_LINE_READ_BYTES_CAP,
 } from './documents-service.js';
@@ -335,7 +340,7 @@ const MODEL_TOOL = Symbol('markdown model tool');
 export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'reading', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'documents.session', 'documents.recoveryList', 'documents.recoveryRead', 'documents.recoveryDiscard', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'documents.captureSelection', 'documents.readSelection', 'documents.editSelection', 'documents.editPrepare', 'documents.editArm', 'documents.editStatus', 'documents.editAbort', 'diag']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'reading', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'documents.session', 'documents.recoveryList', 'documents.recoveryRead', 'documents.recoveryDiscard', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'documents.captureSelection', 'documents.readSelection', 'documents.editSelection', 'documents.editPrepare', 'documents.editArm', 'documents.editStatus', 'documents.editAbort', 'export/pdf', 'export/pdfCancel', 'diag']);
 const SESSION_MUTATING_ENDPOINTS = new Set(['open', 'save', 'edit', 'live', 'docs/create', 'docs/saveAs', 'docs/archive', 'documents.applyEdits', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.undoGroups', 'documents.merge3', 'documents.reviewGroup', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftClear']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
@@ -2145,6 +2150,41 @@ export function createHost(options = {}) {
         case 'docs/archive':
           if (payload?.tag === 'agent-before' && authority !== MODEL_TOOL) return badRequest('model tool authority required');
           return await apiDocsArchive(payload, { prune: authority === MODEL_TOOL && payload?.tag === 'agent-before' });
+        case 'export/pdf': {
+          if (authority === MODEL_TOOL) return badRequest('export/pdf is editor-only');
+          const rendered = await pdfExport.renderPdf({
+            html: payload?.html,
+            title: payload?.title,
+            name: payload?.name,
+            jobId: payload?.jobId,
+          });
+          if (!rendered.ok) {
+            return {
+              ok: false,
+              ...(rendered.canceled ? { canceled: true } : {}),
+              error: { code: rendered.code || 'MP_PDF_ERROR', message: rendered.error || 'PDF 导出失败' },
+              ...(rendered.fallback ? { fallback: rendered.fallback } : {}),
+            };
+          }
+          return {
+            ok: true,
+            pdfBase64: rendered.pdf.toString('base64'),
+            bytes: rendered.bytes,
+            pages: rendered.pages,
+            engine: rendered.engine,
+            name: rendered.name,
+            ms: rendered.ms,
+            tempPathLeaked: rendered.containsTempPath === true,
+          };
+        }
+        case 'export/pdfCancel': {
+          if (authority === MODEL_TOOL) return badRequest('export/pdfCancel is editor-only');
+          const jobId = typeof payload?.jobId === 'string' ? payload.jobId : '';
+          if (!pdfExport.cancelPdf(jobId)) {
+            return { ok: false, error: { code: 'MP_PDF_NO_JOB', message: '没有进行中的 PDF 导出' } };
+          }
+          return { ok: true };
+        }
         case 'diag': {
           lastDiag = { receivedAt: Date.now(), payload };
           // 诊断同时落盘一份，验收时用 PowerShell 直接读，不必开 DevTools、也不受接口鉴权影响。

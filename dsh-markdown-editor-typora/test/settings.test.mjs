@@ -68,14 +68,118 @@ function makeStorage(init) {
   };
 }
 
-test('设置：空存储返回默认值', async () => {
+test('设置：空存储返回默认值（首次打开默认居中开启）', async () => {
   const L = await getLayout();
   const s = L.readSettings(makeStorage());
-  assert.equal(s.enabled, false);
+  assert.equal(s.enabled, true);
   assert.equal(s.mode, 'center');
   assert.equal(s.chatWidth, 420);
   assert.equal(s.docsFolder, '');
   assert.equal(s.docsTemplate, '# {title}\n\n');
+  assert.equal(L.layoutEnabled(makeStorage()), true);
+});
+
+test('设置：只保存过其他设置或旧键缺字段时仍默认居中开启', async () => {
+  const L = await getLayout();
+  // 2.0.20 的设置页只要保存过任意一项，就会把整份默认值写进新键。
+  const otherOnly = makeStorage([[SETTINGS_KEY, JSON.stringify({ docsFolder: 'D:\\Notes', compactChrome: false })]]);
+  const s1 = L.readSettings(otherOnly);
+  assert.equal(s1.enabled, true, '只保存其他设置不得关掉默认启用');
+  assert.equal(s1.mode, 'center');
+  assert.equal(s1.docsFolder, 'D:\\Notes');
+
+  const legacyPartial = makeStorage([[LEGACY_KEY, JSON.stringify({ chatWidth: 500 })]]);
+  const s2 = L.readSettings(legacyPartial);
+  assert.equal(s2.enabled, true, '旧键缺 enabled 按默认开启');
+  assert.equal(s2.mode, 'center');
+  assert.equal(s2.chatWidth, 500);
+});
+
+test('设置：旧版自动物化的 center+false 按新默认开启并一次性迁移', async () => {
+  const L = await getLayout();
+  const st = makeStorage([
+    [LEGACY_KEY, JSON.stringify({ enabled: false, mode: 'center', chatWidth: 420 })],
+    [SETTINGS_KEY, JSON.stringify({ enabled: false, mode: 'center', docsFolder: 'D:\\Keep' })],
+  ]);
+  const before = L.readSettings(st);
+  assert.equal(before.enabled, true, '没有意图标记的 center+false 视为从未选择');
+  assert.equal(before.mode, 'center');
+  assert.equal(before.docsFolder, 'D:\\Keep', '读取不得丢掉其它设置');
+  assert.equal(L.layoutEnabled(st), true);
+  assert.equal(L.readLayoutConfig(st).enabled, true, '引擎读取口必须与实际生效判断一致');
+
+  assert.equal(L.migrateLayoutDefaults(st), true);
+  const after = L.readSettings(st);
+  assert.equal(after.enabled, true);
+  assert.equal(JSON.parse(st.raw(SETTINGS_KEY)).enabled, true, '新键应落盘为开启');
+  assert.equal(JSON.parse(st.raw(LEGACY_KEY)).enabled, true, '旧键镜像同步为开启');
+  assert.equal(after.docsFolder, 'D:\\Keep', '迁移保留其它设置');
+  assert.equal(L.migrateLayoutDefaults(st), false, '迁移只跑一次');
+});
+
+test('设置：旧键 mode=right + 新键缺 mode 时保留 right，不得迁移成 true', async () => {
+  const L = await getLayout();
+  const st = makeStorage([
+    [LEGACY_KEY, JSON.stringify({ enabled: false, mode: 'right', chatWidth: 500 })],
+    [SETTINGS_KEY, JSON.stringify({ enabled: false, docsFolder: 'W' })],
+  ]);
+  // 迁移前：字段合并后是 false/right，不能按新键缺 mode 推成 center。
+  assert.equal(L.readLayoutConfig(st).enabled, false, '迁移前应为 false/right');
+  assert.equal(L.readLayoutConfig(st).mode, 'right');
+  assert.equal(L.readSettings(st).enabled, false);
+  assert.equal(L.readSettings(st).mode, 'right');
+
+  assert.equal(L.migrateLayoutDefaults(st), false, '非 center 布局不得迁移');
+  assert.equal(JSON.parse(st.raw(SETTINGS_KEY)).enabled, false, '迁移不得改写新键');
+  const after = L.readSettings(st);
+  assert.equal(after.enabled, false);
+  assert.equal(after.mode, 'right');
+  assert.equal(after.chatWidth, 500, '旧键的 chatWidth 仍被继承');
+  assert.equal(after.docsFolder, 'W', '新键的文档字段保留');
+});
+
+test('设置：带意图标记的显式关闭跨读取保留，且不会被迁移翻回', async () => {
+  const L = await getLayout();
+  const st = makeStorage([[SETTINGS_KEY, JSON.stringify({ enabled: true, mode: 'center', docsFolder: 'D:\\A' })]]);
+  L.writeSettings(st, { enabled: false });
+  const raw = JSON.parse(st.raw(SETTINGS_KEY));
+  assert.equal(raw.enabled, false);
+  assert.equal(raw.enabledExplicit, true, '写开关必须记录意图');
+
+  // 新读取器 = 重新打开应用
+  assert.equal(L.readSettings(st).enabled, false);
+  assert.equal(L.layoutEnabled(st), false);
+  assert.equal(L.migrateLayoutDefaults(st), false, '显式关闭不能被迁移翻回开启');
+
+  // 改其他设置不得冲掉关闭决定
+  L.writeSettings(st, { docsFolder: 'D:\\B' });
+  assert.equal(L.readSettings(st).enabled, false);
+  assert.equal(JSON.parse(st.raw(SETTINGS_KEY)).enabledExplicit, true);
+
+  // 再次显式开启后仍可往返
+  L.writeSettings(st, { enabled: true });
+  assert.equal(L.readSettings(st).enabled, true);
+  assert.equal(L.layoutEnabled(st), true);
+});
+
+test('设置：非默认布局不被迁移改写', async () => {
+  const L = await getLayout();
+  for (const mode of ['right', 'dock', 'focus']) {
+    const st = makeStorage([[SETTINGS_KEY, JSON.stringify({ enabled: false, mode })]]);
+    assert.equal(L.readSettings(st).enabled, false, mode + ' 是人为布局，保持关闭');
+    assert.equal(L.readLayoutConfig(st).enabled, false);
+    assert.equal(L.migrateLayoutDefaults(st), false);
+    assert.equal(L.readSettings(st).mode, mode);
+  }
+});
+
+test('设置：layoutEnabled 与新键一致，不再只读旧键', async () => {
+  const L = await getLayout();
+  const onlyNew = makeStorage([[SETTINGS_KEY, JSON.stringify({ enabled: true, mode: 'center' })]]);
+  assert.equal(L.layoutEnabled(onlyNew), true, '只有新键 enabled:true 也必须生效');
+  const onlyNewOff = makeStorage([[SETTINGS_KEY, JSON.stringify({ enabled: false, mode: 'center', enabledExplicit: true })]]);
+  assert.equal(L.layoutEnabled(onlyNewOff), false);
+  assert.equal(L.layoutEnabled(makeStorage()), true, '首次打开默认开启');
 });
 
 test('设置：旧布局键被继承（用户已有配置不丢）', async () => {
@@ -129,7 +233,7 @@ test('设置：坏存档不抛，回默认', async () => {
   const st = makeStorage([[SETTINGS_KEY, '{not json']]);
   assert.doesNotThrow(() => L.readSettings(st));
   const s = L.readSettings(st);
-  assert.equal(s.enabled, false);
+  assert.equal(s.enabled, true);
   assert.equal(s.chatWidth, 420);
 });
 
