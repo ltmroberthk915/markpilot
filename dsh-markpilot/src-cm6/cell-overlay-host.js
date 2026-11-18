@@ -5,7 +5,7 @@ export function mountCellOverlay(editor, box) {
   const host = editor.scrollDOM, text = box.firstElementChild;
   if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
   Object.assign(box.style, { position: 'absolute', pointerEvents: 'none', padding: '0px' });
-  Object.assign(text.style, { pointerEvents: 'auto', width: '100%', height: '100%', boxSizing: 'border-box' });
+  Object.assign(text.style, { pointerEvents: 'auto', width: '100%', height: '100%', boxSizing: 'border-box', overflow: 'clip' });
   host.appendChild(box);
   overlayOwners.set(box, { editor, host });
 }

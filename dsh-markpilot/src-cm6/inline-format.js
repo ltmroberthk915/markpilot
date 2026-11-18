@@ -186,20 +186,24 @@ export function inlineLinkSpans(source) {
   return out.sort((a, b) => a.from - b.from);
 }
 
-export function renderInlineSegment(value, options = {}) {
+export function renderInlineSegment(value, options = {}, base = 0) {
   const source = String(value ?? '');
-  if (!/[\*_~`$\\<!\[]/.test(source)) return escapeText(source);
+  const textAt = (from, to) => {
+    const html = escapeText(source.slice(from, to));
+    return html && options.cellOffsets ? '<span data-mp-text-from="' + (base + from) + '">' + html + '</span>' : html;
+  };
+  if (!/[\*_~`$\\<!\[]/.test(source)) return base ? textAt(0, source.length) : escapeText(source);
   const out = [], root = treeOf(source).topNode;
   const stack = [{ child: root.firstChild, pos: 0, end: source.length, close: '' }];
   while (stack.length) {
     const frame = stack[stack.length - 1], node = frame.child;
     if (!node || node.from >= frame.end) {
-      out.push(escapeText(source.slice(frame.pos, frame.end)), frame.close);
+      out.push(textAt(frame.pos, frame.end), frame.close);
       stack.pop(); continue;
     }
     frame.child = node.nextSibling;
     if (node.to <= frame.pos) continue;
-    out.push(escapeText(source.slice(frame.pos, node.from)));
+    out.push(textAt(frame.pos, node.from));
     frame.pos = Math.min(node.to, frame.end);
     const raw = source.slice(node.from, node.to), tag = tags[node.name];
     if (tag || node.name === 'Paragraph') {
@@ -208,31 +212,36 @@ export function renderInlineSegment(value, options = {}) {
     } else if (/^(Emphasis|Strikethrough|Underline|Superscript|Subscript)Mark$/.test(node.name)) {
       // Matched delimiters are hidden; unmatched delimiters remain text gaps.
     } else if (node.name === 'Escape') {
-      out.push(escapeText(raw.slice(1)));
+      out.push(textAt(node.from + 1, node.to));
     } else if (node.name === 'InlineCode') {
       const marks = node.getChildren('CodeMark');
       const body = source.slice(marks[0].to, marks[marks.length - 1].from).replace(/\r\n?|\n/g, ' ');
       const pad = codeSpanPadding(body);
       const code = body.slice(pad, body.length - pad);
-      out.push(options.code?.(code) ?? '<code>' + escapeText(code) + '</code>');
+      out.push(options.code?.(code, base + marks[0].to + pad) ?? '<code>' + escapeText(code) + '</code>');
     } else if (node.name === 'SourceMath') {
       const width = raw.startsWith('$$') ? 2 : 1;
-      out.push(options.math?.(raw.slice(width, -width), width === 2) ?? escapeText(raw));
+      /* 【源码区间一并交出去】调用方（表格静态层）需要用"这条公式在**格源码**里的 [from,to)"
+         来定位它，而不是累加渲染后 DOM 的 textContent 长度 —— 后者经过 trim、加粗、反斜线
+         转义等变换，反推源码必然偏差（实测差 1 就点错公式）。这里把解析器已经算好的
+         node.from/node.to 原样传下去，调用方按顺序关联即可。 */
+      out.push(options.math?.(raw.slice(width, -width), width === 2, { from: base + node.from, to: base + node.to })
+        ?? textAt(node.from, node.to));
     } else if (node.name === 'SourceImage') {
       images.lastIndex = 0;
       const match = images.exec(raw);
       const image = /^<img\b/i.test(raw) ? { raw } : { raw, alt: match[2], src: match[3] ?? match[4] };
-      out.push(options.image?.(image) ?? escapeText(raw));
+      out.push(options.image?.(image) ?? textAt(node.from, node.to));
     } else if (node.name === 'Link') {
       const url = node.getChild('URL'), marks = node.getChildren('LinkMark');
-      if (!url || marks.length < 2) { out.push(escapeText(raw)); continue; }
+      if (!url || marks.length < 2) { out.push(textAt(node.from, node.to)); continue; }
       let href = source.slice(url.from, url.to);
       if (href.startsWith('<') && href.endsWith('>')) href = href.slice(1, -1);
-      out.push(options.link ? options.link(href) : escapeText(source.slice(node.from, marks[0].to)));
+      out.push(options.link ? options.link(href) : textAt(node.from, marks[0].to));
       stack.push({ child: node.firstChild, pos: marks[0].to, end: marks[1].from,
-        close: options.link ? '</a>' : escapeText(source.slice(marks[1].from, node.to)) });
+        close: options.link ? '</a>' : textAt(marks[1].from, node.to) });
     } else {
-      out.push(escapeText(raw));
+      out.push(textAt(node.from, node.to));
     }
   }
   return out.join('');
@@ -246,9 +255,9 @@ export function renderInline(value, options = {}) {
   for (const br of source.matchAll(/<br\s*\/?>/gi)) {
     while (index < spans.length && spans[index].to <= br.index) index++;
     if (spans[index] && spans[index].from <= br.index) continue;
-    out.push(renderInlineSegment(source.slice(start, br.index), options), '<br>');
+    out.push(renderInlineSegment(source.slice(start, br.index), options, start), '<br>');
     start = br.index + br[0].length;
   }
-  out.push(renderInlineSegment(source.slice(start), options));
+  out.push(renderInlineSegment(source.slice(start), options, start));
   return out.join('');
 }

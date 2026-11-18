@@ -44,6 +44,11 @@ export function createHistoryGuard({ state, commands }) {
    *  用户随后在锚点旁打字不影响远端 undo/redo 的来源判定。 */
   const eventGen = StateEffect.define({
     map(value, mapping) {
+      // 事件合并时 @codemirror/commands 只映射“新事件”的 effects，更旧的锚点留在
+      // 较大坐标；连击退格等净删除后这些锚点会超过本轮 mapping 的旧长度，mapPos
+      // 直接抛 RangeError（装机 3.6.17 实测：Position 3588891 > 3588890）。
+      // 锚点已在文档外 ⇒ 该段内容早已消失，按“落在删除区间”同一口径丢弃标记。
+      if (value.pos > mapping.length) return undefined;
       let dead = false;
       mapping.iterChangedRanges((f, t) => { if (!dead && t > f && f <= value.pos && value.pos < t) dead = true; });
       return dead ? undefined : { gen: value.gen, pos: mapping.mapPos(value.pos, -1) };

@@ -61,8 +61,7 @@ export function cellContentSpan(text) {
 /** 覆盖层内 Home/End 的光标落点：extend=true（Shift）保留 DOM 锚点、只把 head 移到可见边界，
     伸缩方向由既有锚点自然决定（anchor 在前/在后都对）；否则折叠到边界。IME 组字键由调用方
     （keydown 的 isComposing/229 分支）先行拦截，不会走到这里。 */
-export function cellCaretEdge(text, key, extend, anchor) {
-  const span = cellContentSpan(text);
+export function cellCaretEdge(text, key, extend, anchor, span = cellContentSpan(text)) {
   const head = key === 'End' ? span.end : span.start;
   return { anchor: extend ? anchor : head, head };
 }

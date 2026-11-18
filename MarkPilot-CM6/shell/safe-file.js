@@ -105,8 +105,9 @@ function prepareFileWorker() {
   return nativeWorker().then(()=>{},()=>{});
 }
 // Standalone Node tests/tools also close the unref'ed helper on a normal exit.
+function stableWin32Code(reply) { const win32=Number(reply?.win32); if(win32===5)return 'EACCES'; if(win32===19)return 'EROFS'; if(win32===32||win32===33)return 'EBUSY'; return ''; }
 function nativeFailure(reply,temp,backup) {
-  const error=Object.assign(Error('无法安全替换文件，当前草稿已保留：'+(reply.error||'未知错误')),{code:reply.code||'MP_REPLACE_FAILED',preserveTemp:!!reply.preserveTemp});
+  const error=Object.assign(Error('无法安全替换文件，当前草稿已保留：'+(reply.error||'未知错误')),{code:reply.code||stableWin32Code(reply)||'MP_REPLACE_FAILED',preserveTemp:!!reply.preserveTemp});
   if(error.preserveTemp)error.recoveryPaths={temp,backup};return error;
 }
 async function prepareFileImpl(target,temp,{baseline,output}={}) {
@@ -134,4 +135,4 @@ async function prepareFileImpl(target,temp,{baseline,output}={}) {
     async abort(){if(done||recovery)return;const reply=await native.rpc({action:'abort',id});if(!reply?.ok)throw nativeFailure(reply||{},temp,backup);done=true;},
   };
 }
-module.exports={prepareFile,shutdownFileWorker,prepareFileWorker};
+module.exports={prepareFile,shutdownFileWorker,prepareFileWorker,stableWin32Code};

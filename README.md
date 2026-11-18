@@ -993,3 +993,10 @@ DSH 重启时会把上次打开的 Markdown 标签恢复成自带预览，停在
 插件包名改为 `dsh-markdown-editor-typora`（原 `dsh-markdown-typora` 停在 1.3.x）。本版包含外部修改自动刷新、主题保持、侧栏手柄位置恢复、透明恢复，以及 live 刷新路径的对抗性加固。
 
 [下载 DSH 插件 1.4.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-editor-typora-v1.4.0)，或安装 `dsh-markdown-editor-typora@1.4.0`。
+
+
+## MarkPilot 3.7.0 / DSH 2.1.0
+
+工具岛可直接切换明暗主题；DSH 右下角采用简洁的 ∑ 入口。包含近期表格、拖选与跨行公式显示改进。
+
+[桌面版下载](https://github.com/ltmroberthk915/markpilot/releases/tag/v3.7.0) · [DSH 插件下载](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-editor-typora-v2.1.0)

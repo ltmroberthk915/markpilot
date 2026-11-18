@@ -42,6 +42,14 @@ window.__ModuleLoader__.load({
     const FRAME_SRC = "/dsh-markdown-editor-typora/renderer-cm6/index.html";
     const SAVE_DEBOUNCE_MS = 1500;   // 与桌面壳 _autoSaveTimer 同拍
   const SAVE_RECONCILE_GRACE_MS = 1200; // 保存成功后忽略自身写入触发的 mtime/ctime 事件
+    /* 镜像分段（单窗口回落态）：第一笔立即写保护，之后同一时刻最多一个全文请求，
+       持续打字按 interval 合流，停打后 trailing 补齐尾字；清理先等在途请求落地，
+       迟到的回执只能补偿删除自己的行，不能把已清理的行复活。 */
+    const MIRROR_MIN_INTERVAL_MS = 600;
+    const MIRROR_TRAILING_MS = 400;
+    const MIRROR_RETRY_MS = 1500;
+    const MIRROR_CLEAR_WAIT_MS = 3000;
+    const MIRROR_PUSH_TIMEOUT_MS = 5000;
     const PULL_TIMEOUT_MS = 2000;    // requestText 超时：超时就不保存，绝不拿旧缓存盖新内容
     const FLUSH_WAIT_MS = 120;       // 关闭后接收已排队输入消息的宽限期
     const RECOVERY_PREFIX = "dsh-markdown-editor-typora:recovery:";
@@ -395,6 +403,14 @@ function applyMirrorDelta(mirror,event){
     /** sessions 服务旁路：apply 里写入取值器（每次 boot 现取，服务晚到也能拿到 cwd；不进 cordis inject） */
     const SessionsBridge = { getSessions: null };
 
+    /**
+     * Optional host interfaces for busy-time delivery. Both are captured with
+     * ctx.inject so a missing service can never block this plugin's apply();
+     * every reader below degrades to the host default ("queue") when absent.
+     */
+    let hostConfigForms = null;
+    let hostUiSession = null;
+
     let generationCounter = 0;
 
     /* ───────────────────────── 纯函数（可测） ───────────────────────── */
@@ -675,10 +691,51 @@ function applyMirrorDelta(mirror,event){
     // Pure review-state helpers: shared by the editor and the portable client tests.
     function mergeReviewGroup(review, groupId, changeCount) {
       const groups = review && Array.isArray(review.groups) ? review.groups.slice() : [];
-      if (groupId && !groups.includes(groupId)) groups.push(groupId);
+      const exists = !!(groupId && groups.includes(groupId));
+      if (groupId && !exists) groups.push(groupId);
       const previous = review && Number.isFinite(Number(review.count)) ? Number(review.count) : 0;
       const added = Number.isFinite(Number(changeCount)) && Number(changeCount) > 0 ? Number(changeCount) : 1;
-      return { groups, count: previous + added };
+      // Optimistic conflict-resolve review and the later live remote group are
+      // the same group; merging it twice must not double the change count.
+      return { groups, count: exists ? Math.max(previous, groups.length) : previous + added };
+    }
+    // Pure conflict-panel helpers: no DOM, no side effects. The host keeps the
+    // full base/ours/theirs texts; the client only receives hunks.
+    function conflictDefaultChoices(session) {
+      const hunks = session && Array.isArray(session.hunks) ? session.hunks : [];
+      return hunks.map((hunk, index) => ({ index, choice: 'ours', text: '' }));
+    }
+    function conflictResolutionsFromChoices(choices) {
+      return (Array.isArray(choices) ? choices : []).map((choice) => ({
+        choice: choice.choice,
+        ...(choice.choice === 'manual' ? { text: String(choice.text == null ? '' : choice.text) } : {}),
+      }));
+    }
+    function conflictApplyEnabled(session, choices, busy) {
+      if (busy || !session || !Array.isArray(session.hunks)) return false;
+      if (!Array.isArray(choices) || choices.length !== session.hunks.length) return false;
+      return choices.every((choice, index) => choice && choice.index === index
+        && ['ours', 'theirs', 'both', 'manual'].includes(choice.choice)
+        && (choice.choice !== 'manual' || String(choice.text == null ? '' : choice.text).length > 0));
+    }
+    function conflictChoiceLabel(choice) {
+      if (choice === 'ours') return '用我的';
+      if (choice === 'theirs') return '用磁盘';
+      if (choice === 'both') return '两边保留';
+      if (choice === 'manual') return '手动编辑';
+      return String(choice == null ? '' : choice);
+    }
+    function conflictTruncatedNotice(session) {
+      return session && session.truncated ? '文档较大，仅显示冲突块摘要；应用仍按完整正文计算。' : '';
+    }
+    // A live join whose seed equals the room text can still be dirty when the
+    // room has unsaved versions (e.g. conflict-resolve appends). Use the room
+    // savedVersion/version pair, not only the initial text comparison.
+    function liveTicketDirty(ticket) {
+      if (!ticket || typeof ticket !== 'object') return false;
+      if (ticket.dirty === true) return true;
+      return Number.isSafeInteger(ticket.version) && Number.isSafeInteger(ticket.savedVersion)
+        && ticket.version !== ticket.savedVersion;
     }
     function reviewUndoGroup(review) {
       return review && Array.isArray(review.groups) && review.groups.length
@@ -689,6 +746,67 @@ function applyMirrorDelta(mirror,event){
     }
     function reviewSuppressesSave(state) {
       return !!(state && state.review);
+    }
+    // Host-authoritative review retention. chainOk answers "are these groups
+    // still exactly the current text?"; reviewRestorable answers "may the
+    // editor show this persisted review again?" They differ when later user
+    // input makes a single group safely selectively undoable. Old hosts omit
+    // reviewRestorable, so fall back to their chainOk-only behavior. This never
+    // turns a stored diff into current-coordinate edits; undo is still planned
+    // and applied by the host against the current authority.
+    function reviewRestorableFromHost(value) {
+      if (!value || typeof value !== "object") return false;
+      if (typeof value.reviewRestorable === "boolean") return value.reviewRestorable;
+      return value.chainOk !== false;
+    }
+    function reviewRestoreKeeps(value, restoring, validIds) {
+      if (!reviewRestorableFromHost(value)) return false;
+      if (!Array.isArray(restoring) || restoring.length === 0) return false;
+      const valid = validIds && typeof validIds[Symbol.iterator] === "function" ? new Set(validIds) : new Set();
+      return restoring.every((id) => valid.has(id));
+    }
+    const UNDO_REASON_HINTS = {
+      "intervening-overlap": "后续用户修改与要撤销的 AI 修改重叠，不能自动保留用户文字",
+      "not-latest": "后面还有更新的 AI 修改，请先撤销更新的组",
+      "later-agent-group": "后面还有更新的 AI 修改，不能越过它撤销",
+      "history-gap": "共享历史不完整，无法证明可安全撤销",
+      "history-unavailable": "共享历史不可用，无法证明可安全撤销",
+      "history-api-unavailable": "当前宿主不支持共享历史，无法选择性撤销",
+      "history-read-failed": "共享历史读取失败，无法证明可安全撤销",
+      "epoch-changed": "编辑器会话已更换，旧审阅不能安全恢复",
+      "result-mismatch": "审阅记录与当前正文不一致",
+      "no-live-history": "当前不是可撤销的共享缓冲区",
+      "version-unavailable": "共享历史版本不可用",
+      "multi-group-selective": "多组审阅不能选择性撤销",
+      "no-inverse": "这组修改没有可撤销的内容",
+    };
+    function undoFailureNotice(error) {
+      const reason = String(error && error.reason || "");
+      const hint = UNDO_REASON_HINTS[reason] || "";
+      const detail = String(error && (error.message || error.code) || "unknown");
+      return "撤销失败：" + (hint || detail) + (hint ? "（" + detail + "）" : "") + "；当前内容未变，可继续保留或重读";
+    }
+    function undoResultNotice(result, groupCount) {
+      const count = Number.isSafeInteger(groupCount) && groupCount > 0 ? groupCount : 0;
+      const pending = result && Array.isArray(result.undoMarkPending) ? result.undoMarkPending.length : 0;
+      const selective = !!(result && result.selective === true);
+      const changed = !(result && result.changed === false);
+      const source = result && result.source;
+      const saved = result && result.saved;
+      const knownDiskState = source === "disk" || source === "buffer" || typeof saved === "boolean";
+      const disk = source === "disk" || saved === true;
+      let message;
+      if (!changed) {
+        // undoGroups' no-op path only marks the audit group; it never writes
+        // text, so do not claim either a buffer or a disk change here.
+        message = "没有需要撤回的正文改动" + (selective ? "（保留后续用户输入）" : "")
+          + "（" + count + " 组审阅记录已标记）";
+      } else {
+        message = "已撤销本次 AI 修改" + (selective ? "（保留后续用户输入）" : "") + "（" + count + " 组）；"
+          + (!knownDiskState ? "保存状态请以文档为准" : disk ? "已写盘" : "仅撤销编辑器缓冲区，磁盘未改变");
+      }
+      if (pending > 0) message += "；但审阅标记未完全写入（" + pending + " 组），重新打开后可能再次出现审阅提示";
+      return message;
     }
     const REVIEW_STORE_PREFIX = "dsh-markdown-editor-typora:review:v1:";
     function reviewPathKey(path) {
@@ -701,7 +819,7 @@ function applyMirrorDelta(mirror,event){
     function normalizeReviewRecord(raw, path, baseVersion) {
       let value = raw;
       if (typeof raw === "string") { try { value = JSON.parse(raw); } catch { return null; } }
-      if (!value || typeof value !== "object" || value.v !== 1) return null;
+      if (!value || typeof value !== "object" || value.v !== 2) return null;
       if (String(value.pathKey || "") !== reviewPathKey(path)) return null;
       if (typeof baseVersion !== "string" || !baseVersion || String(value.baseVersion || "") !== baseVersion) return null;
       if (!Array.isArray(value.groups) || value.groups.length === 0 || value.groups.length > 20) return null;
@@ -713,7 +831,7 @@ function applyMirrorDelta(mirror,event){
       const count = Number(value.count);
       if (!Number.isSafeInteger(count) || count < groups.length || count > 100000) return null;
       const at = Number(value.at);
-      return { v: 1, pathKey: reviewPathKey(path), baseVersion, groups, count, at: Number.isFinite(at) ? at : 0 };
+      return { v: 2, pathKey: reviewPathKey(path), baseVersion, groups, count, at: Number.isFinite(at) ? at : 0 };
     }
 
     /** 轮询档位：SSE 健康/页面隐藏/后台 tab 时返回 null（不调度）；断开首档 2s，三次后 6s。 */
@@ -722,6 +840,59 @@ function applyMirrorDelta(mirror,event){
       if (s.hidden) return null;
       if (s.healthy) return null;
       return Number(s.failures) >= 3 ? POLL_SLOW_MS : POLL_FAST_MS;
+    }
+
+    function saveAsCandidate(file, now = Date.now()) {
+      const source = String(file || "");
+      if (!source) return "";
+      const stem = source.replace(/\.md$/i, "");
+      const stamp = new Date(now).toISOString().replace(/[:.]/g, "-");
+      return stem + "-恢复-" + stamp + ".md";
+    }
+
+    function saveErrorKind(error) {
+      if (!error) return "error";
+      if (error.reason === "missing" || error.code === "MP_FILE_MISSING") return "missing";
+      if (["EACCES", "EPERM", "EBUSY", "EROFS", "FS_PERMISSION_DENIED", "MP_FILE_LINKED"].includes(error.code)) return "readonly";
+      if (error.code === "FS_STALE_VERSION") return "conflict";
+      return "error";
+    }
+
+    function sqlitePrimaryCode(error) {
+      const raw = Number(error && (error.sqliteCode ?? error.errcode ?? error.cause?.errcode));
+      if (!isFinite(raw) || raw <= 0) return null;
+      return Math.trunc(raw) & 0xff;
+    }
+
+    /**
+     * Only explicit SQLITE_CORRUPT(11) / SQLITE_NOTADB(26) enter this path.
+     * `prewrite` comes from the host; absent/false means the writer may already
+     * have touched the disk, so never claim the file was left untouched.
+     */
+    function storageCorruptionFailure(error) {
+      const primary = sqlitePrimaryCode(error);
+      if (primary !== 11 && primary !== 26) return null;
+      if (!error || error.storageFamily !== "local-live") return null;
+      const prewrite = !!(error && error.prewrite === true);
+      return {
+        prewrite,
+        text: prewrite
+          ? "本次未保存：协同存储暂不可用。修改仍在当前窗口，请保留窗口并重试。"
+          : "保存结果未确认：协同存储不可用，请核对磁盘。修改仍在当前窗口，请保留窗口并重试。",
+      };
+    }
+
+    /** Only surface a path the host actually returned; never invent one. */
+    function saveRecoveryPath(error) {
+      if (!error) return "";
+      if (typeof error.recoveryPath === "string" && error.recoveryPath) return error.recoveryPath;
+      if (typeof error.recoveryBackup === "string" && error.recoveryBackup) return error.recoveryBackup;
+      return "";
+    }
+
+    function saveRecoveryNotice(error) {
+      const path = saveRecoveryPath(error);
+      return path ? { text: "保存失败；恢复副本已保留", path } : null;
     }
 
     /** 外部变更能否直接覆盖编辑面：只有干净、非冲突、无保存飞行、可见且页面在前台才行。 */
@@ -793,16 +964,814 @@ function applyMirrorDelta(mirror,event){
     }
 
     /**
-     * 直接让宿主会话发一条消息（照抄 dsh-worktable 的 sendHostSession）：
-     * 浮层里的编辑器拿不到右侧栏 tab 才有的 inputActions，所以不能用 composer 那条路；
-     * worktable 的做法是走 sessions 服务——临时持有 → 等 ready → session.prompt(…,'queue')。
-     * 只选一条通路，拒绝/超时绝不换第二条重发（第一条可能已经到宿主了）。
+     * MP208-UI: read-only quote + restricted edit target.
+     *
+     * The native DSH 0.2.2 composer exposes `inputActions.insertQuote(text,
+     * summary)`: it inserts a quote node, focuses the composer, keeps the
+     * existing draft, and sends `> line` Markdown only when the user submits.
+     * The summary is a display label and is not part of the message. A normal
+     * quote never grants write access.
+     *
+     * These pure helpers live in the client factory so node:test can exercise
+     * them without a host. Renderer-side equivalents live in
+     * renderer-cm6/mp208-core.js; both consume the same CM6 snapshot fields.
      */
-    async function sendViaHostSession(sessionId, text) {
+    const MP208_MAX_QUOTE = 262144;
+    const MP208_MAX_EDIT_INLINE = 16384;   // UTF-8 BYTES, not UTF-16 chars
+    const MP208_MAX_EDIT_BYTES = 32768;   // host readSelection budget / UI hard stop
+    const MP208_MAX_EDIT_INTENT = 2000;
+
+    function mp208ByteLength(text) {
+      try {
+        if (typeof TextEncoder === "function") return new TextEncoder().encode(String(text)).length;
+      } catch (e) { /* fall through */ }
+      return String(text).length * 2;
+    }
+
+    function mp208NormalizeSelection(content) {
+      const input = content && typeof content === "object" ? content : {};
+      const ranges = Array.isArray(input.ranges) ? input.ranges : [];
+      if (!ranges.length) return { ok: false, code: "NO_SELECTION", message: "没有可引用的选区" };
+      if (ranges.length > 64) return { ok: false, code: "TOO_MANY_RANGES", message: "选区段数过多" };
+      const docLength = Number.isSafeInteger(input.docLength) ? input.docLength : null;
+      const out = [];
+      for (let i = 0; i < ranges.length; i += 1) {
+        const item = ranges[i] || {};
+        const from = Number(item.from);
+        const to = Number(item.to);
+        const text = typeof item.text === "string" ? item.text : "";
+        if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || to < from) {
+          return { ok: false, code: "BAD_RANGE", message: "选区位置无效" };
+        }
+        if (docLength !== null && to > docLength) return { ok: false, code: "RANGE_OUT_OF_DOC", message: "选区超出当前快照" };
+        if (text.length !== to - from) return { ok: false, code: "RANGE_TEXT_MISMATCH", message: "选区文本与位置长度不一致" };
+        if (out.length && from < out[out.length - 1].to) return { ok: false, code: "RANGE_OVERLAP", message: "选区段重叠" };
+        out.push({ from: from, to: to, text: text });
+      }
+      const lineStart = Number.isSafeInteger(input.lineStart) ? input.lineStart : 1;
+      const lineEnd = Number.isSafeInteger(input.lineEnd) && input.lineEnd >= lineStart ? input.lineEnd : lineStart;
+      return {
+        ok: true,
+        ranges: out,
+        text: typeof input.text === "string" ? input.text : out.map((r) => r.text).join("\n\n"),
+        docLength: docLength,
+        lineStart: lineStart,
+        lineEnd: lineEnd,
+        capturedAt: Number.isFinite(input.capturedAt) ? input.capturedAt : Date.now(),
+        nonce: typeof input.nonce === "string" ? input.nonce : null,
+      };
+    }
+
+    function mp208QuoteSummary(path, text, ranges, lineStart, lineEnd) {
+      const base = basenameOf(path) || "(未命名文档)";
+      const firstLine = String(text || "").split(/\r?\n/).find((line) => line.trim() !== "") || base;
+      return {
+        label: base + " · 第 " + lineStart + (lineEnd !== lineStart ? "–" + lineEnd : "") + " 行",
+        title: firstLine.length > 120 ? firstLine.slice(0, 117) + "…" : firstLine,
+        detail: String(text || "").length + " 字符 · " + ranges.length + " 段",
+      };
+    }
+
+    function mp208BuildQuote(input) {
+      const sel = mp208NormalizeSelection(input);
+      if (!sel.ok) return sel;
+      const path = typeof input.path === "string" ? input.path.trim() : "";
+      const text = sel.ranges.length > 1
+        ? sel.ranges.map((r, i) => (i ? "\n\n---\n\n" : "") + r.text).join("")
+        : sel.text;
+      const sourceLine = "只读引用：" + (path || "(未命名文档)") + " · 第 " + sel.lineStart
+        + (sel.lineEnd !== sel.lineStart ? "–" + sel.lineEnd : "") + " 行";
+      const full = sourceLine + "\n\n" + text;
+      if (full.length > MP208_MAX_QUOTE) {
+        return { ok: false, code: "QUOTE_TOO_LARGE", message: "选区过大（" + Math.ceil(full.length / 1024) + " KB），请缩小范围后再引用" };
+      }
+      return {
+        ok: true,
+        text: full,
+        summary: mp208QuoteSummary(path, text, sel.ranges, sel.lineStart, sel.lineEnd),
+        meta: {
+          kind: "readonly-quote", path: path, lineStart: sel.lineStart, lineEnd: sel.lineEnd,
+          rangeCount: sel.ranges.length, chars: full.length, bytes: mp208ByteLength(full),
+        },
+      };
+    }
+
+    /**
+     * 2.0.18 payload contract for the restricted edit target.
+     *
+     * The user's own modification request is the first line, so it is read
+     * before any editor metadata. The selection body is sent exactly once:
+     * short ranges inline it and name one executable editSelection call;
+     * longer ranges are read once through readSelection. The read-only quote
+     * path never calls this builder, so a quote stays material and never
+     * authorizes a write.
+     */
+    function mp208EditSelectionBody(sel) {
+      const ranges = sel && Array.isArray(sel.ranges) ? sel.ranges : [];
+      if (ranges.length > 1) {
+        return ranges.map((r, i) => "[第" + (i + 1) + "段]\n" + r.text).join("\n\n");
+      }
+      if (ranges.length) return ranges[0].text;
+      return sel && typeof sel.text === "string" ? sel.text : "";
+    }
+
+    function mp208ReplacementsHint(count) {
+      return "replacements=[每段替换后的文本]（按原文段序，共 " + count + " 项）";
+    }
+
+    function mp208BuildEditPayload(input) {
+      const intent = typeof input.intent === "string" ? input.intent.trim() : "";
+      if (!intent) return { ok: false, code: "EDIT_INTENT_REQUIRED", message: "请先填写修改意图" };
+      if (intent.length > MP208_MAX_EDIT_INTENT) return { ok: false, code: "EDIT_INTENT_TOO_LARGE", message: "修改意图过长" };
+      const sel = mp208NormalizeSelection(input);
+      if (!sel.ok) return sel;
+      if (mp208ByteLength(sel.text) > MP208_MAX_EDIT_BYTES) {
+        return { ok: false, code: "EDIT_SELECTION_TOO_LARGE", message: "选区超过 32 KiB，请缩小范围后再修改（模型单次按需读取上限为 32 KiB）" };
+      }
+      const path = typeof input.path === "string" ? input.path.trim() : "";
+      const selectionId = typeof input.selectionId === "string" ? input.selectionId.trim() : "";
+      if (!path || !selectionId) return { ok: false, code: "EDIT_TARGET_MISSING", message: "修改目标缺少文件或选择标识" };
+      const span = "第 " + sel.lineStart + (sel.lineEnd !== sel.lineStart ? "–" + sel.lineEnd : "") + " 行";
+      const inlineBudget = Number.isSafeInteger(input.inlineBudget) ? input.inlineBudget : MP208_MAX_EDIT_INLINE;
+      const inline = mp208ByteLength(sel.text) <= inlineBudget;
+      if (!inline && input.readSelection !== true) {
+        return { ok: false, code: "EDIT_SELECTION_TOO_LARGE", message: "选区过大（" + sel.text.length + " 字符），当前宿主不支持按需读取；请缩小范围后再修改" };
+      }
+      const multi = sel.ranges.length > 1;
+      const pathArg = "path=" + JSON.stringify(path);
+      const idArg = "selectionId=" + JSON.stringify(selectionId);
+      const action = multi
+        ? mp208ReplacementsHint(sel.ranges.length)
+        : "newString=\"修改后的完整选区\"";
+      const intentShort = intent.length > 24 ? intent.slice(0, 24) + "…" : intent;
+      const lines = [intent];
+      if (inline) {
+        lines.push(
+          "选区已读，直接调用 markdown。",
+          "markdown：action=\"editSelection\"," + pathArg + "," + idArg + "," + action,
+          "原文（" + span + (multi ? "，" + sel.ranges.length + " 段，按段序" : "") + "）：",
+          mp208EditSelectionBody(sel),
+        );
+      } else {
+        lines.push(
+          "先读取：markdown：action=\"readSelection\"," + pathArg + "," + idArg,
+          "再修改：markdown：action=\"editSelection\"," + pathArg + "," + idArg + "," + action,
+          "原文未内联（" + sel.text.length + " 字符）。",
+        );
+      }
+      const text = lines.join("\n");
+      const summary = {
+        label: "修改 · " + basenameOf(path) + " · " + span + " · " + intentShort,
+        title: intent,
+        detail: inline
+          ? ("原文一次 · " + sel.text.length + " 字符")
+          : ("按需读取 · " + sel.text.length + " 字符"),
+      };
+      return {
+        ok: true,
+        mode: inline ? "inline" : "read-on-demand",
+        text: text,
+        message: text,
+        path: path,
+        selectionId: selectionId,
+        lineStart: sel.lineStart,
+        lineEnd: sel.lineEnd,
+        summary: summary,
+        meta: {
+          kind: "restricted-edit", mode: inline ? "inline" : "read-on-demand",
+          promptVersion: "2.0.18",
+          chars: text.length, bytes: mp208ByteLength(text), selectionChars: sel.text.length,
+          rangeCount: sel.ranges.length, multi: multi,
+          toolCalls: inline ? 1 : 2,
+        },
+      };
+    }
+
+    // Compatibility aliases: both the native quote path and the plain fallback
+    // consume exactly the same payload.
+    const mp208BuildEditRequest = mp208BuildEditPayload;
+    const mp208BuildEditQuote = mp208BuildEditPayload;
+
+    /**
+     * Whether the user explicitly asked to reuse the recent discussion.
+     *
+     * This is intentionally narrow: only an unnegated reference phrase such as
+     * "参考刚才的讨论" / "按前面的约定" / "沿用上文" counts. "不要参考上文"
+     * (and its variants) stays on the isolated path — a negated reference is
+     * never a request to include history.
+     */
+    const MP208_REFERENCE_PATTERNS = [
+      /参考(?:一下)?(?:刚才|之前|前面|上文|前文|以上|上一轮|上一条|上一段|前述|此前|刚刚)(?:的)?(?:讨论|对话|交流|约定|要求|说明|评审|意见|结论|上下文|内容|方案|安排|说法|回复|答复)/g,
+      /(?:按|按照|依照|根据|依据)(?:刚才|之前|前面|上文|前文|以上|上一轮|上一条|前述|此前)(?:的)?(?:讨论|约定|要求|说明|方案|结论|意见|安排|说法|回复|答复)/g,
+      /(?:刚才|之前|前面|上文|前文|上一轮|上一条|前述|此前)(?:的)?(?:讨论|约定|要求|说明|评审|意见|结论|方案|安排)/g,
+      /(?:沿用|延续|接续|继续|接着|结合)(?:一下)?(?:刚才|之前|前面|上文|前文|以上|上一轮|上一条|前述|此前)(?:的)?(?:讨论|约定|要求|说明|方案|结论|意见|安排)?/g,
+      /参考(?:一下)?(?:上文|前文|以上内容)/g,
+    ];
+    const MP208_REFERENCE_NEGATION = /(?:不要|不用|不必|无需|不需要|别|勿|禁止|忽略|抛开|无视|跳过|不要管|不用管|别管)(?:再|去|要)?(?:参考|参照|依据|根据|结合|沿用|延续|接续|看|管|考虑|理会)?/;
+    // Quoted text directly after "改成/替换为/..." is the *content* to write,
+    // not an instruction to reuse the discussion. "把这句话改成'参考刚才的
+    // 讨论'" must stay isolated. Quotes used as a reference marker ("按「前面
+    // 的约定」改") are kept because no change-to verb precedes them.
+    const MP208_CONTENT_QUOTE = /"[^"]*"|'[^']*'|“[^”]*”|‘[^’]*’|「[^」]*」|『[^』]*』|`[^`]*`/g;
+    const MP208_CONTENT_VERB = /(?:改成|改为|写成|替换为|换成|变为|输入|插入|填入|填成|写作)\s*[：:，,\s]*$/;
+    function mp208StripContentQuotes(intent) {
+      return String(intent || "").replace(MP208_CONTENT_QUOTE, (match, offset, whole) => {
+        const before = whole.slice(Math.max(0, offset - 16), offset);
+        return MP208_CONTENT_VERB.test(before) ? " " : match;
+      });
+    }
+    function mp208ExplicitReference(intent) {
+      const text = mp208StripContentQuotes(intent);
+      if (!text.trim()) return false;
+      for (const pattern of MP208_REFERENCE_PATTERNS) {
+        const scan = new RegExp(pattern.source, "g");
+        let match;
+        while ((match = scan.exec(text))) {
+          const before = text.slice(Math.max(0, match.index - 12), match.index);
+          if (MP208_REFERENCE_NEGATION.test(before)) continue;
+          return true;
+        }
+      }
+      return false;
+    }
+
+    const MP208_QUOTE_CHOICE_BYTES = 16384;
+    function mp208QuoteCost(text) {
+      const value = String(text || "");
+      const bytes = mp208ByteLength(value);
+      return {
+        chars: value.length,
+        bytes: bytes,
+        kib: Math.ceil(bytes / 1024),
+        tokens: Math.ceil(bytes / 4),
+        tokenMethod: "UTF-8 bytes / 4 (no tokenizer available)",
+      };
+    }
+    function mp208NeedsQuoteChoice(text) {
+      return mp208ByteLength(text) > MP208_QUOTE_CHOICE_BYTES;
+    }
+
+
+    function mp208Capability(actions) {
+      return {
+        nativeQuote: !!(actions && typeof actions.insertQuote === "function"),
+        textInsert: !!(actions && typeof actions.captureInsertion === "function" && typeof actions.insertText === "function"),
+        readOnly: !!(actions && (typeof actions.insertQuote === "function"
+          || (typeof actions.captureInsertion === "function" && typeof actions.insertText === "function"))),
+      };
+    }
+
+    /**
+     * 「修改此处」提交目标（纯逻辑）：
+     *   - 点开弹窗时有可见会话，且现在仍是同一个 → 直接提交；
+     *   - 点开时有会话，现在换成了别的/没了 → 拒绝（用户切换，绝不串会话）；
+     *   - 点开时在空首页（没有会话）：
+     *       · 现在仍没有 → 由本次操作走正常新会话流程创建；
+     *       · 现在已有会话 → 说明用户中途手动选了会话，拒绝（不能把请求投给用户切换后的会话）。
+     *     “本次操作创建的目标”由调用方在 create 分支创建后直接使用，不再拿新 id 回灌本函数。
+     */
+    function mp208EditSubmitTarget(input) {
+      const value = input && typeof input === "object" ? input : {};
+      const current = String(value.currentSessionId || "");
+      const captured = String(value.capturedSessionId || "");
+      if (current) {
+        if (!captured) return { ok: false, code: "SESSION_SWITCHED_BY_USER", message: "你已切换到其他对话，未发送" };
+        if (current !== captured) return { ok: false, code: "SESSION_SWITCHED", message: "对话已切换，未发送" };
+        return { ok: true, sessionId: current, create: false };
+      }
+      if (captured) return { ok: false, code: "SESSION_GONE", message: "对话已关闭，未发送" };
+      return { ok: true, sessionId: "", create: true };
+    }
+
+    /**
+     * 只读引用的目标会话（纯逻辑）：只认可见的当前输入框。
+     * 绝不用文档历史 owner（doc.sessionId）兜底 —— 新首页引用的正文属于新文件，
+     * 旧文件原会话可能仍在后台；把引用送过去就是串会话。可见会话为空时返回 "",
+     * 调用方再走宿主正常新会话流程。
+     */
+    function mp208QuoteRecipient(input) {
+      const value = input && typeof input === "object" ? input : {};
+      const current = String(value.currentSessionId || "");
+      if (current) return current;
+      return String(value.selectedSessionId || "");
+    }
+
+    function mp208InsertNativeQuote(actions, quote) {
+      if (!actions || typeof actions.insertQuote !== "function") return { ok: false, method: "none", reason: "native-quote-unavailable" };
+      try {
+        const ok = actions.insertQuote(quote.text, quote.summary) === true;
+        return { ok: ok, method: "insertQuote", reason: ok ? null : "host-refused" };
+      } catch (error) {
+        return { ok: false, method: "insertQuote", reason: String(error && error.message ? error.message : error) };
+      }
+    }
+
+    /** Short read-only fallback for hosts without insertQuote. Never sends. */
+    function mp208InsertReadOnlyText(actions, quote) {
+      if (!actions || typeof actions.captureInsertion !== "function" || typeof actions.insertText !== "function") {
+        return { ok: false, method: "none", reason: "no-input-face" };
+      }
+      if (quote.text.length > 4096) return { ok: false, method: "none", reason: "too-large-for-readonly-fallback" };
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        let span;
+        try { span = actions.captureInsertion(); } catch (error) { span = undefined; }
+        if (span === undefined || span === null) continue;
+        try {
+          if (actions.insertText(quote.text, span) === true) return { ok: true, method: "insertText", attempts: attempt };
+        } catch (error) { /* retry once */ }
+      }
+      return { ok: false, method: "insertText", reason: "insert-rejected" };
+    }
+
+    function mp208InsertTextPreservingDraft(actions, text) {
       const content = typeof text === "string" ? text : "";
       if (!content) return { ok: false, reason: "empty-text" };
+      if (!actions || typeof actions.captureInsertion !== "function" || typeof actions.insertText !== "function") {
+        return { ok: false, reason: "no-input-face" };
+      }
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        let span;
+        try { span = actions.captureInsertion(); } catch (error) { span = undefined; }
+        if (span === undefined || span === null) continue;
+        try {
+          if (actions.insertText(content, span) === true) return { ok: true, attempts: attempt };
+        } catch (error) { /* retry once */ }
+      }
+      return { ok: false, reason: "insert-rejected" };
+    }
+
+    function mp208RecordCost(kind, meta) {
+      try {
+        const store = window.__MP208_COST || (window.__MP208_COST = { quote: 0, edit: 0, chars: 0, bytes: 0, last: null });
+        if (kind === "quote") store.quote += 1;
+        else if (kind === "edit") store.edit += 1;
+        store.chars += Number(meta && meta.chars) || 0;
+        store.bytes += Number(meta && meta.bytes) || 0;
+        store.last = { kind: kind, at: Date.now(), meta: meta || null };
+      } catch (e) { /* diagnostics only */ }
+    }
+
+    function mp208DigestMatches(clickDigest, freshDigest) {
+      const a = String(clickDigest || "").toLowerCase();
+      const b = String(freshDigest || "").toLowerCase();
+      return /^[0-9a-f]{64}$/.test(a) && a === b;
+    }
+
+    /**
+     * Rebase a historical audit change into current coordinates ONLY when the
+     * host proved this group chain is still the current document (chainOk).
+     * Otherwise there is no proof and the caller must not jump.
+     */
+    function mp208PlanHistoricalLocate(meta, index) {
+      if (!meta || meta.chainOk !== true || !Array.isArray(meta.groups) || !Number.isSafeInteger(index)) {
+        return { ok: false, reason: "not-current" };
+      }
+      // Cross-group rebasing needs a per-position proof we do not have; the
+      // safe product behaviour is to refuse instead of adding a group delta
+      // that may have happened after the target. Single, current groups are
+      // mapped within their own change list only.
+      if (meta.groups.length !== 1) return { ok: false, reason: "multi-group-unproven" };
+      const changes = Array.isArray(meta.groups[0].changes) ? meta.groups[0].changes : [];
+      let within = 0;
+      for (let i = 0; i < changes.length; i += 1) {
+        const item = changes[i] || {};
+        const from = Number(item.from);
+        const to = Number(item.to);
+        const insert = String(item.insert || "");
+        if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to)) return { ok: false, reason: "bad-change" };
+        if (i === index) {
+          if (from + within < 0) return { ok: false, reason: "no-proof" };
+          return { ok: true, from: from + within, to: from + within + insert.length };
+        }
+        within += insert.length - (to - from);
+      }
+      return { ok: false, reason: "no-proof" };
+    }
+
+    /**
+     * Bind a renderer envelope to the live document/session at message time.
+     * Called synchronously from the bridge handler, before any await, so a tab
+     * switch or focus change cannot re-parent the capture to another document.
+     */
+    function mp208Snapshot(doc, content, sessionId) {
+      if (!doc || !doc.opened || doc.dead || !doc.absPath) return { ok: false, code: "NO_DOC", message: "当前文档不可用，引用已取消" };
+      const sel = mp208NormalizeSelection(content);
+      if (!sel.ok) return sel;
+      const contentDocDigest = content && /^[0-9a-f]{64}$/i.test(String(content.docDigest || ""))
+        ? String(content.docDigest).toLowerCase() : null;
+      const live = doc.live || null;
+      const origin = {
+        docToken: doc.token || null,
+        baseVersion: doc.lastVersion || null,
+        liveEpoch: live && typeof live.epoch === "string" ? live.epoch : null,
+        liveVersion: live && Number.isSafeInteger(live.version) ? live.version : null,
+        savedVersion: live && Number.isSafeInteger(live.savedVersion) ? live.savedVersion : null,
+        navigationRevision: doc.tab && doc.tab.navigation && Number.isSafeInteger(doc.tab.navigation.revision) ? doc.tab.navigation.revision : null,
+        docLength: sel.docLength,
+      };
+      const originRevision = live && origin.liveEpoch && origin.liveVersion !== null
+        ? "rev1:live:" + origin.liveEpoch + ":" + origin.liveVersion
+        : (origin.baseVersion || "");
+      return {
+        ok: true,
+        path: doc.absPath,
+        displayPath: doc.displayPath || doc.absPath,
+        sessionId: sessionId || doc.sessionId || null,
+        ranges: sel.ranges,
+        text: sel.text,
+        docLength: sel.docLength,
+        lineStart: sel.lineStart,
+        lineEnd: sel.lineEnd,
+        capturedAt: sel.capturedAt,
+        nonce: sel.nonce,
+        docDigest: contentDocDigest,
+        origin: origin,
+        originRevision: originRevision,
+      };
+    }
+
+    function mp208SelectionBody(snapshot) {
+      return {
+        protocol: 1,
+        path: snapshot.path,
+        docToken: snapshot.origin.docToken,
+        baseVersion: snapshot.origin.baseVersion,
+        live: snapshot.origin.liveEpoch
+          ? { epoch: snapshot.origin.liveEpoch, version: snapshot.origin.liveVersion, savedVersion: snapshot.origin.savedVersion }
+          : null,
+        originRevision: snapshot.originRevision,
+        origin: snapshot.origin,
+        docLength: snapshot.docLength,
+        lineStart: snapshot.lineStart,
+        lineEnd: snapshot.lineEnd,
+        capturedAt: snapshot.capturedAt,
+        ranges: snapshot.ranges.map((r) => ({
+          from: r.from, to: r.to, text: r.text,
+          ...(typeof r.before === "string" ? { before: r.before } : {}),
+          ...(typeof r.after === "string" ? { after: r.after } : {}),
+        })),
+      };
+    }
+
+    /**
+     * Prepare payload for the isolated edit host route: the same selection
+     * snapshot as captureSelection, plus the target Session, intent, and the
+     * explicit-reference decision. The host captures the selection itself and
+     * returns the nonce/rpcId/selectionId used by the isolated pre-step path.
+     */
+    function mp208EditPrepareBody(snapshot, sessionId, intent, explicitReference) {
+      return Object.assign(mp208SelectionBody(snapshot), {
+        protocol: 2,
+        sessionId: sessionId,
+        displayPath: snapshot.displayPath || snapshot.path,
+        intent: intent,
+        explicitReference: explicitReference === true,
+      });
+    }
+
+    async function mp208CaptureHostSelection(snapshot) {
+      const body = Object.assign(mp208SelectionBody(snapshot), { sessionId: snapshot.sessionId });
+      try {
+        const result = await api("documents.captureSelection", body);
+        if (!result || result.ok !== true) {
+          return { ok: false, reason: String((result && result.error && (result.error.code || result.error.message)) || "capture-rejected") };
+        }
+        const value = result.value || result;
+        // The host ID is the only accepted identity. Never fall back to the
+        // temporary client-side id: the model tool validates only host state.
+        if (typeof value.selectionId !== "string" || !value.selectionId) {
+          return { ok: false, reason: "capture-missing-id" };
+        }
+        return { ok: true, selectionId: value.selectionId, value: value, readSelection: value.readSelection === true };
+      } catch (error) {
+        return { ok: false, reason: String(error && error.message ? error.message : error) };
+      }
+    }
+
+    async function mp208Sha256Hex(text) {
+      try {
+        const norm = String(text).replace(/\r\n?/g, "\n").replace(/^\uFEFF/, "");
+        if (typeof crypto === "undefined" || !crypto.subtle || typeof TextEncoder !== "function") return null;
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(norm));
+        return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+      } catch (error) {
+        return null;
+      }
+    }
+
+    /**
+     * 「修改此处」提交弹窗：
+     *   - 主按钮只提交一次：提交中禁用输入/取消/再次点击，双击不会发两条；
+     *   - 成功才收起；失败保留原指令并显示原因，用户可重试；
+     *   - 取消 / 空白指令不调用 onSubmit，不发送任何内容。
+     * onSubmit(intent) 由调用方负责解析会话、构造受限目标和调用宿主发送接口；
+     * 它返回 { ok:true } 或 { ok:false, message }。
+     */
+    function mp208OpenIntentDialog(options) {
+      const opts = options || {};
+      if (!document || !document.body) return Promise.resolve(null);
+      const previous = document.activeElement;
+      return new Promise((resolve) => {
+        let done = false;
+        let submitting = false;
+        const control = { stop: null, stopped: false };
+        const overlay = document.createElement("div");
+        overlay.setAttribute("data-mp208-intent", "1");
+        overlay.style.cssText = "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35);font:13px/1.5 system-ui,-apple-system,'Segoe UI','Microsoft YaHei',sans-serif";
+        const card = document.createElement("div");
+        card.setAttribute("role", "dialog");
+        card.setAttribute("aria-modal", "true");
+        card.setAttribute("aria-labelledby", "mp208-edit-title");
+        card.style.cssText = "width:min(560px,88vw);max-height:80vh;overflow:auto;border-radius:12px;padding:16px;background:var(--dsw-alias-bg-elevated,#25282e);color:var(--dsw-alias-label-primary,#eef1f5);box-shadow:0 18px 48px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12)";
+        const title = document.createElement("div");
+        title.id = "mp208-edit-title";
+        title.textContent = "修改此处";
+        title.style.cssText = "font-weight:650;font-size:15px;margin-bottom:6px";
+        const meta = document.createElement("div");
+        meta.textContent = (opts.path || "") + " · 第 " + opts.lineStart + (opts.lineEnd !== opts.lineStart ? "–" + opts.lineEnd : "") + " 行";
+        meta.style.cssText = "opacity:.72;font-size:12px;margin-bottom:10px;overflow-wrap:anywhere";
+        const preview = document.createElement("pre");
+        preview.textContent = String(opts.text || "").slice(0, 400) + (String(opts.text || "").length > 400 ? "\n…" : "");
+        preview.style.cssText = "margin:0 0 10px;padding:8px;max-height:130px;overflow:auto;white-space:pre-wrap;word-break:break-word;border-radius:8px;background:rgba(127,127,127,.12);font:11.5px/1.45 ui-monospace,Consolas,monospace";
+        const label = document.createElement("div");
+        label.textContent = "说明要怎么改";
+        label.style.cssText = "font-size:12px;opacity:.8;margin-bottom:4px";
+        const input = document.createElement("textarea");
+        input.placeholder = "例如：把这段推导改成矩阵形式，保留结论";
+        input.maxLength = MP208_MAX_EDIT_INTENT;
+        input.setAttribute("aria-label", "说明要怎么改");
+        input.style.cssText = "width:100%;min-height:96px;box-sizing:border-box;resize:vertical;padding:8px;border-radius:8px;border:1px solid rgba(127,127,127,.35);background:rgba(127,127,127,.10);color:inherit;font:inherit;outline:none";
+        const note = document.createElement("div");
+        note.textContent = "默认只提交这段选区和这次说明；要沿用当前对话，可写「参考刚才的讨论」。输入框里已有的草稿和附件不会被发送，也不会被覆盖。";
+        note.style.cssText = "font-size:11.5px;opacity:.72;line-height:1.5;margin-top:6px";
+        const errorLine = document.createElement("div");
+        errorLine.setAttribute("role", "alert");
+        errorLine.style.cssText = "font-size:12px;color:#ff9f9f;line-height:1.5;margin-top:8px;min-height:0;display:none";
+        const actions = document.createElement("div");
+        actions.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:12px";
+        const cancel = document.createElement("button");
+        cancel.type = "button"; cancel.textContent = "取消";
+        cancel.setAttribute("data-mp208-edit-cancel", "1");
+        cancel.style.cssText = "height:30px;padding:0 12px;border-radius:8px;border:1px solid rgba(127,127,127,.35);background:transparent;color:inherit;cursor:pointer";
+        const submit = document.createElement("button");
+        submit.type = "button"; submit.textContent = "提交给对话";
+        submit.setAttribute("data-mp208-edit-submit", "1");
+        submit.setAttribute("aria-label", "把这段选区和修改说明提交给当前对话");
+        submit.title = "提交给当前对话；不会发送输入框里已有的草稿或附件";
+        submit.disabled = true;
+        submit.style.cssText = "height:30px;padding:0 12px;border-radius:8px;border:1px solid rgba(80,150,255,.55);background:rgba(80,150,255,.18);color:inherit;cursor:pointer;opacity:.6";
+        function setError(message) {
+          errorLine.textContent = message || "";
+          errorLine.style.display = message ? "block" : "none";
+        }
+        function setBusy(busy) {
+          submitting = busy === true;
+          input.disabled = submitting;
+          // The edit now runs as an isolated model call, so the dialog stays
+          // open while it works and "停止" is a real cancellation channel.
+          cancel.disabled = false;
+          cancel.textContent = submitting ? "停止" : "取消";
+          submit.disabled = submitting || input.value.trim().length === 0;
+          submit.textContent = submitting ? "正在修改…" : "提交给对话";
+          submit.setAttribute("aria-busy", submitting ? "true" : "false");
+          submit.style.opacity = submit.disabled ? ".6" : "1";
+          cancel.style.opacity = "1";
+        }
+        function cleanup(result) {
+          if (done) return;
+          done = true;
+          try { window.removeEventListener("keydown", onKey, true); } catch (e) { /* ignore */ }
+          try { overlay.remove(); } catch (e) { /* ignore */ }
+          try { if (previous && typeof previous.focus === "function") previous.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
+          resolve(result);
+        }
+        function onKey(event) {
+          if (event.key === "Escape" && !submitting) { event.preventDefault(); event.stopPropagation(); cleanup(null); }
+        }
+        input.addEventListener("input", () => {
+          const ok = input.value.trim().length > 0;
+          submit.disabled = submitting || !ok;
+          submit.style.opacity = submit.disabled ? ".6" : "1";
+          if (errorLine.style.display !== "none") setError("");
+        });
+        cancel.addEventListener("click", () => {
+          if (!submitting) { cleanup(null); return; }
+          if (control.stopped) return;
+          control.stopped = true;
+          try { if (typeof control.stop === "function") control.stop(); } catch (e) { /* 停止失败仍等待结果 */ }
+          cancel.textContent = "正在停止…";
+          cancel.disabled = true;
+        });
+        submit.addEventListener("click", () => {
+          const value = input.value.trim();
+          if (!value || submitting) return;
+          setError("");
+          control.stopped = false;
+          control.stop = null;
+          setBusy(true);
+          Promise.resolve()
+            .then(() => (typeof opts.onSubmit === "function" ? opts.onSubmit(value, control) : { ok: true }))
+            .then((result) => {
+              if (done) return;
+              control.stopped = false;
+              control.stop = null;
+              if (result && result.ok === true) {
+                cleanup({ ok: true, intent: value, result: result });
+                return;
+              }
+              setBusy(false);
+              setError((result && result.message) || "提交失败；指令已保留，可重试。");
+            })
+            .catch((error) => {
+              if (done) return;
+              control.stopped = false;
+              control.stop = null;
+              setBusy(false);
+              setError("提交失败：" + String(error && error.message ? error.message : error) + "；指令已保留，可重试。");
+            });
+        });
+        overlay.addEventListener("mousedown", (event) => { if (event.target === overlay && !submitting) cleanup(null); });
+        card.appendChild(title); card.appendChild(meta); card.appendChild(preview);
+        card.appendChild(label); card.appendChild(input); card.appendChild(note);
+        card.appendChild(errorLine); card.appendChild(actions);
+        actions.appendChild(cancel); actions.appendChild(submit);
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+        window.addEventListener("keydown", onKey, true);
+        try { input.focus(); } catch (e) { /* ignore */ }
+      });
+    }
+
+
+    function mp208OpenQuoteChoiceDialog(options) {
+      const opts = options || {};
+      const cost = opts.cost || { chars: 0, bytes: 0, kib: 0, tokens: 0, tokenMethod: "" };
+      if (!document || !document.body) return Promise.resolve(false);
+      const previous = document.activeElement;
+      return new Promise((resolve) => {
+        let done = false;
+        const overlay = document.createElement("div");
+        overlay.setAttribute("data-mp208-quote-choice", "1");
+        overlay.style.cssText = "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35);font:13px/1.5 system-ui,-apple-system,'Segoe UI','Microsoft YaHei',sans-serif";
+        const card = document.createElement("div");
+        card.style.cssText = "width:min(480px,88vw);border-radius:12px;padding:16px;background:var(--dsw-alias-bg-elevated,#25282e);color:var(--dsw-alias-label-primary,#eef1f5);box-shadow:0 18px 48px rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12)";
+        const title = document.createElement("div");
+        title.textContent = "这段引用较长";
+        title.style.cssText = "font-weight:650;font-size:15px;margin-bottom:6px";
+        const info = document.createElement("div");
+        info.textContent = opts.path ? (opts.path + " · 第 " + opts.lineStart + (opts.lineEnd !== opts.lineStart ? "–" + opts.lineEnd : "") + " 行") : "";
+        info.style.cssText = "opacity:.72;font-size:12px;margin-bottom:8px;overflow-wrap:anywhere";
+        const costLine = document.createElement("div");
+        costLine.textContent = "实际载荷：" + cost.chars + " 字符 / " + cost.kib + " KiB，约 " + cost.tokens + " tokens（" + cost.tokenMethod + "）";
+        costLine.style.cssText = "margin-bottom:8px;font-size:12.5px";
+        const note = document.createElement("div");
+        note.textContent = "普通引用没有按需读取通道，不会截断，也不会授予写权限。可以引用全文，或取消后缩小范围再试。";
+        note.style.cssText = "opacity:.78;font-size:12px;margin-bottom:12px;line-height:1.55";
+        const actions = document.createElement("div");
+        actions.style.cssText = "display:flex;justify-content:flex-end;gap:8px";
+        const cancel = document.createElement("button");
+        cancel.type = "button"; cancel.textContent = "取消，缩小范围";
+        cancel.style.cssText = "height:30px;padding:0 12px;border-radius:8px;border:1px solid rgba(127,127,127,.35);background:transparent;color:inherit;cursor:pointer";
+        const full = document.createElement("button");
+        full.type = "button"; full.textContent = "引用全文";
+        full.style.cssText = "height:30px;padding:0 12px;border-radius:8px;border:1px solid rgba(80,150,255,.55);background:rgba(80,150,255,.18);color:inherit;cursor:pointer";
+        function cleanup(value) {
+          if (done) return;
+          done = true;
+          try { window.removeEventListener("keydown", onKey, true); } catch (e) { /* ignore */ }
+          try { overlay.remove(); } catch (e) { /* ignore */ }
+          try { if (previous && typeof previous.focus === "function") previous.focus({ preventScroll: true }); } catch (e) { /* ignore */ }
+          resolve(value);
+        }
+        function onKey(event) {
+          if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cleanup(false); }
+        }
+        cancel.addEventListener("click", () => cleanup(false));
+        full.addEventListener("click", () => cleanup(true));
+        overlay.addEventListener("mousedown", (event) => { if (event.target === overlay) cleanup(false); });
+        card.appendChild(title); card.appendChild(info); card.appendChild(costLine); card.appendChild(note);
+        card.appendChild(actions); actions.appendChild(cancel); actions.appendChild(full);
+        overlay.appendChild(card); document.body.appendChild(overlay);
+        window.addEventListener("keydown", onKey, true);
+        try { full.focus(); } catch (e) { /* ignore */ }
+      });
+    }
+
+    const MP208_BUSY_ENTER_DEFAULT = "queue";
+
+    function mp208NormalizeBusyEnter(value) {
+      return value === "steer" ? "steer" : MP208_BUSY_ENTER_DEFAULT;
+    }
+
+    /**
+     * Mirror of the host composer's busy-Enter policy:
+     *   - idle: queue a normal next-turn prompt;
+     *   - running: use the user's `ui-conversation` `busyEnter` preference
+     *     ("queue" by default, "steer" only when the user selected it and the
+     *     session can steer).
+     * The plan never cancels another task and never retries a failed send.
+     * DSH Stop uses `agent.cancel({ kind: "user" }, { keepInbox: true })`, so a
+     * request accepted while busy belongs to the host inbox; sending it again
+     * here would replay the same question. A turn stopped between planning and
+     * the prompt call is no longer running, so this plan falls back to queue
+     * and cannot steer into the cancelled turn.
+     */
+    function mp208DeliveryPlan(input) {
+      const value = input && typeof input === "object" ? input : {};
+      const running = value.running === true;
+      const preferred = mp208NormalizeBusyEnter(value.preferred);
+      const steeringAvailable = value.steeringAvailable !== false;
+      const explicit = value.mode === "steer" || value.mode === "queue" ? value.mode : null;
+      const mode = explicit || (running && steeringAvailable ? preferred : MP208_BUSY_ENTER_DEFAULT);
+      return {
+        mode: mode,
+        running: running,
+        preferred: preferred,
+        cancel: false,
+        retry: false,
+      };
+    }
+
+    /**
+     * Actual host shape (dsh-client-ui-conversation):
+     *   ctx.configForms.get('ui-conversation').getSnapshot().value.busyEnter
+     * is the accepted `ui-conversation.busyEnter`, exactly what
+     * ComposerSubmissionPolicy adopts. A missing or unmounted form falls back
+     * to the host default ("queue"); this code never fabricates a settings
+     * object and never writes the preference.
+     */
+    function mp208HostBusyEnter() {
+      try {
+        const forms = hostConfigForms
+          || (docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("configForms") : null);
+        const form = forms && typeof forms.get === "function" ? forms.get("ui-conversation") : null;
+        const snapshot = form && typeof form.getSnapshot === "function" ? form.getSnapshot() : null;
+        const section = snapshot && snapshot.value;
+        return mp208NormalizeBusyEnter(section && section.busyEnter);
+      } catch (e) {
+        return MP208_BUSY_ENTER_DEFAULT;
+      }
+    }
+
+    /**
+     * Actual host shape (dsh-client-ui-session):
+     *   uiSession.sessionStatus.getSnapshot() is a Map<sessionId,
+     *   { running, pendingInteraction, completionUnread }>.
+     * dsh-client-ui-conversation also derives its `steeringAvailable` as
+     * `subagent === null || subagent.address.mode === 'continuable'`; this
+     * plugin only targets a normal visible Session, where that is true. If
+     * the status is absent, queue is the safe host default.
+     */
+    function mp208SessionRunning(sessionId) {
+      try {
+        const ui = hostUiSession
+          || (docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("uiSession") : null);
+        const status = ui && ui.sessionStatus && typeof ui.sessionStatus.getSnapshot === "function"
+          ? ui.sessionStatus.getSnapshot() : null;
+        if (status && typeof status.get === "function" && sessionId) {
+          const entry = status.get(sessionId);
+          if (entry && typeof entry.running === "boolean") return entry.running;
+        }
+      } catch (e) { /* fall through to the list projection */ }
+      try {
+        const sessions = SessionsBridge.getSessions ? SessionsBridge.getSessions() : null;
+        const list = sessions && sessions.list && typeof sessions.list.getSnapshot === "function"
+          ? sessions.list.getSnapshot() : null;
+        const row = list && list.byId && sessionId ? list.byId[sessionId] : null;
+        return !!(row && row.running === true);
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function mp208DeliveryFor(sessionId) {
+      const plan = mp208DeliveryPlan({
+        running: mp208SessionRunning(sessionId),
+        preferred: mp208HostBusyEnter(),
+      });
+      try {
+        window.__MP208_LAST_DELIVERY = {
+          at: Date.now(), sessionId: sessionId,
+          running: plan.running, preferred: plan.preferred, mode: plan.mode,
+        };
+      } catch (e) { /* diagnostics only */ }
+      return plan;
+    }
+
+    /**
+     * 直接让宿主会话发一条消息（照抄 dsh-worktable 的 sendHostSession）：
+     * 浮层里的编辑器拿不到右侧栏 tab 才有的 inputActions，所以不能用 composer 那条路；
+     * worktable 的做法是走 sessions 服务——临时持有 → 等 ready → session.prompt(…, mode)。
+     * mode 来自 mp208DeliveryPlan：忙时尊重宿主 ui-conversation 的 busyEnter，
+     * 空闲时一律 queue；绝不 cancel，也绝不换第二条通路重发。
+     * 只选一条通路，拒绝/超时只报失败（第一条可能已经到宿主了）。
+     */
+    async function sendViaHostSession(sessionId, text, options, requestId) {
+      const content = typeof text === "string" ? text : "";
+      if (!content) return { ok: false, reason: "empty-text" };
+      const plan = mp208DeliveryPlan(options);
       const sessions = SessionsBridge.getSessions ? SessionsBridge.getSessions() : null;
-      if (!sessions) return { ok: false, reason: "no-sessions-service" };
+      if (!sessions) return { ok: false, reason: "no-sessions-service", mode: plan.mode, running: plan.running };
       const check = (result) => {
         if (result && (result.kind === "error" || result.ok === false)) {
           const err = result.error || {};
@@ -811,7 +1780,11 @@ function applyMirrorDelta(mirror,event){
       };
       const send = async (session) => {
         if (session && typeof session.prompt === "function") {
-          check(await session.prompt([{ type: "text", text: content }], "queue"));
+          // The fourth argument is the durable prompt identity. DSH 0.2.2+
+          // records it as source.rpcId, which is how the host's pre-step
+          // listener recognizes (and consumes) exactly this submission. Older
+          // hosts ignore it; the text marker in the payload still identifies it.
+          check(await session.prompt([{ type: "text", text: content }], plan.mode, undefined, requestId));
           return true;
         }
         let conv = null;
@@ -832,7 +1805,9 @@ function applyMirrorDelta(mirror,event){
             const binding = await (ref && ref.ready);
             sent = await send(binding && binding.session);
           });
-          return sent ? { ok: true, method: "session" } : { ok: false, reason: "no-send-path" };
+          return sent
+            ? { ok: true, method: "session", mode: plan.mode, running: plan.running }
+            : { ok: false, reason: "no-send-path", mode: plan.mode, running: plan.running };
         }
         let face = null;
         for (let i = 0; i < 10 && !face; i += 1) {
@@ -840,9 +1815,15 @@ function applyMirrorDelta(mirror,event){
           if (!face) await new Promise((resolve) => setTimeout(resolve, 200));
         }
         const sent = await send(face);
-        return sent ? { ok: true, method: "session" } : { ok: false, reason: "no-send-path" };
+        return sent
+          ? { ok: true, method: "session", mode: plan.mode, running: plan.running }
+          : { ok: false, reason: "no-send-path", mode: plan.mode, running: plan.running };
       } catch (error) {
-        return { ok: false, reason: String(error && error.message ? error.message : error) };
+        return {
+          ok: false,
+          reason: String(error && error.message ? error.message : error),
+          mode: plan.mode, running: plan.running,
+        };
       }
     }
 
@@ -930,7 +1911,7 @@ function applyMirrorDelta(mirror,event){
     var handleGeneration = 0;
     var nativeHandleLeft = new Map();
     var handleLifecycleStop = null;
-    var handleState = { dragging: false, side: null, startX: 0, startW: 0, sb: 0, rb: 0, frame: null, mo: null, hostGrid: "", lastWritten: "", sbMax: 0, rbMax: 0, sbUser: false, rbUser: false, parentMo: null, parentMoTarget: null };
+    var handleState = { dragging: false, side: null, startX: 0, startW: 0, sb: 0, rb: 0, frame: null, mo: null, hostGrid: "", lastWritten: "", sbMax: 0, rbMax: 0, sbUser: false, rbUser: false, parentMo: null, parentMoTarget: null, committing: false };
     /** 上次拖动保存的左右侧栏位置（宿主每次重排都会写回自己的列宽，重开会话后要补回去）。 */
     function readSavedHandles() {
       try {
@@ -974,7 +1955,23 @@ function applyMirrorDelta(mirror,event){
           if (pcls.indexOf("_frame") < 0) continue;
           out.push(el);
         }
-        return out.length ? out : all;   // 一个都没匹配上就退回原选择器，别把功能弄没
+        if (out.length) return out;
+        // 兜底：只接受**看起来真是宿主手柄**的节点。裸 `_handle` 选择器会把
+        // 第三方装饰元素也捞进来，随后 handleFrame() 会把它的父节点当成
+        // AppFrame，pin 被写到错误节点、真正的空列却一直留着。
+        var fallback = [];
+        for (var j = 0; j < all.length; j += 1) {
+          var cand = all[j];
+          try {
+            var side = cand.getAttribute ? cand.getAttribute("data-side") : null;
+            if (side !== "sidebar" && side !== "rightbar") continue;
+            var r = cand.getBoundingClientRect ? cand.getBoundingClientRect() : null;
+            if (!r || !(r.width > 0) || r.width > 20) continue;
+            if (getComputedStyle(cand).cursor !== "col-resize") continue;
+            fallback.push(cand);
+          } catch (e2) { /* 单个候选不可用就跳过 */ }
+        }
+        return fallback;
       } catch (e) { return []; }
     }
 
@@ -982,6 +1979,29 @@ function applyMirrorDelta(mirror,event){
       if (fallback && fallback.isConnected) return fallback;
       var list = handleEls();
       return list.length ? list[0].parentElement : null;
+    }
+
+    /**
+     * 选"要还原/重钉"的 frame。
+     * 宿主折叠左侧栏时会卸载 sidebar DragHandle；此时只看手柄就找不到
+     * 仍然带着 data-mp-grid 的 frame，旧 pin 会留在屏幕上变成一条空列。
+     * 顺序：本次 pin 记住的节点 → 页面上唯一仍在 pin 态的 frame → 手柄父节点。
+     */
+    function pickFrameForRelease(cached, pinned, fromHandle) {
+      if (cached && cached.isConnected) return cached;
+      if (pinned) return pinned;
+      return fromHandle || null;
+    }
+
+    function locateFrame() {
+      var cached = handleState.frame;
+      // 热路径：正常拖拽/apply 每帧都会进来，缓存的 frame 还连着就直接返回，
+      // 不做全局 querySelector，也不摸手柄。
+      if (cached && cached.isConnected) return cached;
+      var pinned = null;
+      try { pinned = document.querySelector('[' + MP_GRID_ATTR + ']'); } catch (e) { /* 忽略 */ }
+      if (pinned) return pinned;
+      return pickFrameForRelease(cached, null, handleFrame(cached));
     }
 
     /** 按类名找 frame 的三列（frame 里还有 overlay/bottom 等兄弟，不能靠 children[0]/[last] 猜）。 */
@@ -1014,6 +2034,11 @@ function applyMirrorDelta(mirror,event){
     }
     function measureSidebarFit() {
       if (handleState.sbUser !== true) return null;
+      // 已经在缩放同一元素：base 是首帧量到的逻辑宽，直接复用。
+      // 每帧再 getComputedStyle 会强制布局，而拖拽帧真正变化的只有目标宽。
+      if (sidebarFit && sidebarFit.el && sidebarFit.el.isConnected) {
+        return { content: sidebarFit.el, base: sidebarFit.base };
+      }
       var col = frameCol("sidebar");
       var content = col && col.firstElementChild;
       var depth = 0;
@@ -1122,21 +2147,35 @@ function applyMirrorDelta(mirror,event){
 
     /* 中间那道：对话列边界。宿主没有给可拖手柄（挤压是我自己写的 margin），
      * 所以在编辑区右沿画一根 10px 的拖条，拖动直接改对话宽度（下限 LAYOUT_MIN_CHAT=220）。 */
-    var chatHandleState = { el: null, dragging: false, startX: 0, startW: 0 };
+    var chatHandleState = { el: null, dragging: false, startX: 0, startW: 0, onLeft: false };
     var handleMoveFrame = null;
     var handlePaintPending = false;
 
     // Raw pointer events may outnumber display frames. Commit the latest
     // geometry once, and always drain the final position before persisting.
-    function flushHandleMove() {
+    function flushHandleMove(commitGeo) {
       if (handleMoveFrame !== null) {
         try { cancelAnimationFrame(handleMoveFrame); } catch (e) { /* no RAF */ }
         handleMoveFrame = null;
       }
       if (!handleFloorInstalled) { handlePaintPending = false; return; }
-      if (handlePaintPending) { handlePaintPending = false; paintHandles(); }
-      if (typeof layoutReapply === "function") layoutReapply();
-      else if (handleState.engine) handleState.engine.apply();
+      if (handlePaintPending) {
+        handlePaintPending = false;
+        // paintHandles() 里的 scheduleLayout() 看到这个标记就不再排下一帧：
+        // 下面紧接着的 layoutReapply() 会用同一帧的最新几何 apply 一次。
+        handleState.committing = true;
+        try { paintHandles(); } finally { handleState.committing = false; }
+      }
+      // Some host adapters forward commitGeo, some call engine.flush() with no
+      // argument. Stash a strictly one-shot immediate copy for the latter; an
+      // explicit apply(commitGeo) clears it and a later no-arg apply validates
+      // identity/rect before use.
+      if (commitGeo && handleState.engine && typeof handleState.engine.setCommitGeo === "function") {
+        handleState.engine.setCommitGeo(commitGeo, true);
+      }
+      if (typeof layoutReapply === "function") layoutReapply(commitGeo);
+      else if (handleState.engine) handleState.engine.apply(commitGeo);
+      if (handleState.engine && typeof handleState.engine.releaseHeaderDirty === "function") handleState.engine.releaseHeaderDirty();
     }
 
     function queueHandleMove(paint) {
@@ -1154,6 +2193,8 @@ function applyMirrorDelta(mirror,event){
     }
 
     function scheduleLayout() {
+      // 拖拽 commit 同一帧会同步 apply；这里再排一帧只会重复读布局。
+      if (handleState.committing) return;
       if (typeof layoutReapply !== "function") return;
       if (layoutReapply.schedule) layoutReapply.schedule();
       else layoutReapply();
@@ -1201,6 +2242,9 @@ function applyMirrorDelta(mirror,event){
     function captureHandlePointer(el, pointerId) {
       handleState.captureTarget = el;
       handleState.captureId = pointerId;
+      // lostpointercapture 在目标元素上可能不冒泡到 document；直接挂在
+      // 捕获目标上，确保捕获被外部释放/目标卸载时一定收到终止信号。
+      try { if (el && el.addEventListener) el.addEventListener("lostpointercapture", onHandleAbort); } catch (e0) { /* 忽略 */ }
       try { if (el && el.setPointerCapture) el.setPointerCapture(pointerId); } catch (e) { /* 忽略 */ }
     }
 
@@ -1209,6 +2253,8 @@ function applyMirrorDelta(mirror,event){
       var pointerId = handleState.captureId;
       handleState.captureTarget = null;
       handleState.captureId = null;
+      // 先摘目标监听再显式释放：正常收尾不应再触发一次 abort 收尾。
+      try { if (el && el.removeEventListener) el.removeEventListener("lostpointercapture", onHandleAbort); } catch (e0) { /* 忽略 */ }
       try { if (el && el.releasePointerCapture) el.releasePointerCapture(pointerId); } catch (e) { /* 忽略 */ }
     }
 
@@ -1223,7 +2269,9 @@ function applyMirrorDelta(mirror,event){
         var el = document.createElement("div");
         el.id = "mp-chat-handle";
         el.setAttribute("aria-hidden", "true");
-        el.style.cssText = "position:fixed;width:22px;margin-left:-11px;cursor:col-resize;"
+        // 只占边界右侧 8px。滚动条在各列右缘（边界左侧），旧版 22px 居中
+        // 热区把编辑区滚动条整条盖住，拖页变成拖宽。
+        el.style.cssText = "position:fixed;width:" + HANDLE_HOT_WIDTH + "px;margin-left:0;cursor:col-resize;"
           + "z-index:2147483647;display:none;background:transparent;touch-action:none";
         document.body.appendChild(el);
         chatHandleState.el = el;
@@ -1251,7 +2299,8 @@ function applyMirrorDelta(mirror,event){
         el.id = id;
         el.__mpHandleOwner = handleState;
         el.setAttribute("aria-hidden", "true");
-        el.style.cssText = "position:fixed;width:18px;margin-left:-9px;cursor:col-resize;"
+        // 与中间那道同一规则：8px 全落在边界右侧，边界左侧留给列滚动条。
+        el.style.cssText = "position:fixed;width:" + HANDLE_HOT_WIDTH + "px;margin-left:0;cursor:col-resize;"
           + "z-index:2147483600;display:none;background:transparent;touch-action:none";
         document.body.appendChild(el);
         frameEdge[id === "mp-edge-left" ? "left" : "right"] = el;
@@ -1263,13 +2312,18 @@ function applyMirrorDelta(mirror,event){
     function positionEdgeHandles(leftX, rightX, top, height, visible) {
       var L = ensureEdgeHandle("mp-edge-left");
       var R = ensureEdgeHandle("mp-edge-right");
+      // 折叠的那一侧没有可拖的边界：留着透明热区会变成"假手柄"
+      // （光标还是 col-resize，拖了却没反应）。收起时一并隐藏。
+      var f = locateFrame();
+      var leftCollapsed = !!(f && stateOn(f, "data-sidebar-collapsed"));
+      var rightCollapsed = !!(f && stateOn(f, "data-rightbar-collapsed"));
       if (L) {
-        setOwnedStyle(L, "display", visible ? "block" : "none");
-        if (visible) { setOwnedStyle(L, "left", Math.round(leftX) + "px"); setOwnedStyle(L, "top", Math.round(top) + "px"); setOwnedStyle(L, "height", Math.round(height) + "px"); }
+        setOwnedStyle(L, "display", visible && !leftCollapsed ? "block" : "none");
+        if (visible && !leftCollapsed) { setOwnedStyle(L, "left", Math.round(leftX) + "px"); setOwnedStyle(L, "top", Math.round(top) + "px"); setOwnedStyle(L, "height", Math.round(height) + "px"); }
       }
       if (R) {
-        setOwnedStyle(R, "display", visible && rightX > 0 ? "block" : "none");
-        if (visible && rightX > 0) { setOwnedStyle(R, "left", Math.round(rightX) + "px"); setOwnedStyle(R, "top", Math.round(top) + "px"); setOwnedStyle(R, "height", Math.round(height) + "px"); }
+        setOwnedStyle(R, "display", visible && rightX > 0 && !rightCollapsed ? "block" : "none");
+        if (visible && rightX > 0 && !rightCollapsed) { setOwnedStyle(R, "left", Math.round(rightX) + "px"); setOwnedStyle(R, "top", Math.round(top) + "px"); setOwnedStyle(R, "height", Math.round(height) + "px"); }
       }
     }
 
@@ -1288,8 +2342,8 @@ function applyMirrorDelta(mirror,event){
             try { now = readHandleWidths(); } catch (e1) { now = null; }
             if (!now) return;
             // 只拦"被拖的那一侧"折叠
-            if (side === "sidebar" && attrOn(now.frame, "data-sidebar-collapsed")) return;
-            if (side === "rightbar" && attrOn(now.frame, "data-rightbar-collapsed")) return;
+            if (side === "sidebar" && stateOn(now.frame, "data-sidebar-collapsed")) return;
+            if (side === "rightbar" && stateOn(now.frame, "data-rightbar-collapsed")) return;
             handleState.frame = now.frame;
             handleState.side = side;
             handleState.startX = e.clientX;
@@ -1330,8 +2384,21 @@ function applyMirrorDelta(mirror,event){
       return !(s === "" || s === "false" || s === "0" || s === "off" || s === "null");
     }
 
+    /**
+     * 折叠态可能挂在 frame 自己或它最近的祖先上（宿主版本/外壳不同）。
+     * 只看 frame 会把"祖先已折叠"读成展开，于是重新钉回旧宽度；
+     * 只看祖先又可能被无关外壳属性误伤，所以逐层向上但限深。
+     */
+    function stateOn(frame, name) {
+      var el = frame;
+      for (var depth = 0; el && depth < 4; depth += 1, el = el.parentElement) {
+        if (attrOn(el, name)) return true;
+      }
+      return false;
+    }
+
     function frameCollapsed(frame) {
-      return !!(frame && (attrOn(frame, "data-sidebar-collapsed") || attrOn(frame, "data-rightbar-collapsed")));
+      return !!(frame && (stateOn(frame, "data-sidebar-collapsed") || stateOn(frame, "data-rightbar-collapsed")));
     }
 
     /* ═══════════════════════════════════════════════════════════════════════
@@ -1367,7 +2434,10 @@ function applyMirrorDelta(mirror,event){
       // 根因是列的 min-width:auto 不肯收缩，把后面的列整体推出视口。
       + "[" + MP_GRID_ATTR + "] [data-mp-rightbar-fit] [data-sidebar-right-panel=\"push\"]{width:var(--mp-rightbar-fit-width)!important;zoom:var(--mp-rightbar-fit-zoom)!important;--dsh-sidebar-width:var(--mp-rightbar-fit-width)!important;}"
       + "[" + MP_GRID_ATTR + "] > [class*=\"Col\"]{min-width:0!important;}"
-      + "[" + MP_GRID_ATTR + "] > [class*=\"Col\"] > *{min-width:0!important;}";
+      + "[" + MP_GRID_ATTR + "] > [class*=\"Col\"] > *{min-width:0!important;}"
+      // 原生 .handle 是 8px、靠 margin-left:-4px 骑在边界上。引脚期把手柄
+      // 整体挪到边界右侧：左半边的边界左侧是列滚动条，不能被手柄盖住。
+      + "[" + MP_GRID_ATTR + "] > [class*=\"_handle\"]{margin-left:0!important;}";
 
     /** 注入 pin 样式表（幂等；doc 缺 head 时挂到 documentElement）。 */
     function ensureGridStyle(doc) {
@@ -1461,8 +2531,8 @@ function applyMirrorDelta(mirror,event){
       var sbTrack = host.ok ? host.sbTrack : Math.max(0, fallbackW.sb);
       var rbTrack = host.ok ? host.rbTrack : Math.max(0, fallbackW.rb);
 
-      var sidebarCollapsed = attrOn(frame, "data-sidebar-collapsed") || (host.ok && host.collapsedSidebar);
-      var rightbarCollapsed = attrOn(frame, "data-rightbar-collapsed") || (host.ok && !host.rightbarOpen);
+      var sidebarCollapsed = stateOn(frame, "data-sidebar-collapsed") || (host.ok && host.collapsedSidebar);
+      var rightbarCollapsed = stateOn(frame, "data-rightbar-collapsed") || (host.ok && !host.rightbarOpen);
       var cfg = {};
       try { cfg = readSettings(window.localStorage) || {}; } catch (e1) { cfg = {}; }
       var vw = Math.max(0, Math.round(Number(typeof window !== "undefined" ? window.innerWidth : 0) || 0));
@@ -1511,9 +2581,12 @@ function applyMirrorDelta(mirror,event){
       var beforeSb = parseFloat(frame.style.getPropertyValue("--mp-sidebar"));
       var beforeRb = parseFloat(frame.style.getPropertyValue("--mp-rightbar"));
       pinGrid(frame, res.model.sidebar.w, res.model.rightbar.w, PURE_DEFAULT_CENTER_MIN);
-      // 把生效值回写进 handleState，后续拖动从当前值继续
-      handleState.sb = res.model.sidebar.w;
-      handleState.rb = res.model.rightbar.w;
+      handleState.frame = frame;
+      // 把生效值回写进 handleState，后续拖动从当前值继续。
+      // 折叠列只改 DOM 的生效值，**不覆盖用户宽度** —— 否则收起再展开时
+      // 只能拿到宿主的 264/280，用户拖过的宽度就丢了。
+      if (!res.model.sidebar.collapsed) handleState.sb = res.model.sidebar.w;
+      if (!res.model.rightbar.collapsed) handleState.rb = res.model.rightbar.w;
       // 首次 pin 成功时记住"这是宿主实测的边界"，供后续冷启动兜底。
       if (handleState.sbMax <= 0 && sbTrack > 0) handleState.sbMax = sbTrack;
       if (handleState.rbMax <= 0 && rbTrack > 0) handleState.rbMax = rbTrack;
@@ -1572,8 +2645,11 @@ function applyMirrorDelta(mirror,event){
 
     function paintHandles() {
       if (!handleFloorInstalled) return;
-      var frame = handleFrame(handleState.frame);
+      var frame = locateFrame();
       if (!frame) return;
+      // 记住真正被操作的 AppFrame：宿主折叠时会卸载手柄，releasePinned()
+      // 不能再靠 handleEls() 反推（现场两只手柄都可能不存在）。
+      handleState.frame = frame;
       // ── P1 新写路径 ──────────────────────────────────────────────────
       if (USE_NEW_LAYOUT) {
         var sidebarMeasurement = measureSidebarFit();
@@ -1584,6 +2660,8 @@ function applyMirrorDelta(mirror,event){
           var listN = handleEls();
           for (var hi = 0; hi < listN.length; hi += 1) {
             var sideN = listN[hi].getAttribute("data-side");
+            // 原生手柄的 margin-left 被 MP_GRID_CSS 归零，left=边界即 8px
+            // 全在边界右侧；边界左侧留给列滚动条。
             if (sideN === "sidebar") setNativeHandleLeft(listN[hi], out.model.sidebar.w + "px");
             else if (sideN === "rightbar") setNativeHandleLeft(listN[hi], (vwN - out.model.rightbar.w) + "px");
           }
@@ -1712,8 +2790,11 @@ function applyMirrorDelta(mirror,event){
       rects.sort(function (a, b) { return a.left - b.left; });
       var l0 = rects[0] || null;
       var l1 = rects.length > 1 ? rects[rects.length - 1] : null;
-      var sbFromHandle = l0 ? Math.round(l0.left + 4) : 0;
-      var rbFromHandle = l1 ? Math.round(vw - (l1.left + 4)) : 0;
+      // 未引脚：宿主把 8px 手柄居中在边界上（margin-left:-4px），left+4 才是边界。
+      // 引脚期：MP_GRID_CSS 把 margin-left 归零，left 本身就是边界。
+      var handleInset = pinned ? 0 : 4;
+      var sbFromHandle = l0 ? Math.round(l0.left + handleInset) : 0;
+      var rbFromHandle = l1 ? Math.round(vw - (l1.left + handleInset)) : 0;
       // 还没接管时，**边界以手柄位置为准**（手柄就摆在那条缝上），列宽只作兜底。
       // 之前优先用"列宽"，一旦量到别的同名元素（或列还没渲染）就会算出错的边界，
       // 命中判定随之失效 —— 表现就是"刚打开时最左侧手柄拖不动"（用户实测）。
@@ -1732,9 +2813,13 @@ function applyMirrorDelta(mirror,event){
 
     function watchPinned() {
       if (!handleFloorInstalled) return;
+      // Existing observer already owns recovery; do not run locateFrame()'s
+      // querySelectorAll/getComputedStyle on every pointerup.
+      if (handleState.mo) return;
       var watchGeneration = handleGeneration;
-      var frame = handleFrame(handleState.frame);
-      if (!frame || handleState.mo) return;
+      var frame = locateFrame();
+      if (!frame) return;
+      handleState.frame = frame;
       var MO = window.MutationObserver;
       if (!MO) return;
       try {
@@ -1764,7 +2849,7 @@ function applyMirrorDelta(mirror,event){
             handleState.parentMo = new MO(function () {
               if (!handleFloorInstalled || handleGeneration !== watchGeneration) return;
               try {
-                var f = handleFrame(handleState.frame);
+                var f = locateFrame();
                 if (!f) return;
                 if (!isPinned(f)) paintHandles();
               } catch (e3) { /* 忽略 */ }
@@ -1777,6 +2862,9 @@ function applyMirrorDelta(mirror,event){
 
     function onHandleDown(e) {
       if (!handleFloorInstalled || e.button !== 0) return;
+      // 上一个手势如果没收到 up/lost（Alt+Tab、捕获目标被卸载），先幂等收尾，
+      // 否则新指针会被"正在拖拽"永久挡住。收尾只用最后一次已应用的宽度。
+      if (handleState.dragging || chatHandleState.dragging) endAllDrag("new-pointer");
       var t = e.target;
       // ① 中间那根：对话列边界（我自己画的）
       if (t && t.id === "mp-chat-handle") {
@@ -1784,16 +2872,18 @@ function applyMirrorDelta(mirror,event){
         chatHandleState.startX = e.clientX;
         var snap = handleState.engine && handleState.engine.snapshot ? handleState.engine.snapshot() : null;
         chatHandleState.startW = (snap && snap.chatW) || 420;
+        // 聊天在左（mode=right）时 marginLeft 为空、marginRight 有值；
+        // 方向在按下这一刻定下来，后续 resize/apply 不会改变本次拖拽语义。
+        chatHandleState.onLeft = !!(snap && !snap.marginLeft && snap.marginRight);
         // mp-chat-handle 的指针捕获：往左拖时指针会越过编辑器 iframe，
         // 不捕获的话后续 pointermove 全进 iframe 文档，父窗口收不到 → 往左拖永远没反应。
         captureHandlePointer(t, e.pointerId);
         try { e.preventDefault(); e.stopPropagation(); } catch (err) { /* 忽略 */ }
         return;
       }
-      // ② 左右两条：宿主的 frame 手柄。命中判定不只认类名 ——
-      //    8px 的条很容易点偏一两像素，所以再按“离边界 8px 内”兜一层。
-      var cls = t && typeof t.className === "string" ? t.className : "";
-      var isHandleEl = cls.indexOf("_handle") >= 0;
+      // ② 左右两条：宿主的 frame 手柄 / 我们贴边界右侧的浮层热区。
+      //    命中判定按「边界右侧 8px」而不是类名：边界左侧是各列滚动条，
+      //    任何跨到左侧的兜底都会把滚动条滑块的按下吞成拖宽。
       var now0 = readHandleWidths();
       if (!now0) return;
       var vwNow = now0.vw;
@@ -1806,14 +2896,15 @@ function applyMirrorDelta(mirror,event){
         if (sbColZ && sbColZ.style && sbColZ.style.zoom) sbZoom = parseFloat(sbColZ.style.zoom) || 1;
       } catch (eZ) { sbZoom = 1; }
       var sbVisual = Math.round(now0.sb * sbZoom);
-      var nearLeft = Math.abs(e.clientX - now0.sb) <= 8 || Math.abs(e.clientX - sbVisual) <= 10;
-      var nearRight = now0.rb > 0 && Math.abs(e.clientX - (vwNow - now0.rb)) <= 8;
-      if (!isHandleEl && !nearLeft && !nearRight) return;
+      var nearLeft = inHandleHotBand(e.clientX, now0.sb)
+        || inHandleHotBand(e.clientX, sbVisual);
+      var nearRight = now0.rb > 0 && inHandleHotBand(e.clientX, vwNow - now0.rb);
+      if (!nearLeft && !nearRight) return;
       // 只拦"被拖的那一侧"折叠：左栏折叠不影响拖右栏，右栏收起也不该让左栏拖不动。
       // 传值是 "false"/"" 之类的都不算折叠（见 attrOn）。
       var wantLeft = nearLeft || (!nearRight && e.clientX < midX);
-      if (wantLeft && attrOn(now0.frame, "data-sidebar-collapsed")) return;
-      if (!wantLeft && attrOn(now0.frame, "data-rightbar-collapsed")) return;
+      if (wantLeft && stateOn(now0.frame, "data-sidebar-collapsed")) return;
+      if (!wantLeft && stateOn(now0.frame, "data-rightbar-collapsed")) return;
       var now = now0;
       // 下限每次拖动现读设置（改完立刻生效，不需要重启页面）
       try {
@@ -1841,11 +2932,21 @@ function applyMirrorDelta(mirror,event){
 
     function onHandleMove(e) {
       if (!handleFloorInstalled) return;
+      // 只认本次捕获的那个指针；别的指针/合成事件不能改我们的宽度。
+      var activeId = handleState.captureId;
+      if (activeId !== null && activeId !== undefined && e && typeof e.pointerId === "number" && e.pointerId !== activeId) return;
+      // 兜底：按钮已经抬起但没收到 pointerup/lost（捕获目标被宿主换掉等）。
+      // 下一次 pointermove 的 buttons===0 就是可信的"手势结束"，不采信坐标。
+      if (e && e.type === "pointermove" && (chatHandleState.dragging || handleState.dragging)
+          && typeof e.buttons === "number" && e.buttons === 0) {
+        endAllDrag("buttons-released");
+        return;
+      }
       // 中间那根：改对话宽度（下限 220，上限 900）
       if (chatHandleState.dragging) {
         try { e.preventDefault(); e.stopPropagation(); } catch (err) { /* 忽略 */ }
         var dx0 = e.clientX - chatHandleState.startX;
-        var v0 = Math.round(layoutClamp(chatHandleState.startW - dx0, LAYOUT_MIN_CHAT, 900));
+        var v0 = chatWidthFromDrag(chatHandleState.startW, dx0, chatHandleState.onLeft, LAYOUT_MIN_CHAT, 900);
         var eng = handleState.engine;
         if (eng && typeof eng.updateCfg === "function") {
           eng.updateCfg({ chatWidth: v0 });
@@ -1867,33 +2968,102 @@ function applyMirrorDelta(mirror,event){
 
     function onHandleUp(e) {
       if (!handleFloorInstalled) return;
-      if (chatHandleState.dragging || handleState.dragging) {
-        if (e && e.type !== "pointercancel" && isFinite(e.clientX)) onHandleMove(e);
-        flushHandleMove();
-      }
+      var activeId = handleState.captureId;
+      if (activeId !== null && activeId !== undefined && e && typeof e.pointerId === "number" && e.pointerId !== activeId) return;
+      var wasChat = chatHandleState.dragging === true;
+      var wasSide = handleState.dragging === true;
+      if (!wasChat && !wasSide) return;
+      // pointercancel 不把取消点当成最后一次移动；pointerup 才采信终点坐标。
+      if (e && e.type !== "pointercancel" && isFinite(e.clientX)) onHandleMove(e);
+      try { e.preventDefault(); e.stopPropagation(); } catch (err) { /* 忽略 */ }
+      // Measure once before the commit writes. The single final apply then uses
+      // this exact geometry and never reads layout back after painting the pin.
+      var commitGeo = null;
+      try {
+        if (!wasChat && handleState.engine && typeof handleState.engine.measureCommit === "function") {
+          commitGeo = handleState.engine.measureCommit();
+        }
+      } catch (errM) { commitGeo = null; }
+      // Clear the drag state BEFORE the commit so the single final apply takes
+      // the fresh final geometry. The old code flushed a cached/derived pass
+      // here and then flushed a second fresh pass after clearing; the second
+      // pass forced another layout/commit from pointerup. One measured pass is
+      // enough and keeps the final width exact.
+      chatHandleState.dragging = false;
+      handleState.dragging = false;
       releaseHandlePointer();
-      if (chatHandleState.dragging) {
-        chatHandleState.dragging = false;
-        try { e.preventDefault(); e.stopPropagation(); } catch (err) { /* 忽略 */ }
+      try { flushHandleMove(commitGeo); } catch (err0) { /* 忽略 */ }
+      try { if (handleState.engine && handleState.engine.suppressResizeEcho) handleState.engine.suppressResizeEcho(); } catch (errE) { /* 忽略 */ }
+      if (wasChat) {
         try {
           var snap = handleState.engine && handleState.engine.snapshot ? handleState.engine.snapshot() : null;
           if (snap && snap.chatW) writeSettings(window.localStorage, { chatWidth: snap.chatW });
         } catch (err) { /* 无存储 */ }
         return;
       }
-      if (!handleState.dragging) return;
-      handleState.dragging = false;
       traceHandle("up", { sb: handleState.sb, rb: handleState.rb });
-      try { e.preventDefault(); e.stopPropagation(); } catch (err) { /* 忽略 */ }
       try {
         window.localStorage.setItem("dsh.markpilot.handles.v1", JSON.stringify({ sb: handleState.sb, rb: handleState.rb }));
       } catch (err) { /* 无存储 */ }
       watchPinned();
     }
 
+    /**
+     * 拖拽的幂等终止：Alt+Tab 失焦、pointer capture 丢失、捕获目标被宿主卸载、
+     * 或新指针按下接管。绝不采信 abort 事件里的坐标（可能是 0）：
+     * 只用最后一次已应用的宽度收尾，再强制一次 fresh 几何。
+     * 显式 pointerup 已先清 dragging，因此随后的 lostpointercapture 不会重入。
+     */
+    function endAllDrag(reason) {
+      if (!handleFloorInstalled) return false;
+      var wasChat = chatHandleState.dragging === true;
+      var wasSide = handleState.dragging === true;
+      if (!wasChat && !wasSide) return false;
+      var commitGeo = null;
+      try {
+        if (!wasChat && handleState.engine && typeof handleState.engine.measureCommit === "function") {
+          commitGeo = handleState.engine.measureCommit();
+        }
+      } catch (eM) { commitGeo = null; }
+      chatHandleState.dragging = false;
+      handleState.dragging = false;
+      releaseHandlePointer();
+      try { flushHandleMove(commitGeo); } catch (e0) { /* 忽略 */ }
+      try { if (handleState.engine && handleState.engine.suppressResizeEcho) handleState.engine.suppressResizeEcho(); } catch (eE) { /* 忽略 */ }
+      if (wasChat) {
+        try {
+          var snap = handleState.engine && handleState.engine.snapshot ? handleState.engine.snapshot() : null;
+          if (snap && snap.chatW) writeSettings(window.localStorage, { chatWidth: snap.chatW });
+        } catch (e1) { /* 无存储 */ }
+      } else {
+        try {
+          window.localStorage.setItem("dsh.markpilot.handles.v1", JSON.stringify({ sb: handleState.sb, rb: handleState.rb }));
+        } catch (e2) { /* 无存储 */ }
+        try { watchPinned(); } catch (e3) { /* 忽略 */ }
+      }
+      traceHandle("abort", { reason: reason, chat: wasChat, side: wasSide, sb: handleState.sb, rb: handleState.rb });
+      return true;
+    }
+
+    function onHandleAbort(e) {
+      if (!handleFloorInstalled) return;
+      var activeId = handleState.captureId;
+      if (activeId !== null && activeId !== undefined && e && typeof e.pointerId === "number" && e.pointerId !== activeId) return;
+      endAllDrag(e && e.type === "lostpointercapture" ? "lost-capture" : "blur");
+    }
+
+    function onWindowBlur() {
+      if (handleFloorInstalled) endAllDrag("blur");
+    }
+
+    function onVisibilityChange() {
+      if (!handleFloorInstalled) return;
+      try { if (document.visibilityState === "hidden") endAllDrag("hidden"); } catch (e) { /* 忽略 */ }
+    }
+
     /** 侧栏折叠/展开时把手柄交还宿主：清掉接管标记与观察器。 */
     function releasePinned() {
-      var frame = handleFrame(handleState.frame);
+      var frame = locateFrame();
       if (handleState.mo) { try { handleState.mo.disconnect(); } catch (e) { /* 忽略 */ } handleState.mo = null; }
       if (handleState.parentMo) { try { handleState.parentMo.disconnect(); } catch (e2) { /* 忽略 */ } handleState.parentMo = null; }
       if (frame) {
@@ -1940,12 +3110,17 @@ function applyMirrorDelta(mirror,event){
         try { document.removeEventListener("pointermove", onHandleMove, true); } catch (e0) { /* 忽略 */ }
         try { document.removeEventListener("pointerup", onHandleUp, true); } catch (e0) { /* 忽略 */ }
         try { document.removeEventListener("pointercancel", onHandleUp, true); } catch (e0) { /* 忽略 */ }
+        try { window.removeEventListener("lostpointercapture", onHandleAbort, true); } catch (e0) { /* 忽略 */ }
+        try { window.removeEventListener("visibilitychange", onVisibilityChange, true); } catch (e0) { /* 忽略 */ }
+        try { window.removeEventListener("blur", onWindowBlur); } catch (e0) { /* 忽略 */ }
         var owned = [chatHandleState.el, frameEdge.left, frameEdge.right];
         for (var i = 0; i < owned.length; i += 1) {
           try { if (owned[i]) owned[i].remove(); } catch (e1) { /* 忽略 */ }
         }
         chatHandleState.el = null;
         frameEdge.left = frameEdge.right = null;
+        // 旧版伪元素热区不属于本 factory，但继续留着会压住滚动条。
+        try { removeStageHandleStyle(document); } catch (eSH) { /* 忽略 */ }
         try {
           if (window.__mpHandleFloorDispose === disposeHandles) {
             // releasePinned() ran above. Only the active factory may remove
@@ -1972,17 +3147,41 @@ function applyMirrorDelta(mirror,event){
         }
       } catch (eS) { /* 忽略 */ }
       document.addEventListener("pointercancel", onHandleUp, true);
+      // 终止兜底：Alt+Tab 失焦、pointer capture 丢失、页面隐藏。
+      // 这些事件不带可信坐标，收尾只用最后一次已应用的宽度（见 endAllDrag）。
+      // 挂在 window 上：document 级监听数量是既有生命周期测试的契约，不额外增加。
+      try { window.addEventListener("lostpointercapture", onHandleAbort, true); } catch (eL) { /* 忽略 */ }
+      try { window.addEventListener("visibilitychange", onVisibilityChange, true); } catch (eV) { /* 忽略 */ }
+      try { window.addEventListener("blur", onWindowBlur); } catch (eB) { /* 忽略 */ }
       // 侧栏折叠/展开、右栏开关：宿主会自己重排，我们放手（否则会和它的动画打架）。
       // 注意：不能只在安装这一刻解析 frame —— 插件可能比宿主布局先跑，
       // 那时 frame 还不存在，观察器就永远装不上。改成挂在 document 上、回调里现找。
       try {
         var MO = window.MutationObserver;
         if (MO) {
-          release = new MO(function () {
+          release = new MO(function (records) {
             if (disposed) return;
-            var f = handleFrame(handleState.frame);
+            var f = locateFrame();
             if (!f) return;
-            if (frameCollapsed(f)) { releasePinned(); return; }
+            // 只看"本次真正变化的那个属性"：右栏关闭时 data-rightbar-collapsed
+            // 会常驻，用 frameCollapsed() 一刀切会把"左栏重新展开"也当成折叠，
+            // 于是刚恢复的 pin 又被摘掉、用户宽度永远回不来。
+            var sidebarChanged = false, rightbarChanged = false;
+            for (var ri = 0; ri < (records ? records.length : 0); ri += 1) {
+              var an = records[ri] && records[ri].attributeName;
+              if (an === "data-sidebar-collapsed") sidebarChanged = true;
+              else if (an === "data-rightbar-collapsed") rightbarChanged = true;
+            }
+            if (sidebarChanged && stateOn(f, "data-sidebar-collapsed")) {
+              releasePinned();
+              scheduleLayout();   // 同一帧把舞台重算，别等 250ms 宽看门
+              return;
+            }
+            if (rightbarChanged && stateOn(f, "data-rightbar-collapsed")) {
+              releasePinned();
+              scheduleLayout();
+              return;
+            }
             // 重新展开：把用户自己拉过的宽度接回来
             try { paintHandles(); } catch (e) { /* 忽略 */ }
             try { watchPinned(); } catch (e) { /* 忽略 */ }
@@ -2074,11 +3273,12 @@ function applyMirrorDelta(mirror,event){
       }
     }
 
-    async function api(endpoint, payload) {
+    async function api(endpoint, payload, options) {
       const res = await fetch(API_BASE + endpoint, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload || {}),
+        ...(options && options.signal ? { signal: options.signal } : {}),
       });
       if (!res.ok) throw new Error("api " + endpoint + ": HTTP " + res.status);
       return res.json();
@@ -2104,7 +3304,7 @@ function applyMirrorDelta(mirror,event){
  *   · 只写宿主会话内容区的 margin-left / margin-right 与一个 CSS 变量；
  *   · 不搬节点、不改宿主 grid、不碰 iframe、不动宿主 layoutInfo；
  *   · 全部写操作经 writeStyle()，值没变不碰 DOM（= 回归场景 8 的前提）；
- *   · 关闭默认：localStorage["dsh.markpilot.layout.v1"].enabled === true 才启动。
+ *   · 默认开启居中；只有显式关闭（enabled:false 且带意图标记）才回右侧栏。
  *
  * 依据：设计 draft-2 §3.3 / §3.4 / §3.6。最关键的一条是 §3.6：
  *   宽度变量必须写在 **会话内容区** 上，不能写在会话根上 —— 宿主的
@@ -2114,7 +3314,7 @@ function applyMirrorDelta(mirror,event){
 
 const LAYOUT_STORAGE_KEY = "dsh.markpilot.layout.v1";
 const LAYOUT_MODES = ["center", "right", "dock", "focus"];
-const LAYOUT_DEFAULTS = { enabled: false, mode: "center", chatWidth: 420 };
+const LAYOUT_DEFAULTS = { enabled: true, mode: "center", chatWidth: 420 };
 const LAYOUT_MIN_CHAT = 220;   // 对话列下限：220 时宿主内部（composer/卡片）会塌成竖条，300 是实测稳定值
 const LAYOUT_EDITOR_MIN = 420;   // 编辑区最小可读宽：右侧栏一开，中间列可能只剩几百像素
 const LAYOUT_GAP = 8;
@@ -2130,7 +3330,133 @@ var squeezeForTests = null;
  * 手柄有稳定属性 data-width-handle（不依赖哈希类名）。
  */
 const LAYOUT_STYLE_ID = "dsh-markdown-editor-typora-layout-style";
-const LAYOUT_STYLE_CSS = '[data-mp-layout="on"] [data-width-handle]{display:none !important}';
+/* Compact chrome. Every rule is scoped by data-mp-chrome, which the engine only
+   writes while the workbench is open and the 紧凑工作台 setting is on; removing
+   the attribute (close / setting off / restore) returns the host to its own
+   layout with no residue. Selectors use substring class matching because DSH
+   appends state classes (e.g. "…_treeBody …_wide"), which breaks suffix
+   matching.
+
+   Wide column, one row, reading order left to right:
+     title (+ its mode marker) | 14px | view tabs + views More | flexible gap |
+     session More, right-column tools.
+   The title cluster keeps the host's own ellipsis, the tab row keeps a width
+   that does not depend on how many tabs the host chooses to show (so DSH's
+   ResizeObserver loop settles instead of oscillating), and every control keeps
+   the host's resting background and border: only hover and focus states are
+   added, drawn from theme tokens.
+
+   Narrow column, two rows: title and its mode marker share the first row with
+   the trailing tools; the view tabs take the second row, starting where the
+   title starts. */
+const LAYOUT_STYLE_CSS = `
+[data-mp-layout="on"] [data-width-handle]{display:none !important}
+/* dsh-ui-alt owns the header when its own compact mode is on: stand down so the
+   two plugins never fight over the same rows. */
+html:not([data-dcc-enabled="on"][data-dcc-compact-header="on"])
+  [data-mp-chrome] [data-slot="conversation.header"] header[data-window-drag]:not([class*="_headerBlank"]):has([data-conversation-header-corner]) {
+  min-height:0 !important; padding:2px 16px 2px 20px !important;
+  align-items:center; border-bottom:0.5px solid var(--dsw-alias-border-l3);
+  /* The slot anchor is display:contents in DSH; the header itself is the row. */
+  & [class*="_titleRow"] { display:contents; }
+  & [class*="_titleCluster"] {
+    /* Host fade band reaches over the utilities seat; drop it and let the
+       cluster clip its own title so nothing overlaps a neighbour. */
+    --title-cluster-fade:0px;
+    flex:0 1 auto; min-width:0; min-height:28px;
+    margin:0; padding:0; gap:8px; overflow:hidden;
+    mask-image:none;
+  }
+  & [class*="_crumbs"] { min-width:0; }
+  & [class*="_crumb"] { max-width:min(34vw,420px); }
+  /* Title keeps the host's own weight and colour; no new type scale. */
+  & [class*="_crumbCurrent"] { font-weight:500; }
+  & [class*="_headerUtilities"] {
+    position:relative; z-index:1; margin-left:auto; gap:6px;
+  }
+  & [data-conversation-header-corner] { margin:0; }
+  & div:has(> [data-conversation-tabs]) {
+    margin:0; padding:0; align-items:center; gap:2px 8px; flex-wrap:nowrap;
+  }
+  & [data-conversation-tabs] { min-height:0; gap:2px 4px; flex-wrap:nowrap; }
+  & [role="tab"] {
+    --dsh-tab-hit-inline:8px;
+    min-height:28px; margin:0; padding:6px 8px;
+  }
+  /* Resting chrome is the host's; hover and focus are the only additions. */
+  & [role="tab"]:hover { color:var(--dsw-alias-label-primary); }
+  & [role="tab"]:focus-visible {
+    outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));
+    outline-offset:-2px; border-radius:var(--dsw-radius-sm);
+  }
+  & [class*="_viewsMore"][aria-haspopup="menu"] {
+    min-width:28px; min-height:28px; margin:0;
+  }
+  /* The More launcher rides an inline wrapper; make it a flex box so the row
+     measures the 28px control instead of a taller line box. */
+  & [class*="_viewsMoreAnchor"] { display:inline-flex; align-items:center; flex:none; }
+  & [class*="_viewsMore"][aria-haspopup="menu"]:hover {
+    background:var(--dsw-alias-interactive-bg-hover);
+  }
+  & [class*="_viewsMore"][aria-haspopup="menu"]:focus-visible {
+    outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));
+    outline-offset:-2px;
+  }
+}
+/* Wide: one row. Flex order puts the tab row directly after the title group
+   and pushes the trailing tools to the right edge. */
+html:not([data-dcc-enabled="on"][data-dcc-compact-header="on"])
+  [data-mp-chrome="wide"] [data-slot="conversation.header"] header[data-window-drag]:has([data-conversation-tabs]):has([class*="_viewsMore"][aria-haspopup="menu"]):has([data-conversation-header-corner]) {
+  display:flex; flex-wrap:nowrap; column-gap:0;
+  & [data-conversation-header-leading] { order:0; flex:none; }
+  & [class*="_titleCluster"] { order:1; }
+  & div:has(> [data-conversation-tabs]) {
+    order:2; flex:0 0 auto;
+    /* Width must not depend on the visible tab count, or DSH's own
+       ResizeObserver loop would keep re-deciding how many tabs fit. */
+    width:clamp(200px,40%,420px);
+    margin-inline-start:14px; justify-content:flex-start;
+  }
+  & [class*="_headerUtilities"] { order:3; }
+  & [data-conversation-header-corner] { order:4; }
+}
+/* Narrow: two rows. Title and its mode marker sit on row 1 with the trailing
+   tools; the tab row starts on row 2 at the title's own start edge. */
+html:not([data-dcc-enabled="on"][data-dcc-compact-header="on"])
+  [data-mp-chrome="narrow"] [data-slot="conversation.header"] header[data-window-drag]:has([data-conversation-tabs]):has([data-conversation-header-corner]) {
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto auto;
+  grid-template-rows:auto auto;
+  column-gap:6px; row-gap:2px;
+  & [data-conversation-header-leading] { grid-area:1/1; }
+  & [class*="_titleCluster"] { grid-area:1/2; }
+  & [class*="_headerUtilities"] { grid-area:1/3; margin-left:0; }
+  & [data-conversation-header-corner] { grid-area:1/4; }
+  & div:has(> [data-conversation-tabs]) {
+    grid-area:2/2/3/5; width:100%; min-width:0;
+    margin-inline-start:0; justify-content:flex-start;
+  }
+}
+/* Expanded workspace sidebar only: reclaim the brand row, the new-session bar
+   and the panel rows for the session list, and let a tall plugin footer scroll
+   instead of pushing the list out. Brand, entry button and panel rows share one
+   inline start so the column keeps a single left rhythm. The drawer, the
+   collapsed rail and the Windows caption keep the host's geometry. */
+[data-mp-squeezed]:not([data-sidebar-drawer]):not([data-sidebar-collapsed="true"]):has([data-mp-chrome])
+  [class*="_sidebarCol"] [class*="_root"]:has(> [class*="_footArea"]):has([data-sidebar-scrollport]) {
+  & > [class*="_logoRow"] { height:32px !important; margin-block:0; padding:0 0 0 12px; }
+  & > [class*="_newSessionRow"] { margin:3px 0 !important; }
+  & button[class*="_newSession"] { height:30px; padding-inline:12px; }
+  & [data-sidebar-scrollport] > nav { gap:1px; margin-bottom:2px; }
+  & [data-sidebar-scrollport] > nav button[class*="_panelRow"] { min-height:28px; padding-block:3px; }
+  & > [class*="_footArea"] { max-height:32%; overflow-y:auto; overscroll-behavior:contain; }
+  /* Keyboard focus stays visible against the column fill. */
+  & button[class*="_newSession"]:focus-visible,
+  & [data-sidebar-scrollport] > nav button[class*="_panelRow"]:focus-visible {
+    outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));
+    outline-offset:-2px;
+  }
+}`;
 
 function ensureLayoutStyle(doc) {
   try {
@@ -2181,7 +3507,10 @@ function watchSettingsChanges(callback) {
   };
 }
 const SETTINGS_DEFAULTS = {
-  enabled: false,
+  enabled: true,
+  // 用户是否亲手改过「编辑区居中」开关。旧版（≤2.0.20）会把默认 false+center
+  // 随任意设置写入；没有这个标记就无法区分「没选过」和「亲手关闭」。
+  enabledExplicit: false,
   mode: "center",
   chatWidth: 420,
   docsFolder: "",
@@ -2193,6 +3522,7 @@ const SETTINGS_DEFAULTS = {
   passiveOpenMode: "workbench",
   docsTemplate: "# {title}\n\n",
   transparent: true,     // 编辑区透明：让应用背景（含 dream-skin 皮肤）透上来
+  compactChrome: true,
   keepResizeHandlesAfterClose: false,
   docsListCollapsed: false,  // 文档中心左侧列表是否折叠
   docsListWidth: 268,       // 文档中心左侧列表宽度（可拖，160..460）
@@ -2204,10 +3534,53 @@ const SETTINGS_DEFAULTS = {
 const RIGHTBAR_MIN = 300;
 const RIGHTBAR_MAX = 900;
 
-/** 读设置：旧键铺底 → 新键覆盖；任何异常都回默认。 */
+/**
+ * 布局三字段的唯一合并口：旧键铺底 → 新键逐字段覆盖（纯读，不落盘）。
+ * 返回**迁移前**的原值：新键缺的字段由旧键补齐，不能只看新键。
+ * 归一化与实际生效判断在 readLayoutFields；迁移判断直接复用这里的合并结果。
+ */
+function mergeLayoutFields(storage) {
+  var out = {
+    enabled: LAYOUT_DEFAULTS.enabled,
+    mode: LAYOUT_DEFAULTS.mode,
+    chatWidth: LAYOUT_DEFAULTS.chatWidth,
+    explicit: false,
+  };
+  if (!storage) return out;
+  function merge(raw) {
+    if (!raw) return;
+    var s;
+    try { s = JSON.parse(raw); } catch (e) { return; }
+    if (!s || typeof s !== "object") return;
+    if (typeof s.enabled === "boolean") out.enabled = s.enabled;
+    if (LAYOUT_MODES.indexOf(s.mode) >= 0) out.mode = s.mode;
+    if (typeof s.chatWidth === "number") out.chatWidth = Math.round(layoutClamp(s.chatWidth, LAYOUT_MIN_CHAT, 900));
+    if (s.enabledExplicit === true) out.explicit = true;
+  }
+  try { merge(storage.getItem(LAYOUT_STORAGE_KEY)); } catch (e) { /* 旧键不可读 */ }
+  try { merge(storage.getItem(SETTINGS_KEY)); } catch (e) { /* 新键不可读 */ }
+  return out;
+}
+
+/**
+ * 实际生效判断：旧版（≤2.0.20）会把默认 enabled:false + mode:"center" 随任意
+ * 设置写入（拖对话宽、保存文档文件夹都会触发 writeSettings）。单看 enabled
+ * 无法区分「从未选择」与「亲手关闭」，所以这里只做一处兼容解释：
+ *   · 无意图标记（enabledExplicit）的 center+false ⇒ 视为从未选择，按新默认开启；
+ *   · 带标记的 false，或 right/dock/focus 等非默认布局 ⇒ 原样保留。
+ * 落盘由 apply 时的 migrateLayoutDefaults 一次性完成，避免读路径产生写副作用。
+ */
+function readLayoutFields(storage) {
+  var out = mergeLayoutFields(storage);
+  if (!out.explicit && out.enabled === false && out.mode === "center") out.enabled = true;
+  return out;
+}
+
+/** 读设置：沿用布局三字段的统一解析，再补文档/外观字段；任何异常都回默认。 */
 function readSettings(storage) {
   var out = {
     enabled: SETTINGS_DEFAULTS.enabled,
+    enabledExplicit: SETTINGS_DEFAULTS.enabledExplicit,
     mode: SETTINGS_DEFAULTS.mode,
     chatWidth: SETTINGS_DEFAULTS.chatWidth,
     docsFolder: SETTINGS_DEFAULTS.docsFolder,
@@ -2217,25 +3590,24 @@ function readSettings(storage) {
     passiveOpenMode: SETTINGS_DEFAULTS.passiveOpenMode,
     docsTemplate: SETTINGS_DEFAULTS.docsTemplate,
     transparent: SETTINGS_DEFAULTS.transparent,
+    compactChrome: SETTINGS_DEFAULTS.compactChrome,
     docsListCollapsed: SETTINGS_DEFAULTS.docsListCollapsed,
     keepResizeHandlesAfterClose: SETTINGS_DEFAULTS.keepResizeHandlesAfterClose,
     rightbarWidth: SETTINGS_DEFAULTS.rightbarWidth,
     sidebarMin: SETTINGS_DEFAULTS.sidebarMin,
     rightbarMin: SETTINGS_DEFAULTS.rightbarMin,
   };
-  var legacy = readLayoutConfig(storage);
-  out.enabled = legacy.enabled;
-  out.mode = legacy.mode;
-  out.chatWidth = legacy.chatWidth;
+  var layout = readLayoutFields(storage);
+  out.enabled = layout.enabled;
+  out.enabledExplicit = layout.explicit;
+  out.mode = layout.mode;
+  out.chatWidth = layout.chatWidth;
   try {
     if (!storage) return out;
     var raw = storage.getItem(SETTINGS_KEY);
     if (!raw) return out;
     var s = JSON.parse(raw);
     if (!s || typeof s !== "object") return out;
-    if (typeof s.enabled === "boolean") out.enabled = s.enabled;
-    if (LAYOUT_MODES.indexOf(s.mode) >= 0) out.mode = s.mode;
-    if (typeof s.chatWidth === "number") out.chatWidth = Math.round(layoutClamp(s.chatWidth, LAYOUT_MIN_CHAT, 900));
     if (typeof s.docsFolder === "string") out.docsFolder = s.docsFolder;
     if (["recent", "files", "blank"].includes(s.workspaceOpenMode)) out.workspaceOpenMode=s.workspaceOpenMode;
     if (["files", "blank"].includes(s.workspaceEmptyMode)) out.workspaceEmptyMode=s.workspaceEmptyMode;
@@ -2243,6 +3615,7 @@ function readSettings(storage) {
     if (["workbench", "overlay"].includes(s.passiveOpenMode)) out.passiveOpenMode=s.passiveOpenMode;
     if (typeof s.docsTemplate === "string") out.docsTemplate = s.docsTemplate;
     if (typeof s.transparent === "boolean") out.transparent = s.transparent;
+    if (typeof s.compactChrome === "boolean") out.compactChrome = s.compactChrome;
     if (typeof s.keepResizeHandlesAfterClose === "boolean") out.keepResizeHandlesAfterClose = s.keepResizeHandlesAfterClose;
     if (typeof s.docsListCollapsed === "boolean") out.docsListCollapsed = s.docsListCollapsed;
     if (typeof s.docsListWidth === "number") out.docsListWidth = Math.round(layoutClamp(s.docsListWidth, 160, 460));
@@ -2256,7 +3629,9 @@ function readSettings(storage) {
 /** 写设置：合并 → 落新键 → 布局三字段同步回旧键。返回写后的完整设置，失败返回 null。 */
 function writeSettings(storage, patch) {
   var next = readSettings(storage);
+  var choseEnabled = false;
   if (patch && typeof patch === "object") {
+    choseEnabled = Object.prototype.hasOwnProperty.call(patch, "enabled");
     for (var k in patch) {
       if (Object.prototype.hasOwnProperty.call(patch, k)) next[k] = patch[k];
     }
@@ -2264,6 +3639,10 @@ function writeSettings(storage, patch) {
   next.chatWidth = Math.round(layoutClamp(next.chatWidth, LAYOUT_MIN_CHAT, 900));
   if (LAYOUT_MODES.indexOf(next.mode) < 0) next.mode = "center";
   next.enabled = next.enabled === true;
+  // 任何显式写 enabled 的调用（设置页开关、打开工作台）都记录意图；
+  // 只改其他设置时沿用已有标记，避免把「亲手关闭」冲成默认值。
+  if (choseEnabled) next.enabledExplicit = true;
+  else next.enabledExplicit = next.enabledExplicit === true;
   if (!["recent", "files", "blank"].includes(next.workspaceOpenMode)) next.workspaceOpenMode="recent";
   if (!["files", "blank"].includes(next.workspaceEmptyMode)) next.workspaceEmptyMode="files";
   if (!["follow", "keep"].includes(next.workspaceSwitchMode)) next.workspaceSwitchMode="follow";
@@ -2284,34 +3663,10 @@ function writeSettings(storage, patch) {
   return next;
 }
 
-/** 读配置：任何异常都回默认，绝不把坏存档抛到启动路径上。 */
+/** 读配置：布局三字段走同一解析口；任何异常都回默认，绝不把坏存档抛到启动路径上。 */
 function readLayoutConfig(storage) {
-  var out = { enabled: LAYOUT_DEFAULTS.enabled, mode: LAYOUT_DEFAULTS.mode, chatWidth: LAYOUT_DEFAULTS.chatWidth };
-  if (!storage) return out;
-  // 以设置键为准（设置页写的就是它），旧键仅作兼容回退。
-  // 直接解析 JSON 而不调 readSettings —— 后者会回调本函数，构成递归。
-  try {
-    var rawNew = storage.getItem(SETTINGS_KEY);
-    if (rawNew) {
-      var s = JSON.parse(rawNew);
-      if (s && typeof s === "object") {
-        out.enabled = s.enabled === true;
-        out.mode = LAYOUT_MODES.indexOf(s.mode) >= 0 ? s.mode : "center";
-        if (typeof s.chatWidth === "number") out.chatWidth = Math.round(layoutClamp(s.chatWidth, LAYOUT_MIN_CHAT, 900));
-        return out;
-      }
-    }
-  } catch (e) { /* 新键坏了就继续读旧键 */ }
-  try {
-    var raw = storage.getItem(LAYOUT_STORAGE_KEY);
-    if (!raw) return out;
-    var saved = JSON.parse(raw);
-    if (!saved || typeof saved !== "object") return out;
-    out.enabled = saved.enabled === true;
-    out.mode = LAYOUT_MODES.indexOf(saved.mode) >= 0 ? saved.mode : "center";
-    out.chatWidth = Math.round(layoutClamp(saved.chatWidth, LAYOUT_MIN_CHAT, 900));
-  } catch (e) { /* 坏存档 = 默认值 */ }
-  return out;
+  var fields = readLayoutFields(storage);
+  return { enabled: fields.enabled, mode: fields.mode, chatWidth: fields.chatWidth };
 }
 
 function saveLayoutConfig(storage, cfg) {
@@ -2323,6 +3678,33 @@ function saveLayoutConfig(storage, cfg) {
       chatWidth: Math.round(layoutClamp(cfg.chatWidth, LAYOUT_MIN_CHAT, 900)),
     }));
     return true;
+  } catch (e) { return false; }
+}
+
+/**
+ * 一次性迁移 2.0.20 及更早版本「自动物化」的 center+false。
+ *
+ * 旧版从未选择布局的用户也会在拖对话宽 / 保存其它设置时被写入
+ * enabled:false + mode:"center"；这类记录没有意图标记，按新默认改写成开启。
+ * 带标记的显式关闭、以及 right/dock/focus 等非 center 布局原样保留。
+ * 只对合并后的迁移前值确实为 false+center 写一次；写后条件不再成立。
+ */
+function migrateLayoutDefaults(storage) {
+  try {
+    if (!storage) return false;
+    // 新键存在但坏掉时不要迁移：writeSettings 会覆盖它，先保住原档。
+    var rawNew = null;
+    try { rawNew = storage.getItem(SETTINGS_KEY); } catch (e) { rawNew = null; }
+    if (rawNew) {
+      var parsedNew = JSON.parse(rawNew);
+      if (!parsedNew || typeof parsedNew !== "object") return false;
+    }
+    // 用合并后的迁移前值判断：旧键 mode=right + 新键缺 mode 仍是 right，不得迁成 center。
+    var fields = mergeLayoutFields(storage);
+    if (fields.explicit) return false;
+    if (fields.enabled !== false) return false;
+    if (fields.mode !== "center") return false;
+    return !!writeSettings(storage, { enabled: true });
   } catch (e) { return false; }
 }
 
@@ -2424,6 +3806,94 @@ function computeLayout(mode, cfg, width, height) {
 }
 
 /**
+ * 舞台矩形：只允许落在宿主真实内容区（右侧让开侧栏、顶部让开标题栏、
+ * 不越过右栏/视口）。空间不足时明确返回 ok:false，调用方必须收起舞台，
+ * 绝不以 0,0/62vw 的兜底盖住侧栏或输入框。
+ */
+function fitStageRect(input) {
+  var value = input || {};
+  var contentLeft = Number(value.contentLeft);
+  var contentTop = Number(value.contentTop);
+  var contentRight = Number(value.contentRight);
+  var contentBottom = Number(value.contentBottom);
+  var sidebarRight = Number(value.sidebarRight);
+  var headerBottom = Number(value.headerBottom);
+  var rightbarLeft = Number(value.rightbarLeft);
+  var viewportWidth = Number(value.viewportWidth);
+  var viewportHeight = Number(value.viewportHeight);
+  var editorWidth = Number(value.editorWidth);
+  var left = Math.max(
+    isFinite(contentLeft) ? contentLeft : 0,
+    isFinite(sidebarRight) ? sidebarRight : 0
+  );
+  var stageLeft = Number(value.stageLeft);
+  if (isFinite(stageLeft)) left = Math.max(left, stageLeft);
+  var top = Math.max(
+    isFinite(contentTop) ? contentTop : 0,
+    isFinite(headerBottom) ? headerBottom : 0
+  );
+  var rightCandidates = [];
+  if (isFinite(contentRight)) rightCandidates.push(contentRight);
+  if (isFinite(rightbarLeft) && rightbarLeft > 0) rightCandidates.push(rightbarLeft);
+  if (isFinite(viewportWidth) && viewportWidth > 0) rightCandidates.push(viewportWidth);
+  var right = rightCandidates.length ? Math.min.apply(Math, rightCandidates) : left;
+  var bottomCandidates = [];
+  if (isFinite(contentBottom)) bottomCandidates.push(contentBottom);
+  if (isFinite(viewportHeight) && viewportHeight > 0) bottomCandidates.push(viewportHeight);
+  var bottom = bottomCandidates.length ? Math.min.apply(Math, bottomCandidates) : top;
+  var width = Math.min(isFinite(editorWidth) ? Math.max(0, editorWidth) : 0, Math.max(0, right - left));
+  var height = Math.max(0, bottom - top);
+  if (!(width >= 240) || !(height >= 240)) {
+    return { ok: false, reason: "stage-no-room", left: left, top: top, width: width, height: height };
+  }
+  return { ok: true, left: Math.round(left), top: Math.round(top), width: Math.round(width), height: Math.round(height) };
+}
+
+/** 两个视口矩形是否真重叠（只用于“绝不盖住输入框”这条硬边界）。 */
+function rectsOverlap(a, b) {
+  if (!a || !b) return false;
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+}
+
+/**
+ * 中缝手柄的横坐标：必须始终落在「聊天 ↔ 编辑器」的边界上。
+ *   · marginLeft 非空 ⇒ 聊天贴右、编辑器在左，边界 = 列左 + 编辑器宽；
+ *   · marginLeft 为空 ⇒ 聊天贴左、编辑器在右，边界 = 列左 + 聊天宽。
+ * 旧写法无条件再加 editorW，在聊天居左时把手柄推到整列最右边。
+ */
+function chatBoundaryX(rectLeft, rectWidth, chatW, marginLeft) {
+  var editorW = Math.max(0, Number(rectWidth) - Number(chatW));
+  // marginLeft 是 CSS 字符串（"900px"）——Number("900px") 是 NaN，
+  // 不能拿它当真假判据；只判"是否写了值"。
+  var chatOnRight = String(marginLeft == null ? "" : marginLeft).trim() !== "";
+  return chatOnRight ? Number(rectLeft) + editorW : Number(rectLeft) + Number(chatW);
+}
+
+/**
+ * 中缝拖动后的聊天宽度：聊天贴右时向左拖变宽，贴左时向右拖变宽。
+ * onLeft 在 pointerdown 时确定，拖拽过程中不换边。
+ */
+function chatWidthFromDrag(startW, dx, onLeft, minW, maxW) {
+  var next = Number(startW) + (onLeft ? Number(dx) : -Number(dx));
+  return Math.round(pureClamp(next, minW, maxW));
+}
+
+/** 与宿主原生 .handle 同宽；所有竖向热区都只占边界右侧这么宽。 */
+var HANDLE_HOT_WIDTH = 8;
+
+/**
+ * 竖向分隔线的命中带：[round(边界), round(边界)+8)。
+ * 宿主的列滚动条永远在边界左侧；半开区间保证命中区绝不越过边界。
+ */
+function inHandleHotBand(clientX, boundary) {
+  var x = Number(clientX);
+  var b = Number(boundary);
+  if (!isFinite(x) || !isFinite(b)) return false;
+  var start = Math.round(b);
+  return x >= start && x < start + HANDLE_HOT_WIDTH;
+}
+
+/**
  * 找出会话根里承载输入框（composer）的那个直接子元素。
  * 会话根的结构是 [头部, 内容滚动区, (可选)输入区]；我们只压内容区，
  * 输入区是**另一个孩子**，不一起压就会在窄列里飘出去/塌成竖条。
@@ -2516,6 +3986,20 @@ function createLayoutEngine(options) {
     yields: 0,
     ro: null,
     mo: null,
+    // 拖拽帧的几何缓存：列宽只由本次指针位移改变，拖拽期间用上一帧实测
+    // 几何推导，避免每帧在写完样式后再 getBoundingClientRect 强制布局。
+    // 松手后的最后一次 apply 会强制重新测量并校正端点。
+    geoCache: null,
+    commitEcho: 0,
+    pendingCommitGeo: null,
+    headerRo: null,
+    headerMo: null,
+    headerStructure: null,
+    headerStructureTarget: null,
+    headerTarget: null,
+    headerHost: null,
+    headerDirty: false,
+    stageRetry: 0,
   };
 
   var applyFrame = null;
@@ -2524,9 +4008,16 @@ function createLayoutEngine(options) {
     if (applyFrame !== null && win && win.cancelAnimationFrame) win.cancelAnimationFrame(applyFrame);
     applyFrame = null;
   }
-  function flush() {
+  function scheduleStageRetry() {
+    if (state.disposed || state.stageRetry >= 3) return;
+    state.stageRetry += 1;
+    try {
+      setTimeout(function () { if (!state.disposed) requestApply(); }, 140);
+    } catch (e) { /* 非浏览器测试环境 */ }
+  }
+  function flush(rectOverride) {
     cancelApply();
-    var ok = apply();
+    var ok = apply(rectOverride);
     if (ok) observe();
     return ok;
   }
@@ -2536,9 +4027,132 @@ function createLayoutEngine(options) {
     applyFrame = win.requestAnimationFrame(function () { applyFrame = null; flush(); });
   }
 
-  function onObservedResize() {
+  function onObservedResize(entries) {
     if (!state.active || state.disposed) return;
+    // The drag commit already applied this exact geometry synchronously. Consume
+    // only the echo whose root size matches the committed geometry; a real host
+    // resize with a different size still schedules a fresh apply.
+    if (state.commitEcho > 0) {
+      var expected = state.geoCache && state.geoCache.rect;
+      var rootEntry = null;
+      try {
+        for (var i = 0; entries && i < entries.length; i += 1) {
+          if (entries[i] && entries[i].target === state.root) { rootEntry = entries[i]; break; }
+        }
+      } catch (eE) { rootEntry = null; }
+      if (rootEntry && expected
+          && Math.round(rootEntry.contentRect.width) === expected.width
+          && Math.round(rootEntry.contentRect.height) === expected.height) {
+        state.commitEcho = 0;
+        return;
+      }
+      state.commitEcho = 0;
+    }
+    if (handleState.dragging || chatHandleState.dragging) return;
     requestApply();
+  }
+
+  function markHeaderChange() {
+    if (!state.active || state.disposed) return;
+    if (handleState.dragging || chatHandleState.dragging) { state.headerDirty = true; return; }
+    requestApply();
+  }
+  function headerHost(root) {
+    if (!root || !root.children) return null;
+    var body = state.body;
+    var kids = [];
+    for (var i = 0; i < root.children.length; i += 1) {
+      var el = root.children[i];
+      if (!el || el === body || (body && body.contains && body.contains(el)) || (body && el.contains && el.contains(body))) continue;
+      kids.push(el);
+    }
+    for (var j = 0; j < kids.length; j += 1) {
+      try { if (kids[j].getBoundingClientRect().height > 0) return kids[j]; } catch (e) { /* try next */ }
+    }
+    return kids[0] || null;
+  }
+  function headerGeometryTarget(host) {
+    if (!host) return null;
+    var body = state.body;
+    var target = visibleHeaderIn(host) || host;
+    if (!target || target === body || (body && body.contains && body.contains(target))) return null;
+    return target;
+  }
+  function resolveHeader(root) {
+    var host = headerHost(root);
+    var target = headerGeometryTarget(host);
+    var bottom = null, hostHeight = null, hostTop = null, targetHeight = null, targetTop = null;
+    if (host) {
+      try { var rh = host.getBoundingClientRect(); hostHeight = Math.round(rh.height); hostTop = Math.round(rh.top); } catch (eH) { /* best effort */ }
+    }
+    if (target) {
+      try {
+        var r = target.getBoundingClientRect();
+        if (r.height > 0) bottom = Math.round(r.bottom);
+        targetHeight = Math.round(r.height); targetTop = Math.round(r.top);
+      } catch (e) { bottom = null; }
+    }
+    return { host: host, target: target, bottom: bottom, hostHeight: hostHeight, hostTop: hostTop, targetHeight: targetHeight, targetTop: targetTop };
+  }
+  function unwatchHeader() {
+    if (state.headerRo && state.headerRo.disconnect) { try { state.headerRo.disconnect(); } catch (e) { /* 忽略 */ } }
+    if (state.headerMo && state.headerMo.disconnect) { try { state.headerMo.disconnect(); } catch (e) { /* 忽略 */ } }
+    if (state.headerStructure && state.headerStructure.disconnect) { try { state.headerStructure.disconnect(); } catch (e) { /* 忽略 */ } }
+    state.headerRo = null; state.headerMo = null; state.headerStructure = null; state.headerTarget = null; state.headerHost = null; state.headerStructureTarget = null; state.headerDirty = false;
+  }
+  function ensureHeaderWatch(root, resolved) {
+    if (!root || !root.children) return;
+    var host = resolved.host, target = resolved.target;
+    // Root direct children only: replacement of the header node must be visible
+    // even while root/body identities stay the same. No descendant attrs/style.
+    if (state.headerStructureTarget !== root) {
+      if (state.headerStructure && state.headerStructure.disconnect) { try { state.headerStructure.disconnect(); } catch (e) { /* 忽略 */ } }
+      state.headerStructureTarget = root;
+      if (MutationObserverImpl) {
+        try {
+          state.headerStructure = new MutationObserverImpl(markHeaderChange);
+          state.headerStructure.observe(root, { childList: true });
+        } catch (e1) { state.headerStructure = null; }
+      }
+    }
+    if (state.headerHost === host && state.headerTarget === target &&
+        (state.headerRo || state.headerMo || (!ResizeObserverImpl && !MutationObserverImpl))) {
+      state.headerHostHeight = resolved.hostHeight; state.headerHostTop = resolved.hostTop;
+      state.headerTargetHeight = resolved.targetHeight; state.headerTargetTop = resolved.targetTop;
+      return;
+    }
+    if (state.headerRo && state.headerRo.disconnect) { try { state.headerRo.disconnect(); } catch (e2) { /* 忽略 */ } }
+    state.headerRo = null; state.headerHost = host; state.headerTarget = target;
+    state.headerHostHeight = resolved.hostHeight; state.headerHostTop = resolved.hostTop;
+    state.headerTargetHeight = resolved.targetHeight; state.headerTargetTop = resolved.targetTop;
+    if (state.headerMo && state.headerMo.disconnect) { try { state.headerMo.disconnect(); } catch (e3) { /* 忽略 */ } }
+    state.headerMo = null;
+    // If the actual header is nested, observe only its direct parent's childList.
+    if (target && MutationObserverImpl && target.parentElement && target.parentElement !== root) {
+      try {
+        state.headerMo = new MutationObserverImpl(markHeaderChange);
+        state.headerMo.observe(target.parentElement, { childList: true });
+      } catch (e4) { state.headerMo = null; }
+    }
+    if (ResizeObserverImpl && (host || target)) {
+      try {
+        state.headerRo = new ResizeObserverImpl(function (entries) {
+          if (!state.active || state.disposed) return;
+          var changed = false;
+          for (var i = 0; i < (entries ? entries.length : 0); i += 1) {
+            var en = entries[i], rect = en && en.contentRect;
+            if (!rect) { changed = true; break; }
+            if (en.target === target && Math.round(rect.height) !== state.headerTargetHeight) changed = true;
+            if (en.target === host && Math.round(rect.height) !== state.headerHostHeight) changed = true;
+          }
+          // Width-only header resizes keep the same top/height baseline; they do
+          // not force a fresh geometry read.
+          if (changed) markHeaderChange();
+        });
+        if (host) state.headerRo.observe(host);
+        if (target && target !== host) state.headerRo.observe(target);
+      } catch (e5) { state.headerRo = null; }
+    }
   }
 
   function readRect(el) {
@@ -2556,7 +4170,12 @@ function createLayoutEngine(options) {
   function hideStage() {
     try {
       var el = (doc && typeof doc.getElementById === "function") ? doc.getElementById("mp-stage") : null;
-      if (el && el.style && el.style.display !== "none") el.style.display = "none";
+      if (el && el.style) {
+        if (el.style.display !== "none") el.style.display = "none";
+        // 兜底几何也必须是不可见、不可点：绝不以 0,0/62vw 盖住侧栏或顶栏。
+        if (el.style.visibility !== "hidden") el.style.visibility = "hidden";
+        if (el.style.pointerEvents !== "none") el.style.pointerEvents = "none";
+      }
     } catch (e) { /* 拿不到舞台就算了 */ }
     try { positionChatHandle(0, 0, 0, false); } catch (e) { /* 手柄不存在就算了 */ }
     try { positionEdgeHandles(0, 0, 0, 0, false); } catch (e2) { /* 忽略 */ }
@@ -2629,7 +4248,7 @@ function createLayoutEngine(options) {
     state.saved.composerMarginRight = el.style ? el.style.getPropertyValue("margin-right") : "";
   }
 
-  function apply() {
+  function apply(rectOverride) {
     if (state.disposed) return false;
     state.applies += 1;
     // ① 只有文档工作台／浮层编辑区打开时才挤压对话；
@@ -2660,7 +4279,54 @@ function createLayoutEngine(options) {
       var initialFrame=handleFrame(handleState.frame);
       if(initialFrame && !isPinned(initialFrame)) { paintHandles(); watchPinned(); }
     }
-    var rect = readRect(root);
+    var trackNow = { sb: Math.round(Number(handleState.sb) || 0), rb: Math.round(Number(handleState.rb) || 0) };
+    var dragActive = !!(handleState.dragging || chatHandleState.dragging);
+    var commitOverride = rectOverride && rectOverride.rect ? rectOverride : null;
+    // An explicit commit rect consumes any older one-shot cache. The cache is
+    // only valid for the same root/body identity and the same root rect; a
+    // remount, a size change, or a parent shift must fall back to fresh layout.
+    if (commitOverride) state.pendingCommitGeo = null;
+    if (!commitOverride && state.pendingCommitGeo) {
+      var pending = state.pendingCommitGeo;
+      state.pendingCommitGeo = null;
+      var pendingGeo = pending && pending.geo ? pending.geo : pending;
+      var pendingRect = pending && pending.rect ? pending.rect : (pendingGeo && pendingGeo.rect) || null;
+      var immediate = !!(pending && pending.immediate === true);
+      // An immediate commit was measured in this same synchronous release. Do
+      // not force a read-after-write barrier for the adapter that calls
+      // engine.flush() with no argument. Identity still has to match.
+      var currentRect = !immediate && pending && pending.root ? readRect(root) : null;
+      if (pending && pending.root === root && pending.body === body
+          && (immediate || (currentRect && pendingRect
+            && Math.round(currentRect.width) === Math.round(pendingRect.width)
+            && Math.round(currentRect.height) === Math.round(pendingRect.height)
+            && Math.round(currentRect.top) === Math.round(pendingRect.top)
+            && Math.round(currentRect.left) === Math.round(pendingRect.left)))) {
+        commitOverride = pendingGeo;
+      }
+    }
+    var derivedGeo = null;
+    if (!commitOverride && dragActive && state.geoCache && state.geoCache.root === root && state.geoCache.body === body) {
+      var gc = state.geoCache;
+      var dsb = trackNow.sb - gc.sb;
+      var drb = trackNow.rb - gc.rb;
+      derivedGeo = {
+        rect: {
+          width: gc.rect.width - dsb - drb,
+          height: gc.rect.height,
+          top: gc.rect.top,
+          left: gc.rect.left + dsb,
+          right: gc.rect.right - drb,
+          bottom: gc.rect.bottom,
+        },
+        topEdge: gc.topEdge,
+        leftEdgeX: gc.leftEdgeX + dsb,
+        rightEdgeX: gc.rightEdgeX - drb,
+      };
+      // 推导值只在仍为正向列宽时使用；异常形状让下一次真测量兜底。
+      if (!(derivedGeo.rect.width > 0)) derivedGeo = null;
+    }
+    var rect = commitOverride ? commitOverride.rect : (derivedGeo ? derivedGeo.rect : readRect(root));
     if (!rect || rect.width <= 0) { state.reason = "bad-rect"; hideStage(); if (state.active) restore(); return false; }
 
     var geo = computeLayout(cfg.mode, cfg, rect.width, rect.height);
@@ -2698,19 +4364,36 @@ function createLayoutEngine(options) {
     rememberOriginal(body);
     state.root = root;
     state.body = body;
+    // Set before measuring the header: both the stage and its divider must
+    // start below the rendered row, including on the very first open.
+    if (root.getAttribute && root.setAttribute) {
+      var chrome = cfg.compactChrome === false ? null : (rect.width >= 680 ? "wide" : "narrow");
+      if (root.getAttribute("data-mp-chrome") !== chrome) {
+        if (chrome) root.setAttribute("data-mp-chrome", chrome);
+        else root.removeAttribute("data-mp-chrome");
+      }
+    }
+    var headerResolved = null;
+    if (!commitOverride && !derivedGeo) {
+      headerResolved = resolveHeader(root);
+      ensureHeaderWatch(root, headerResolved);
+    }
 
     var topEdge = rect.top;
-    try {
-      var anchorEl = resolveAnchor(root);
-      var hdr = anchorEl && anchorEl.header;
-      if (hdr && typeof hdr.getBoundingClientRect === "function") {
-        var hr = hdr.getBoundingClientRect();
-        if (hr.height > 0 && hr.bottom > rect.top) topEdge = Math.round(hr.bottom);
-      }
-    } catch (e) { /* 头部解析失败就贴根顶部 */ }
+    var leftEdgeX = rect.left;
+    var rightEdgeX = rect.left + rect.width - (geo.marginLeft ? geo.chatW : 0);
+    if (commitOverride) {
+      if (Number.isFinite(commitOverride.topEdge)) topEdge = commitOverride.topEdge;
+      if (Number.isFinite(commitOverride.leftEdgeX)) leftEdgeX = commitOverride.leftEdgeX;
+      if (Number.isFinite(commitOverride.rightEdgeX)) rightEdgeX = commitOverride.rightEdgeX;
+    } else if (derivedGeo) {
+      topEdge = derivedGeo.topEdge;
+      leftEdgeX = derivedGeo.leftEdgeX;
+      rightEdgeX = derivedGeo.rightEdgeX;
+    } else {
+      if (headerResolved && Number.isFinite(headerResolved.bottom) && headerResolved.bottom > rect.top
+          && headerResolved.bottom <= rect.bottom) topEdge = headerResolved.bottom;
       // 边界坐标优先取「宿主列元素的实测边」——比 rect.left 更贴合视觉缝隙
-      var leftEdgeX = rect.left;
-      var rightEdgeX = rect.left + rect.width - (geo.marginLeft ? geo.chatW : 0);
       try {
         var sbColE = frameCol("sidebar");
         if (sbColE) {
@@ -2723,6 +4406,7 @@ function createLayoutEngine(options) {
           if (rbR && rbR.width > 4) rightEdgeX = rbR.left;
         }
       } catch (eCol) { /* 用 rect 兜底 */ }
+    }
 
     // ① 钉内容宽：写在 body 上（§3.6）。写在根上会被宿主 publishWidths 覆盖。
     if (writeStyle(body, LAYOUT_WIDTH_VAR, geo.chatW + "px")) state.writes += 1;
@@ -2785,19 +4469,73 @@ function createLayoutEngine(options) {
       if (state.active) restore();
       return false;
     }
-    if (stageEl && editorW > 0) {
-      if (stageEl.style && stageEl.style.display === "none") stageEl.style.display = "";   // 恢复上一步收起过的舞台
-      var chatOnRight = !!geo.marginLeft;                 // 对话被推到右 ⇒ 编辑器在左
-      var stageLeft = chatOnRight ? rect.left : rect.left + geo.chatW;
-      if (writeStyle(stageEl, "left", stageLeft + "px")) state.writes += 1;
-      if (writeStyle(stageEl, "top", topEdge + "px")) state.writes += 1;
-      if (writeStyle(stageEl, "width", editorW + "px")) state.writes += 1;
-      if (writeStyle(stageEl, "height", Math.max(0, rect.bottom - topEdge) + "px")) state.writes += 1;
+    var chatOnRight = !!geo.marginLeft;                 // 对话被推到右 ⇒ 编辑器在左
+    var stageLeftWanted = chatOnRight ? rect.left : rect.left + geo.chatW;
+    var viewportW = 0, viewportH = 0;
+    try {
+      viewportW = Math.round(Number((win && win.innerWidth) || 0) || 0);
+      viewportH = Math.round(Number((win && win.innerHeight) || 0) || 0);
+    } catch (eV) { /* 非浏览器测试环境 */ }
+    var contentRight = isFinite(rightEdgeX) && rightEdgeX > rect.left ? rightEdgeX : rect.right;
+    if (!isFinite(contentRight)) contentRight = rect.left + rect.width;
+    var contentBottom = isFinite(rect.bottom) ? rect.bottom : rect.top + rect.height;
+    var fitInput = {
+      // 真实宿主内容区：右侧让开侧栏，顶部让开标题栏，右侧让开右栏/视口。
+      contentLeft: rect.left,
+      contentTop: topEdge,
+      contentRight: contentRight,
+      contentBottom: contentBottom,
+      sidebarRight: leftEdgeX,
+      headerBottom: topEdge,
+      rightbarLeft: isFinite(rightEdgeX) && rightEdgeX > rect.left ? rightEdgeX : null,
+      viewportWidth: viewportW,
+      viewportHeight: viewportH,
+      editorWidth: editorW,
+      stageLeft: stageLeftWanted,
+    };
+    var fit = fitStageRect(fitInput);
+    if (!fit.ok) {
+      // 空间真的不足：明确收起舞台，保留侧栏/标题栏/输入框，绝不让 fixed 0,0
+      // 的兜底盖住界面。下一次几何变化会重新尝试。
+      state.reason = fit.reason;
+      hideStage();
+      if (state.active) restore();
+      scheduleStageRetry();
+      return false;
+    }
+    // 首页的 composer 也在内容区里。挤压成功后它应落在对话列；若宿主没有
+    // 跟着移动，就绝不让编辑器盖住输入框（宁可收起并交还宿主排版）。
+    var composerEl = null;
+    try { composerEl = doc.querySelector("[data-composer-card]") || doc.querySelector("[data-composer-input]"); } catch (eC) { composerEl = null; }
+    var composerRect = composerEl ? readRect(composerEl) : null;
+    var stageRect = {
+      left: fit.left, top: fit.top,
+      right: fit.left + fit.width, bottom: fit.top + fit.height,
+    };
+    if (composerRect && rectsOverlap(stageRect, composerRect)) {
+      state.reason = "composer-overlap";
+      hideStage();
+      if (state.active) restore();
+      scheduleStageRetry();
+      return false;
+    }
+    if (stageEl) {
+      if (stageEl.style) {
+        if (stageEl.style.display === "none") stageEl.style.display = "flex";   // 恢复上一步收起过的舞台
+        // 兜底样式是 visibility:hidden；几何确认后才允许出现。
+        if (stageEl.style.visibility !== "visible") stageEl.style.visibility = "visible";
+        if (stageEl.style.pointerEvents !== "auto") stageEl.style.pointerEvents = "auto";
+      }
+      if (writeStyle(stageEl, "left", fit.left + "px")) state.writes += 1;
+      if (writeStyle(stageEl, "top", fit.top + "px")) state.writes += 1;
+      if (writeStyle(stageEl, "width", fit.width + "px")) state.writes += 1;
+      if (writeStyle(stageEl, "height", fit.height + "px")) state.writes += 1;
     }
     // 中间那道手柄（对话列边界）跟着编辑区右沿走
     try {
-      var handleX = (geo.marginLeft ? rect.left : rect.left + geo.chatW) + editorW;
-      positionChatHandle(handleX, topEdge, Math.max(0, rect.bottom - topEdge), !!(stageEl && editorW > 0));
+      // 中缝必须落在"聊天 ↔ 编辑器"的边界上（两种位置模式都成立）。
+      var handleX = chatBoundaryX(rect.left, rect.width, geo.chatW, geo.marginLeft);
+      positionChatHandle(handleX, fit.top, fit.height, !!(stageEl && fit.width > 0));
     } catch (e) { /* 手柄定位失败不影响挤压 */ }
 
     // 左右边界也用浮层热区（iframe 会盖住真手柄，见 ensureEdgeHandle 注释）。
@@ -2834,12 +4572,20 @@ function createLayoutEngine(options) {
     };
     state.active = true;
     state.reason = "ok";
+    state.stageRetry = 0;
+    // 记录本帧采用的几何；拖拽帧用它 + 已知列宽增量推导，免掉每帧强制布局。
+    state.geoCache = {
+      root: root, body: body,
+      rect: { width: rect.width, height: rect.height, top: rect.top, left: rect.left, right: rect.right, bottom: rect.bottom },
+      topEdge: topEdge, leftEdgeX: leftEdgeX, rightEdgeX: rightEdgeX,
+      sb: trackNow.sb, rb: trackNow.rb,
+    };
     syncColumnShadow(body, geo.chatW + "px");
     // 窄列排版修正：列宽低于阈值时挂标记。会话根上挂 data-mp-narrow-chat，
     // frame 上挂 data-mp-narrow-frame —— composer 在会话根**之外**，只有 frame 上的标记盖得到它。
     try {
       ensureNarrowChatStyle(doc);
-      ensureStageHandleStyle(doc);
+      removeStageHandleStyle(doc);
       var frameForMark = null;
       try { frameForMark = root.closest ? root.closest('[class*="_frame"]') : null; } catch (eFM) { frameForMark = null; }
       var isNarrow = geo.chatW < NARROW_CHAT_PX;
@@ -2891,6 +4637,7 @@ function createLayoutEngine(options) {
     }
     if (state.root) {
       try { if (state.root.removeAttribute) state.root.removeAttribute(LAYOUT_FLAG_ATTR); } catch (e) { /* 忽略 */ }
+      try { state.root.removeAttribute("data-mp-chrome"); } catch (e) { /* detached */ }
       try { if (state.root.removeAttribute) state.root.removeAttribute("data-mp-narrow-chat"); } catch (e) { /* 忽略 */ }
       try {
         var frameR = state.root.closest ? state.root.closest('[class*="_frame"]') : null;
@@ -2900,6 +4647,7 @@ function createLayoutEngine(options) {
     }
     if (state.ro && state.ro.disconnect) { try { state.ro.disconnect(); } catch (e) { /* 忽略 */ } }
     if (state.mo && state.mo.disconnect) { try { state.mo.disconnect(); } catch (e) { /* 忽略 */ } }
+    unwatchHeader();
     state.ro = null;
     state.mo = null;
     if (state.parentRo && state.parentRo.disconnect) { try { state.parentRo.disconnect(); } catch (e) { /* 忽略 */ } }
@@ -2911,6 +4659,8 @@ function createLayoutEngine(options) {
     state.body = null;
     state.saved = null;
     state.last = null;
+    state.geoCache = null;
+    state.pendingCommitGeo = null;
   }
 
   /**
@@ -2926,6 +4676,51 @@ function createLayoutEngine(options) {
       state.yields += 1;
       restore();
       return true;
+    }
+    return false;
+  }
+
+  /**
+   * 聊天流式输出会持续往会话内容区里追加/替换文本节点；这些 mutation 不可能
+   * 换掉 conversation root/body。旧观察器对每个 mutation 都唤醒 100ms tick，
+   * tick 又做一次全文档 `[data-phase]` 查询 —— 长会话里这是纯放大。
+   *
+   * 只把"可能改变锚点"的 mutation 放行：
+   *  - data-phase / data-conversation-content 属性变化（但 body 内部属性不算）；
+   *  - 直接落在 root 上的 childList（body/header 被换）；
+   *  - 新增/移除的节点本身是 root/body，或包含 root/body 锚点（宿主重挂载）。
+   * 流式消息追加在 body 内部，target 在 body 内时直接 continue，不扫描其子树。
+   *
+   * 失败的输入形态（不是数组/节点无方法）按"可能相关"处理，宁可多一次 tick。
+   */
+  function mutationTouchesConversation(mutations) {
+    if (!mutations || typeof mutations.length !== "number") return true;
+    for (var i = 0; i < mutations.length; i += 1) {
+      var m = mutations[i];
+      if (!m) return true;
+      // Attribute mutations only matter on the root/body anchors themselves.
+      if (m.type === "attributes") {
+        if (state.body && m.target !== state.body && state.body.contains && state.body.contains(m.target)) continue;
+        return true;
+      }
+      if (state.root && m.target === state.root) return true;
+      // Fast path: everything inside the current body is chat content. A streamed
+      // message can never replace the conversation root/body from inside it, so
+      // skip the added/removed-node scan entirely on the hot path.
+      if (state.body && m.target && m.target !== state.root && state.body.contains && state.body.contains(m.target)) continue;
+      var lists = [m.addedNodes, m.removedNodes];
+      for (var k = 0; k < lists.length; k += 1) {
+        var nodes = lists[k] || [];
+        for (var j = 0; j < nodes.length; j += 1) {
+          var node = nodes[j];
+          if (!node || node.nodeType !== 1) continue;
+          if (node === state.root || node === state.body) return true;
+          try {
+            if (node.matches && (node.matches("[data-phase]") || node.matches("[data-conversation-content]"))) return true;
+            if (node.querySelector && (node.querySelector("[data-phase]") || node.querySelector("[data-conversation-content]"))) return true;
+          } catch (e) { return true; }
+        }
+      }
     }
     return false;
   }
@@ -2973,9 +4768,10 @@ function createLayoutEngine(options) {
     if (MutationObserverImpl && doc && doc.body && !state.mo) {
       var lastRun = 0;
       try {
-        state.mo = new MutationObserverImpl(function () {
+        state.mo = new MutationObserverImpl(function (mutations) {
           if (!state.active) return;
           if (onWarn.noop) return;
+          if (!mutationTouchesConversation(mutations)) return;
           var now = (win && win.performance && win.performance.now) ? win.performance.now() : Date.now();
           if (now - lastRun < 100) {
             if (mutationTimer === null) {
@@ -2990,13 +4786,18 @@ function createLayoutEngine(options) {
           lastRun = now;
           tick();
         });
-        state.mo.observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-phase"] });
+        state.mo.observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-phase", "data-conversation-content"] });
       } catch (e) { onWarn("layout: MutationObserver 挂载失败", e); }
       var tick = function () {
         if (!state.active) return;
         if (checkYield()) return;
         var current = findConversationRoot(doc);
-        if (current && (current !== state.root || findConversationBody(current) !== state.body)) requestApply();
+        if (!current) return;
+        // Never treat "old body still contains itself" as proof of identity:
+        // data-conversation-content can move to a sibling while the old body
+        // remains in the DOM. This tick only runs for non-stream/anchor
+        // mutations now, so one identity query is cheap and required here.
+        if (current !== state.root || findConversationBody(current) !== state.body) requestApply();
       };
     }
   }
@@ -3015,12 +4816,49 @@ function createLayoutEngine(options) {
     state.last = null;
     state.body = null;
     state.root = null;
+    unwatchHeader();
     if (state.ro && state.ro.disconnect) { try { state.ro.disconnect(); } catch (e) { /* 忽略 */ } }
     state.ro = null;
     if (state.heal && state.heal.disconnect) { try { state.heal.disconnect(); } catch (e) { /* 忽略 */ } }
     state.heal = null;
     state.active = false;
+    state.pendingCommitGeo = null;
     if (apply()) observe();
+  }
+
+  /**
+   * Measure the root once BEFORE the commit writes. The returned geometry is
+   * the final pin geometry derived from the fresh root rect plus the exact
+   * sidebar/rightbar delta, so apply() does not have to read layout back after
+   * writing the pinned grid. Returns null when there is no trustworthy cache.
+   */
+  function measureCommit() {
+    if (state.disposed || !state.active || !state.root || !state.geoCache) return null;
+    if (!state.body || !state.body.isConnected) return null;
+    var currentRoot = findConversationRoot(doc);
+    if (!currentRoot || currentRoot !== state.root) return null;
+    var rect = readRect(state.root);
+    if (!rect) return null;
+    var gc = state.geoCache;
+    var sb = Math.round(Number(handleState.sb) || 0);
+    var rb = Math.round(Number(handleState.rb) || 0);
+    var dsb = sb - gc.sb;
+    var drb = rb - gc.rb;
+    var width = rect.width - dsb - drb;
+    if (!(width > 0)) return null;
+    return {
+      rect: {
+        width: width, height: rect.height, top: rect.top,
+        left: rect.left + dsb, right: rect.right - drb, bottom: rect.bottom,
+      },
+      topEdge: gc.topEdge,
+      leftEdgeX: gc.leftEdgeX + dsb,
+      rightEdgeX: gc.rightEdgeX - drb,
+    };
+  }
+
+  function suppressResizeEcho() {
+    state.commitEcho = 1;
   }
 
   function snapshot() {
@@ -3044,6 +4882,25 @@ function createLayoutEngine(options) {
     requestApply: requestApply,
     cancelPendingApply: cancelApply,
     flush: flush,
+    measureCommit: measureCommit,
+    suppressResizeEcho: suppressResizeEcho,
+    releaseHeaderDirty: function () {
+      if (!state.headerDirty) return;
+      // flushHandleMove is also called by queueHandleMove on every drag frame.
+      // Only the final up/endAllDrag path (dragging already false) consumes it.
+      if (handleState.dragging || chatHandleState.dragging) return;
+      state.headerDirty = false;
+      requestApply();
+    },
+    setCommitGeo: function (geo, immediate) {
+      state.pendingCommitGeo = geo ? { geo: geo, root: state.root, body: state.body, rect: geo.rect || null, immediate: immediate === true } : null;
+      // One event-loop turn only: a cache nobody consumed must not leak into a
+      // later frame where the root/body/geometry may have moved.
+      if (state.pendingCommitGeo && state.pendingCommitGeo.immediate) {
+        var token = state.pendingCommitGeo;
+        Promise.resolve().then(function () { if (state.pendingCommitGeo === token) state.pendingCommitGeo = null; });
+      }
+    },
     restore: restore,
     dispose: function () { if (!state.disposed) { state.disposed = true; restore(); } },
     observe: observe,
@@ -3075,26 +4932,43 @@ const NARROW_CHAT_PX = 360;
 //   · 之前那一堆 `overflow-wrap:anywhere` / `min-width:0` / `max-width:100%` 规则
 //     反而把 composer 挤成 43px 的竖条、把英文拆成一字一行 —— 实测（关掉整组 CSS 即恢复正常）。
 // 保留常量与注入点，方便将来某个具体控件真出问题时**单条**加回来，而不是整组。
-// 窄列下**只**处理输入区那一行的按钮尺寸：宿主按钮是固定尺寸，列一窄就换行占两行高。
+// 窄列下**只**处理输入区那一行的控件排版：宿主按钮是固定尺寸，列一窄就换行占两行高。
 // 注意作用域挂 frame（composer 在会话根之外，`[data-mp-narrow-chat]` 盖不到它）。
+//
+// 【2026-11-15】删掉 `@container (max-width:320px)` 那条 `flex:1 0 100%`：
+// 宿主 `.row` 本身就是 `flex-wrap:wrap` + `container-type:inline-size`，宿主自己的
+// `observeControlRow` 会按"各组实测宽之和 vs 行内容宽"决定模型紧凑态；再来一条固定
+// 320px 阈值等于**绕过**宿主测量：只要行宽 ≤320 就把 trailing 拉成整行，即使其余宽度
+// 明明放得下（实测 294px 行里 tools 76 + trailing 内容 ~145 本可同行，却被拆成两行）。
+// 现在只做两件事：把控件间距压紧（紧凑外观），并允许 trailing 在极窄时按**自己的内容宽**
+// 折行 —— 能不能单行由浏览器按真实可用宽度决定，不再由我们写死阈值。
+// 纪律：不改控件尺寸（点击面积不变）、不覆盖 [hidden]、不改活动态/禁用态、不写 flex 比例。
 const NARROW_CHAT_CSS = [
   // Only adapt the native input card. Composer dock slots belong to other
   // plugins (including balance-dsh), whose buttons must retain their sizing.
-  '[data-mp-narrow-frame] [data-composer-card] > [class*="_row"]{flex-wrap:wrap;gap:4px;min-width:0}',
+  '[data-mp-narrow-frame] [data-composer-card] > [class*="_row"]{gap:4px;min-width:0}',
   '[data-mp-narrow-frame] [data-composer-card] > [class*="_row"] > *{min-width:0;max-width:100%}',
-  '[data-mp-narrow-frame] [data-composer-card] > [class*="_row"] > [class*="_tools"]{flex-wrap:nowrap;gap:4px}',
-  // Keep model/language/send together; wrapping this native group creates a
-  // four-storey input card at the 220px chat minimum. Do not size slot buttons.
-  '@container (max-width:320px){[data-mp-narrow-frame] [data-composer-card] > [class*="_row"] > [class*="_trailing"]{flex:1 0 100%;width:100%;max-width:100%;flex-wrap:nowrap;gap:4px;margin-left:0}[data-mp-narrow-frame] [data-composer-card] > [class*="_row"] > [class*="_trailing"] > [class*="_standardControls"]{flex:1 1 auto;min-width:0;gap:4px}}',
+  // 极窄 + 额外插槽（WorkBuddy 等）时，左侧组可能比行还宽：让它按自己的内容宽有序换行，
+  // 而不是把组内按钮压到互相重叠/越界（按钮尺寸与顺序都不变）。
+  '[data-mp-narrow-frame] [data-composer-card] > [class*="_row"] > [class*="_tools"]{gap:4px;flex-wrap:wrap}',
+  // trailing 保持宿主给的内容宽（flex:none）与 margin-left:auto：放得下就与左侧同行并贴右，
+  // 放不下时整组换到下一行并由 auto 外边距重新贴右（宿主注释里的原始设计）。
+  // max-width:100% + flex-wrap 只在"这一组比整行还宽"时生效 ⇒ 组内自然折行、不溢出。
+  '[data-mp-narrow-frame] [data-composer-card] > [class*="_row"] > [class*="_trailing"]{min-width:0;max-width:100%;flex-wrap:wrap;justify-content:flex-end;gap:4px}',
+  '[data-mp-narrow-frame] [data-composer-card] > [class*="_row"] > [class*="_trailing"] > [class*="_standardControls"]{min-width:0;max-width:100%;gap:4px}',
   // F10：最窄列时正文会溢出到输入框/底部状态条下面（实测"the turn was closed"压住 3/7/2%）。
   // 给滚动区留出底部安全区；只在我们挤压期间生效。
   // 对话列内容顶部留白偏多（用户自检反馈）：列容器与内容顶部的 padding 都收到 0/8。
   '[data-mp-squeezed] [class*="_column"]{padding-top:0 !important}',
-  // 挤压时对话列的滚动条偏粗、贴着列边像一条灰杠（用户自检反馈）——统一收细、圆角、留 4px。
-  '[data-mp-squeezed] [class*="_scroll"]{scrollbar-width:thin !important;padding-top:8px !important;padding-right:4px !important}',
-  '[data-mp-squeezed] [class*="_scroll"]::-webkit-scrollbar{width:6px !important}',
-  '[data-mp-squeezed] [class*="_scroll"]::-webkit-scrollbar-thumb{border-radius:3px !important;background:color-mix(in srgb,currentColor 22%,transparent) !important}',
-  '[data-mp-squeezed] [class*="_scroll"]::-webkit-scrollbar-track{background:transparent !important}',
+  // 对话列的滚动条收细；宿主左栏的 _scrollRegion/_scrollArea 也会命中，排除侧栏。
+  '[data-mp-squeezed] [class*="_scroll"]:not([class*="_sidebarCol"] *){scrollbar-width:thin !important;padding-top:8px !important;padding-right:4px !important}',
+  '[data-mp-squeezed] [class*="_scroll"]:not([class*="_sidebarCol"] *)::-webkit-scrollbar{width:6px !important}',
+  '[data-mp-squeezed] [class*="_scroll"]:not([class*="_sidebarCol"] *)::-webkit-scrollbar-thumb{border-radius:3px !important;background:color-mix(in srgb,currentColor 22%,transparent) !important}',
+  '[data-mp-squeezed] [class*="_scroll"]:not([class*="_sidebarCol"] *)::-webkit-scrollbar-track{background:transparent !important}',
+  // 侧栏只保留旧版的 8px 顶部留白，不再追加水平 padding 或滚动条样式。
+  '[data-mp-squeezed] [class*="_sidebarCol"] [class*="_scroll"]{padding-top:8px !important}',
+  // 初开时只有外层 scrollport 能滚动：给它一条原生 thin 滚动条。
+  '[data-mp-squeezed] [class*="_sidebarCol"] [data-sidebar-scrollport]{scrollbar-width:thin !important}',
   // F7：宿主表格单元格默认按字符断行（Bellm/an、Bana/ch），英文应该按词断。
   '[data-mp-narrow-frame] table,[data-mp-narrow-frame] th,[data-mp-narrow-frame] td{word-break:normal !important;overflow-wrap:break-word !important}',
   // ── 输入框位置（用户反馈"太高、位置奇怪"）──────────────────────────────
@@ -3106,38 +4980,61 @@ const NARROW_CHAT_CSS = [
   '[data-mp-workbench] [data-mp-rail-action]{background:transparent !important;border-color:transparent !important;border-radius:8px !important;transition:background .12s ease,color .12s ease,border-color .12s ease}',
   '[data-mp-workbench] [data-mp-rail-action]:hover{background:color-mix(in srgb,currentColor 10%,transparent) !important;border-color:color-mix(in srgb,currentColor 20%,transparent) !important}',
   '[data-mp-workbench] [data-mp-rail-action]:focus-visible{outline:2px solid var(--dsw-focus-ring-color,#4f8ef7);outline-offset:1px;background:color-mix(in srgb,currentColor 10%,transparent) !important}',
-  // ── 表头：只压缩高度，**不合并行** ────────────────────────────────────
-  // 试过把标题行与标签行并成一行（横向 flex）：标题 "Test Rely OK" 直接被挤没了（实测截图），
-  // 所以改成保守做法——两行都保留，只把行高/间距压紧，省下 8~10px。
-  // 会话头：**不做并一行**。试过两次（flex 横排 + ellipsis），都会把宿主的标题块压成 0 宽、
-  // 标题 "Test Rely OK" 直接消失 —— 这是宿主结构决定的，只能保守压缩高度。
+  // Legacy split layout: compact chrome adds only scoped rules for the native header.
   '[data-mp-squeezed] [data-phase] > :first-child{padding-top:0 !important;padding-bottom:0 !important;min-height:0 !important}',
-  '[data-mp-squeezed] [data-phase] > :first-child > *{min-height:0 !important}',
   '[data-mp-squeezed] [data-phase] > :first-child > *{min-height:0 !important}',
 ].join("\n");
 
 /** 对话列被挤窄时的排版修正（外壳层 CSS；改完可整条删掉，不影响宿主）。 */
-/** 舞台右边缘的拖拽热区：用伪元素，避免额外 DOM 与层叠问题（只影响 cursor 与命中区）。 */
-function ensureStageHandleStyle(doc) {
-  if (!doc || typeof doc.createElement !== "function") return;
+/**
+ * 清掉旧版（≤2.0.6-rc.2）在 #mp-stage 上挂的 16px 伪元素热区。
+ * 那个 ::after 从舞台右沿向左铺满全高，正好压住编辑器竖向滚动条；
+ * 新版本的分隔线由父页面 #mp-chat-handle 独占（贴边界右侧 8px）。
+ * 热更新时旧 factory 已经离开，样式仍留在 DOM 里，所以这里按 id 清。
+ */
+function removeStageHandleStyle(doc) {
+  var d = doc || (typeof document !== "undefined" ? document : null);
+  if (!d || typeof d.getElementById !== "function") return;
   try {
-    if (doc.getElementById("mp-stage-handle-style")) return;
-    const st = doc.createElement("style");
-    st.id = "mp-stage-handle-style";
-    st.textContent = "#mp-stage::after{content:\"\";position:absolute;right:0;top:0;width:16px;height:100%;cursor:col-resize;z-index:2147483000;background:transparent}";
-    (doc.head || doc.documentElement).appendChild(st);
-  } catch (e) { /* 注入失败就只靠 18px 命中区 */ }
+    var stale = d.getElementById("mp-stage-handle-style");
+    if (stale && stale.parentNode) stale.parentNode.removeChild(stale);
+    else if (stale && stale.remove) stale.remove();
+  } catch (e) { /* 已移除或不可访问 */ }
 }
 
+/* 窄列输入区样式表：**同 id 节点原地升级**，不是"找到 id 就跳过"。
+   0.14/0.15 的这个样式没有版本标记；桌面热升级后新客户端若直接 return，已打开的宿主页面会
+   继续跑旧规则（旧版把 trailing 强制整行 ⇒ 约 320px 时"上一行 +/权限、下一行靠左模型 +
+   靠右发送、中间大片空白"）。做法：
+     · 首次见到已存在的节点 ⇒ 按当前 CSS 文本就地更新（旧节点、无标记节点都能升级）；
+     · 之后若还是同一个节点 ⇒ 直接返回（重复 apply/拖动零 DOM 写入，也不读布局）；
+     · 节点被删除/重建 ⇒ getElementById 会给出新节点，重新核对文本后缓存。
+   卸载不删除节点：旧版本本身也从不删除它，而且全部规则都挂在 [data-mp-narrow-*] 标记上，
+   没有标记时零效果 ⇒ 从根上避免"旧 controller 卸载误删新样式"，不需要所有权代号/额外属性。 */
+const NARROW_CHAT_STYLE_ID = "mp-narrow-chat-style";
+let narrowChatStyleNode = null;   // 本模块已确认过的节点（模块级缓存，不跨模块共享）
+
 function ensureNarrowChatStyle(doc) {
-  if (!doc || typeof doc.createElement !== "function") return;
+  if (!doc || typeof doc.createElement !== "function") return null;
   try {
-    if (doc.getElementById("mp-narrow-chat-style")) return;
-    const st = doc.createElement("style");
-    st.id = "mp-narrow-chat-style";
-    st.textContent = (typeof NARROW_CHAT_CSS === "string" ? NARROW_CHAT_CSS : "");
+    const css = (typeof NARROW_CHAT_CSS === "string" ? NARROW_CHAT_CSS : "");
+    let st = null;
+    try { st = doc.getElementById ? doc.getElementById(NARROW_CHAT_STYLE_ID) : null; } catch (e0) { st = null; }
+    if (st) {
+      if (st === narrowChatStyleNode) return st;      /* 同一节点：已确认是当前 CSS */
+      let text = null;
+      try { text = st.textContent; } catch (e1) { text = null; }
+      if (text !== css) { try { st.textContent = css; } catch (e2) { /* 写不进去就沿用旧值 */ } }
+      narrowChatStyleNode = st;
+      return st;
+    }
+    st = doc.createElement("style");
+    st.id = NARROW_CHAT_STYLE_ID;
+    st.textContent = css;
     (doc.head || doc.documentElement).appendChild(st);
-  } catch (e) { /* 注入失败就退化为宿主原始排版 */ }
+    narrowChatStyleNode = st;
+    return st;
+  } catch (e) { return null; }   /* 注入失败就退化为宿主原始排版 */
 }
 
 function waitForConversationRoot(engine, options) {
@@ -3298,6 +5195,7 @@ function mountLayout(ctx, overrides) {
       } catch (e) { /* 忽略 */ }
       return hostEngine;
     }
+    cfg.compactChrome = readSettings(storage).compactChrome;
     var engine = createLayoutEngine({
       doc: doc,
       win: win,
@@ -3307,6 +5205,13 @@ function mountLayout(ctx, overrides) {
     });
 
       var layoutDisposed = false;
+      var syncChrome = function (event) {
+        if (event.type === "storage" && event.key !== null && event.key !== SETTINGS_KEY) return;
+        var compact = readSettings(storage).compactChrome;
+        if (cfg.compactChrome === compact) return;
+        cfg.compactChrome = compact;
+        engine.requestApply();
+      };
       var stopPanelWatch = null;
       var onLayoutResize = function () {
         if (!layoutDisposed) engine.requestApply();
@@ -3317,6 +5222,8 @@ function mountLayout(ctx, overrides) {
           // 窄窗右栏保护：**加载时也要跑一次**（只在 resize 里跑的话，窄窗直接打开页面时
           // 右栏仍在屏幕外 —— 实测 x=2855 而窗口右边界 1679）。
           win.addEventListener("resize", onLayoutResize);
+          win.addEventListener(SETTINGS_CHANGED_EVENT, syncChrome);
+          win.addEventListener("storage", syncChrome);
         }
       } catch (e) { /* 忽略 */ }
 
@@ -3340,6 +5247,8 @@ function mountLayout(ctx, overrides) {
             }
           } catch (e) { /* 忽略 */ }
         }, 250);
+        // Node 测试/无宿主环境不吊住事件循环；浏览器 setInterval 返回数字，无 unref。
+        try { if (watchTimer && typeof watchTimer.unref === "function") watchTimer.unref(); } catch (eU) { /* 忽略 */ }
       } catch (e) { /* 忽略 */ }
 
       // 订阅宿主 layout 面板状态：右栏开合/面板切换都会改列宽 → 立刻重算
@@ -3352,11 +5261,11 @@ function mountLayout(ctx, overrides) {
         }
       } catch (e) { /* 忽略 */ }
 
-      var reapply = function () {
+      var reapply = function (commitGeo) {
         if (layoutDisposed) return;
         // 主区域切换会把会话根重新挂载：不仅要重算，还要把观察器重新挂上，
         // 否则后续变化（拖拽、窗口 resize）都不再触发，挤压会"卡死"在旧值上。
-        try { engine.flush(); } catch (e) { /* 忽略 */ }
+        try { engine.flush(commitGeo); } catch (e) { /* 忽略 */ }
       };
       reapply.schedule = engine.requestApply;
       layoutReapply = reapply;
@@ -3409,6 +5318,10 @@ function mountLayout(ctx, overrides) {
       try { if (waiter && waiter.stop) waiter.stop(); } catch (e) { /* 忽略 */ }
       clearInterval(watchTimer);
       try { if (win && win.removeEventListener) win.removeEventListener("resize", onLayoutResize); } catch (e) { /* 忽略 */ }
+      if (win && win.removeEventListener) {
+        win.removeEventListener(SETTINGS_CHANGED_EVENT, syncChrome);
+        win.removeEventListener("storage", syncChrome);
+      }
       try {
         if (typeof stopPanelWatch === "function") stopPanelWatch();
         else if (stopPanelWatch && typeof stopPanelWatch.unsubscribe === "function") stopPanelWatch.unsubscribe();
@@ -3627,11 +5540,250 @@ function normDocs(d) {
   return { open: d.open === true, listW: (isFinite(w) && w > 0) ? Math.round(w) : 268 };
 }
 
+function captureReadingFromWindow(win) {
+  if (!win || win === window) return null;
+  try {
+    const engine = win.mpEngine;
+    if (!engine || typeof engine.flushReadingPosition !== 'function') return null;
+    const captured = engine.flushReadingPosition();
+    return captured && captured.anchor ? captured : null;
+  } catch { return null; }
+}
+
+const defaultReadingTimers = {
+  setTimeout: (...args) => globalThis.setTimeout(...args),
+  clearTimeout: (...args) => globalThis.clearTimeout(...args),
+};
+
+function createReadingLeaseKeeper({
+  api, makeSessionId, alive, generation, path, isUntitled,
+  now = () => Date.now(), heartbeatMs = 20000,
+  timers = defaultReadingTimers,
+  onLease, onLeaseLost, onRestore, onArm, onError = () => {},
+}) {
+  const s = {
+    started: false, stopped: false, gen: null, sessionId: null, leaseLost: false,
+    last: null, lastAt: 0, lastSeq: 0, dirty: false,
+    recovering: false, recoverAttempts: 0, recoverTimer: null,
+    heartbeatTimer: null, inFlight: null, pending: null, waiters: [], restored: false,
+  };
+  const retryDelay = [1000, 5000, 15000];
+  const current = () => !s.stopped && alive() && s.gen === generation();
+  const codeOf = result => result && (result.code || (result.error && result.error.code));
+  const leaseCode = result => codeOf(result) === 'MP_READING_STALE_SESSION' || codeOf(result) === 'MP_READING_SESSION';
+  const retryable = result => codeOf(result) === 'MP_READING_UNAVAILABLE' || !codeOf(result);
+  const resolveWaiters = () => {
+    if (s.inFlight) return;
+    if (s.pending && s.stopped && (!s.sessionId || s.leaseLost)) s.pending = null;
+    if (s.pending) return;
+    const waiters = s.waiters; s.waiters = [];
+    for (const resolve of waiters) resolve();
+  };
+  const clearHeartbeat = () => {
+    if (s.heartbeatTimer) { timers.clearTimeout(s.heartbeatTimer); s.heartbeatTimer = null; }
+  };
+  const clearRecover = () => {
+    if (s.recoverTimer) { timers.clearTimeout(s.recoverTimer); s.recoverTimer = null; }
+  };
+  const scheduleHeartbeat = () => {
+    if (!current() || s.heartbeatTimer) return;
+    s.heartbeatTimer = timers.setTimeout(() => { s.heartbeatTimer = null; void beat(); }, heartbeatMs);
+  };
+  const scheduleRecover = delay => {
+    if (!current() || s.stopped || s.recoverTimer) return;
+    s.recoverTimer = timers.setTimeout(() => {
+      s.recoverTimer = null;
+      void acquire(false);
+    }, delay === undefined ? 0 : delay);
+  };
+  const loseLease = ({ keepPending = false } = {}) => {
+    s.sessionId = null;
+    s.leaseLost = true;
+    clearHeartbeat();
+    if (typeof onLeaseLost === 'function') onLeaseLost();
+    if (!keepPending) { s.pending = null; s.dirty = false; s.last = null; }
+    else if (!s.pending) s.dirty = false;
+  };
+  async function beat() {
+    if (!current()) return;
+    if (!s.sessionId || s.leaseLost) { scheduleRecover(0); return; }
+    const sessionId = s.sessionId;
+    let result;
+    try { result = await api('touch', { path: path(), sessionId }); }
+    catch { result = { ok: false, error: { code: 'MP_READING_UNAVAILABLE' } }; }
+    if (!current() || s.sessionId !== sessionId) return;
+    if (result && result.ok === true) { s.recoverAttempts = 0; scheduleHeartbeat(); return; }
+    if (leaseCode(result)) {
+      loseLease();
+      scheduleRecover(0);
+      return;
+    }
+    s.recoverAttempts += 1;
+    if (s.recoverAttempts < 3) scheduleRecover(retryDelay[Math.min(s.recoverAttempts - 1, retryDelay.length - 1)]);
+    else scheduleHeartbeat();
+  }
+  async function acquire(restore) {
+    if (!current() || s.stopped || s.recovering) return;
+    s.recovering = true;
+    const sessionId = makeSessionId();
+    let result;
+    try { result = await api('register', { path: path(), sessionId }); }
+    catch { result = { ok: false, error: { code: 'MP_READING_UNAVAILABLE' } }; }
+    s.recovering = false;
+    if (!current() || s.stopped) return;
+    if (!result || result.ok !== true) {
+      if (leaseCode(result) || retryable(result)) {
+        s.recoverAttempts += 1;
+        if (s.recoverAttempts < 3) scheduleRecover(retryDelay[Math.min(s.recoverAttempts - 1, retryDelay.length - 1)]);
+        else scheduleHeartbeat();
+      } else onError(result);
+      return;
+    }
+    s.sessionId = sessionId;
+    s.leaseLost = false;
+    s.recoverAttempts = 0;
+    if (typeof onLease === 'function') onLease(sessionId);
+    if (restore && !s.restored) {
+      s.restored = true;
+      let got;
+      try { got = await api('get', { path: path(), sessionId }); }
+      catch { got = { ok: false, error: { code: 'MP_READING_UNAVAILABLE' } }; }
+      if (!current() || s.sessionId !== sessionId) return;
+      if (got && got.ok === true && got.value && got.value.anchor) {
+        if (typeof onRestore === 'function') onRestore(got.value.anchor);
+      } else if (typeof onArm === 'function') onArm();
+    }
+    scheduleHeartbeat();
+    drain();
+  }
+  function drain() {
+    if (s.inFlight || !s.pending || !s.sessionId || s.leaseLost) return;
+    const payload = s.pending;
+    s.pending = null;
+    const sessionId = s.sessionId;
+    s.inFlight = Promise.resolve()
+      .then(() => api('save', { ...payload, path: path(), sessionId }))
+      .catch(() => ({ ok: false, error: { code: 'MP_READING_UNAVAILABLE' } }))
+      .then(result => {
+        if (!result || result.ok !== true) {
+          if (leaseCode(result)) {
+            loseLease({ keepPending: !!s.pending });
+            scheduleRecover(0);
+          } else if (retryable(result)) {
+            s.pending = s.pending || payload;
+            scheduleRecover(0);
+          }
+        } else {
+          s.leaseLost = false;
+          if (!s.pending) s.dirty = false;
+        }
+        return result;
+      })
+      .finally(() => {
+        s.inFlight = null;
+        if (s.pending && s.sessionId && !s.leaseLost) drain();
+        resolveWaiters();
+      });
+  }
+  function whenIdle() {
+    if (!s.inFlight && !s.pending) return Promise.resolve();
+    if (s.stopped && !s.inFlight && (!s.sessionId || s.leaseLost)) {
+      s.pending = null;
+      return Promise.resolve();
+    }
+    return new Promise(resolve => { s.waiters.push(resolve); });
+  }
+  return {
+    start() {
+      if (s.started) return;
+      s.started = true;
+      s.gen = generation();
+      void acquire(true);
+    },
+    notePosition({ anchor, seq, at, reason } = {}) {
+      if (!current() || !anchor || isUntitled()) return;
+      s.last = anchor;
+      s.lastAt = Number.isFinite(at) && at > 0 ? at : now();
+      s.lastSeq = Number.isSafeInteger(seq) ? Math.max(s.lastSeq, seq) : s.lastSeq + 1;
+      s.dirty = true;
+      s.pending = { op: 'save', anchor, seq: s.lastSeq, sampleAt: s.lastAt, reason: reason || 'scroll' };
+      if (!s.sessionId || s.leaseLost) { scheduleRecover(0); return; }
+      drain();
+    },
+    capturePosition({ anchor, seq, at } = {}) {
+      if (!current() || !anchor || isUntitled()) return false;
+      s.last = anchor;
+      s.lastAt = Number.isFinite(at) && at > 0 ? at : now();
+      s.lastSeq = Number.isSafeInteger(seq) ? Math.max(s.lastSeq, seq) : s.lastSeq + 1;
+      s.dirty = true;
+      return true;
+    },
+    stop(flush) {
+      if (s.stopped) return whenIdle();
+      s.stopped = true;
+      clearHeartbeat();
+      clearRecover();
+      if (flush && s.dirty && s.last && s.sessionId && !s.leaseLost) {
+        s.pending = { op: 'save', anchor: s.last, seq: s.lastSeq + 1, sampleAt: s.lastAt || now(), reason: 'close-flush' };
+      } else if (!s.sessionId || s.leaseLost) {
+        s.pending = null;
+      }
+      drain();
+      if (!s.inFlight && !s.pending) resolveWaiters();
+      return whenIdle();
+    },
+    whenIdle,
+    currentSessionId: () => s.sessionId,
+    isStopped: () => s.stopped,
+    isLeaseLost: () => s.leaseLost,
+  };
+}
+
+function chainReadingClose(savePromise, release) {
+  return Promise.resolve(savePromise)
+    .catch(() => null)
+    .then(() => (typeof release === 'function' ? release() : null))
+    .catch(() => null);
+}
+
 const __test = {
       createDraftStore,
+      chainReadingClose,
+      createReadingLeaseKeeper,
+      captureReadingFromWindow,
       mergeReviewGroup, reviewUndoGroup, reviewIsMulti, reviewSuppressesSave,
+      reviewRestorableFromHost, reviewRestoreKeeps, undoFailureNotice, undoResultNotice,
+      conflictDefaultChoices, conflictResolutionsFromChoices, conflictApplyEnabled,
+      conflictChoiceLabel, conflictTruncatedNotice, liveTicketDirty,
       reviewPathKey, reviewStoreKey, normalizeReviewRecord,
-      normalizeSavedText, shouldAdoptSavedVersion, shouldVerifyExternalEvent, externalDiskVerdict,
+      normalizeSavedText, shouldAdoptSavedVersion, shouldVerifyExternalEvent, externalDiskVerdict, saveErrorKind, saveAsCandidate,
+      saveRecoveryNotice, sqlitePrimaryCode, storageCorruptionFailure,
+      selection: {
+        constants: { MAX_QUOTE: MP208_MAX_QUOTE, MAX_EDIT_INLINE: MP208_MAX_EDIT_INLINE, MAX_EDIT_BYTES: MP208_MAX_EDIT_BYTES, MAX_EDIT_INTENT: MP208_MAX_EDIT_INTENT },
+        normalize: mp208NormalizeSelection,
+        quote: mp208BuildQuote,
+        editRequest: mp208BuildEditRequest,
+        editQuote: mp208BuildEditQuote,
+        explicitReference: mp208ExplicitReference,
+        editPrepareBody: mp208EditPrepareBody,
+        editSelectionBody: mp208EditSelectionBody,
+        replacementsHint: mp208ReplacementsHint,
+        deliveryPlan: mp208DeliveryPlan,
+        normalizeBusyEnter: mp208NormalizeBusyEnter,
+        quoteCost: mp208QuoteCost,
+        needsQuoteChoice: mp208NeedsQuoteChoice,
+        QUOTE_CHOICE_BYTES: MP208_QUOTE_CHOICE_BYTES,
+        capability: mp208Capability,
+        snapshot: mp208Snapshot,
+        insertNativeQuote: mp208InsertNativeQuote,
+        insertReadOnlyText: mp208InsertReadOnlyText,
+        insertTextPreservingDraft: mp208InsertTextPreservingDraft,
+        quoteRecipient: mp208QuoteRecipient,
+        editSubmitTarget: mp208EditSubmitTarget,
+        byteLength: mp208ByteLength,
+        digestMatches: mp208DigestMatches,
+        planLocate: mp208PlanHistoricalLocate,
+      },
       constants: {
         TAB_TYPE_ID: TAB_TYPE_ID,
         FILE_ADDRESS_PREFIX: FILE_ADDRESS_PREFIX,
@@ -3660,9 +5812,12 @@ const __test = {
     },
     readLayoutConfig: readLayoutConfig,
     saveLayoutConfig: saveLayoutConfig,
+    migrateLayoutDefaults: migrateLayoutDefaults,
     findConversationRoot: findConversationRoot,
     findConversationBody: findConversationBody,
     computeLayout: computeLayout,
+    fitStageRect: fitStageRect,
+    rectsOverlap: rectsOverlap,
     writeStyle: writeStyle,
     createLayoutEngine: createLayoutEngine,
     mountLayout: mountLayout,
@@ -3678,10 +5833,31 @@ const __test = {
     clearOverlayDoc: clearOverlayDoc,
     docKeyOf: docKeyOf,
     getOverlayDoc: function () { return overlayDoc; },
+    // 布局取证钩子（无 DOM 入参即可单测）：折叠时选哪个 frame、状态是否在祖先上、
+    // 中缝位置/方向。产品路径与测试调用同一实现。
+    pickFrameForRelease: pickFrameForRelease,
+    stateOn: stateOn,
+    inHandleHotBand: inHandleHotBand,
+    chatBoundaryX: chatBoundaryX,
+    chatWidthFromDrag: chatWidthFromDrag,
+    dragState: function () {
+      return {
+        chat: chatHandleState.dragging === true,
+        side: handleState.dragging === true,
+        captureId: handleState.captureId === undefined ? null : handleState.captureId,
+      };
+    },
     modes: LAYOUT_MODES,
     defaults: LAYOUT_DEFAULTS,
     storageKey: LAYOUT_STORAGE_KEY,
     widthVar: LAYOUT_WIDTH_VAR,
+    // 窄列输入区样式：热升级/幂等/所有权释放的回归测试入口（产品路径同一实现）。
+    narrowChatStyle: {
+      ensure: ensureNarrowChatStyle,
+      css: NARROW_CHAT_CSS,
+      id: NARROW_CHAT_STYLE_ID,
+      resetCache: function () { narrowChatStyleNode = null; },
+    },
   },
   parseFileAddress: parseFileAddress,
       basenameOf: basenameOf,
@@ -3736,12 +5912,197 @@ const __test = {
         } else if (cmd === "open-external") {
           try { window.open(String(args.url == null ? "" : args.url), "_blank", "noopener"); } catch (e) { /* 拦截器拒绝 */ }
           done(true);
+        } else if (cmd === "export-pdf") {
+          exportPdfViaHost(args).then(done, fail);
+        } else if (cmd === "export-pdf-cancel") {
+          api("export/pdfCancel", { jobId: args.jobId }).then(done, fail);
+        } else if (cmd === "read-file-base64") {
+          readFileBase64ViaImageRoute(args).then(done, fail);
         } else {
           done(null);
         }
       } catch (error) {
         fail(error);
       }
+    }
+
+    /** 保存对话框只接受用户可读的文件名；路径永远由 Chromium 原生另存为决定。 */
+    function pdfSafeName(value) {
+      let base = String(value == null ? "" : value)
+        .replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!base) base = "MarkPilot";
+      base = base.replace(/\.pdf$/i, "").trim().slice(0, 120).trim() || "MarkPilot";
+      if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(base)) base = "_" + base;
+      return base + ".pdf";
+    }
+
+    function pdfBytesFromBase64(value) {
+      const bin = atob(String(value || ""));
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+      return bytes;
+    }
+
+    /** Native image path → the plugin's existing auth-fenced /img/ route.
+     *  Only image bytes are exposed; no arbitrary file: URL reaches the temp HTML. */
+    function imageRouteForPath(value) {
+      const raw = String(value == null ? "" : value).replace(/\\/g, "/");
+      if (!raw) return null;
+      let prefix = "";
+      let rest = raw;
+      if (rest.startsWith("//")) { prefix = "//"; rest = rest.slice(2); }
+      else rest = rest.replace(/^\/+/, "");
+      const parts = rest.split("/").filter(Boolean).map((part) => encodeURIComponent(part));
+      if (!parts.length) return null;
+      return "/dsh-markdown-editor-typora/img/" + prefix + parts.join("/");
+    }
+
+    function bytesToBase64(bytes) {
+      let out = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        out += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      }
+      return btoa(out);
+    }
+
+    async function readFileBase64ViaImageRoute(args) {
+      const route = imageRouteForPath(args && args.path);
+      if (!route) return { ok: false, error: "bad-image-path" };
+      const maxBytes = Number.isSafeInteger(args.maxBytes) && args.maxBytes > 0 ? args.maxBytes : 16 * 1024 * 1024;
+      const controller = typeof AbortController === "function" ? new AbortController() : null;
+      const timer = controller ? setTimeout(() => { try { controller.abort(); } catch (e) { /* 已结束 */ } }, 20000) : null;
+      try {
+        const res = await fetch(route, {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+          ...(controller ? { signal: controller.signal } : {}),
+        });
+        if (!res.ok) return { ok: false, error: "image-" + res.status };
+        const type = String(res.headers.get("content-type") || "").split(";", 1)[0].trim();
+        if (!/^image\//i.test(type)) return { ok: false, error: "not-an-image" };
+        const length = Number(res.headers.get("content-length"));
+        if (Number.isFinite(length) && length > maxBytes) return { ok: false, error: "image-too-large" };
+        const buffer = await res.arrayBuffer();
+        if (buffer.byteLength > maxBytes) return { ok: false, error: "image-too-large" };
+        return {
+          ok: true,
+          base64: bytesToBase64(new Uint8Array(buffer)),
+          mime: type,
+          bytes: buffer.byteLength,
+        };
+      } catch (error) {
+        return { ok: false, error: String((error && error.message) || error) };
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    }
+
+    function downloadPdfBlob(blob, name) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      a.rel = "noopener";
+      (document.body || document.documentElement).appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) { /* 已释放 */ } }, 60000);
+    }
+
+    /**
+     * Real PDF path for DSH:
+     *   1) ask the host to render the engine's export HTML with headless Chromium
+     *      (A4/EXE print CSS, KaTeX/table/Mermaid and inlined document images), then
+     *   2) hand the actual PDF bytes to DSH's supported native Save-As IPC
+     *      (`dshDesktop.files.save`, mode "saveAs"): it owns the path choice,
+     *      overwrite confirmation and cancel result.
+     * Browser-only DSH (no desktop bridge) downloads the same real PDF Blob;
+     * it never falls back to "printed but no file" as success.
+     * The host never writes the user's target; only the native save dialog or
+     * the browser download does.
+     */
+    async function exportPdfViaHost(args) {
+      const desktop = typeof window !== "undefined" ? window.dshDesktop : null;
+      const save = desktop && desktop.files && desktop.files.save;
+      const html = args && typeof args.html === "string" ? args.html : "";
+      if (!html) return { ok: false, error: "print-html-empty" };
+      const imageSummary = args && args.images && typeof args.images === "object" ? args.images : null;
+      const fileName = pdfSafeName(args.name || args.title || "MarkPilot");
+      let rendered;
+      try {
+        rendered = await api("export/pdf", {
+          html: html,
+          title: String(args.title || args.name || "MarkPilot"),
+          name: fileName,
+          jobId: typeof args.jobId === "string" ? args.jobId : undefined,
+        });
+      } catch (error) {
+        const message = String((error && error.message) || error);
+        return /HTTP (404|405)/.test(message)
+          ? { ok: false, error: "pdf-endpoint-unavailable" }
+          : { ok: false, error: message };
+      }
+      if (!rendered || rendered.ok !== true) {
+        const err = rendered && rendered.error;
+        return {
+          ok: false,
+          ...(rendered && rendered.canceled ? { canceled: true } : {}),
+          error: (err && (err.message || err.code)) || "pdf-render-failed",
+          ...(rendered && rendered.fallback ? { fallback: rendered.fallback } : {}),
+        };
+      }
+      let bytes;
+      try { bytes = pdfBytesFromBase64(rendered.pdfBase64); }
+      catch (error) { return { ok: false, error: "pdf-decode-failed" }; }
+      if (!bytes.length) return { ok: false, error: "pdf-empty" };
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const outName = rendered.name || fileName;
+      if (typeof save !== "function") {
+        downloadPdfBlob(blob, outName);
+        return {
+          ok: true,
+          mode: "download",
+          file: outName,
+          bytes: rendered.bytes || bytes.length,
+          pages: rendered.pages,
+          engine: rendered.engine,
+          ...(imageSummary ? { images: imageSummary } : {}),
+          ...(rendered.tempPathLeaked ? { tempPathLeaked: true } : {}),
+        };
+      }
+      const url = URL.createObjectURL(blob);
+      let saved;
+      try {
+        saved = await save({
+          url: url,
+          name: outName,
+          mediaType: "application/pdf",
+          mode: "saveAs",
+        });
+      } catch (error) {
+        return { ok: false, error: String((error && error.message) || error) };
+      } finally {
+        try { URL.revokeObjectURL(url); } catch (e) { /* 已释放 */ }
+      }
+      if (saved && saved.status === "cancelled") {
+        return { ok: false, canceled: true, error: "已取消导出 PDF" };
+      }
+      if (!saved || saved.status !== "saved" || typeof saved.path !== "string" || !saved.path) {
+        return { ok: false, error: "save-failed" };
+      }
+      return {
+        ok: true,
+        mode: "file",
+        file: saved.path,
+        bytes: rendered.bytes || bytes.length,
+        pages: rendered.pages,
+        engine: rendered.engine,
+        ...(imageSummary ? { images: imageSummary } : {}),
+        ...(rendered.tempPathLeaked ? { tempPathLeaked: true } : {}),
+      };
     }
 
     /* ───────────────────────── 样式 ───────────────────────── */
@@ -3768,16 +6129,52 @@ const __test = {
       fontSize: 12, padding: "1px 8px", border: "1px solid rgba(127,127,127,0.4)",
       borderRadius: 4, background: "transparent", cursor: "pointer",
     };
-    // B1: rail is a fixed 28px flex sibling above the iframe. Container query
-    // (not @media) because the panel can be 160px inside a wide window.
+    // B2: the rail floats above the editor's own 24px bottom status bar. It is
+    // absolutely positioned and takes no layout height, so the iframe keeps the
+    // full panel height (the old 28px flex sibling is gone). The layer itself is
+    // hit-transparent: only real controls opt back in, which keeps editor click
+    // and drag-selection working through the passive text. Container query (not
+    // @media) because the panel can be 160px inside a wide window.
     const RAIL_CSS = `
-.mp-rail-btn{height:22px;min-width:22px;padding:0 6px;border:0;border-radius:5px;background:transparent;color:inherit;font:inherit;font-size:11.5px;cursor:pointer;white-space:nowrap;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:3px}
+.mp-rail{position:absolute;left:0;right:0;bottom:28px;z-index:3;display:flex;align-items:center;justify-content:flex-start;gap:8px;height:auto;min-height:0;box-sizing:border-box;overflow:visible;background:transparent;border:0;pointer-events:none}
+.mp-rail-btn{height:22px;min-width:22px;padding:0 6px;border:0;border-radius:5px;background:transparent;color:inherit;font:inherit;font-size:11.5px;cursor:pointer;white-space:nowrap;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:3px;pointer-events:auto}
 .mp-rail-btn:hover{background:color-mix(in srgb,currentColor 10%,transparent)}
 .mp-rail-btn:focus-visible{outline:2px solid currentColor;outline-offset:1px}
-.mp-rail-status{flex:0 0 auto;max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;opacity:.72}
-.mp-rail-text{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;cursor:default}
+.mp-rail-status{flex:0 0 auto;max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;opacity:.72;pointer-events:none}
+.mp-rail-text{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;cursor:default;pointer-events:none}
+.mp-rail-text[data-mp-popover="1"]{cursor:pointer;pointer-events:auto}
 .mp-rail-text:focus-visible{outline:2px solid currentColor;outline-offset:1px;border-radius:4px}
-.mp-rail-actions{display:flex;align-items:center;gap:4px;flex:0 0 auto;min-width:0}
+.mp-rail-actions{display:flex;align-items:center;gap:4px;flex:0 0 auto;min-width:0;pointer-events:none}
+.mp-rail[data-mp-elevated="1"] .mp-rail-text{flex:0 1 auto;padding:1px 8px;border-radius:999px;background:color-mix(in srgb,currentColor 12%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.mp-rail[data-mp-elevated="1"] .mp-rail-actions{padding:1px 3px;border-radius:999px;background:color-mix(in srgb,currentColor 9%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+/* 「查看差异」面板：仅 diff 存在时整块偏冷近黑。基础色不透明，能力允许时由
+   @supports 升级成 95% 近黑 + 14px 模糊；行底色低饱和酒红/松绿，白字 1.5 行距。 */
+.mp-rail-popover-diff{color-scheme:dark;background:#181b20;border:1px solid rgba(244,245,247,.16);box-shadow:0 8px 22px rgba(0,0,0,.42),inset 0 0 0 1px rgba(255,255,255,.07);color:#f4f5f7}
+.mp-rail-popover-diff .mp-rail-btn{color:#f4f5f7}
+.mp-rail-popover-diff .mp-rail-btn:hover{background:rgba(244,245,247,.16)}
+.mp-rail-popover-diff .mp-rail-btn:active{background:rgba(244,245,247,.24)}
+.mp-rail-popover-diff .mp-rail-btn:focus-visible{outline:2px solid #a9c8ff;outline-offset:1px}
+.mp-rail-diff-item{padding:6px 0;border-top:1px solid rgba(244,245,247,.10)}
+.mp-rail-diff-meta{display:flex;gap:6px;align-items:center;margin-bottom:3px;color:#b9c0cb;font-size:11.5px}
+.mp-rail-diff-line{margin:2px 0;padding:5px 7px;white-space:pre-wrap;word-break:break-word;border:1px solid transparent;border-radius:5px;font-size:11.5px;line-height:1.5;color:#fff}
+.mp-rail-diff-del{background:#3a2026;border-color:#6d3a43}
+.mp-rail-diff-add{background:#1c3128;border-color:#315b47}
+@supports (backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px)){
+  .mp-rail-popover-diff{background:rgba(21,24,29,.95);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+}
+@media (prefers-contrast:more){
+  .mp-rail-popover-diff{background:#111318 !important;border-color:#fff !important;-webkit-backdrop-filter:none !important;backdrop-filter:none !important}
+  .mp-rail-diff-del{border-color:#d98a96}
+  .mp-rail-diff-add{border-color:#7fc3a4}
+}
+@media (forced-colors:active){
+  .mp-rail-popover-diff{background:Canvas !important;border:1px solid CanvasText !important;color:CanvasText !important;box-shadow:none !important;-webkit-backdrop-filter:none !important;backdrop-filter:none !important}
+  .mp-rail-popover-diff .mp-rail-btn:hover{background:Highlight;color:HighlightText}
+  .mp-rail-popover-diff .mp-rail-btn:focus-visible{outline:2px solid Highlight}
+  .mp-rail-diff-item{border-top-color:CanvasText}
+  .mp-rail-diff-meta{color:CanvasText}
+  .mp-rail-diff-line{background:Canvas;border-color:CanvasText;color:CanvasText}
+}
 @container (max-width:360px){
   .mp-rail-status{display:inline-block;width:8px;height:8px;min-width:8px;max-width:8px;padding:0;border-radius:50%;font-size:0;color:transparent;background:#d9a441;overflow:hidden;flex:0 0 8px}
   .mp-rail-status[data-mp-save-status="saved"]{background:transparent;border:1.5px solid #4caf50;box-sizing:border-box}
@@ -3790,7 +6187,7 @@ const __test = {
   .mp-rail-btn{width:20px;min-width:20px;height:20px}
   .mp-rail-actions{gap:1px}
   .mp-rail-status{width:6px;min-width:6px;max-width:6px;height:6px;flex-basis:6px}
-  .mp-rail-popover{top:92px !important;left:8px !important;right:calc(8px + var(--mp-rail-inset-right,0px)) !important;max-height:calc(100% - 100px) !important}
+  .mp-rail-popover{top:auto !important;left:8px !important;right:calc(8px + var(--mp-rail-inset-right,0px)) !important;bottom:52px !important;max-height:calc(100% - 104px) !important}
   .mp-rail-head{flex-wrap:wrap}
   .mp-rail-head strong{flex:1 1 100% !important}
   .mp-rail-date{flex:1 1 100% !important;white-space:normal !important}
@@ -3799,6 +6196,8 @@ const __test = {
 }
 @media (prefers-reduced-motion:reduce){.mp-rail-btn{transition:none}}
 `;
+
+
     const emptyStyle = { padding: 12, fontSize: 12, opacity: 0.7 };
 
     /* ───────────────────────── tab body ───────────────────────── */
@@ -3850,10 +6249,121 @@ const __test = {
       return null;
     }
 
-    /** 取某个会话的输入面：先官方动作面，再退到 tab props 里记住的那份。 */
+    /** 当前可见会话：uiWorkspace 选择优先，其次 uiSession 当前绑定。 */
+    function currentConversationSessionId() {
+      try {
+        var service = workspaceService || (docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("uiWorkspace") : null);
+        var selected = service && service.selection && typeof service.selection.getSnapshot === "function"
+          ? service.selection.getSnapshot() : null;
+        if (selected && selected.sessionId) return selected.sessionId;
+      } catch (e) { /* 旧宿主没有 uiWorkspace */ }
+      try {
+        var ui = docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("uiSession") : null;
+        var cur = ui && ui.adapter && ui.adapter.current && typeof ui.adapter.current.getSnapshot === "function"
+          ? ui.adapter.current.getSnapshot() : null;
+        if (cur && cur.key) return cur.key;
+      } catch (e) { /* 旧宿主没有 uiSession */ }
+      return "";
+    }
+
+    /**
+     * 首页/新会话的 composer 只渲染 conversation.composer.bar，宿主并**不渲染**
+     * conversation.composer.dock（InputBar：variant === "composer" 才渲染）。
+     * 因此 dock 里的零像素抓手在首页拿不到 inputActions。官方 uiSession 已经按
+     * 会话物化了 standard props（含 inputActions），这里直接读当前绑定：
+     * 不依赖任何 slot 挂载，也不碰 composer DOM / 草稿。
+     */
+    function inputActionsFromUiSession(sessionId) {
+      try {
+        var ui = docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("uiSession") : null;
+        if (!ui) return null;
+        var sessions = docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("sessions") : null;
+        var binding = sessionId && sessions && typeof sessions.binding === "function"
+          ? sessions.binding(sessionId) : null;
+        var source = ui.adapter && typeof ui.adapter.bindingSource === "function"
+          ? ui.adapter.bindingSource(binding ? { sessionId: sessionId, binding: binding } : undefined) : null;
+        var snap = source && typeof source.getSnapshot === "function" ? source.getSnapshot()
+          : (source && source.value ? source.value : null);
+        if (!snap && ui.adapter && ui.adapter.current && typeof ui.adapter.current.getSnapshot === "function") {
+          snap = ui.adapter.current.getSnapshot();
+        }
+        var actions = snap && snap.props ? snap.props.inputActions : null;
+        if (actions && (!sessionId || !snap.key || snap.key === sessionId)) return actions;
+      } catch (e) { /* 绑定尚未物化 / 旧宿主 */ }
+      return null;
+    }
+
+    /** 取某个会话的输入面：dock 抓手优先，其次官方 uiSession 当前绑定。 */
     function inputFaceOf(sessionId) {
       var face = sessionId ? inputFaces.get(sessionId) : null;
-      return face || null;
+      if (face) return face;
+      var fallback = inputActionsFromUiSession(sessionId);
+      if (fallback) return fallback;
+      if (!sessionId) {
+        var currentId = currentConversationSessionId();
+        if (currentId) return inputFaces.get(currentId) || inputActionsFromUiSession(currentId);
+      }
+      return null;
+    }
+
+    /** 新会话绑定/首帧 composer 可能晚一拍；只等有限时间，绝不轮询到永久。 */
+    async function waitForInputFace(sessionId, timeoutMs) {
+      var deadline = Date.now() + Math.max(0, Number(timeoutMs) || 0);
+      for (;;) {
+        var face = inputFaceOf(sessionId);
+        if (face) return face;
+        if (Date.now() >= deadline) return null;
+        await new Promise(function (resolve) { setTimeout(resolve, 120); });
+      }
+    }
+
+    /** 会话选择落定后才允许真正写入/提交；只等有限时间。 */
+    async function waitForVisibleSession(sessionId, timeoutMs) {
+      if (!sessionId) return false;
+      var deadline = Date.now() + Math.max(0, Number(timeoutMs) || 0);
+      for (;;) {
+        var current = currentConversationSessionId() || workspaceContext().sessionId;
+        if (current === sessionId) return true;
+        if (Date.now() >= deadline) return false;
+        await new Promise(function (resolve) { setTimeout(resolve, 120); });
+      }
+    }
+
+    /**
+     * 没有当前会话时走宿主正常的新会话流程（复用空白会话，不写占位消息）。
+     * connectWorkspace 只连接/创建，不选中；再 openSession 让用户落到这个对话。
+     * 期间用户手动切到别的会话 ⇒ 返回 ""，调用方放弃（绝不把内容投给用户新选的会话）。
+     */
+    async function ensureConversationSession() {
+      var current = currentConversationSessionId() || workspaceContext().sessionId;
+      if (current) return current;
+      var ui = docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("uiWorkspace") : null;
+      var workspaces = docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("workspaces") : null;
+      if (!ui || !workspaces || typeof ui.connectWorkspace !== "function") return "";
+      var items = [];
+      try { items = workspaces.list.getSnapshot().items || []; } catch (e) { items = []; }
+      var context = workspaceContext();
+      var target = null;
+      for (var i = 0; i < items.length; i += 1) {
+        var item = items[i];
+        if (!item || !item.workspaceId) continue;
+        if (context.key && workspaceKey(item.path) === context.key) { target = item; break; }
+      }
+      if (!target) {
+        for (var j = 0; j < items.length; j += 1) {
+          if (items[j] && items[j].workspaceId) { target = items[j]; break; }
+        }
+      }
+      if (!target) return "";
+      var id = "";
+      try { id = await ui.connectWorkspace(target.workspaceId); } catch (e) { return ""; }
+      if (!id) return "";
+      // await 期间用户已经手动选了会话 ⇒ 这不是本次操作创建的目标，放弃。
+      var selectedDuring = currentConversationSessionId() || workspaceContext().sessionId;
+      if (selectedDuring && selectedDuring !== id) return "";
+      try { if (typeof ui.openSession === "function") ui.openSession(id); } catch (e) { /* 仍可尝试直接投递 */ }
+      if (!(await waitForVisibleSession(id, 1600))) return "";
+      return id;
     }
 
     function docKeyOf(tab) {
@@ -3952,12 +6462,12 @@ const __test = {
       recomputeOverlayDoc();
     }
 
-    function layoutEnabled() {
+    /** 实际生效判断：与 readSettings/readLayoutConfig 共用同一解析口，不再只读旧键。 */
+    function layoutEnabled(storage) {
       try {
-        var raw = window.localStorage ? window.localStorage.getItem("dsh.markpilot.layout.v1") : null;
-        if (!raw) return false;
-        return JSON.parse(raw).enabled === true;
-      } catch (e) { return false; }
+        var store = storage === undefined ? window.localStorage : storage;
+        return readSettings(store).enabled === true;
+      } catch (e) { return SETTINGS_DEFAULTS.enabled === true; }
     }
 
     function publishOverlayDoc(next) {
@@ -4142,6 +6652,43 @@ const __test = {
         writeSettings(window.localStorage,{enabled:true}); mountLayout(docsCtx);
       }
     }
+    /**
+     * 「编辑区居中」开关立即生效：
+     *   off→on：挂载布局引擎；已打开的右栏 md 标签由 EditorTabBody 自己切到
+     *           Redirect，必要时再接管宿主恢复的原生标签，并多重算几次几何。
+     *   on→off：收起中间工作台、还原宿主排版，并把同一份文档放回右侧栏，
+     *           不关文档、不丢草稿。
+     */
+    function installLayoutSettingBridge() {
+      var lastEnabled = readSettings(window.localStorage).enabled === true;
+      return watchSettingsChanges(function () {
+        var enabled = readSettings(window.localStorage).enabled === true;
+        if (enabled === lastEnabled) return;
+        lastEnabled = enabled;
+        if (enabled) {
+          mountLayout(docsCtx);
+          setTimeout(function () {
+            try { if (!docsModeOn) adoptOpenNativeDocs(); } catch (e) { /* 忽略 */ }
+          }, 60);
+          [120, 320, 700].forEach(function (delay) {
+            setTimeout(function () {
+              try { if (typeof layoutReapply === "function") layoutReapply(); } catch (e) { /* 忽略 */ }
+            }, delay);
+          });
+          return;
+        }
+        // 明确关闭：即使当前没有已打开文档，也要让正在等待的自动恢复/链接接管失效。
+        ++workspaceIntent;
+        var doc = docsModeOn && workbenchDoc ? workbenchDoc : null;
+        if (docsModeOn || overlayDoc) closeDocsWorkbench();
+        try { if (typeof window.__mpLayoutDispose === "function") window.__mpLayoutDispose(); } catch (e) { /* 忽略 */ }
+        if (doc && doc.path) {
+          setTimeout(function () {
+            try { openDocAddress(docsCtx, absoluteFileAddress(doc.path)); } catch (e) { /* 忽略 */ }
+          }, 0);
+        }
+      });
+    }
     async function chooseWorkbenchDoc(entry) {
       var intent=++workspaceIntent;
       var check=await prepareWorkspaceLeave();
@@ -4173,6 +6720,8 @@ const __test = {
     async function openWorkspace(context, options) {
       var auto=!!(options && options.auto);
       var intent=++workspaceIntent, cfg=readSettings(window.localStorage);
+      // 自动恢复（切会话/切目录）必须尊重显式关闭；显式点 Markdown 仍可打开工作台。
+      if (auto && cfg.enabled !== true) return;
       const current=()=>intent===workspaceIntent && workspaceContext().sessionId===context.sessionId && workspaceContext().key===context.key;
       if (!context.sessionId || !context.key) { if(!auto) workspaceMessage("请先选择有工作目录的会话。"); return; }
       try {
@@ -4228,6 +6777,8 @@ const __test = {
         }
         if (!entry) return;
         if (entry.draft && !pendingWorkspaceDraft(context,entry)) throw new Error("无法保留空白草稿，请检查本机存储空间。");
+        // 明确关闭可能发生在 await 期间（recent 查询/离开守卫）；自动路径落地前重验。
+        if (auto && readSettings(window.localStorage).enabled !== true) return;
         workbenchDoc=entry; workspaceNotice=""; docsModeOn=true; clearClosedOverlayKeys();
         setWorkspaceAutoOpenSuppressed(context.key,false);
         enableWorkbench(); bumpOverlay();
@@ -4262,7 +6813,6 @@ const __test = {
     function openLocalDoc(path) {
       try {
         if (!path || !layoutEnabled()) return false;
-        if (readSettings(window.localStorage).enabled !== true) return false;
         var wctx = workspaceContext();
         void chooseWorkbenchDoc({ path: path, address: absoluteFileAddress(path), workspace: wctx.cwd || "", sessionId: wctx.sessionId || "" });
         return true;
@@ -4298,6 +6848,67 @@ const __test = {
         }
         if (!openLocalDoc(path)) return;
         try { ev.preventDefault(); ev.stopPropagation(); if (ev.stopImmediatePropagation) ev.stopImmediatePropagation(); } catch (e) { /* 忽略 */ }
+      };
+      document.addEventListener("click", onClick, true);
+      return function () { try { document.removeEventListener("click", onClick, true); } catch (e) { /* 忽略 */ } };
+    }
+
+    /* 侧栏「Markdown」入口的点击短路。
+     *
+     * 宿主对 sidebar.panellist 的点击走 layout.selectPanel(id)，main slot 的
+     * entryKey 由 "conversation" 变成我们的面板 id ⇒ 会话列整棵卸载、再按新 key
+     * 重建。会话越长，这次重建越贵（实测：合成 180 行内容后打开就绪中位数
+     * 501ms，轻内容 387ms；会话子树每次打开被重新插入 1 次）。
+     *
+     * 而本插件的编辑面画在 shell.overlay（见 EditorOverlayStage），主区域右侧
+     * 本来就留着对话；把会话列拆掉纯属副作用。所以在捕获阶段吃掉这一次点击，
+     * 直接开/关工作台，主区域保持挂载。
+     *
+     * 只认我们自己注册的那一行（label 由 slot 的 label 决定；文案随语言变化，
+     * 因此用入口元素上宿主给的 aria-label 与我们的 slot label 常量比对），
+     * 其它面板入口、以及带修饰键/非左键的点击一律原样交给宿主。 */
+    function installPanelEntryShortcut() {
+      if (typeof document === "undefined" || typeof document.addEventListener !== "function") return function () {};
+      /* Resolve the entry row, then ask whether OUR icon is inside it.
+       *
+       * Not `closest('nav button [data-mp-docs-entry]')`: that looks for a marked
+       * ANCESTOR of the event target, so it only matches when the click lands on
+       * the icon itself. Clicking the row's label, its blank padding, or
+       * activating it from the keyboard targets the button, and the marked icon
+       * is its CHILD — the selector then finds nothing and the host's default
+       * panel switch runs, rebuilding the conversation subtree.
+       *
+       * Looking the icon up inside the resolved button covers all four ways the
+       * row can be activated with one check, and keeps the ownership test on a
+       * static attribute rather than a localized label. */
+      var onClick = function (ev) {
+        if (!ev || ev.defaultPrevented) return;
+        if (typeof ev.button === "number" && ev.button !== 0) return;
+        if (ev.metaKey || ev.ctrlKey || ev.altKey || ev.shiftKey) return;
+        var target = ev.target;
+        if (!target || typeof target.closest !== "function") return;
+        var row = null;
+        try { row = target.closest("nav button"); } catch (e) { row = null; }
+        if (!row) return;
+        var ours = false;
+        try { ours = !!row.querySelector("[" + DOCS_PANEL_MARK + "]"); } catch (e1) { ours = false; }
+        if (!ours) return;
+        try {
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+        } catch (e2) { /* 忽略 */ }
+        try {
+          var host = docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("layout") : null;
+          // 用户在别的面板页时要先把 main 换回会话，否则编辑面无处可挤；
+          // 这一步之后本插件的编辑面才能在会话列右侧展开。
+          var activePanel = null;
+          try { activePanel = host && host.panelInfo && typeof host.panelInfo.getSnapshot === "function"
+            ? host.panelInfo.getSnapshot().activePanelId : null; } catch (e3) { activePanel = null; }
+          if (activePanel !== null && typeof host.selectPanel === "function") host.selectPanel(null);
+        } catch (e4) { /* 忽略 */ }
+        if (docsModeOn || overlayDoc) void closeWorkspaceEditor();
+        else void openWorkspace(workspaceContext());
       };
       document.addEventListener("click", onClick, true);
       return function () { try { document.removeEventListener("click", onClick, true); } catch (e) { /* 忽略 */ } };
@@ -4434,13 +7045,21 @@ const __test = {
 
     var DOCS_PANEL_ID = "dsh-markdown-editor-typora-docs";
 
+    /* Ownership marker for the sidebar row. The host renders this icon inside the
+       entry button and nowhere else, so a static attribute on it identifies our
+       row without depending on the visible label (which is localized and could
+       coincide with another panel's name). */
+    var DOCS_PANEL_MARK = "data-mp-docs-entry";
+
     function DocsPanelIcon(props) {
       var size = (props && typeof props.size === "number") ? props.size : 16;
       var h = React.createElement;
-      return h("svg", {
+      var mark = {};
+      mark[DOCS_PANEL_MARK] = "";
+      return h("svg", Object.assign({
         width: size, height: size, viewBox: "0 0 24 24", fill: "none",
         xmlns: "http://www.w3.org/2000/svg", "aria-hidden": "true",
-      },
+      }, mark),
       h("path", { d: "M6 3.5h7.5L18 8v12.5H6z", stroke: "currentColor", strokeWidth: 1.6, strokeLinejoin: "round" }),
       h("path", { d: "M13.5 3.5V8H18", stroke: "currentColor", strokeWidth: 1.6, strokeLinejoin: "round" }),
       h("path", { d: "M9 12.5h6M9 16h4.5", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" }));
@@ -4621,14 +7240,15 @@ const __test = {
             transition: "width .16s ease",
           },
         },
-        // 右沿拖拽热区：往左拖变窄（160），往右拖变宽（460），松手写回设置
+        // 右沿拖拽热区：往左拖变窄（160），往右拖变宽（460），松手写回设置。
+        // 8px 全铺在列表边界右侧：列表滚动条在边界左侧，居中会压住滑块。
         collapsed ? null : h("div", {
           onPointerDown: onListHandleDown,
           title: "拖动调整文件列表宽度",
           "aria-label": "拖动调整文件列表宽度",
           "data-mp-list-handle": "",
           style: {
-            position: "absolute", top: 0, bottom: 0, right: -4, width: 8,
+            position: "absolute", top: 0, bottom: 0, right: -8, width: 8,
             cursor: "col-resize", zIndex: 6, touchAction: "none", background: "transparent",
           },
         }),
@@ -4807,7 +7427,7 @@ const __test = {
         h("div", { style: group }, "布局"),
         h(SettingsField, {
           label: "编辑区居中（对话靠右）",
-          hint: "将编辑区放在中间，对话显示在右侧。关闭后，文档在右侧栏中打开。",
+          hint: "默认开启：首次打开 Markdown 会在中间编辑区打开，对话在右侧。关闭后文件链接和恢复的文档回到右侧栏，重新打开应用仍保持关闭；点击侧栏 Markdown 仍可主动打开工作台。",
         }, h("label", { style: { display: "flex", alignItems: "center", gap: 8, cursor: "pointer" } },
           h("input", {
             type: "checkbox", checked: settings.enabled === true,
@@ -4815,6 +7435,13 @@ const __test = {
           }),
           h("span", { style: { color: "var(--dsw-alias-label-secondary, #9aa4b2)" } },
             settings.enabled ? "已开启" : "已关闭"))),
+        h(SettingsField, {
+          label: "紧凑工作台",
+          hint: "分栏编辑时收紧左侧导航；空间足够时，会话标题和视图标签共用一行。",
+        }, h("label", { style: { display: "flex", alignItems: "center", gap: 8, cursor: "pointer" } },
+          h("input", { type: "checkbox", "aria-label": "紧凑工作台", checked: settings.compactChrome,
+            onChange: function (e) { save({ compactChrome: e.target.checked }); } }),
+          h("span", null, settings.compactChrome ? "已开启" : "已关闭"))),
         h(SettingsField, {
           label: "退出编辑器后保留分栏拖动",
           hint: "关闭后恢复宿主布局；开启时仍可使用扩展拖动范围。",
@@ -4869,19 +7496,27 @@ const __test = {
           h("button", {
             type: "button", onClick: reload,
             style: { padding: "6px 14px", fontSize: 12.5, borderRadius: 6, border: "1px solid var(--dsw-alias-border-l2, #3a4150)", background: "transparent", color: "inherit", cursor: "pointer", fontFamily: "inherit" },
-          }, "重新加载以应用布局"),
+          }, "重新加载以应用宽度"),
           h("span", { style: { fontSize: 11.5, color: "var(--dsw-alias-label-tertiary, #6e7683)" } },
-            "布局开关与宽度设置重新加载后生效；透明、退出分栏策略和文档设置立即生效。")),
+            "「编辑区居中」开关立即生效；对话宽度重新加载后生效；透明、退出分栏策略和文档设置立即生效。")),
       );
     }
 
     function EditorTabBody(props) {
       if (!React) return null;
+      // 设置开关立即生效：同一个已经打开的 md 标签在 enabled 翻转后重渲染，
+      // 从右栏 iframe 切到中间工作台（EditorTabRedirect 发布同一份文档），
+      // 不需要用户关闭再打开文档。
+      var enabledState = React.useState(function () { return layoutEnabled(); });
+      var enabled = enabledState[0], setEnabled = enabledState[1];
+      React.useEffect(function () {
+        return watchSettingsChanges(function () { setEnabled(layoutEnabled()); });
+      }, []);
       if (typeof props.useTabInfo !== "function") {
         return React.createElement("div", { style: emptyStyle }, "dsh-markdown-editor-typora: useTabInfo unavailable");
       }
       // 布局关闭 ⇒ 旧行为（iframe 仍在这里）
-      if (!layoutEnabled()) return React.createElement(EditorTabBodyInner, props);
+      if (!enabled) return React.createElement(EditorTabBodyInner, props);
       return React.createElement(EditorTabRedirect, props);
     }
 
@@ -4919,6 +7554,7 @@ const __test = {
     /** 被动打开的 .md（文件链接 / 切会话恢复）接进工作台；受「被动打开」设置与关闭记忆约束。 */
     function routePassiveNativeDoc(tab, sessionId, force) {
       try {
+        if (!layoutEnabled()) return false;
         if (readSettings(window.localStorage).passiveOpenMode === "overlay") return false;
         var key = docKeyOf(tab);
         if (!force && (!key || !overlayDocs.has(key))) return false;   // 未公布，或已被用户显式关闭
@@ -4939,7 +7575,7 @@ const __test = {
      */
     function adoptOpenNativeDocs() {
       try {
-        if (readSettings(window.localStorage).enabled !== true) return false;
+        if (!layoutEnabled()) return false;
         if (readSettings(window.localStorage).passiveOpenMode === "overlay") return false;
         if (docsModeOn) return false;
         var sr = hostSidebarRight || (docsCtx && typeof docsCtx.get === "function" ? docsCtx.get("sidebarRight") : null);
@@ -5107,29 +7743,17 @@ const __test = {
         return h("div", {
           id: "mp-stage",
           style: {
-            // 兜底几何：布局引擎只在"有会话"时才写 left/width；没有会话时也要能看见工作台。
-            // 引擎一旦写内联值就会覆盖这里（writeStyle 直接改同一批属性）。
-            position: "fixed", left: 0, top: 0, width: "62vw", height: "100%", zIndex: 19,
+            // 兜底几何必须是“不可见、不可点、零面积”：几何引擎确认了真实内容区
+            // 边界之后才写 left/top/width/height 并改成 visible。绝不能再用
+            // fixed 0,0/62vw 在首帧盖住侧栏、标题栏或首页输入框。
+            position: "fixed", left: 0, top: 0, width: 0, height: 0, zIndex: 19,
+            visibility: "hidden", pointerEvents: "none",
             display: "flex", flexDirection: "column", minWidth: 0,
             background: (readSettings(window.localStorage).transparent !== false) ? "transparent" : "var(--dsw-alias-bg-base, #0b0e14)",
             // 与宿主同款分隔线：编辑区右侧一条细线，和对话分开但不割裂
             borderRight: "1px solid var(--dsw-alias-border-l2, #3a4150)",
-            borderRadius: 0, overflow: "hidden", pointerEvents: "auto",
+            borderRadius: 0, overflow: "hidden",
           },
-          onPointerDown: function (e) {
-            // 只有贴在舞台右边缘 18px 内才算"拖对话列"（其余点击照常进编辑器）
-            var r = e.currentTarget.getBoundingClientRect();
-            if (e.clientX < r.right - 18) return;
-            chatHandleState.dragging = true;
-            chatHandleState.startX = e.clientX;
-            var snap0 = handleState.engine && handleState.engine.snapshot ? handleState.engine.snapshot() : null;
-            chatHandleState.startW = (snap0 && snap0.chatW) || 420;
-            try { if (e.currentTarget.setPointerCapture) e.currentTarget.setPointerCapture(e.pointerId); } catch (err0) { /* 忽略 */ }
-            try { e.preventDefault(); } catch (err1) { /* 忽略 */ }
-          },
-          onPointerMove: onHandleMove,
-          onPointerUp: onHandleUp,
-          onPointerCancel: onHandleUp,
         }, h(DocsWorkbench, {
           close: closeWorkspaceEditor,
         }));
@@ -5161,21 +7785,7 @@ const __test = {
           borderRadius: 0, overflow: "hidden",
           pointerEvents: "auto",
         },
-      }, closeBtn, h("div", {
-                  id: "mp-chat-drag",
-                  onPointerDown: function (e) {
-                    chatHandleState.dragging = true;
-                    chatHandleState.startX = e.clientX;
-                    var snap0 = handleState.engine && handleState.engine.snapshot ? handleState.engine.snapshot() : null;
-                    chatHandleState.startW = (snap0 && snap0.chatW) || 420;
-                    try { if (e.currentTarget && e.currentTarget.setPointerCapture) e.currentTarget.setPointerCapture(e.pointerId); } catch (err0) { /* 忽略 */ }
-                    try { e.preventDefault(); } catch (err1) { /* 忽略 */ }
-                  },
-                  onPointerMove: onHandleMove,
-                  onPointerUp: onHandleUp,
-                  onPointerCancel: onHandleUp,
-                  style: { position: "absolute", right: 0, top: 0, width: 16, height: "100%", cursor: "col-resize", zIndex: 6, touchAction: "none", background: "transparent" },
-                }), h(EditorTabBodyInner, {
+      }, closeBtn, h(EditorTabBodyInner, {
         useTabInfo: function () { return { tab: d.tab }; },
         sessionId: d.sessionId,
         inputActions: d.inputActions,
@@ -5248,6 +7858,10 @@ const __test = {
         const win = frameRef.current && frameRef.current.contentWindow;
         if (win) { try { win.postMessage({ __dshmd: true, dir: "down", type: "appearance", content: editorAppearance() }, "*"); } catch (e) { /* load/ready retries */ } }
       }, [props.workbenchCollapsed]);
+      React.useEffect(() => {
+        const frame = frameRef.current;
+        return installEditorShortcutReservation(frame, () => tabVisible);
+      }, [depKey, tabVisible]);
 
       const [ui, setUi] = React.useState({ phase: "loading", detail: "", notice: "", recovery: null, recovered: null, saveStatus: "", notices: [] });
       const setUiIfChanged = React.useCallback((next) => {
@@ -5299,9 +7913,16 @@ const __test = {
           saveTimer: null,
           flushed: false,
           live: null, liveUnsupported: false, liveFlushSeq: 0, liveFlushWaiters: new Map(), liveStatus: null,
-          liveStaleRounds: 0, liveStaleBlocked: false,
+          liveStaleRounds: 0, liveStaleBlocked: false, liveDiskCheckSeq: 0,
+          reading: { keeper: null, started: false, stopped: false },
+          baseSha256: "", draftMirror: null, draftMirrorAck: null, draftMirrorTimer: null, draftMirrorSeq: 0,
+          draftMirrorFlight: null, draftMirrorPending: false, draftMirrorLastAt: 0,
+          draftMirrorRetries: 0, draftMirrorProbe: null, openStamp: 0,
+          mirrorCleanup: false, mirrorClearAfterFlight: false,
           liveRecoveredShownFor: null, liveRecoveredItems: null,
           review: null, remoteGroups: null, ignoreRemoteGroupId: null, savedAt: 0, lastSavedText: "", externalVerifyTimer: null,
+          conflictSession: null, conflictChoices: [], conflictBusy: false, resolvedDisk: null,
+          needLiveJoin: false,
           es: null,
           esHealthy: false,
           pollTimer: null,
@@ -5314,9 +7935,15 @@ const __test = {
           reload: null,
           reloadDisk: null,
           copyMine: null,
+          retryMissing: null,
+          missing: false,
+          missingPending: false,
+          readonly: false,
+          saveAsValue: "",
+          saveAsBusy: false,
         };
         st.doc = doc;
-        setUi((prev) => ({ ...prev, phase: "loading", detail: "", notice: "", recovery: null, railOpen: false, notices: [] }));
+        setUi((prev) => ({ ...prev, phase: "loading", detail: "", notice: "", recovery: null, railOpen: false, notices: [], saveAsOpen: false, saveAsValue: "", saveAsError: "", saveAsBusy: false, recoveryCenterOpen: false, recoveryCenterLoading: false, recoveryCenterItems: [], recoveryCenterError: "", recoveryPreview: "" }));
         setUi((prev) => (prev.recovered || prev.saveStatus ? { ...prev, recovered: null, saveStatus: "" } : prev));   // 新文档代际不继承恢复提示或保存回执
 
         const ticket = ticketOf(doc.sessionId, doc.absPath, doc.gen);
@@ -5387,9 +8014,11 @@ const __test = {
             });
           }
           const id = ++noticeSeq;
-          const item = { id, text, kind: opts.kind || (archive ? "archive" : "info"), ts: Date.now(), actions };
+          const noticePath = typeof opts.path === "string" ? opts.path : "";
+          const key = text + (noticePath ? "\0" + noticePath : "");
+          const item = { id, text, kind: opts.kind || (archive ? "archive" : "info"), ts: Date.now(), actions, ...(noticePath ? { path: noticePath } : {}) };
           const ttl = Number.isFinite(opts.ttlMs) ? Math.max(1500, opts.ttlMs) : (archive ? 10000 : 6000);
-          const existingId = noticeTexts.get(text);
+          const existingId = noticeTexts.get(key);
           if (existingId) {
             if (opts.update && actions.length) {
               setUi((prev) => ({
@@ -5402,21 +8031,21 @@ const __test = {
           if (noticeTexts.size >= 5) {
             const oldest = noticeTexts.entries().next().value;
             if (oldest) {
-              const [oldestText, oldestId] = oldest;
+              const [oldestKey, oldestId] = oldest;
               const oldTimer = noticeTimers.get(oldestId);
               if (oldTimer) { try { clearTimeout(oldTimer); } catch (e) { /* 忽略 */ } }
               noticeTimers.delete(oldestId);
-              noticeTexts.delete(oldestText);
+              noticeTexts.delete(oldestKey);
             }
           }
-          noticeTexts.set(text, id);
+          noticeTexts.set(key, id);
           setUi((prev) => {
             const list = Array.isArray(prev.notices) ? prev.notices : [];
             return { ...prev, notices: [...list.slice(-4), item] };
           });
           const timer = setTimeout(() => {
             noticeTimers.delete(id);
-            noticeTexts.delete(text);
+            noticeTexts.delete(key);
             setUi((prev) => {
               const list = Array.isArray(prev.notices) ? prev.notices : [];
               if (!list.some((entry) => entry.id === id)) return prev;
@@ -5548,6 +8177,7 @@ const __test = {
             || !Number.isSafeInteger(ticket.version) || typeof text !== "string") return;
           doc.live = { client: ticket.client, epoch: ticket.epoch, version: ticket.version,
             diskHash: ticket.diskHash, savedVersion: Number.isSafeInteger(ticket.savedVersion) ? ticket.savedVersion : ticket.version };
+          if (typeof ticket.resolvedDisk === "string" && ticket.resolvedDisk) doc.resolvedDisk = ticket.resolvedDisk;
           post("live-bind", { protocol: 2, docToken: doc.token, text: text, live: ticket });
           // recovered：join 票带回的草稿副本（内核恢复记录）。只在本 tab 内展示一次：
           // 路径可复制、原件未被覆盖；不读文件、不进 SSE、不影响其它文档。
@@ -5558,8 +8188,87 @@ const __test = {
             setUiIfChangedWithRecovered(recovered);
           }
         }
-        function stopLive(backstopLeave) {
-          const session = doc.live;
+        /* ── 阅读位置（插件优先租约在宿主业务层；这里只做当前文档代的票据映射）──
+         * 打开/重载完成（apply-result.applied）后取一次位置；之后引擎只在真实用户滚动时
+         * 上行锚点，保存合并进行；关 tab 前 flush + release，插件关闭后桌面才可接管。 */
+        function newReadingSessionId(token) {
+          const suffix = (typeof crypto !== 'undefined' && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : (Date.now().toString(36) + ':' + Math.random().toString(36).slice(2, 12));
+          return String(token) + ':rp:' + suffix;
+        }
+        function onReadingPosition(content) {
+          if (!alive() || !content || content.protocol !== 2 || content.docToken !== doc.token) return;
+          const reading = doc.reading;
+          const keeper = reading && reading.keeper;
+          if (!keeper || !content.anchor) return;
+          const sessionId = keeper.currentSessionId();
+          if (content.sessionId && sessionId && content.sessionId !== sessionId) return;
+          keeper.notePosition({ anchor: content.anchor, seq: content.seq, at: content.at,
+            reason: content.reason || 'scroll' });
+        }
+        function startReadingPosition() {
+          const reading = doc.reading;
+          if (!reading || reading.started || !doc.absPath || doc.untitled) return;
+          reading.started = true;
+          const keeper = createReadingLeaseKeeper({
+            api: (op, payload) => api('reading', { op, ...payload }),
+            makeSessionId: () => newReadingSessionId(doc.token),
+            alive,
+            generation: () => doc.gen,
+            path: () => doc.absPath,
+            isUntitled: () => doc.untitled,
+            onLease: sessionId => {
+              if (alive() && !reading.stopped)
+                post('reading-arm', { protocol: 2, docToken: doc.token, sessionId });
+            },
+            onLeaseLost: () => {
+              if (alive() && !reading.stopped)
+                post('reading-arm', { protocol: 2, docToken: doc.token, sessionId: null });
+            },
+            onRestore: anchor => {
+              if (alive() && !reading.stopped)
+                post('reading-anchor', { protocol: 2, docToken: doc.token, sessionId: keeper.currentSessionId(), anchor });
+            },
+            onArm: () => {
+              if (alive() && !reading.stopped)
+                post('reading-arm', { protocol: 2, docToken: doc.token, sessionId: keeper.currentSessionId() });
+            },
+          });
+          reading.keeper = keeper;
+          keeper.start();
+        }
+        function captureReadingNow() {
+          const reading = doc.reading;
+          const keeper = reading && reading.keeper;
+          if (!keeper) return;
+          const captured = captureReadingFromWindow(currentFrameWin() || doc.win);
+          if (captured) keeper.capturePosition(captured);
+        }
+        function stopReadingPosition(flush) {
+          const reading = doc.reading;
+          const keeper = reading && reading.keeper;
+          if (!keeper || reading.stopped) return;
+          // The iframe is same-origin (sandbox includes allow-same-origin) and
+          // its engine is still readable in the pre-unmount cleanup.  Capture
+          // the current scroll before releasing: otherwise the first wheel can
+          // be closed inside one rAF, before the 320/900ms trailing publish.
+          if (flush) captureReadingNow();
+          reading.stopped = true;
+          const sessionId = keeper.currentSessionId();
+          const settled = keeper.stop(flush);
+          // Release only after every queued save has settled.  Late save/touch
+          // are also rejected by the host, so this is durability + defense.
+          chainReadingClose(settled, () => (sessionId ? api('reading', { op: 'release', sessionId }) : null));
+        }
+        async function joinLiveIfNeeded() {
+          if (!alive() || doc.live || doc.liveUnsupported || doc.untitled || !doc.absPath) return false;
+          if (doc.dirty || doc.conflict || doc.saving || doc.pendingApply || doc.applyUnknown) return false;
+          doc.needLiveJoin = false;
+          return loadFromDisk({ silent: true, reason: "untitled-live-join" });
+        }
+
+        function stopLive(backstopLeave) {          const session = doc.live;
           doc.live = null;
           doc.liveStaleBlocked = false;   // 会话离场：STALE 预算随会话作废
           doc.liveStaleRounds = 0;
@@ -5616,9 +8325,14 @@ const __test = {
             // 单窗口回落：重新以非 live 口径读盘（干净时），避免把共享房间的未存草稿
             // 留在编辑面里被当成磁盘基线；用户已输入（脏）时由 loadFromDisk 自身守卫保留。
             if (doc.opened && !doc.dirty && !doc.conflict) void loadFromDisk({ silent: true, reason: "live-unsupported" });
+            if (doc.dirty) scheduleDraftMirror();
             return;
           }
           if (action === "conflict") {
+            // Unbind before dropping the parent ticket: otherwise the bridge's
+            // per-docToken idempotence would keep the old engine member and a
+            // later join would bind a different client than the parent holds.
+            if (doc.live) stopLive(true);
             doc.live = null;
             doc.conflict = true;
             showPhase("conflict", (code === "MP_LIVE_STALE" ? "共享文档版本已变化，未覆盖；" : "共享编辑会话已结束，") + "当前内容已保留：" + friendly);
@@ -5668,20 +8382,29 @@ const __test = {
         function commitApplied(pending,reply,snapshot) {
           const value=pending.value,restore=pending.kind==='restore';
           doc.opened=true;doc.text=value.text;doc.textFresh=true;doc.lastVersion=value.version;
+          doc.missing=false;doc.missingPending=false;doc.readonly=false;
+          if (typeof value.diskRevisionSha === "string" && /^[0-9a-f]{64}$/i.test(value.diskRevisionSha))
+            doc.baseSha256 = value.diskRevisionSha.toLowerCase();
+          // Claim only residual mirror rows that predate this generation (see
+          // ensureDraftMirrorHandle): a row written after open belongs to another window.
+          doc.openStamp = Date.now();
+          doc.draftMirrorProbe = probeDraftMirror();
           doc.lastSavedText=value.text;
           doc.displayPath=value.displayPath||doc.absPath;doc.size=value.size;
           doc.mirror=mirrorOf(value.text,reply.session,doc.token);doc.composing=false;
           // 共享房间的未存草稿不是磁盘状态：open 带回的正文若与磁盘种子不同（value.live.dirty），
           // 必须如实标记脏 —— baseVersion/lastVersion 仍指向磁盘版本，绝不能把共享正文
           // 当成"已在盘上"的基线；后续落盘只能走 live 票（房间校验）路径。
-          doc.dirty=restore||doc.untitled||(pending.firstOpen&&value.live&&value.live.dirty===true);
+          doc.dirty=restore||doc.untitled||(pending.firstOpen&&value.live&&liveTicketDirty(value.live));
+          if(pending.firstOpen && !doc.untitled) startReadingPosition();
           if (pending.firstOpen || restore) restorePersistedReview();
           if(pending.firstOpen && !doc.untitled) recordRecentDoc({path:doc.absPath,scope:"absolute"},doc.sessionId,doc.workspace);
           doc.conflict=false;doc.externalStale=false;doc.staleNotified=false;
           if(restore)doc.editSeq++;
-          // live 会话：open(live:true) 回执带票且引擎 facade 可用时，把传输桥交给 iframe。
-          // join 票对应的正文就是本次应用的 value.text，facade bind 的 initial 与之一致。
-          if(value.live && pending.firstOpen && !doc.live && !doc.liveUnsupported) startLive(value.live, value.text);
+          // live 会话：open 回执带票且引擎 facade 可用时绑定。不能只在 firstOpen
+          // 绑定：重载/冲突解决后第一次保存都需要重新接上同一房间。
+          doc.resolvedDisk = typeof value.live?.resolvedDisk === 'string' && value.live.resolvedDisk ? value.live.resolvedDisk : null;
+          if(value.live && !doc.live && !doc.liveUnsupported) startLive(value.live, value.text);
           const recoveryReceipt=checkpointRecovery(value.text,reply.session,restore);
           if(snapshot && snapshot.session.epoch===reply.session.epoch && snapshot.session.sourceRevision>=reply.session.sourceRevision){
             const changed=snapshot.session.sourceRevision>reply.session.sourceRevision;
@@ -5776,6 +8499,7 @@ const __test = {
           if(!applied.ok){doc.mirror.continuous=false;doc.dirty=true;saveStatus.update(true);if(!doc.gapDeltas.some(x=>sameSession(x.after,delta.after)))doc.gapDeltas.push(delta);if(!doc.pulls.size)void requestSnapshot('gap');return false;}
           doc.mirror=applied.mirror;doc.textFresh=false;doc.dirty=true;doc.editSeq++;doc.composing=!!delta.composing;
           doc.recoveryBackupFailed=false;
+          if (doc.liveUnsupported) scheduleDraftMirror();
           try{const result=inspectStoreResult(draftStore()?.append?.({...delta,path:doc.absPath,baseVersion:doc.lastVersion}));result?.durable?.then?.(inspectStoreResult).catch?.(error=>showNotice('恢复记录尚未持久化：'+String(error)));}catch(error){showNotice('恢复记录尚未持久化：'+String(error));}
           if(doc.dead){persistCurrentRecovery();return true;}
           showPhase('dirty',doc.composing?'输入中…':'编辑中…');
@@ -5783,6 +8507,7 @@ const __test = {
             doc.review = mergeReviewGroup(doc.review, remoteGroupId, Array.isArray(delta.changes) ? delta.changes.length : 1);
         persistReviewState();
             doc.reviewDiff = null;
+            doc.reviewDiffMeta = null;
             setUi((prev) => ({ ...prev, reviewDiff: null }));
             const multi = reviewIsMulti(doc.review);
             showPhase('review', 'AI 修改了 ' + doc.review.count + ' 处' + (multi ? '（共 ' + doc.review.groups.length + ' 组）' : '') + '，保存前请确认');
@@ -5818,6 +8543,7 @@ const __test = {
           doc.composing=!!content.composing;
           if(doc.dead){persistCurrentRecovery();return;}
           if(!doc.composing && doc.dirty && !doc.pendingApply){if(doc.manualPending){doc.manualPending=false;void runSave({manual:true});}else scheduleSave(SAVE_DEBOUNCE_MS);}
+          if(doc.liveUnsupported && !doc.composing) scheduleDraftMirror();
         }
         function onSnapshot(reply) {
           const pending=reply && doc.pulls.get(reply.id);
@@ -5846,6 +8572,10 @@ const __test = {
 
 
         function showPhase(phase, detail) {
+          // missing 是删/改名后的显性 latch：输入、apply、live 刷新只能把文档标脏，
+          // 不能把横幅顶掉而留下一个静默停写的 dirty 状态。
+          if (doc.missing && phase !== "missing" && phase !== "error") return;
+          if (!doc.missing && doc.readonly && phase !== "readonly" && phase !== "missing" && phase !== "error") return;
           saveStatus.update(doc.dirty);
           doc.phase = phase;
           doc.detail = detail || "";
@@ -5880,7 +8610,7 @@ const __test = {
             }
             if (typeof doc.lastVersion !== "string" || !doc.lastVersion) return;
             storage.setItem(reviewStoreKey(doc.absPath), JSON.stringify({
-              v: 1,
+              v: 2,
               pathKey: reviewPathKey(doc.absPath),
               baseVersion: doc.lastVersion,
               groups: doc.review.groups.slice(0, 20),
@@ -5913,7 +8643,12 @@ const __test = {
             if (!alive() || !doc.review) return;
             if (!result || result.ok !== true || !Array.isArray(result.value && result.value.groups)) return; // 网络/宿主暂不可用：保留本地状态
             const valid = new Set((result.value.groups || []).filter((group) => group && !group.undoneAt).map((group) => group.groupId));
-            if (restoring.every((id) => valid.has(id))) return;
+            // Host-side reviewRestorable is authoritative for "may this review
+            // be shown again": it is true for the current chain and for a single
+            // group with a proven selective undo after later non-overlapping
+            // user input. Old hosts omit it; reviewRestoreKeeps then falls back
+            // to chainOk and keeps the old cleanup behavior.
+            if (reviewRestoreKeeps(result.value, restoring, valid)) return;
             // Only clear when the provisional groups are still the current set;
             // a newer AI edit must never be discarded by this validation.
             if (doc.review.groups.length === restoring.length && doc.review.groups.every((id, i) => id === restoring[i])) {
@@ -5943,8 +8678,12 @@ const __test = {
         function flushClose() {
           if (doc.flushed) return;
           doc.flushed = true; doc.closeUntil = Date.now() + FLUSH_WAIT_MS + 80;
+          if (!doc.dirty) void clearDraftMirror("close");
           if (!doc.opened || !doc.absPath || !doc.dirty) return;
           persistCurrentRecovery();
+          // The reliable copy on a dirty close is the journal above. This is the
+          // best-effort last mirror write for readers; it never promotes text to disk.
+          flushDraftMirrorOnClose();
           // The parent mirror survives iframe removal. Unknown/composing text
           // is recovery only; closing never promotes it to a disk write.
           if (!doc.mirror?.continuous) void requestSnapshot('close');
@@ -5952,12 +8691,23 @@ const __test = {
 
         function pullText() {
           if (doc.pendingApply || doc.applyUnknown || doc.composing) return Promise.resolve({text:doc.text,stale:true});
+          // The engine buffer is authoritative. mpEngine.setValue / history
+          // replacement deliberately does not publish a document-delta (the
+          // engine suppresses it), so a continuous parent mirror can lag behind
+          // the room. Save must ask the engine for the current text; the room's
+          // live.save validates materialize(room)===text and would otherwise
+          // reject the stale mirror forever as MP_LIVE_STALE.
+          if (doc.live) return requestSnapshot('save');
           if (doc.mirror?.continuous) return Promise.resolve({text:materialize(doc.mirror),stale:false,session:{...doc.mirror.session}});
           return requestSnapshot('save');
         }
 
+        function stopSaveTimer() {
+          if (doc.saveTimer) { clearTimeout(doc.saveTimer); doc.saveTimer = null; }
+        }
+
         function scheduleSave(delay) {
-          if (doc.dead) return;
+          if (doc.dead || doc.missing || doc.readonly) return;
           if (reviewSuppressesSave(doc)) return;   // AI review must reach a decision before the timer can write.
           if (doc.saveTimer) { clearTimeout(doc.saveTimer); doc.saveTimer = null; }
           doc.saveTimer = setTimeout(() => {
@@ -5992,6 +8742,12 @@ const __test = {
               showError("文件已创建，但本机草稿状态尚未确认；内容已保留，请再次保存。");return;
             }
             doc.lastVersion=result.value.version;doc.untitled=false;
+            if (typeof result.value.diskRevisionSha === "string" && /^[0-9a-f]{64}$/i.test(result.value.diskRevisionSha))
+              doc.baseSha256 = result.value.diskRevisionSha.toLowerCase();
+            // Only the real safe-create receipt opts into a live rejoin. Test
+            // doubles and older hosts omit `safe`; treating those as live would
+            // start an async open against a fixture with no engine.
+            if(result.value.safe===true && !doc.live && !doc.liveUnsupported) doc.needLiveJoin = true;
             const clean=seq===doc.editSeq && pulled.text===doc.firstSaveText;
             doc.dirty=!clean; doc.firstSaveText=null;
             if(workbenchDoc?.address===address)delete workbenchDoc.draft;
@@ -6007,6 +8763,7 @@ const __test = {
           } catch(e) {if(alive())showError("保存未确认，草稿已保留，请重试："+String(e?.message||e));}
           finally {
             doc.saving=false;
+            if(alive() && doc.needLiveJoin && !doc.dirty && !doc.untitled) await joinLiveIfNeeded().catch(() => {});
             if(alive() && !doc.untitled && (doc.saveQueued || doc.manualPending)) {
               doc.saveQueued=false; scheduleSave(0);
             }
@@ -6016,6 +8773,21 @@ const __test = {
           const manual = !!(options && options.manual);
           if (doc.dead) return;
           if (reviewSuppressesSave(doc)) return;
+          if (doc.missing) {
+            stopSaveTimer();
+            if (manual) post("toast", "磁盘上的文件已不存在；草稿未写盘，请先重试或复制内容");
+            return;
+          }
+          if (doc.readonly) {
+            stopSaveTimer();
+            if (manual) post("toast", "文件只读或被占用；草稿未写盘，请用另存为副本");
+            return;
+          }
+          if (doc.conflict) {
+            stopSaveTimer();
+            if (manual) post("toast", "请先解决冲突，再保存");
+            return;
+          }
           // 有界预算耗尽后不再自动发保存请求（防持续竞争下无界后台唤醒）；
           // 显式保存（Ctrl+S）重置预算，输入改动只保留草稿等显式动作。
           if (doc.untitled) { if(manual) await saveUntitled(); return; }
@@ -6048,6 +8820,13 @@ const __test = {
           }
           const manualThisRun = manual || doc.manualPending;
           doc.manualPending = false;
+          if (manualThisRun) {
+            // A manual save queued behind an in-flight auto-save must still
+            // reset the STALE budget; otherwise the first stale reply is
+            // treated as exhausted and the user sees "对端持续编辑中" again.
+            doc.liveStaleRounds = 0;
+            doc.liveStaleBlocked = false;
+          }
           doc.saving = true;
           const saveSeq = doc.editSeq; // 保存飞行期间的新编辑靠它识别：宁可多存一轮，不许把脏标清掉
           if (doc.phase !== "dirty" && doc.phase !== "conflict") showPhase("saving", "保存中…");
@@ -6093,6 +8872,9 @@ const __test = {
               if (!alive()) return;
               if (result.ok === true) {
                 doc.lastVersion = result.value.version;
+                if (typeof result.value.diskRevisionSha === "string" && /^[0-9a-f]{64}$/i.test(result.value.diskRevisionSha))
+                  doc.baseSha256 = result.value.diskRevisionSha.toLowerCase();
+                doc.resolvedDisk = null;
                 doc.savedAt = Date.now();
                 doc.lastSavedText = pulled.text;
                 if (doc.live) doc.live = applyLiveReceipt(doc.live, result.value);
@@ -6113,6 +8895,7 @@ const __test = {
                   doc.textFresh = true;
                   doc.mirror = mirrorOf(pulled.text, pulled.session, doc.token);
                   doc.dirty = false;
+                  void clearDraftMirror("save");
                 } else {
                   doc.dirty = true;
                   doc.saveQueued = true;
@@ -6130,13 +8913,15 @@ const __test = {
                 try {
                   const stat = await api("stat", { path: doc.absPath });
                   if (alive() && stat.ok === true && stat.value && stat.value.version !== doc.lastVersion) {
-                    if (doc.live) void refreshLiveRoom();
+                    if (doc.live) void refreshLiveRoom({ afterSave: true });
                     else {
                       let adopted = false;
                       try {
                         const opened = await api("open", { path: doc.absPath, live: false });
                         if (alive() && shouldAdoptSavedVersion(opened, pulled.text)) {
                           doc.lastVersion = String(opened.value.version);
+                          if (typeof opened.value.diskRevisionSha === "string" && /^[0-9a-f]{64}$/i.test(opened.value.diskRevisionSha))
+                            doc.baseSha256 = opened.value.diskRevisionSha.toLowerCase();
                           doc.externalStale = false;
                           doc.conflict = false;
                           adopted = true;
@@ -6172,11 +8957,30 @@ const __test = {
                 if (manualThisRun) post("toast", "对端持续编辑中，请按 Ctrl+S 手动保存");
                 return;
               }
+              const recoveryNotice = saveRecoveryNotice(result.error);
+              if (recoveryNotice) notify(recoveryNotice.text, { kind: "recovery", path: recoveryNotice.path, ttlMs: 15000 });
+              const storageFailure = storageCorruptionFailure(result.error);
+              if (storageFailure) {
+                showError(storageFailure.text);
+                if (manualThisRun) post("toast", storageFailure.text);
+                return;
+              }
+              const saveKind = saveErrorKind(result.error);
+              if (saveKind === "missing") {
+                enterMissing();
+                if (manualThisRun) post("toast", "磁盘上的文件已不存在；草稿未写盘，请先重试或复制内容");
+                return;
+              }
+              if (saveKind === "readonly") {
+                enterReadonly();
+                if (manualThisRun) post("toast", "文件只读或被占用；草稿未写盘，请用另存为副本");
+                return;
+              }
               if (doc.live && result.error && liveErrorAction(result.error.code) === "conflict") {
                 handleLiveError(result.error.code, result.error.message);
                 return;
               }
-              if (result.error && result.error.code === "FS_STALE_VERSION") {
+              if (saveKind === "conflict") {
                 doc.conflict = true;
                 showPhase("conflict", "文件已在别处被修改（" + (result.error.message || "FS_STALE_VERSION") + "）；版本守卫拒绝覆盖");
                 if (manualThisRun) post("toast", "文件已在别处被修改，未覆盖；请先重载磁盘版本");
@@ -6189,14 +8993,27 @@ const __test = {
             }
           } catch (error) {
             if (alive()) {
+              const recoveryNotice = saveRecoveryNotice(error);
+              if (recoveryNotice) notify(recoveryNotice.text, { kind: "recovery", path: recoveryNotice.path, ttlMs: 15000 });
+              const storageFailure = storageCorruptionFailure(error);
+              if (storageFailure) {
+                showError(storageFailure.text);
+                if (manualThisRun) post("toast", storageFailure.text);
+                return;
+              }
               const message = String(error && error.message ? error.message : error);
-              showError("保存失败：" + message);
-              if (manualThisRun) post("toast", "保存失败：" + message);
+              const kind = saveErrorKind(error);
+              if (kind === "missing") enterMissing();
+              else if (kind === "readonly") enterReadonly();
+              else showError("保存失败：" + message);
+              if (manualThisRun) post("toast", kind === "missing" ? "磁盘上的文件已不存在；草稿未写盘" : kind === "readonly" ? "文件只读或被占用；草稿未写盘" : "保存失败：" + message);
             }
           } finally {
             doc.saving = false;
+            if (doc.missingPending) { doc.missingPending = false; enterMissing(); }
             const reload=doc.reloadAfterSave;doc.reloadAfterSave=null;
             if(reload && alive()){if(doc.editSeq===reload.editSeq)void loadFromDisk(reload.opts);else doc.externalStale=true;}
+            if(alive() && doc.needLiveJoin && !doc.dirty && !doc.conflict) await joinLiveIfNeeded().catch(() => {});
             if (doc.saveQueued && alive()) {
               doc.saveQueued = false;
               if (doc.manualPending) {
@@ -6293,6 +9110,230 @@ const __test = {
           void loadFromDisk({}).finally(() => { doc.booting = false; });
         }
 
+        function draftMirrorEligible() {
+          return !!(doc.liveUnsupported && doc.opened && !doc.untitled && doc.absPath && doc.baseSha256
+            && doc.dirty && !doc.dead && !doc.saving && !doc.applyUnknown && !doc.review);
+        }
+        function cancelDraftMirror() {
+          if (doc.draftMirrorTimer) { clearTimeout(doc.draftMirrorTimer); doc.draftMirrorTimer = null; }
+          doc.draftMirrorSeq += 1;
+        }
+        function armDraftMirror(delay) {
+          if (doc.mirrorCleanup || doc.dead || doc.draftMirrorTimer) return;
+          doc.draftMirrorTimer = setTimeout(() => {
+            doc.draftMirrorTimer = null;
+            void pushDraftMirror();
+          }, Math.max(0, delay));
+        }
+        function scheduleDraftMirror() {
+          if (doc.dead) return;
+          if (!doc.liveUnsupported || !doc.opened || doc.untitled || !doc.absPath
+            || !doc.baseSha256 || !doc.dirty) return;
+          doc.draftMirrorPending = true;
+          if (doc.mirrorCleanup) return;                    // cleanup re-arms after it finishes
+          if (doc.draftMirrorFlight) return;                // single flight
+          if (doc.review) return;                           // review owns the buffer
+          if (!draftMirrorEligible()) {                     // saving / applyUnknown: bounded retry
+            armDraftMirror(MIRROR_RETRY_MS);
+            return;
+          }
+          // A new user edit renews the bounded retry budget; idle failures stop.
+          doc.draftMirrorRetries = 0;
+          // Every new dirty cycle starts with an immediate write: the last
+          // cleanup cleared the row, so waiting would leave readers blind.
+          if (!doc.draftMirrorLastAt) { void pushDraftMirror(); return; }
+          const wait = MIRROR_MIN_INTERVAL_MS - (Date.now() - doc.draftMirrorLastAt);
+          armDraftMirror(wait > 0 ? wait : MIRROR_TRAILING_MS);
+        }
+        async function pushDraftMirror() {
+          if (doc.draftMirrorFlight || doc.mirrorCleanup || doc.dead || !doc.draftMirrorPending) return;
+          if (!draftMirrorEligible() || doc.pendingApply || doc.composing) {
+            // Composition end / apply receipt re-schedules; never send half-composed text.
+            if (!doc.composing && doc.dirty) {
+              doc.draftMirrorRetries = (doc.draftMirrorRetries || 0) + 1;
+              if (doc.draftMirrorRetries <= 3) armDraftMirror(MIRROR_RETRY_MS);
+            }
+            return;
+          }
+          const seq = ++doc.draftMirrorSeq;
+          const pathAtSend = doc.absPath, tokenAtSend = doc.token;
+          doc.draftMirrorPending = false;
+          doc.draftMirrorLastAt = Date.now() || 1;   // 0 is the "never sent" sentinel
+          const flight = (async () => {
+            let ack = null;
+            try {
+              let text;
+              if (doc.mirror?.continuous) text = materialize(doc.mirror);
+              else {
+                const snap = await requestSnapshot("mirror");
+                if (!snap || snap.stale || seq !== doc.draftMirrorSeq || doc.dead) {
+                  // A stale snapshot must not drop the trailing edits.
+                  if (!doc.mirrorCleanup && !doc.dead) doc.draftMirrorPending = true;
+                  return;
+                }
+                text = snap.text;
+              }
+              const payload = {
+                path: pathAtSend, text, baseVersion: doc.lastVersion, baseSha256: doc.baseSha256,
+                docToken: tokenAtSend, session: doc.mirror?.session || null,
+              };
+              // A mirror request that never settles must not hold the single
+              // flight forever. Abort the real fetch; the flight then settles
+              // and the bounded retry path can send the latest text again.
+              const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+              const abortTimer = controller
+                ? setTimeout(() => { try { controller.abort(); } catch { /* already settled */ } }, MIRROR_PUSH_TIMEOUT_MS)
+                : 0;
+              let result;
+              try {
+                result = await api("documents.draftMirror", payload, controller ? { signal: controller.signal } : undefined);
+              } finally {
+                if (abortTimer) clearTimeout(abortTimer);
+              }
+              if (result.ok !== true) throw Error("mirror rejected");
+              ack = { docToken: tokenAtSend, textSha256: result.value?.textSha256 || "" };
+              if (doc.absPath === pathAtSend && doc.token === tokenAtSend) doc.draftMirrorAck = ack;
+              if (seq === doc.draftMirrorSeq && !doc.dead && !doc.mirrorCleanup
+                && doc.absPath === pathAtSend && doc.token === tokenAtSend) {
+                doc.draftMirror = ack;
+                doc.draftMirrorRetries = 0;
+              }
+            } catch (error) {
+              // Keep the need: a later edit or a bounded retry must still mirror.
+              if (!doc.mirrorCleanup && !doc.dead) {
+                doc.draftMirrorPending = true;
+                doc.draftMirrorRetries = (doc.draftMirrorRetries || 0) + 1;
+              }
+            } finally {
+              doc.draftMirrorFlight = null;
+              // A clear that could not wait for this flight self-deletes only the
+              // exact value this flight wrote (token+sha in one host statement).
+              if (doc.mirrorClearAfterFlight) {
+                doc.mirrorClearAfterFlight = false;
+                if (ack) {
+                  try {
+                    const removed = await deleteDraftMirrorRow(pathAtSend, ack);
+                    if (removed && doc.draftMirror?.docToken === ack.docToken) doc.draftMirror = null;
+                  } catch { /* the next explicit cleanup owns it */ }
+                }
+                // Edits made while the timed-out cleanup was still waiting must
+                // reach the mirror once the flight has settled. The clear may have
+                // reset the pacing already; make the tail write immediate.
+                if (doc.draftMirrorPending && !doc.mirrorCleanup && doc.dirty && !doc.dead) {
+                  doc.draftMirrorLastAt = 0;
+                  scheduleDraftMirror();
+                }
+              } else if (doc.draftMirrorPending && !doc.mirrorCleanup && doc.dirty && !doc.dead) {
+                const retries = doc.draftMirrorRetries || 0;
+                const delay = retries > 0 ? ((retries <= 2) ? MIRROR_RETRY_MS : 0) : MIRROR_TRAILING_MS;
+                if (delay > 0) armDraftMirror(delay);
+              }
+            }
+          })();
+          doc.draftMirrorFlight = flight;
+          await flight;
+        }
+        async function ensureDraftMirrorHandle() {
+          if (doc.draftMirror) return true;
+          if (!doc.absPath || doc.dead) return false;
+          try {
+            const result = await api("documents.draftRead", { path: doc.absPath, docToken: doc.token });
+            if (result.ok === true && result.value && typeof result.value.textSha256 === "string"
+              && /^[0-9a-f]{64}$/i.test(result.value.textSha256)) {
+              const updatedAt = Number(result.value.updatedAt);
+              // A row written after this generation opened belongs to another
+              // window; adopting it would later delete a row we do not own.
+              if (doc.openStamp && Number.isFinite(updatedAt) && updatedAt > doc.openStamp) return false;
+              doc.draftMirror = { docToken: result.value.docToken || doc.token, textSha256: result.value.textSha256 };
+              return true;
+            }
+          } catch { /* old host or store unavailable */ }
+          return false;
+        }
+        async function probeDraftMirror() {
+          if (doc.untitled || !doc.absPath || doc.dead || doc.draftMirror) return;
+          if (!await ensureDraftMirrorHandle()) return;
+          // A mirror from an earlier unsupported/restarted session is not a
+          // recovery banner yet, but its handle must be known so a later save,
+          // close or reload can remove the row instead of blocking AI for 14 days.
+          if (!doc.liveUnsupported && !doc.dirty) showNotice("发现上次未保存的草稿镜像；保存或关闭时会清理，不会覆盖当前磁盘正文。");
+        }
+        function draftClearPayload(pathAtClear, claimed) {
+          if (!claimed || typeof claimed.docToken !== "string" || !claimed.docToken) return null;
+          const textSha256 = typeof claimed.textSha256 === "string" && /^[0-9a-f]{64}$/i.test(claimed.textSha256)
+            ? claimed.textSha256.toLowerCase() : null;
+          return textSha256
+            // One host statement matches source+kind+doc_token+text_sha. The old
+            // sha-only / token-only contracts are untouched for old callers.
+            ? { path: pathAtClear, docToken: claimed.docToken, exact: true, expectedTextSha256: textSha256 }
+            : { path: pathAtClear, docToken: claimed.docToken };
+        }
+        async function deleteDraftMirrorRow(pathAtClear, claimed) {
+          const payload = draftClearPayload(pathAtClear, claimed);
+          if (!payload) return false;
+          try {
+            const result = await api("documents.draftClear", payload);
+            return result.ok === true && result.value?.removed > 0;
+          } catch { return false; }
+        }
+        async function clearDraftMirror(reason) {
+          if (!doc.absPath) { cancelDraftMirror(); return; }
+          if (!doc.liveUnsupported && !doc.draftMirror) { cancelDraftMirror(); return; }
+          cancelDraftMirror();
+          const pathAtClear = doc.absPath, tokenAtClear = doc.token;
+          doc.mirrorCleanup = true;
+          // Let an in-flight write land first. Only a timeout arms the flight's
+          // own exact self-delete; a landed flight is covered by the ack below.
+          const flight = doc.draftMirrorFlight;
+          if (flight) {
+            let timer = null;
+            const timedOut = await Promise.race([
+              flight.then(() => false, () => false),
+              new Promise(resolve => { timer = setTimeout(() => resolve(true), MIRROR_CLEAR_WAIT_MS); }),
+            ]);
+            if (timer) clearTimeout(timer);
+            if (timedOut) doc.mirrorClearAfterFlight = true;
+          }
+          try {
+            if (doc.absPath !== pathAtClear || doc.token !== tokenAtClear) return;
+            // Wait for the open-time residual probe, then use only a handle that
+            // already belonged to this generation (never a fresh read here).
+            if (doc.draftMirrorProbe) {
+              let timer = null;
+              await Promise.race([
+                doc.draftMirrorProbe.then(() => true, () => true),
+                new Promise(resolve => { timer = setTimeout(() => resolve(false), PULL_TIMEOUT_MS); }),
+              ]);
+              if (timer) clearTimeout(timer);
+              if (doc.absPath !== pathAtClear || doc.token !== tokenAtClear) return;
+            }
+            const claimed = doc.draftMirrorAck && doc.draftMirrorAck.docToken === tokenAtClear
+              ? doc.draftMirrorAck : doc.draftMirror;
+            if (!claimed || typeof claimed.docToken !== "string" || !claimed.docToken) return;
+            const removed = await deleteDraftMirrorRow(pathAtClear, claimed);
+            if (removed && doc.draftMirror?.docToken === claimed.docToken) doc.draftMirror = null;
+          } catch { /* keep the handle for a later retry */ }
+          finally {
+            if (doc.token === tokenAtClear) {
+              doc.mirrorCleanup = false;
+              doc.draftMirrorAck = null;
+              doc.draftMirrorLastAt = 0;   // next dirty cycle's first key writes immediately
+              doc.draftMirrorRetries = 0;
+              if (doc.draftMirrorPending && doc.dirty && !doc.review && !doc.dead) {
+                // The flight may still be settling; its finally re-schedules.
+                if (draftMirrorEligible()) scheduleDraftMirror();
+                else if (!doc.draftMirrorFlight) armDraftMirror(MIRROR_RETRY_MS);
+              }
+            }
+          }
+        }
+        function flushDraftMirrorOnClose() {
+          if (!doc.liveUnsupported || !doc.dirty || doc.untitled || !doc.absPath || !doc.baseSha256) return;
+          doc.draftMirrorPending = true;
+          doc.draftMirrorLastAt = 0;   // last chance: the iframe is about to be removed
+          void pushDraftMirror();
+        }
+
         function onDirty(content) {
           doc.dirty = true;
           doc.recoveryBackupFailed = false;
@@ -6307,16 +9348,115 @@ const __test = {
             showPhase("dirty", "编辑中…（磁盘已更新，保存时会冲突）");
           }
           scheduleSave(SAVE_DEBOUNCE_MS);
+          scheduleDraftMirror();
         }
 
         /** 外部磁盘变更：live 房间先从磁盘采纳（干净时自动进正文；有草稿时报告冲突）。 */
         const LIVE_RETRY_CODES = { MP_FILE_CONFLICT: 1, MP_FILE_MISSING: 1, MP_FILE_BUSY: 1 };
+        // A dirty live room may only be dirty because this editor has an AI edit
+        // awaiting confirmation. An own-save watch echo or a visibility refresh
+        // must not turn that into a conflict. Read the disk identity without side
+        // effects; only a version/hash pair that proves the known disk baseline
+        // may advance the baseline. Text equality is never such a proof.
+        function liveRefreshSnapshot(checkSeq, allowSaving) {
+          return {
+            seq: checkSeq,
+            allowSaving: allowSaving === true,
+            token: doc.token,
+            client: doc.live && doc.live.client,
+            epoch: doc.live && doc.live.epoch,
+            path: doc.absPath,
+            lastVersion: doc.lastVersion,
+            baseSha256: doc.baseSha256,
+          };
+        }
+        // One frozen-identity gate for every await boundary (stat, open, catch)
+        // and for the final UI write. A newer refresh, a switched document, a
+        // changed live generation, or a moved version/hash baseline is stale.
+        function liveRefreshCurrent(snap) {
+          return !!snap
+            && snap.seq === doc.liveDiskCheckSeq
+            && alive() && !doc.dead && doc.opened && !!doc.live
+            && doc.token === snap.token
+            && doc.absPath === snap.path
+            && doc.live.client === snap.client
+            && doc.live.epoch === snap.epoch
+            && doc.lastVersion === snap.lastVersion
+            && String(doc.baseSha256 || "") === String(snap.baseSha256 || "")
+            && !doc.conflict
+            && (!doc.saving || snap.allowSaving);
+        }
+        async function liveDirtyDiskVerdict(snap) {
+          if (!snap.path) return { verdict: "unknown" };
+          let stat;
+          try { stat = await api("stat", { path: snap.path }); }
+          catch (e) { return liveRefreshCurrent(snap) ? { verdict: "unknown" } : { verdict: "stale" }; }
+          if (!liveRefreshCurrent(snap)) return { verdict: "stale" };
+          if (!stat || stat.ok !== true || !stat.value) return { verdict: "unknown" };
+          if (stat.value.missing === true) return { verdict: "missing" };
+          const statVersion = stat.value.version == null ? "" : String(stat.value.version);
+          if (!statVersion) return { verdict: "unknown" };
+          // A same-version stat proves no disk change but must never advance
+          // doc.lastVersion/doc.baseSha256; the baseline moves only on a known hash.
+          if (snap.lastVersion && statVersion === String(snap.lastVersion)) return { verdict: "same", source: "stat" };
+          // The stat is only a cheap prefilter. Once the version changed, read the
+          // disk baseline with the read-only open (live:false; never joins/adopts).
+          // Only this open's exact diskRevisionSha may prove the frozen baseSha256.
+          let opened;
+          try { opened = await api("open", { path: snap.path, live: false }); }
+          catch (e) { return liveRefreshCurrent(snap) ? { verdict: "unknown" } : { verdict: "stale" }; }
+          if (!liveRefreshCurrent(snap)) return { verdict: "stale" };
+          const errorCode = opened && opened.ok === false && opened.error ? String(opened.error.code || "") : "";
+          if (errorCode === "FS_NOT_FOUND" || errorCode === "ENOENT") return { verdict: "missing" };
+          if (!opened || opened.ok !== true || !opened.value) return { verdict: "unknown" };
+          const openVersion = opened.value.version == null ? "" : String(opened.value.version);
+          if (!openVersion) return { verdict: "unknown" };
+          const diskSha = typeof opened.value.diskRevisionSha === "string" ? opened.value.diskRevisionSha.toLowerCase() : "";
+          const knownBase = String(snap.baseSha256 || "").toLowerCase();
+          if (/^[0-9a-f]{64}$/.test(diskSha) && /^[0-9a-f]{64}$/.test(knownBase) && diskSha === knownBase)
+            return { verdict: "same", source: "open", version: openVersion };
+          // Version changed and the byte hash is not the known disk baseline:
+          // equality with the current draft, lastSavedText (including an old empty
+          // value), or a normalized text is NOT proof. Fail closed; never advance.
+          return { verdict: "changed", source: "open" };
+        }
         async function refreshLiveRoom(options) {
           const opts = options || {};
           if (!doc.live) return null;
+          const checkSeq = doc.liveDiskCheckSeq = (doc.liveDiskCheckSeq || 0) + 1;
           // R1：本地有未提交/编辑中的内容时不自动采纳磁盘，避免丢掉尚在交换途中的按键。
-          if (!opts.discard && (doc.dirty || doc.conflict || doc.saving)) {
+          // A conflict-resolved buffer is intentionally dirty; let the host decide
+          // whether the disk still matches room_resolved instead of faking conflict.
+          if (!opts.discard && (doc.dirty || doc.conflict || doc.saving || doc.review) && !doc.resolvedDisk) {
+            // An in-flight save owns its own reconcile; never preempt it with a banner.
+            // The post-save reconcile call is explicitly allowed to probe after the
+            // successful save response while the finally-block has not cleared saving.
+            if (doc.saving && !opts.afterSave) return null;
+            // A real conflict is already latched; do not clear it on a refresh.
+            if (doc.conflict) { doc.externalStale = true; return null; }
+            const snap = liveRefreshSnapshot(checkSeq, opts.afterSave === true);
+            const diskState = await liveDirtyDiskVerdict(snap);
+            // Final gate immediately before any state/UI write. Nothing below
+            // awaits, so one frozen-identity check covers the whole commit.
+            if (!liveRefreshCurrent(snap)) return null;
+            if (diskState.verdict === "stale") return null;
+            if (diskState.verdict === "missing") { enterMissing(); return null; }
+            if (diskState.verdict === "same") {
+              // Baseline advance is allowed only for the open-proven known hash,
+              // and only the opened version moves; stat-same never touches it.
+              if (diskState.source === "open" && diskState.version) doc.lastVersion = diskState.version;
+              doc.externalStale = false;
+              doc.staleNotified = false;
+              if (doc.phase === "conflict") {
+                if (doc.review) showPhase("review", "AI 修改了 " + doc.review.count + " 处，保存前请确认");
+                else showPhase(doc.dirty ? "dirty" : "ready", "");
+              }
+              return null;
+            }
+            // changed (or unprovable unknown): real external / fail-closed. Never
+            // adopt or write; keep the current buffer and the conflict banner.
             doc.externalStale = true;
+            stopSaveTimer();
             showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
             return null;
           }
@@ -6332,6 +9472,7 @@ const __test = {
               if (value.changed) post("live-refresh", { protocol: 2, docToken: doc.token });
               if (value.unsavedDraft && !opts.discard) {
                 doc.externalStale = true;
+                stopSaveTimer();
                 showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
                 return value;
               }
@@ -6376,7 +9517,7 @@ const __test = {
           if (!alive()) return;
           if (!opened || opened.ok !== true || !opened.value) {
             doc.externalStale = true;
-            if (doc.dirty || doc.conflict) showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
+            if (doc.dirty || doc.conflict) { stopSaveTimer(); showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑"); }
             return;
           }
           const diskVersion = String(opened.value.version || "");
@@ -6390,6 +9531,8 @@ const __test = {
           const verdict = externalDiskVerdict(diskText, currentText, savedText);
           if (verdict !== "conflict") {
             if (diskVersion) doc.lastVersion = diskVersion;
+            if (typeof opened.value.diskRevisionSha === "string" && /^[0-9a-f]{64}$/i.test(opened.value.diskRevisionSha))
+              doc.baseSha256 = opened.value.diskRevisionSha.toLowerCase();
             doc.externalStale = false;
             doc.conflict = false;
             if (doc.review) showPhase("review", "AI 修改了 " + doc.review.count + " 处，保存前请确认");
@@ -6397,17 +9540,205 @@ const __test = {
             return;
           }
           doc.externalStale = true;
-          if (doc.dirty || doc.conflict) showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
+          if (doc.dirty || doc.conflict) { stopSaveTimer(); showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑"); }
         }
+        function enterMissing() {
+          if (doc.missing) return;
+          doc.missing = true;
+          doc.externalStale = true;
+          doc.staleNotified = true;
+          stopSaveTimer();
+          clearPoll();
+          showPhase("missing", doc.dirty
+            ? "磁盘上的文件已不存在；当前编辑内容保留、未写盘"
+            : "磁盘上的文件已不存在（可能被删除或改名）");
+          void locateMissing();
+        }
+
+        async function locateMissing() {
+          if (!doc.missing || !doc.absPath || doc.dead) return;
+          try {
+            const result = await api("documents.locate", { path: doc.absPath, cwd: doc.workspace });
+            if (!alive() || !doc.missing || result.ok !== true) return;
+            const candidates = Array.isArray(result.value?.candidates) ? result.value.candidates : [];
+            if (!candidates.length) return;
+            const names = candidates.slice(0, 3).map((item) => String(item.path).split(/[\\/]/).pop()).join("、");
+            showPhase("missing", "检测到可能已改名为：" + names + "；可重试或另存为副本");
+          } catch { /* locate is best-effort; the missing latch stays */ }
+        }
+
+        function exitMissing() {
+          if (!doc.missing) return;
+          doc.missing = false;
+          doc.externalStale = false;
+          doc.staleNotified = false;
+          if (doc.readonly) { showPhase("readonly", "文件只读或被占用；当前编辑内容保留、未写盘，可另存为副本"); return; }
+          if (doc.conflict) showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
+          else showPhase(doc.dirty ? "dirty" : "ready", doc.dirty ? "编辑中…" : "");
+        }
+
+        function enterReadonly() {
+          if (doc.readonly || doc.missing) return;
+          doc.readonly = true;
+          doc.externalStale = true;
+          doc.staleNotified = true;
+          stopSaveTimer();
+          showPhase("readonly", "文件只读或被占用；当前编辑内容保留、未写盘，可另存为副本");
+        }
+
+        function exitReadonly() {
+          if (!doc.readonly) return;
+          doc.readonly = false;
+          doc.externalStale = false;
+          doc.staleNotified = false;
+          if (doc.missing) { showPhase("missing", doc.dirty ? "磁盘上的文件已不存在；当前编辑内容保留、未写盘" : "磁盘上的文件已不存在（可能被删除或改名）"); return; }
+          showPhase(doc.dirty ? "dirty" : "ready", doc.dirty ? "编辑中…" : "");
+        }
+
+        async function retryMissing() {
+          if (!doc.missing || !doc.absPath || doc.dead) return;
+          try {
+            const result = await api("stat", { path: doc.absPath });
+            if (!result.ok || result.value?.missing === true) {
+              post("toast", "文件仍不存在；草稿保留在恢复日志，不会重建旧路径");
+              return;
+            }
+            if (doc.live) stopLive(true);
+            await loadFromDisk({ silent: true, reason: "retry-missing" });
+            if (!doc.missing) exitMissing();
+          } catch (error) {
+            post("toast", "重试失败：" + String(error && error.message ? error.message : error));
+          }
+        }
+
+        async function retryReadonly() {
+          if (!doc.readonly || doc.dead) return;
+          exitReadonly();
+          await runSave({ manual: true });
+          if (!doc.readonly && doc.phase === "error") {
+            doc.readonly = true;
+            showPhase("readonly", "仍无法写入此路径；当前编辑内容保留，可另存为副本");
+          }
+        }
+
+        function openSaveAs() {
+          if ((!doc.missing && !doc.readonly) || !doc.absPath || doc.saveAsBusy) return;
+          doc.saveAsValue = saveAsCandidate(doc.absPath);
+          setUi((prev) => ({ ...prev, saveAsOpen: true, saveAsValue: doc.saveAsValue, saveAsError: "", saveAsBusy: false }));
+        }
+
+        function closeSaveAs() {
+          if (doc.dead || doc.saveAsBusy) return;
+          setUi((prev) => ({ ...prev, saveAsOpen: false, saveAsError: "", saveAsBusy: false }));
+        }
+
+        async function submitSaveAs() {
+          if ((!doc.missing && !doc.readonly) || !doc.absPath || doc.saving || doc.pendingApply || doc.applyUnknown || doc.saveAsBusy) return;
+          const targetPath = String(doc.saveAsValue || "").trim();
+          if (!targetPath) {
+            setUi((prev) => ({ ...prev, saveAsError: "请输入绝对路径" }));
+            return;
+          }
+          if (targetPath === doc.absPath) {
+            setUi((prev) => ({ ...prev, saveAsError: "目标不能是当前源文件；另存为不会重建原路径" }));
+            return;
+          }
+          doc.saveAsBusy = true;
+          setUi((prev) => ({ ...prev, saveAsBusy: true, saveAsError: "" }));
+          const fail = (message) => {
+            doc.saveAsBusy = false;
+            setUi((prev) => ({ ...prev, saveAsBusy: false, saveAsError: message }));
+          };
+          let pulled;
+          try {
+            pulled = await pullText();
+          } catch (error) {
+            fail("编辑器未返回完整正文，未另存：" + String(error?.message || error));
+            return;
+          }
+          if (!pulled || pulled.stale || typeof pulled.text !== "string") {
+            fail("编辑器未返回完整正文，未另存；请稍后重试");
+            return;
+          }
+          const text = pulled.text;
+          let result;
+          try {
+            result = await api("docs/saveAs", { path: doc.absPath, targetPath, text });
+          } catch (error) {
+            fail(String(error?.message || error));
+            return;
+          }
+          if (!alive()) { doc.saveAsBusy = false; return; }
+          if (result.ok !== true) {
+            const code = result.error?.code;
+            fail(code === "FS_SANDBOX_DENIED"
+              ? "当前工作区不允许写该路径，请选择 workspace 内的路径"
+              : code === "FS_EXISTS"
+                ? "目标文件已存在，另存为不会覆盖"
+                : String(result.error?.message || code || "另存为失败"));
+            return;
+          }
+          const savedPath = result.value && typeof result.value.path === "string" ? result.value.path : "";
+          if (!savedPath) { fail("另存为回执不完整，未确认副本路径"); return; }
+          doc.saveAsBusy = false;
+          recordRecentDoc({ path: savedPath, scope: "absolute" }, doc.sessionId, doc.workspace);
+          setUi((prev) => ({ ...prev, saveAsOpen: false, saveAsBusy: false }));
+          post("toast", "已另存为：" + savedPath);
+          if (doc.missing) showPhase("missing", "已另存为副本：" + savedPath + "；原文件仍不存在");
+          else if (doc.readonly) showPhase("readonly", "已另存为副本：" + savedPath + "；原文件仍只读或被占用");
+          else showPhase(doc.dirty ? "dirty" : "ready", doc.dirty ? "编辑中…" : "");
+        }
+
+        async function openRecoveryCenter() {
+          if (!doc.absPath || doc.dead) return;
+          setUi((prev) => ({ ...prev, recoveryCenterOpen: true, recoveryCenterLoading: true, recoveryCenterError: "", recoveryCenterItems: [], recoveryPreview: "" }));
+          try {
+            const result = await api("documents.recoveryList", { path: doc.absPath, cwd: doc.workspace });
+            if (!alive()) return;
+            if (result.ok !== true) {
+              setUi((prev) => ({ ...prev, recoveryCenterLoading: false, recoveryCenterError: String(result.error?.message || result.error?.code || "读取恢复索引失败") }));
+              return;
+            }
+            setUi((prev) => ({ ...prev, recoveryCenterLoading: false, recoveryCenterItems: Array.isArray(result.value?.items) ? result.value.items : [] }));
+          } catch (error) {
+            if (alive()) setUi((prev) => ({ ...prev, recoveryCenterLoading: false, recoveryCenterError: String(error?.message || error) }));
+          }
+        }
+
+        function closeRecoveryCenter() {
+          setUi((prev) => ({ ...prev, recoveryCenterOpen: false, recoveryCenterLoading: false, recoveryCenterItems: [], recoveryCenterError: "", recoveryPreview: "" }));
+        }
+
+        async function readRecoveryItem(item) {
+          if (!item?.recoveryPath || !doc.absPath) return;
+          try {
+            const result = await api("documents.recoveryRead", { path: doc.absPath, recoveryPath: item.recoveryPath });
+            if (!alive()) return;
+            if (result.ok !== true) {
+              setUi((prev) => ({ ...prev, recoveryPreview: "", recoveryCenterError: String(result.error?.message || result.error?.code || "读取恢复副本失败") }));
+              return;
+            }
+            setUi((prev) => ({ ...prev, recoveryCenterError: "", recoveryPreview: String(result.value?.text || "").slice(0, 20000) + (String(result.value?.text || "").length > 20000 ? "\n…（已截断）" : "") }));
+          } catch (error) {
+            if (alive()) setUi((prev) => ({ ...prev, recoveryPreview: "", recoveryCenterError: String(error?.message || error) }));
+          }
+        }
+
         function onExternalEvent(event) {
           let data = {};
           try { data = JSON.parse(event.data) || {}; } catch (e) { data = {}; }
           if (data.path && doc.absPath && !samePath(data.path, doc.absPath)) return;
           if (!doc.opened) return; // 握手/首次 open 之前的事件没有落点（boot 自己会读磁盘）
+          if (doc.missing && data.missing !== true) exitMissing();
           // Our own save can emit a watch event while the editor still has
           // unsaved edits. Defer that event and verify the disk text before
           // turning it into a conflict; real external edits still conflict.
-          if (doc.saving) return;
+          if (doc.saving) {
+            if (data.missing === true) doc.missingPending = true;
+            else if (doc.missing) { doc.missingPending = false; exitMissing(); }
+            return;
+          }
+          if (data.missing === true) { enterMissing(); return; }
           // live 会话：磁盘事件的采纳权在共享房间（external 写入会被 adopt 成房间更新），
           // 这里只催一次 refresh，绝不 loadFromDisk 覆盖共享草稿。
           if (doc.live) { void refreshLiveRoom(); return; }
@@ -6426,6 +9757,7 @@ const __test = {
               if (doc.dirty && !doc.staleNotified) doc.staleNotified = true;
             }
             if (doc.dirty || doc.conflict) {
+              stopSaveTimer();
               showPhase("conflict", "文件已在磁盘上更新；点「重载磁盘版本」用磁盘内容覆盖，或「复制我的内容」保留当前编辑");
             }
             return;
@@ -6456,13 +9788,14 @@ const __test = {
           if (isDocumentHidden()) return;
           if (doc.tabVisible === false) { schedulePoll(POLL_SLOW_MS); return; }
           if (doc.esHealthy) { schedulePoll(POLL_SLOW_MS); return; }
-          if (doc.dirty || doc.conflict || doc.saving || !doc.opened || !doc.lastVersion) {
+          if (doc.dirty || doc.conflict || doc.saving || doc.missing || !doc.opened || !doc.lastVersion) {
             doc.pollFailures = Math.min(3, doc.pollFailures + 1);
             schedulePoll(nextPollDelay({ healthy: false, failures: doc.pollFailures, hidden: false }));
             return;
           }
           api("stat", { path: doc.absPath }).then((result) => {
             if (doc.dead) return;
+            if (result.ok === true && result.value?.missing === true) { enterMissing(); return; }
             if (result.ok === true && result.value && String(result.value.version) !== String(doc.lastVersion)) {
               void loadFromDisk({ silent: true, reason: "poll" });
             }
@@ -6536,11 +9869,15 @@ const __test = {
               return;
             }
             if (wantSend) {
-              const direct = await sendViaHostSession(recipient, payload);
+              const delivery = mp208DeliveryFor(recipient);
+              const direct = await sendViaHostSession(recipient, payload, delivery);
               if (!alive()) return;
               if (direct.ok) {
-                post("toast", "已发送给 AI");
-                showNotice("已发送给 AI");
+                const note = direct.mode === "steer"
+                  ? "已插话发送给 AI"
+                  : direct.running === true ? "已排队发送给 AI" : "已发送给 AI";
+                post("toast", note);
+                showNotice(note);
                 return;
               }
               log.warn?.("dsh-markdown-editor-typora: 直发失败：%s", String(direct.reason || "unknown"));
@@ -6567,6 +9904,468 @@ const __test = {
           }
         }
 
+        /**
+         * Normal selection insertion is a READ-ONLY quote through the official
+         * composer action. It keeps the existing draft, never submits, and
+         * never falls back to a long paste or a direct session send.
+         */
+        async function onInsertQuote(content) {
+          let recipient = mp208QuoteRecipient({
+            currentSessionId: currentConversationSessionId(),
+            selectedSessionId: workspaceContext().sessionId,
+          });
+          const tokenAtCapture = doc.token;
+          const snap = mp208Snapshot(doc, content, recipient);
+          if (!snap.ok) { post("toast", snap.message); showNotice(snap.message); return; }
+          if (!alive() || doc.token !== tokenAtCapture) return;
+          const quote = mp208BuildQuote({
+            path: snap.displayPath || snap.path,
+            ranges: snap.ranges,
+            text: snap.text,
+            docLength: snap.docLength,
+            lineStart: snap.lineStart,
+            lineEnd: snap.lineEnd,
+          });
+          if (!quote.ok) { post("toast", quote.message); showNotice(quote.message); return; }
+          // 空首页没有会话时，按宿主正常新会话流程建立一个空白会话；只把引用
+          // 放进它的草稿，不发任何占位消息。已有空白会话则直接复用。
+          if (!recipient) {
+            recipient = await ensureConversationSession();
+            if (!alive() || doc.token !== tokenAtCapture) return;
+            if (!recipient) {
+              post("toast", "当前没有可用的对话输入框；引用未插入，选区已保留");
+              showNotice("当前没有可用的对话输入框；引用未插入，选区已保留");
+              return;
+            }
+          }
+          if (mp208NeedsQuoteChoice(quote.text)) {
+            // No safe read-only on-demand path exists for a normal quote. Ask
+            // explicitly for the full payload or cancel with the real cost.
+            const chosen = await mp208OpenQuoteChoiceDialog({
+              path: snap.displayPath || snap.path,
+              lineStart: snap.lineStart,
+              lineEnd: snap.lineEnd,
+              cost: mp208QuoteCost(quote.text),
+            });
+            if (!alive() || doc.token !== tokenAtCapture) return;
+            if ((currentConversationSessionId() || workspaceContext().sessionId) !== recipient) {
+              post("toast", "会话已切换，引用已取消；选区与草稿已保留");
+              showNotice("会话已切换，引用已取消；选区与草稿已保留");
+              return;
+            }
+            if (!chosen) {
+              post("toast", "已取消引用；请缩小范围后再试（选区与草稿已保留）");
+              showNotice("已取消引用；请缩小范围后再试（选区与草稿已保留）");
+              return;
+            }
+          }
+          let acts = inputFaceOf(recipient) || (recipient === doc.sessionId ? inputActionsRef.current : null);
+          if (!acts) acts = await waitForInputFace(recipient, 1800);
+          if (!alive() || doc.token !== tokenAtCapture) return;
+          // 等待动作面/新会话绑定期间用户可能切走：真正写入前再核对可见会话。
+          if ((currentConversationSessionId() || workspaceContext().sessionId) !== recipient) {
+            post("toast", "会话已切换，引用已取消；选区与草稿已保留");
+            showNotice("会话已切换，引用已取消；选区与草稿已保留");
+            return;
+          }
+          const cap = mp208Capability(acts);
+          if (cap.nativeQuote) {
+            const inserted = mp208InsertNativeQuote(acts, quote);
+            try {
+              window.__MP208_LAST_QUOTE = {
+                at: Date.now(), ok: inserted.ok === true, method: inserted.method || null,
+                reason: inserted.reason || null, meta: quote.meta, summary: quote.summary,
+              };
+            } catch (e) { /* diagnostics only */ }
+            if (inserted.ok) {
+              mp208RecordCost("quote", quote.meta);
+              post("toast", "已插入引用（只读）；可预览或移除，确认后请手动发送");
+              showNotice("已插入引用（只读）；可预览或移除，确认后请手动发送");
+              return;
+            }
+            // Host refused because the composer is busy / not in the plain phase.
+            // Keep the selection and the draft; never paste or auto-send.
+            post("toast", "引用未插入：输入框正在生成或发送中；草稿和选区已保留");
+            showNotice("引用未插入：输入框正在生成或发送中；草稿和选区已保留");
+            return;
+          }
+          // No native quote on this host: only a SHORT read-only text insertion
+          // is an acceptable degradation. Longer content is refused honestly.
+          const fallback = mp208InsertReadOnlyText(acts, quote);
+          if (fallback.ok) {
+            mp208RecordCost("quote", quote.meta);
+            post("toast", "已插入只读引用（当前宿主无原生引用）；请手动发送");
+            showNotice("已插入只读引用（当前宿主无原生引用）；请手动发送");
+            return;
+          }
+          post("toast", fallback.reason === "too-large-for-readonly-fallback"
+            ? "当前宿主无原生引用，且选区过长，无法安全降级；已保留选区与草稿"
+            : "当前宿主输入面不可用；已保留选区与草稿，未自动粘贴或发送");
+          showNotice(fallback.reason === "too-large-for-readonly-fallback"
+            ? "当前宿主无原生引用，且选区过长，无法安全降级；已保留选区与草稿"
+            : "当前宿主输入面不可用；已保留选区与草稿，未自动粘贴或发送");
+        }
+
+        /**
+         * Wait for the host's isolated edit record. The record is the only
+         * durable progress signal: it transitions held → running → done /
+         * failed / cancelled. The dialog's "停止" calls editAbort, which flips
+         * the record to cancelled and aborts the isolated model call.
+         */
+        async function mp208AwaitEditOutcome(nonce, control) {
+          const deadline = Date.now() + 5 * 60 * 1000;
+          let stopDeadline = 0;
+          while (Date.now() < deadline) {
+            let result;
+            try {
+              result = await api("documents.editStatus", { nonce: nonce });
+            } catch (error) {
+              return { status: "failed", error: { code: "MP_EDIT_STATUS", message: String(error && error.message ? error.message : error) } };
+            }
+            const value = result && result.ok === true ? (result.value || {}) : null;
+            if (!value) {
+              return { status: "failed", error: (result && result.error) || { code: "MP_EDIT_STATUS", message: "状态读取失败" } };
+            }
+            if (value.status === "done") return { status: "done", value: value.result };
+            if (value.status === "failed" || value.status === "cancelled" || value.status === "expired"
+              || value.status === "superseded" || value.status === "missing") {
+              return { status: value.status, error: value.error || null };
+            }
+            if (control && control.stopped) {
+              if (!stopDeadline) stopDeadline = Date.now() + 5000;
+              if (Date.now() > stopDeadline) return { status: "cancelled", error: { code: "MP_EDIT_CANCELLED", message: "已停止修改" } };
+            }
+            await new Promise((resolve) => setTimeout(resolve, 350));
+          }
+          return { status: "timeout", error: { code: "MP_EDIT_TIMEOUT", message: "修改超时" } };
+        }
+
+        /**
+         * Explicit “修改此处”: capture a short-lived restricted target, ask for
+         * the user's intent, then SUBMIT that one restricted request to the
+         * current conversation. It never uses the composer draft or attachment
+         * rail, and never sends the user's existing draft. The target is
+         * validated again after every await so a tab/session change cannot
+         * redirect the edit.
+         */
+        async function onEditTarget(content) {
+          const docAtCapture = doc;
+          // 只认可见的当前输入框；不要用文档历史 owner 兜底（新首页没有会话）。
+          const recipient = currentConversationSessionId() || workspaceContext().sessionId;
+          const tokenAtCapture = doc.token;
+          const pathAtCapture = doc.absPath;
+          // Host captureSelection requires a selection owner session. The chat
+          // target may be created only at submit time; for the click-time
+          // preflight, use the visible session first, then the document's own
+          // tab session. It is never used as the chat recipient.
+          const selectionSessionId = recipient || doc.sessionId || "";
+          const snap = mp208Snapshot(doc, content, selectionSessionId);
+          if (!snap.ok) { post("toast", snap.message); showNotice(snap.message); return; }
+          if (!snap.docDigest) {
+            post("toast", "没有拿到点击时的文档摘要，修改目标未创建；请改用只读引用");
+            showNotice("没有拿到点击时的文档摘要，修改目标未创建；请改用只读引用");
+            return;
+          }
+          if (mp208ByteLength(snap.text) > MP208_MAX_EDIT_BYTES) {
+            post("toast", "选区超过 32 KiB，请缩小范围后再修改");
+            showNotice("选区超过 32 KiB，请缩小范围后再修改");
+            return;
+          }
+          // 发送不再依赖 composer 的动作面：用户可以在首页/空会话直接提交。
+          // 这里只校验文档仍属于同一次点击，避免异步期间换文档。
+          const sameDocument = () => alive() && doc === docAtCapture && doc.opened && !doc.dead
+            && doc.token === tokenAtCapture && doc.absPath === pathAtCapture;
+          const visibleSession = () => currentConversationSessionId() || workspaceContext().sessionId;
+          // Tab/session ownership only. Revisions are proved separately from the
+          // same engine snapshot; a live room version may legitimately advance
+          // while the flush/snapshot round-trip is in flight.
+          const sameTarget = () => sameDocument() && visibleSession() === recipient;
+
+          /**
+           * Build a verifiable origin revision from the SAME engine snapshot:
+           *   1. flush the live room so all local edits are in the room;
+           *   2. take one engine text snapshot;
+           *   3. hash its normalized text (CRLF/BOM normalization matches the
+           *      host revisionTextSha), and require every captured range to still
+           *      describe that exact text;
+           *   4. live: rev1:live:<epoch>:<version>:<sha256>; disk/mirror: use the
+           *      full rev1: revision already delivered with the synced text and
+           *      prove its sha equals this snapshot.
+           * A dirty document without a live buffer is refused (no authoritative
+           * revision contains the unsaved text).
+           */
+          const prepareCapture = async (checkSession) => {
+            const fail = (reason) => ({ ok: false, reason: reason });
+            const sessionStillOk = () => (checkSession === false ? sameDocument() : sameTarget());
+            let live = null;
+            if (doc.live) {
+              let flushed;
+              try { flushed = await flushLive(); }
+              catch (error) { return fail("flush:" + String(error && error.message ? error.message : error)); }
+              if (!flushed || flushed.ok !== true) return fail("flush:" + String(flushed && (flushed.code || flushed.error) || "failed"));
+              const result = flushed.result || {};
+              if (typeof result.epoch !== "string" || !result.epoch || !Number.isSafeInteger(result.version)) return fail("flush-version");
+              live = { epoch: result.epoch, version: result.version };
+            } else if (doc.dirty) {
+              return fail("dirty-without-live-buffer");
+            }
+            const fresh = await requestSnapshot("mp208-capture");
+            if (!fresh || fresh.stale === true || typeof fresh.text !== "string") return fail("snapshot-stale");
+            if (!sessionStillOk()) return fail("target-changed");
+            const text = fresh.text;
+            const sha = await mp208Sha256Hex(text);
+            if (!sha) return fail("hash-unavailable");
+            // The click-time digest was taken from the SAME CM6 state that
+            // produced the offsets. After the flush we only compare: a full-doc
+            // digest match proves the offsets still address the same content,
+            // even when the selected text also occurs elsewhere. If it differs,
+            // we never re-bind to new offsets.
+            if (!snap.docDigest) return fail("missing-click-digest");
+            if (!mp208DigestMatches(snap.docDigest, sha)) return fail("document-changed-since-click");
+            if (!sessionStillOk()) return fail("target-changed");
+            const ranges = [];
+            for (const r of snap.ranges) {
+              // With the digest match this is a second, cheap assertion; it
+              // must not be used to "find" a same-text range anywhere else.
+              if (text.slice(r.from, r.to) !== r.text) return fail("selection-stale");
+              ranges.push({
+                from: r.from, to: r.to, text: r.text,
+                before: text.slice(Math.max(0, r.from - 64), r.from),
+                after: text.slice(r.to, Math.min(text.length, r.to + 64)),
+              });
+            }
+            let revision;
+            let origin;
+            if (live) {
+              revision = "rev1:live:" + live.epoch + ":" + live.version + ":" + sha;
+              origin = { ...snap.origin, liveEpoch: live.epoch, liveVersion: live.version, docLength: text.length };
+            } else {
+              revision = typeof doc.lastVersion === "string" ? doc.lastVersion : "";
+              if (!/^rev1:(disk|mirror):/.test(revision)) return fail("no-verifiable-revision");
+              const parts = revision.split(":");
+              if (parts[parts.length - 1] !== sha) return fail("revision-text-mismatch");
+              origin = { ...snap.origin, docLength: text.length };
+            }
+            return {
+              ok: true,
+              snapshot: {
+                // Keep snap.text as the SELECTION body. The freshly read full
+                // document is only used for digest/revision context and is
+                // never forwarded to the model.
+                ...snap, ranges: ranges, docLength: text.length,
+                documentText: text,
+                originRevision: revision, origin: origin,
+              },
+            };
+          };
+
+          const prepared = await prepareCapture();
+          if (!sameTarget()) {
+            post("toast", "文档或会话已切换，修改目标已失效；未发送任何内容");
+            showNotice("文档或会话已切换，修改目标已失效；未发送任何内容");
+            return;
+          }
+          if (!prepared || prepared.ok !== true) {
+            const reason = prepared && prepared.reason ? prepared.reason : "capture-unavailable";
+            // Safe degradation: read-only quote, preserving the existing draft.
+            const quote = mp208BuildQuote({
+              path: snap.displayPath || snap.path,
+              ranges: snap.ranges,
+              text: snap.text,
+              docLength: snap.docLength,
+              lineStart: snap.lineStart,
+              lineEnd: snap.lineEnd,
+            });
+            const acts = inputFaceOf(recipient) || (recipient === doc.sessionId ? inputActionsRef.current : null);
+            const readOnly = quote.ok ? mp208InsertNativeQuote(acts, quote) : { ok: false };
+            if (readOnly.ok) {
+              mp208RecordCost("quote", quote.meta);
+              post("toast", "修改目标暂不可用（" + reason + "）；已作为只读引用插入，请手动发送");
+              showNotice("修改目标暂不可用（" + reason + "）；已作为只读引用插入，请手动发送");
+            } else {
+              post("toast", "修改目标暂不可用（" + reason + "）；未改写任何内容，草稿已保留");
+              showNotice("修改目标暂不可用（" + reason + "）；未改写任何内容，草稿已保留");
+            }
+            return;
+          }
+          const activeSnap = prepared.snapshot;
+          let captured;
+          try { captured = await mp208CaptureHostSelection(activeSnap); }
+          catch (error) { captured = { ok: false, reason: String(error && error.message ? error.message : error) }; }
+          try {
+            window.__MP208_LAST_CAPTURE = {
+              at: Date.now(), ok: captured && captured.ok === true,
+              selectionId: captured && captured.selectionId ? captured.selectionId : null,
+              reason: captured && captured.reason ? captured.reason : null,
+              originRevision: activeSnap.originRevision,
+              lineStart: activeSnap.lineStart, lineEnd: activeSnap.lineEnd,
+            };
+          } catch (e) { /* diagnostics only */ }
+          if (!sameTarget()) {
+            post("toast", "文档或会话已切换，修改目标已失效；未发送任何内容");
+            showNotice("文档或会话已切换，修改目标已失效；未发送任何内容");
+            return;
+          }
+          // 点击时的 captureSelection 只是预检：选区引用有 TTL，而且首页可能
+          // 还没有会话可作 owner。真正提交时会在目标会话确定后重新捕获；
+          // 这里失败不阻止弹窗，失败原因由提交阶段给出并保留指令。
+          const dialog = await mp208OpenIntentDialog({
+            path: activeSnap.displayPath || activeSnap.path,
+            lineStart: activeSnap.lineStart,
+            lineEnd: activeSnap.lineEnd,
+            text: activeSnap.text,
+            onSubmit: async (intent, control) => {
+              if (!sameDocument()) {
+                return { ok: false, message: "文档已切换，未发送；指令已保留，可重试。" };
+              }
+              const target = mp208EditSubmitTarget({
+                capturedSessionId: recipient,
+                currentSessionId: visibleSession(),
+              });
+              if (!target.ok) {
+                return { ok: false, message: target.message + "；指令已保留，可重试。" };
+              }
+              let targetSessionId = target.sessionId;
+              if (target.create) {
+                // 空首页：由这次操作走宿主正常新会话流程创建。创建过程中用户
+                // 手动选了别的会话时 ensureConversationSession 会返回 ""。
+                targetSessionId = await ensureConversationSession();
+                if (!sameDocument()) {
+                  return { ok: false, message: "文档已切换，未发送；指令已保留，可重试。" };
+                }
+                if (!targetSessionId) {
+                  return { ok: false, message: "没有可提交的对话（可能已切换会话），未发送；指令已保留，可重试。" };
+                }
+              }
+              // 异步创建/等待结束后，真正生成载荷前再核对一次可见会话与文档。
+              if (!sameDocument() || visibleSession() !== targetSessionId) {
+                return { ok: false, message: "文档或对话已切换，未发送；指令已保留，可重试。" };
+              }
+              // 选区引用是短期的：用户填写意图可能已过了一段时间。提交时用
+              // 同一份点击快照重新 flush/核对摘要并重新 captureSelection，
+              // 过期就保留指令让用户重试，绝不发送一个已失效的 selectionId。
+              const refreshed = await prepareCapture(false);
+              if (!sameDocument() || visibleSession() !== targetSessionId) {
+                return { ok: false, message: "文档或对话已切换，未发送；指令已保留，可重试。" };
+              }
+              if (!refreshed || refreshed.ok !== true) {
+                return { ok: false, message: "选区已失效，未发送；指令已保留，可重试。" };
+              }
+              const freshSnap = refreshed.snapshot;
+              // The isolated path captures the selection on the host and returns
+              // a short-lived selectionId + nonce. The only session submission is
+              // a marked prompt that the host's agent/pre-step listener consumes
+              // before the parent loop builds its request; no parent history is
+              // sent for this edit.
+              const explicitReference = mp208ExplicitReference(intent);
+              let preparedEdit;
+              try {
+                preparedEdit = await api("documents.editPrepare", mp208EditPrepareBody(freshSnap, targetSessionId, intent, explicitReference));
+              } catch (error) {
+                preparedEdit = { ok: false, error: { code: "MP_EDIT_PREPARE", message: String(error && error.message ? error.message : error) } };
+              }
+              if (!sameDocument() || visibleSession() !== targetSessionId) {
+                return { ok: false, message: "文档或对话已切换，未发送；指令已保留，可重试。" };
+              }
+              if (!preparedEdit || preparedEdit.ok !== true) {
+                const reason = String((preparedEdit && preparedEdit.error && (preparedEdit.error.code || preparedEdit.error.message)) || "选区已失效");
+                return { ok: false, message: "修改目标已失效（" + reason + "）；指令已保留，可重试。" };
+              }
+              const preparedValue = preparedEdit.value || {};
+              const nonce = String(preparedValue.nonce || "");
+              const rpcId = String(preparedValue.rpcId || "");
+              const selectionId = String(preparedValue.selectionId || "");
+              if (!nonce || !selectionId) {
+                return { ok: false, message: "宿主没有返回修改目标；指令已保留，可重试。" };
+              }
+              if (control && typeof control === "object") {
+                control.stop = function () {
+                  try { void api("documents.editAbort", { nonce: nonce }).catch(function () { /* 已停止 */ }); } catch (e) { /* 已停止 */ }
+                };
+                if (control.stopped) {
+                  await api("documents.editAbort", { nonce: nonce }).catch(function () { /* 已停止 */ });
+                  return { ok: false, message: "已停止修改；指令已保留，可重试。" };
+                }
+              }
+              const editPayload = mp208BuildEditPayload({
+                path: freshSnap.displayPath || freshSnap.path,
+                ranges: freshSnap.ranges,
+                text: freshSnap.text,
+                docLength: freshSnap.docLength,
+                lineStart: freshSnap.lineStart,
+                lineEnd: freshSnap.lineEnd,
+                selectionId: selectionId,
+                intent: intent,
+                readSelection: mp208ByteLength(freshSnap.text) > MP208_MAX_EDIT_INLINE,
+              });
+              if (!editPayload.ok) {
+                await api("documents.editAbort", { nonce: nonce }).catch(function () { /* 已清理 */ });
+                return { ok: false, message: editPayload.message };
+              }
+              const armed = await api("documents.editArm", { nonce: nonce, text: editPayload.text, meta: editPayload.meta })
+                .catch(function (error) {
+                  return { ok: false, error: { message: String(error && error.message ? error.message : error) } };
+                });
+              if (!armed || armed.ok !== true) {
+                await api("documents.editAbort", { nonce: nonce }).catch(function () { /* 已清理 */ });
+                return { ok: false, message: "修改目标未就绪；指令已保留，可重试。" };
+              }
+              // 最后一次同步核对：载荷已就绪，调用宿主发送前不再有任何 await。
+              if (!sameDocument() || visibleSession() !== targetSessionId) {
+                await api("documents.editAbort", { nonce: nonce }).catch(function () { /* 已清理 */ });
+                return { ok: false, message: "文档或对话已切换，未发送；指令已保留，可重试。" };
+              }
+              // ONE send path: a single marked Session prompt. It never submits
+              // or replaces the composer draft/attachments. The host consumes
+              // this exact submission in agent/pre-step and runs the edit in an
+              // isolated model context; the parent model is not called for it.
+              // Always queue as a NEW turn: steering the marker into a running
+              // turn's later step would not get the clean step-0 empty-turn
+              // completion the isolation contract relies on.
+              const delivery = Object.assign({}, mp208DeliveryFor(targetSessionId), { mode: "queue" });
+              const marker = typeof preparedValue.marker === "string" && preparedValue.marker
+                ? preparedValue.marker : ("[[mp-edit:" + nonce + "]]\n");
+              const sent = await sendViaHostSession(targetSessionId, marker + editPayload.text, delivery, rpcId);
+              if (!sent.ok) {
+                await api("documents.editAbort", { nonce: nonce }).catch(function () { /* 已清理 */ });
+                return {
+                  ok: false,
+                  message: "提交失败：" + String(sent.reason || "宿主未接受")
+                    + "；指令已保留，可重试（不会发送输入框草稿）。",
+                };
+              }
+              const outcome = await mp208AwaitEditOutcome(nonce, control);
+              try {
+                window.__MP208_LAST_EDIT_SUBMIT = {
+                  at: Date.now(), ok: outcome.status === "done", sessionId: targetSessionId,
+                  createdSession: target.create === true, selectionId: selectionId,
+                  nonce: nonce, explicitReference: explicitReference,
+                  path: freshSnap.path, meta: editPayload.meta, text: editPayload.text,
+                  delivery: delivery, status: outcome.status,
+                };
+              } catch (e) { /* diagnostics only */ }
+              if (outcome.status !== "done") {
+                if (outcome.status === "cancelled") {
+                  return { ok: false, message: "已停止修改；指令已保留，可重试。" };
+                }
+                const reason = String((outcome.error && (outcome.error.message || outcome.error.code)) || outcome.status || "修改失败");
+                return { ok: false, message: "修改失败（" + reason + "）；指令已保留，可重试。" };
+              }
+              mp208RecordCost("edit", editPayload.meta);
+              const doneNote = explicitReference
+                ? "已参考刚才的讨论完成修改（仅进入编辑器缓冲区；输入框草稿未改动）"
+                : "已完成修改（仅进入编辑器缓冲区；输入框草稿未改动）";
+              post("toast", doneNote);
+              showNotice(doneNote);
+              return { ok: true, sessionId: targetSessionId, mode: sent.mode, nonce: nonce };
+            },
+          });
+          if (dialog === null) {
+            post("toast", "已取消修改请求；未发送任何内容");
+            showNotice("已取消修改请求；未发送任何内容");
+          }
+        }
+
         function onMessage(event) {
           const data = event && event.data;
           if (!isUpEnvelope(data)) return;
@@ -6582,34 +10381,15 @@ const __test = {
           }
           // 已死代际只放行"关 tab flush 的 text 回执"（旧回执一律丢弃）。
           if (!alive() && !(doc.closeUntil >= Date.now() && ["text","document-delta","composition","apply-result","live-exchange","live-leave","live-flush-result"].includes(type))) return;
-          // 编辑器 iframe 的右沿热区：拖动量上行到这里改对话宽度
-          if (type === "chat-resize") {
-            var rz = data.content || {};
-            var eng0 = handleState.engine;
-            if (eng0) {
-              if (rz.phase === "start") {
-                var snapW = eng0.snapshot ? eng0.snapshot() : null;
-                chatHandleState.startW = (snapW && snapW.chatW) || 420;
-              } else {
-                // 上限按"当前可用列宽"算，否则会拖出一个宽到放不下的对话列（编辑区被压没、对话内容溢出）
-                var rootEl1 = findConversationRoot(doc);
-                var rectNow = rootEl1 ? rootEl1.getBoundingClientRect() : null;
-                var hiW = rectNow ? Math.max(LAYOUT_MIN_CHAT, Math.round(rectNow.width) - 240) : 900;
-                var nextW = Math.round(layoutClamp(chatHandleState.startW - (Number(rz.dx) || 0), LAYOUT_MIN_CHAT, Math.min(900, hiW)));
-                eng0.updateCfg({ chatWidth: nextW });
-                // 必须走统一的 layoutReapply（apply + observe + 阶段几何），
-                // 只调 apply() 时舞台宽度会滞后 —— 表现为"编辑区撑满、对话列跑出屏幕"。
-                try {
-                  if (rz.phase === "end") {
-                    if (typeof layoutReapply === "function") layoutReapply();
-                    else eng0.apply();
-                  } else if (typeof layoutReapply === "function") scheduleLayout();
-                  else if (eng0.requestApply) eng0.requestApply();
-                } catch (e0) { /* 忽略 */ }
-                if (rz.phase === "end") {
-                  try { writeSettings(window.localStorage, { chatWidth: nextW }); } catch (e1) { /* 无存储 */ }
-                }
-              }
+          if (type === "reading-position") { if (alive()) onReadingPosition(data.content); return; }
+          if (type === "reading-release") {
+            const content = data.content || {};
+            const keeper = doc.reading.keeper;
+            if (content.docToken === doc.token && content.sessionId && keeper &&
+                content.sessionId === keeper.currentSessionId()) {
+              const sessionId = content.sessionId;
+              chainReadingClose(keeper.whenIdle(),
+                () => api("reading", { op: "release", sessionId }).catch(() => {}));
             }
             return;
           }
@@ -6686,6 +10466,8 @@ const __test = {
           if (type === "manual-save") { manualSave(data.content); return; }
           if (type === "text") { onSnapshot(data.content); return; }
           if (type === "insert-to-chat") { void onInsertToChat(data.content); return; }
+          if (type === "insert-quote") { void onInsertQuote(data.content); return; }
+          if (type === "edit-target") { void onEditTarget(data.content); return; }
           if (type === "host-invoke") { handleHostInvoke(data.content, post); return; }
           if (type === "openLink" && data.content) {
             try { window.open(String(data.content), "_blank", "noopener"); } catch (e) { /* 拦截器拒绝 */ }
@@ -6792,6 +10574,7 @@ const __test = {
           clearRecoverySlot(null,doc.absPath);
           const token=typeof slot?.docToken==='string'&&slot.docToken?slot.docToken:null;
           if(token){try{Promise.resolve(draftStore()?.clear?.(doc.absPath,token,slot?.session)).catch(error=>showNotice('清除恢复记录失败：'+String(error)));}catch(error){showNotice('清除恢复记录失败：'+String(error));}}
+          void clearDraftMirror("discard");
           setUiIfChanged({phase:'ready',detail:'已丢弃恢复内容',notice:'',recovery:null});
           return Promise.resolve();
         }
@@ -6805,7 +10588,9 @@ const __test = {
             if (!clipboard || typeof clipboard.writeText !== "function") throw new Error("clipboard unavailable");
             await clipboard.writeText(text);
             post("toast", "已复制当前编辑内容");
-            showPhase("conflict", "已复制当前编辑内容；磁盘版本未覆盖");
+            if (doc.missing) showPhase("missing", "已复制当前编辑内容；磁盘上的文件仍不存在");
+            else if (doc.readonly) showPhase("readonly", "已复制当前编辑内容；原文件仍只读或被占用");
+            else showPhase("conflict", "已复制当前编辑内容；磁盘版本未覆盖");
           } catch (error) {
             post("toast", "复制失败：" + String(error && error.message ? error.message : error));
           }
@@ -6848,6 +10633,7 @@ const __test = {
               return;
             }
             stopLive(true);   // 冲突后重载 = 放弃旧房间，重新 join
+            await clearDraftMirror('reload');
             setUiIfChanged({ phase: "loading", detail: "", notice: "" });
             const loaded = await loadFromDisk({ silent: false, discard: true });
             if (!loaded && alive() && (doc.dirty || doc.conflict)) {
@@ -6866,9 +10652,175 @@ const __test = {
         }
 
         // 横幅按钮回调（渲染侧通过 st.actions 取当前代）。
+        function syncConflictUi() { setUi((prev) => ({ ...prev })); }
+        function closeConflictPanel() {
+          doc.conflictSession = null;
+          doc.conflictChoices = [];
+          doc.conflictBusy = false;
+          syncConflictUi();
+        }
+        function chooseConflict(index, choice, text) {
+          const choiceList = Array.isArray(doc.conflictChoices) ? doc.conflictChoices.slice() : [];
+          if (!doc.conflictSession || index < 0 || index >= choiceList.length) return;
+          choiceList[index] = { ...choiceList[index], choice, ...(text === undefined ? {} : { text: String(text) }) };
+          doc.conflictChoices = choiceList;
+          syncConflictUi();
+        }
+        async function openConflict() {
+          if (!alive() || !doc.opened || !doc.absPath || doc.untitled) return;
+          if (doc.pendingApply || doc.applyUnknown || doc.saving) { showNotice('编辑器同步或保存进行中，暂时不能打开冲突；请稍后再试'); return; }
+          if (doc.conflictBusy) return;
+          const pathAtStart = doc.absPath;
+          doc.conflictBusy = true; syncConflictUi();
+          let result = null;
+          try { result = await api('documents.conflictOpen', { path: pathAtStart, cwd: doc.workspace }); } catch (e) { result = null; }
+          if (!alive() || doc.absPath !== pathAtStart) { doc.conflictBusy = false; syncConflictUi(); return; }
+          doc.conflictBusy = false;
+          if (!result || result.ok !== true) {
+            const code = result?.error?.code || '';
+            showNotice('打开冲突失败：' + String(result?.error?.message || code || 'unknown'));
+            syncConflictUi();
+            return;
+          }
+          const value = result.value || {};
+          if (value.conflict === false) {
+            closeConflictPanel();
+            doc.conflict = false;
+            doc.externalStale = false;
+            if (doc.review) showPhase('review', 'AI 修改了 ' + doc.review.count + ' 处，保存前请确认');
+            else if (doc.dirty) showPhase('dirty', '冲突已消失；当前编辑内容已保留');
+            else { showPhase('loading', ''); void loadFromDisk({ silent: true, reason: 'conflict-gone' }); }
+            return;
+          }
+          doc.conflictSession = value;
+          doc.conflictChoices = conflictDefaultChoices(value);
+          syncConflictUi();
+          setUi((prev) => ({ ...prev, railOpen: false }));
+        }
+        async function applyConflict() {
+          const session = doc.conflictSession;
+          if (!session || doc.conflictBusy) return;
+          if (!conflictApplyEnabled(session, doc.conflictChoices, doc.conflictBusy)) {
+            showNotice('请为每个冲突选择处理方式；手动编辑不能为空');
+            return;
+          }
+          if (doc.pendingApply || doc.applyUnknown || doc.saving) { showNotice('编辑器同步或保存进行中，暂时不能应用冲突选择；请稍后再试'); return; }
+          doc.conflictBusy = true; syncConflictUi();
+          let result = null;
+          try {
+            result = await api('documents.conflictResolve', {
+              path: doc.absPath, cwd: doc.workspace, conflictId: session.conflictId,
+              resolutions: conflictResolutionsFromChoices(doc.conflictChoices),
+            });
+          } catch (e) { result = null; }
+          if (!alive()) return;
+          doc.conflictBusy = false;
+          if (!result || result.ok !== true) {
+            const code = result?.error?.code || '';
+            if (code === 'MP_DOC_STALE' || code === 'MP_CONFLICT_NOT_FOUND' || code === 'MP_LIVE_NO_ROOM' || code === 'MP_LIVE_SESSION') {
+              closeConflictPanel();
+              doc.conflict = true;
+              doc.resolvedDisk = null;
+              stopSaveTimer();
+              showPhase('conflict', '冲突已变化或会话已过期；请重新点「查看冲突」');
+              showNotice('未应用：' + String(result?.error?.message || code));
+            } else {
+              syncConflictUi();
+              showNotice('解决冲突失败：' + String(result?.error?.message || code || 'unknown'));
+            }
+            return;
+          }
+          const value = result.value || {};
+          if (value.changed === false) {
+            closeConflictPanel();
+            if (value.resolved === true) {
+              doc.lastVersion = typeof value.diskVersion === 'string' && value.diskVersion ? value.diskVersion : doc.lastVersion;
+              doc.resolvedDisk = typeof value.resolvedDisk === 'string' && value.resolvedDisk ? value.resolvedDisk : session.diskHash;
+              // "Keep mine" did not change the buffer, but the buffer still
+              // differs from disk; mark dirty or Ctrl+S would be a clean no-op
+              // and the approved overwrite would never be written.
+              doc.dirty = true;
+              doc.staleNotified = false;
+              doc.liveStaleRounds = 0;
+              doc.liveStaleBlocked = false;
+              // A pending AI review must stay visible: manualSaveGate suppresses
+              // saving while review exists, so phase=dirty here would hide the
+              // 保留并保存/撤销本次 buttons and create a dead end.
+              if (doc.review) persistReviewState();
+            }
+            doc.conflict = false;
+            doc.externalStale = false;
+            stopSaveTimer();
+            if (doc.review) {
+              const multi = reviewIsMulti(doc.review);
+              showPhase('review', 'AI 修改了 ' + doc.review.count + ' 处' + (multi ? '（共 ' + doc.review.groups.length + ' 组）' : '') + '，保存前请确认');
+            } else {
+              showPhase(doc.dirty ? 'dirty' : 'ready', value.resolved === true ? '已保留我的版本；保存时会覆盖磁盘' : '冲突已解决（正文未改变）');
+            }
+            return;
+          }
+          // Optimistic review: the host wrote one conflict-resolve group. Set the
+          // review before closing so no pending save timer can write unreviewed
+          // text, and persist with the new disk version.
+          doc.lastVersion = typeof value.diskVersion === 'string' && value.diskVersion ? value.diskVersion : doc.lastVersion;
+          doc.resolvedDisk = typeof value.resolvedDisk === 'string' && value.resolvedDisk ? value.resolvedDisk : session.diskHash;
+          const groupId = typeof value.groupId === 'string' && value.groupId ? value.groupId : null;
+          if (groupId) {
+            const count = Array.isArray(value.applied) && value.applied.length ? value.applied.length : 1;
+            doc.review = mergeReviewGroup(doc.review, groupId, count);
+            persistReviewState();
+            doc.reviewDiff = null;
+            doc.reviewDiffMeta = null;
+            setUi((prev) => ({ ...prev, reviewDiff: null }));
+          }
+          doc.conflict = false;
+          doc.externalStale = false;
+          doc.staleNotified = false;
+          doc.liveStaleRounds = 0;
+          doc.liveStaleBlocked = false;
+          // The resolve changed the buffer relative to disk; never let a stale
+          // dirty bit turn the following Ctrl+S into a clean no-op.
+          doc.dirty = true;
+          stopSaveTimer();
+          closeConflictPanel();
+          if (doc.review) {
+            const multi = reviewIsMulti(doc.review);
+            showPhase('review', 'AI 修改了 ' + doc.review.count + ' 处' + (multi ? '（共 ' + doc.review.groups.length + ' 组）' : '') + '，保存前请确认');
+          } else {
+            showPhase('dirty', '冲突已解决；当前内容尚未保存');
+          }
+          // Do not call refreshLiveRoom here: R1 would turn the dirty buffer into
+          // a fake conflict. post() has no R1 guard and lets the facade exchange.
+          post('live-refresh', { protocol: 2, docToken: doc.token });
+          setTimeout(() => {
+            if (alive() && doc.resolvedDisk && !doc.review) showNotice('冲突已解决；正在等待编辑器同步');
+          }, 1500);
+        }
+        async function cancelConflict() {
+          if (doc.conflictBusy) return;
+          const session = doc.conflictSession;
+          const conflictId = session && session.conflictId;
+          closeConflictPanel();
+          if (!conflictId) return;
+          try { await api('documents.conflictCancel', { path: doc.absPath, conflictId }); }
+          catch (e) { /* session is memory-only; TTL will clear it */ }
+        }
+
         st.actions = {
           reloadDisk: forceReload,
           copyMine: copyMine,
+          retryMissing,
+          retryReadonly,
+          openSaveAs,
+          openRecoveryCenter,
+          closeRecoveryCenter,
+          readRecoveryItem,
+          closeSaveAs,
+          submitSaveAs,
+          openConflict,
+          applyConflict,
+          cancelConflict,
+          chooseConflict,
           restoreRecovery: restoreRecovery,
           discardRecovery: discardRecovery,
           clearNotices: clearRailNotices,
@@ -6939,28 +10891,71 @@ const __test = {
             if (!groupIds.length) return;
             void api('documents.undoGroups', { path: doc.absPath, groupIds }).then((result) => {
               if (!result || result.ok !== true) {
-                showNotice('撤销失败：' + String(result?.error?.message || result?.error?.code || 'unknown') + '；当前内容未变，可继续保留或重读');
+                showNotice(undoFailureNotice(result && result.error));
                 return;
               }
               doc.ignoreRemoteGroupId = result.value?.groupId || null;
               doc.review = null;
               clearPersistedReview();
               doc.reviewDiff = null;
+              doc.reviewDiffMeta = null;
+              stopSaveTimer();
               setUi((prev) => ({ ...prev, reviewDiff: null, railOpen: false }));
-              const message = '已撤销本次 AI 修改（' + groupIds.length + ' 组）；磁盘未改变';
-              showPhase(doc.dirty ? 'dirty' : 'ready', message);
-              showNotice(message);
-            }).catch((error) => showNotice('撤销失败：' + String(error && error.message ? error.message : error)));
+              const message = undoResultNotice(result.value, groupIds.length);
+              const pending = Array.isArray(result.value?.undoMarkPending) ? result.value.undoMarkPending.length : 0;
+              if (result.value?.reopenedConflict === true) {
+                doc.conflict = true;
+                doc.resolvedDisk = null;
+                showPhase('conflict', '撤销后冲突重新出现：磁盘与编辑器都改了；请重新「查看冲突」');
+                const storage = (result.value?.source === 'disk' || result.value?.saved === true)
+                  ? '已写盘' : '仅撤销编辑器缓冲区，磁盘未改变';
+                showNotice('撤销成功；冲突已重新出现，保存前请先解决；' + storage
+                  + (pending > 0 ? '；审阅标记未完全写入（' + pending + ' 组），重新打开后可能再次出现审阅提示' : ''));
+              } else {
+                showPhase(doc.dirty ? 'dirty' : 'ready', message);
+                showNotice(message);
+              }
+            }).catch((error) => showNotice('撤销请求未完成：' + String(error && error.message ? error.message : error) + '；请先重读正文确认内容后再操作'));
           },
           reviewKeep: () => {
             if (!doc.review) return;
             doc.review = null;
             clearPersistedReview();
             doc.reviewDiff = null;
+            doc.reviewDiffMeta = null;
             doc.ignoreRemoteGroupId = null;
+            // A review exists because the buffer contains accepted remote
+            // changes. Do not rely on a possibly-cleared dirty bit: mark it so
+            // the explicit keep action always reaches runSave instead of
+            // being treated as a clean no-op.
+            doc.dirty = true;
             setUi((prev) => ({ ...prev, reviewDiff: null, railOpen: false }));
             showPhase('dirty', '已保留 AI 修改，正在保存');
             scheduleSave(0);
+          },
+          reviewLocate: (index) => {
+            const meta = doc.reviewDiffMeta;
+            if (!meta || meta.chainOk !== true) {
+              showNotice('这组差异是历史片段，正文已变化，无法证明当前坐标；未跳转（请用撤销或重新查看差异）');
+              return;
+            }
+            if (meta.editSeq !== doc.editSeq) {
+              showNotice('查看差异后正文又有改动，历史坐标已失效；未跳转，请重新查看差异');
+              return;
+            }
+            const change = Array.isArray(doc.reviewDiff) ? doc.reviewDiff[index] : null;
+            if (!change) { showNotice('该差异已不在当前列表中'); return; }
+            const located = mp208PlanHistoricalLocate(meta, index);
+            if (!located.ok) {
+              showNotice('该差异没有可证明的当前位置（历史片段）；未跳转');
+              return;
+            }
+            if (Number.isSafeInteger(doc.text && doc.text.length) && located.to > doc.text.length) {
+              showNotice('该差异的当前位置已超出正文；未跳转，请重新查看差异');
+              return;
+            }
+            post('cmd', { kind: 'reveal', from: located.from, to: located.to });
+            showNotice('已定位到修改处（已按版本链重定位）；正文内容未改动');
           },
           reviewDiff: () => {
             const review = doc.review;
@@ -6978,11 +10973,20 @@ const __test = {
               }
               if (!changes.length) { showNotice('该组没有可显示的差异'); return; }
               doc.reviewDiff = changes;
+              doc.reviewDiffMeta = {
+                chainOk: result.value?.chainOk === true,
+                chainReason: result.value?.chainReason || null,
+                currentRevisionId: result.value?.currentRevisionId || null,
+                editSeq: doc.editSeq,
+                groups: groups,
+                at: Date.now(),
+              };
               setUi((prev) => ({ ...prev, reviewDiff: changes, railOpen: true }));
             }).catch((error) => showNotice('读取差异失败：' + String(error && error.message ? error.message : error)));
           },
           closeReviewDiff: () => {
             doc.reviewDiff = null;
+            doc.reviewDiffMeta = null;
             setUi((prev) => ({ ...prev, reviewDiff: null, railOpen: false }));
           },
           retry: () => {
@@ -7036,6 +11040,7 @@ const __test = {
 
         const onVisibilityChange = () => {
           if (doc.dead) return;
+          if (doc.missing) return;
           if (isDocumentHidden()) { clearPoll(); return; }
           // API.md §1.5：窗口重新获焦 → 立即增量交换（不是全文轮询）。
           if (doc.live) void refreshLiveRoom();
@@ -7054,7 +11059,10 @@ const __test = {
         const tabSignal = tab && tab.signal;
         try {
           if (tabSignal && typeof tabSignal.addEventListener === "function") {
-            const onAbort = () => { try { flushClose(); } catch (e) { /* 最后一搏失败不阻塞关闭 */ } };
+            const onAbort = () => {
+              try { captureReadingNow(); } catch (e) { /* reading capture is best effort */ }
+              try { flushClose(); } catch (e) { /* 最后一搏失败不阻塞关闭 */ }
+            };
             tabSignal.addEventListener("abort", onAbort, { once: true });
             cleanups.push(() => { try { tabSignal.removeEventListener("abort", onAbort); } catch (e) { /* 忽略 */ } });
           }
@@ -7063,8 +11071,10 @@ const __test = {
         startSse();
 
         return () => {
-          doc.dead = true;
           try { flushClose(); } catch (e) { /* 已尽力 */ }
+          try { stopReadingPosition(true); } catch (e) { /* 位置收尾不阻塞关闭 */ }
+          doc.dead = true;
+          cancelDraftMirror();
           // live 会话离场：先请 facade 解绑（iframe 还在时经上行 leave），再直接向宿主
           // 补一张 leave（幂等）兜底 iframe 已删的情形 —— 租约不落盘、不残留。
           try { stopLive(true); } catch (e) { /* 关闭路径不再抛 */ }
@@ -7093,7 +11103,7 @@ const __test = {
         const doc = st.doc;
         if (!doc) return;
         doc.tabVisible = tabVisible;
-        if (tabVisible && doc.externalStale && !doc.dirty && !doc.conflict && !doc.saving) {
+        if (tabVisible && !doc.missing && doc.externalStale && !doc.dirty && !doc.conflict && !doc.saving) {
           doc.externalStale = false;
           if (typeof doc.reload === "function") void doc.reload({ silent: true, reason: "visible" });
         }
@@ -7112,12 +11122,31 @@ const __test = {
       const noticeItems = Array.isArray(ui.notices) ? ui.notices : [];
       const latestNotice = noticeItems[noticeItems.length - 1];
       const hasPopover = recoveredItems.length > 0 || reviewDiffItems.length > 0 || noticeItems.length > 0;
+      const doc = st.doc;
+      const conflictSession = doc && doc.conflictSession ? doc.conflictSession : null;
+      const conflictChoices = doc && Array.isArray(doc.conflictChoices) ? doc.conflictChoices : [];
+      const conflictBusy = !!(doc && doc.conflictBusy);
       const toggleRail = () => setUi((prev) => ({ ...prev, railOpen: !prev.railOpen }));
       const actions = [];
       let primaryText = "", primaryTone = "info";
-      if (ui.phase === "conflict") {
+      if (ui.phase === "readonly") {
         primaryText = "⚠ " + ui.detail;
         primaryTone = "warn";
+        actions.push({ label: "重试保存", icon: "⟳", run: () => st.actions.retryReadonly && st.actions.retryReadonly() });
+        actions.push({ label: "另存为…", icon: "⤓", run: () => st.actions.openSaveAs && st.actions.openSaveAs() });
+        actions.push({ label: "历史副本", icon: "🕘", run: () => st.actions.openRecoveryCenter && st.actions.openRecoveryCenter() });
+        actions.push({ label: "复制我的内容", icon: "⧉", run: () => st.actions.copyMine && st.actions.copyMine() });
+      } else if (ui.phase === "missing") {
+        primaryText = "⚠ " + ui.detail;
+        primaryTone = "warn";
+        actions.push({ label: "重试", icon: "⟳", run: () => st.actions.retryMissing && st.actions.retryMissing() });
+        actions.push({ label: "另存为…", icon: "⤓", run: () => st.actions.openSaveAs && st.actions.openSaveAs() });
+        actions.push({ label: "历史副本", icon: "🕘", run: () => st.actions.openRecoveryCenter && st.actions.openRecoveryCenter() });
+        actions.push({ label: "复制我的内容", icon: "⧉", run: () => st.actions.copyMine && st.actions.copyMine() });
+      } else if (ui.phase === "conflict") {
+        primaryText = "⚠ " + ui.detail;
+        primaryTone = "warn";
+        actions.push({ label: "查看冲突", icon: "⇄", run: () => st.actions.openConflict && st.actions.openConflict() });
         actions.push({ label: "重载磁盘版本", icon: "↻", run: () => st.actions.reloadDisk && st.actions.reloadDisk() });
         actions.push({ label: "复制我的内容", icon: "⧉", run: () => st.actions.copyMine && st.actions.copyMine() });
       } else if (ui.phase === "review") {
@@ -7167,11 +11196,157 @@ const __test = {
         onClick: () => { try { item.run && item.run(); } catch (e) { /* 忽略 */ } },
         ...(item.aria || {}),
       }, item.label);
-      // B1: fixed 28px rail above the iframe. The rail is always present, so
-      // banners and save status never change the editor geometry.
+      // B2: the rail is an out-of-flow bottom overlay above the editor's own
+      // status bar. Passive status text passes hit-testing through to the
+      // editor; only the actual buttons and popover trigger opt in.
+      const saveAsPanel = () => {
+        if (!ui.saveAsOpen) return null;
+        return h('div', {
+          key: 'save-as-panel', role: 'dialog', 'aria-label': '另存为',
+          style: {
+            position: 'absolute', top: 48, left: 16 + railInsetLeft, right: 16 + railInsetRight,
+            zIndex: 70, boxSizing: 'border-box', padding: 12, borderRadius: 8,
+            border: '1px solid color-mix(in srgb, currentColor 22%, transparent)',
+            background: 'color-mix(in srgb, currentColor 8%, transparent)', backdropFilter: 'blur(12px)',
+            boxShadow: '0 8px 24px color-mix(in srgb, black 30%, transparent)', color: 'inherit', fontSize: 12,
+          },
+        },
+          h('div', { style: { fontWeight: 600, marginBottom: 8 } }, '另存为（新路径，不覆盖）'),
+          h('input', {
+            value: ui.saveAsValue || '', autoFocus: true, spellCheck: false,
+            'aria-label': '另存为绝对路径',
+            onChange: (event) => {
+              const value = event.target.value;
+              doc.saveAsValue = value;
+              setUi((prev) => ({ ...prev, saveAsValue: value, saveAsError: '' }));
+            },
+            onKeyDown: (event) => {
+              if (event.key === 'Enter') { event.preventDefault(); void st.actions.submitSaveAs?.(); }
+              else if (event.key === 'Escape') { event.preventDefault(); st.actions.closeSaveAs?.(); }
+            },
+            style: { width: '100%', boxSizing: 'border-box', padding: '6px 7px', fontSize: 12, fontFamily: 'inherit', color: 'inherit', background: 'color-mix(in srgb, currentColor 6%, transparent)', border: '1px solid color-mix(in srgb, currentColor 22%, transparent)', borderRadius: 5 },
+          }),
+          ui.saveAsError ? h('div', { style: { color: '#d86', marginTop: 6 } }, ui.saveAsError) : null,
+          h('div', { style: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 } },
+            h('button', { type: 'button', className: 'mp-rail-btn', disabled: !!ui.saveAsBusy, onClick: () => st.actions.closeSaveAs && st.actions.closeSaveAs() }, '取消'),
+            h('button', { type: 'button', className: 'mp-rail-btn', disabled: !!ui.saveAsBusy, onClick: () => st.actions.submitSaveAs && st.actions.submitSaveAs() }, ui.saveAsBusy ? '保存中…' : '保存'),
+          ));
+      };
+
+      const recoveryCenterPanel = () => {
+        if (!ui.recoveryCenterOpen) return null;
+        const items = Array.isArray(ui.recoveryCenterItems) ? ui.recoveryCenterItems : [];
+        return h('div', {
+          key: 'recovery-center-panel', role: 'dialog', 'aria-label': '历史恢复副本',
+          style: {
+            position: 'absolute', top: 48, left: 16 + railInsetLeft, right: 16 + railInsetRight, bottom: 16,
+            zIndex: 70, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', minHeight: 0,
+            padding: 12, borderRadius: 8, border: '1px solid color-mix(in srgb, currentColor 22%, transparent)',
+            background: 'color-mix(in srgb, currentColor 8%, transparent)', backdropFilter: 'blur(12px)',
+            boxShadow: '0 8px 24px color-mix(in srgb, black 30%, transparent)', color: 'inherit', fontSize: 12,
+          },
+        },
+          h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 } },
+            h('strong', { style: { flex: '1 1 auto' } }, '历史恢复副本（' + items.length + '）'),
+            h('button', { type: 'button', className: 'mp-rail-btn', 'data-icon': '⌫', title: '关闭恢复中心', 'aria-label': '关闭恢复中心', onClick: () => st.actions.closeRecoveryCenter?.() }, '关闭')),
+          ui.recoveryCenterError ? h('div', { style: { color: '#d86', marginBottom: 6 } }, ui.recoveryCenterError) : null,
+          h('div', { style: { flex: '1 1 auto', minHeight: 0, overflow: 'auto' } },
+            ui.recoveryCenterLoading
+              ? h('div', { style: { opacity: 0.7, padding: 8 } }, '正在读取恢复索引…')
+              : ui.recoveryCenterError
+                ? null
+                : items.length === 0
+                  ? h('div', { style: { opacity: 0.7, padding: 8 } }, '当前文档没有可用的追加恢复副本。')
+                  : items.map((item) => h('div', { key: item.recoveryPath, style: { display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0', borderTop: '1px solid color-mix(in srgb, currentColor 12%, transparent)' } },
+                    h('div', { style: { flex: '1 1 auto', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+                      new Date(Number(item.at) || Date.now()).toLocaleString() + ' · v' + String(item.version || '') + ' · ' + String(item.bytes || 0) + ' bytes'),
+                    h('button', { type: 'button', className: 'mp-rail-btn', 'data-icon': '👁', title: '查看恢复副本', 'aria-label': '查看恢复副本', onClick: () => st.actions.readRecoveryItem?.(item) }, '查看'),
+                    h('button', { type: 'button', className: 'mp-rail-btn', 'data-icon': '⧉', title: '复制恢复副本路径', 'aria-label': '复制恢复副本路径', onClick: () => { try { void navigator.clipboard?.writeText?.(item.recoveryPath); } catch { /* best effort */ } } }, '复制路径')))),
+          ui.recoveryPreview ? h('pre', {
+            style: { flex: '0 1 40%', overflow: 'auto', margin: '8px 0 0', padding: 8, whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: 'color-mix(in srgb, currentColor 5%, transparent)', borderRadius: 5, fontSize: 11.5 },
+          }, ui.recoveryPreview) : null);
+      };
+
+      const conflictPanel = () => {
+        if (!conflictSession) return null;
+        const hunks = Array.isArray(conflictSession.hunks) ? conflictSession.hunks : [];
+        const body = hunks.length
+          ? hunks.map((hunk, index) => {
+            const choice = conflictChoices[index] || { index, choice: 'ours', text: '' };
+            const setChoice = (nextChoice, text) => st.actions.chooseConflict(index, nextChoice, text);
+            return h('div', {
+              key: 'conflict-hunk-' + index,
+              style: { padding: '8px 0', borderTop: index ? '1px solid color-mix(in srgb, currentColor 12%, transparent)' : 'none' },
+            },
+              h('div', { style: { fontWeight: 600, marginBottom: 6 } }, '第 ' + (index + 1) + '/' + hunks.length + ' 处冲突'),
+              h('div', { style: { display: 'grid', gap: 6, marginBottom: 8 } },
+                h('div', { style: { background: 'color-mix(in srgb, currentColor 5%, transparent)', padding: 6, borderRadius: 5 } },
+                  h('div', { style: { opacity: 0.65, fontSize: 11, marginBottom: 2 } }, 'base'),
+                  h('pre', { style: { margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11.5, maxHeight: 140, overflow: 'auto' } }, String(hunk.base || '').slice(0, 1500))),
+                h('div', { style: { background: 'color-mix(in srgb, #2a7 12%, transparent)', padding: 6, borderRadius: 5 } },
+                  h('div', { style: { opacity: 0.65, fontSize: 11, marginBottom: 2 } }, '我的'),
+                  h('pre', { style: { margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11.5, maxHeight: 140, overflow: 'auto' } }, String(hunk.ours || '').slice(0, 1500))),
+                h('div', { style: { background: 'color-mix(in srgb, #4f8ef7 12%, transparent)', padding: 6, borderRadius: 5 } },
+                  h('div', { style: { opacity: 0.65, fontSize: 11, marginBottom: 2 } }, '磁盘'),
+                  h('pre', { style: { margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 11.5, maxHeight: 140, overflow: 'auto' } }, String(hunk.other || '').slice(0, 1500)))),
+              h('div', { style: { display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' } },
+                ['ours', 'theirs', 'both', 'manual'].map((key) => h('label', {
+                  key: key, style: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11.5, cursor: 'pointer' },
+                },
+                  h('input', {
+                    type: 'radio', name: 'mp-conflict-' + index, checked: choice.choice === key,
+                    autoFocus: index === 0 && key === 'ours',
+                    onChange: () => setChoice(key),
+                  }), conflictChoiceLabel(key)))),
+              choice.choice === 'manual'
+                ? h('textarea', {
+                  value: choice.text || '',
+                  maxLength: 1024 * 1024,
+                  onChange: (event) => setChoice('manual', event.target.value),
+                  placeholder: '手动编辑这一处的结果',
+                  'aria-label': '第 ' + (index + 1) + ' 处手动结果',
+                  style: { width: '100%', boxSizing: 'border-box', minHeight: 56, marginTop: 6, padding: 5, fontSize: 12, fontFamily: 'inherit', resize: 'vertical' },
+                })
+                : null);
+          })
+          : h('div', { style: { padding: '10px 0', opacity: 0.85 } },
+            conflictSession.clean ? '这两边没有重叠冲突，可直接应用合并结果。' : '没有可显示的冲突块。');
+        return h('div', {
+          key: 'conflict-panel',
+          role: 'dialog',
+          'aria-label': '冲突解决',
+          style: {
+            position: 'absolute', top: 34, left: 8 + railInsetLeft, right: 8 + railInsetRight, bottom: 8,
+            zIndex: 60, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', minHeight: 0,
+            padding: 10, borderRadius: 8, border: '1px solid color-mix(in srgb, currentColor 22%, transparent)',
+            background: 'color-mix(in srgb, currentColor 8%, transparent)', backdropFilter: 'blur(12px)',
+            boxShadow: '0 8px 24px color-mix(in srgb, black 30%, transparent)', color: 'inherit', fontSize: 12,
+          },
+        },
+          h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flex: '0 0 auto', marginBottom: 6 } },
+            h('strong', { style: { flex: '1 1 auto', minWidth: 0 } }, '冲突解决 · ' + (hunks.length ? hunks.length + ' 处' : '可合并')),
+            h('button', {
+              type: 'button', className: 'mp-rail-btn', 'data-icon': '⌫', title: '关闭冲突面板',
+              onClick: () => st.actions.cancelConflict(),
+            }, '关闭')),
+          conflictSession.truncated ? h('div', { style: { flex: '0 0 auto', opacity: 0.75, marginBottom: 6 } }, conflictTruncatedNotice(conflictSession)) : null,
+          h('div', { style: { flex: '1 1 auto', minHeight: 0, overflow: 'auto', paddingRight: 2 } }, body),
+          h('div', { style: { display: 'flex', gap: 8, justifyContent: 'flex-end', flex: '0 0 auto', paddingTop: 8 } },
+            h('button', { type: 'button', className: 'mp-rail-btn', onClick: () => st.actions.cancelConflict() }, '取消'),
+            h('button', {
+              type: 'button', className: 'mp-rail-btn', disabled: !conflictApplyEnabled(conflictSession, conflictChoices, conflictBusy),
+              onClick: () => st.actions.applyConflict(),
+            }, conflictBusy ? '应用中…' : '应用选择')));
+      };
+
       return h("div", {
         ref: rootRef,
         onKeyDown: (event) => {
+          if (doc && doc.conflictSession) {
+            if (event.key === "Escape") { try { event.preventDefault(); } catch (e) { /* 忽略 */ } st.actions.cancelConflict(); return; }
+            if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { try { event.preventDefault(); } catch (e) { /* 忽略 */ } st.actions.applyConflict(); return; }
+          }
+          if (event.key === "Escape" && ui.recoveryCenterOpen) { try { event.preventDefault(); } catch (e) { /* 忽略 */ } st.actions.closeRecoveryCenter?.(); return; }
           if (event.key === "Escape" && ui.railOpen) setUi((prev) => ({ ...prev, railOpen: false }));
         },
         style: { position: "relative", width: "100%", height: "100%", display: "flex", flexDirection: "column", minHeight: 0, containerType: "inline-size", "--mp-rail-inset-left": railInsetLeft + "px", "--mp-rail-inset-right": railInsetRight + "px" },
@@ -7181,14 +11356,13 @@ const __test = {
           className: "mp-rail",
           role: "toolbar",
           "aria-label": "文档状态与提示",
+          "data-mp-rail-anchor": "bottom",
+          "data-mp-elevated": primaryText ? "1" : "0",
+          "data-mp-tone": primaryTone,
           style: {
-            flex: "0 0 28px", height: 28, minHeight: 28, maxHeight: 28, minWidth: 0,
-            boxSizing: "border-box",
-            display: "flex", alignItems: "center", gap: 8, overflow: "hidden",
-            paddingLeft: 8 + railInsetLeft, paddingRight: 8 + railInsetRight,
-            borderBottom: "1px solid color-mix(in srgb, currentColor 14%, transparent)",
-            background: "color-mix(in srgb, currentColor 4%, transparent)",
-            position: "relative", zIndex: 1,
+            // The old workbench left inset existed for the top-left floating
+            // controls; the bottom rail has no chrome on its left side.
+            paddingLeft: 8, paddingRight: 8 + railInsetRight,
           },
         },
           saveText ? h("span", {
@@ -7202,14 +11376,14 @@ const __test = {
             className: "mp-rail-text",
             title: primaryText + (hasPopover ? "；点击查看通知与恢复副本" : ""),
             role: primaryTone === "warn" ? "alert" : "status",
+            "data-mp-popover": hasPopover ? "1" : undefined,
             tabIndex: hasPopover ? 0 : undefined,
             "aria-expanded": hasPopover ? !!ui.railOpen : undefined,
-            style: hasPopover ? { cursor: "pointer" } : undefined,
             onClick: hasPopover ? toggleRail : undefined,
             onKeyDown: hasPopover ? (event) => {
               if (event.key === "Enter" || event.key === " ") { try { event.preventDefault(); } catch (e) { /* 忽略 */ } toggleRail(); }
             } : undefined,
-          }, primaryText + (recoveredItems.length ? " ♻" : (noticeItems.length ? " ≡" : ""))) : (saveText ? null : h("span", { className: "mp-rail-text", style: { opacity: 0.6 } }, "就绪")),
+          }, primaryText + (recoveredItems.length ? " ♻" : (noticeItems.length ? " ≡" : ""))) : (saveText ? null : h("span", { className: "mp-rail-text", "data-mp-passive": "1", style: { opacity: 0.6 } }, "就绪")),
           h("div", { className: "mp-rail-actions" }, ...actions.map(actionButton))),
         h("iframe", {
           key: depKey,
@@ -7249,36 +11423,46 @@ const __test = {
           },
           style: { width: "100%", border: 0, background: "transparent", flex: "1 1 auto", minHeight: 0, height: "auto" },
         }),
+        conflictPanel(),
+        saveAsPanel(),
+        recoveryCenterPanel(),
         hasPopover ? h("div", {
           key: "rail-popover",
-          className: "mp-rail-popover",
+          className: "mp-rail-popover" + (reviewDiffItems.length ? " mp-rail-popover-diff" : ""),
           role: "dialog",
-          "aria-label": "通知与共享会话恢复的草稿副本",
+          "aria-label": reviewDiffItems.length ? "AI 修改差异" : "通知与共享会话恢复的草稿副本",
           style: {
-            position: "absolute", top: 34, left: 8 + railInsetLeft, right: 8 + railInsetRight,
-            maxHeight: "calc(100% - 42px)", overflow: "auto", overflowX: "hidden", zIndex: 40,
+            position: "absolute", top: "auto", bottom: 56, left: 8 + railInsetLeft, right: 8 + railInsetRight,
+            maxHeight: "calc(100% - 108px)", overflow: "auto", overflowX: "hidden", zIndex: 40,
             boxSizing: "border-box",
             display: ui.railOpen ? "block" : "none",
             padding: 10, borderRadius: 8,
-            border: "1px solid color-mix(in srgb, currentColor 22%, transparent)",
-            background: "color-mix(in srgb, currentColor 8%, transparent)",
-            backdropFilter: "blur(12px)",
-            boxShadow: "0 8px 24px color-mix(in srgb, black 30%, transparent)",
-            color: "inherit",
             fontSize: 12,
+            ...(reviewDiffItems.length ? {} : {
+              border: "1px solid color-mix(in srgb, currentColor 22%, transparent)",
+              background: "color-mix(in srgb, currentColor 8%, transparent)",
+              backdropFilter: "blur(12px)",
+              boxShadow: "0 8px 24px color-mix(in srgb, black 30%, transparent)",
+              color: "inherit",
+            }),
           },
         },
           reviewDiffItems.length ? h("div", { style: { marginBottom: 6 } },
             h("div", { className: "mp-rail-head", style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 6 } },
-              h("strong", { style: { flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, "≠ AI 修改差异（" + reviewDiffItems.length + " 处）"),
+              h("strong", { style: { flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, "≠ AI 修改差异（" + reviewDiffItems.length + " 处，历史片段）"),
               h("button", {
                 type: "button", className: "mp-rail-btn", "data-icon": "⌫", title: "收起差异",
                 onClick: () => { try { st.actions.closeReviewDiff && st.actions.closeReviewDiff(); } catch (e) { /* 忽略 */ } },
               }, "收起")),
-            ...reviewDiffItems.slice(0, 12).map((change, index) => h("div", { key: "review-diff-" + index, style: { padding: "5px 0", borderTop: "1px solid color-mix(in srgb, currentColor 10%, transparent)" } },
-              h("div", { style: { opacity: 0.65, marginBottom: 3 } }, (change.group ? "第 " + change.group + " 组 · " : "") + "修改 " + (index + 1) + (change.to > change.from ? "（替换 " + (change.to - change.from) + " 字符）" : "（插入）")),
-              String(change.removed || "").length ? h("pre", { style: { margin: "2px 0", padding: "4px 6px", whiteSpace: "pre-wrap", wordBreak: "break-word", background: "color-mix(in srgb, #d33 14%, transparent)", borderRadius: 4, fontSize: 11.5 } }, "- " + String(change.removed).slice(0, 1500)) : null,
-              h("pre", { style: { margin: "2px 0", padding: "4px 6px", whiteSpace: "pre-wrap", wordBreak: "break-word", background: "color-mix(in srgb, #2a7 14%, transparent)", borderRadius: 4, fontSize: 11.5 } }, "+ " + String(change.insert || "").slice(0, 1500))))) : null,
+            ...reviewDiffItems.slice(0, 12).map((change, index) => h("div", { key: "review-diff-" + index, className: "mp-rail-diff-item" },
+              h("div", { className: "mp-rail-diff-meta" },
+                h("span", { style: { flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, (change.group ? "第 " + change.group + " 组 · " : "") + "修改 " + (index + 1) + (change.to > change.from ? "（原操作替换 " + (change.to - change.from) + " 字符 · 历史位置）" : "（原操作插入 · 历史位置）")),
+                h("button", {
+                  type: "button", className: "mp-rail-btn", "data-icon": "◎", title: "在正文中定位这处历史修改",
+                  onClick: () => { try { st.actions.reviewLocate && st.actions.reviewLocate(index); } catch (e) { /* 忽略 */ } },
+                }, "定位")),
+              String(change.removed || "").length ? h("pre", { className: "mp-rail-diff-line mp-rail-diff-del" }, "- " + String(change.removed).slice(0, 1500)) : null,
+              h("pre", { className: "mp-rail-diff-line mp-rail-diff-add" }, "+ " + String(change.insert || "").slice(0, 1500))))) : null,
           recoveredItems.length ? h("div", { className: "mp-rail-head", style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 8 } },
             h("strong", { style: { flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" } }, "♻ 共享会话恢复的草稿副本（原件未被覆盖）"),
             h("button", {
@@ -7309,6 +11493,7 @@ const __test = {
               }, "清除")),
             ...noticeItems.map((notice) => h("div", { key: "notice-" + notice.id, style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", padding: "3px 0" } },
               h("span", { style: { flex: "1 1 240px", minWidth: 0, overflowWrap: "anywhere", fontSize: 11.5 } }, notice.text),
+              notice.path ? h("code", { style: { userSelect: "all", wordBreak: "break-all", fontSize: 11, flex: "1 1 100%", minWidth: 0 } }, notice.path) : null,
               ...(notice.actions || []).map((action, actionIndex) => h("button", {
                 key: "notice-action-" + notice.id + "-" + actionIndex,
                 type: "button", className: "mp-rail-btn", "data-icon": action.icon || "⧉", title: action.title || action.label,
@@ -7387,6 +11572,239 @@ const __test = {
       }
     }
 
+    /* ───────────────────────── 编辑器原生按键临时保留 ─────────────────────────
+     * Desktop DSH intercepts physical shortcuts in the main process before the
+     * editor iframe sees them. While this editor really owns focus, reserve the
+     * engine's current B/I/U bindings through the public ctx.shortcuts.registerFixed
+     * API. A fixed reservation does not execute anything: it only puts those physical
+     * keys in conflict with the host commands, so the host stops swallowing them and
+     * the native CM6 keymap receives the same physical key once. Disposing it on
+     * blur/unmount immediately gives the key back to the sidebar.
+     *
+     * Do not add data-sidebar-browser-frame here. The preload filter intentionally
+     * drops unknown iframes; this route is public and does not impersonate a built-in
+     * preview role. Do not synthesize keydown either: the real key continues to the
+     * focused frame after native interception is released.
+     */
+    const EDITOR_SHORTCUT_ID = "dsh-markdown-editor-typora.editor-keys";
+    const EDITOR_SHORTCUT_DEFAULTS = { bold: "Mod-b", italic: "Mod-i", underline: "Mod-u" };
+    let editorShortcutService = null;
+    let editorShortcutDispose = null;
+    let editorShortcutSignature = "";
+    let editorShortcutOwner = null;
+    const editorShortcutChecks = new Set();
+
+    /* A frame that is no longer active may only release its *own* reservation. */
+    function releaseEditorShortcutReservation(owner = null) {
+      if (owner !== null && editorShortcutOwner !== owner) return;
+      const dispose = editorShortcutDispose;
+      editorShortcutDispose = null;
+      editorShortcutSignature = "";
+      editorShortcutOwner = null;
+      if (dispose) { try { dispose(); } catch (e) { /* older host: idempotent disposer */ } }
+    }
+
+    function editorShortcutConfig() {
+      const cfg = { ...EDITOR_SHORTCUT_DEFAULTS };
+      try {
+        const saved = JSON.parse(localStorage.getItem("mp-keys") || "{}");
+        if (saved && typeof saved === "object" && !Array.isArray(saved)) {
+          for (const action of Object.keys(EDITOR_SHORTCUT_DEFAULTS)) {
+            if (typeof saved[action] === "string") cfg[action] = saved[action];
+          }
+        }
+      } catch (e) { /* 默认键位 */ }
+      return cfg;
+    }
+
+    /* Engine combos use Mod/Ctrl/Alt/Shift and one physical code (`Mod-b`). */
+    function parseEditorShortcut(combo) {
+      const parts = String(combo || "").split("-").filter(Boolean);
+      if (parts.length < 2) return null; // single letters are rejected by the engine too
+      const rawKey = parts.pop().toLowerCase();
+      const modifiers = [];
+      for (const part of parts) {
+        const token = part.toLowerCase();
+        if (token === "mod") modifiers.push("primary");
+        else if (token === "ctrl" || token === "control") modifiers.push("control");
+        else if (token === "alt") modifiers.push("alt");
+        else if (token === "shift") modifiers.push("shift");
+        else if (token === "meta" || token === "cmd" || token === "win") modifiers.push("meta");
+        else return null;
+      }
+      let code = null;
+      if (/^[a-z]$/.test(rawKey)) code = "Key" + rawKey.toUpperCase();
+      else if (/^[0-9]$/.test(rawKey)) code = "Digit" + rawKey;
+      else if (/^f([1-9]|1[0-9]|2[0-4])$/.test(rawKey)) code = "F" + rawKey.slice(1);
+      else code = { esc: "Escape", escape: "Escape", space: "Space", tab: "Tab", enter: "Enter", backspace: "Backspace", delete: "Delete" }[rawKey] || null;
+      return code ? { code, modifiers } : null;
+    }
+
+    function displayEditorShortcut(combo, platform) {
+      const parts = String(combo || "").split("-").filter(Boolean);
+      const key = parts.pop() || "";
+      const shown = parts.map(part => {
+        const token = part.toLowerCase();
+        if (token === "mod") return platform === "macos" ? "Cmd" : "Ctrl";
+        if (token === "ctrl" || token === "control") return "Ctrl";
+        if (token === "alt") return "Alt";
+        if (token === "shift") return "Shift";
+        if (token === "meta" || token === "cmd" || token === "win") return "Meta";
+        return part;
+      });
+      shown.push(/^[a-z]$/i.test(key) ? key.toUpperCase() : key);
+      return shown.join("+");
+    }
+
+    function editorShortcutSnapshot() {
+      const platform = editorShortcutService && editorShortcutService.platform === "macos" ? "macos" : "windows";
+      const cfg = editorShortcutConfig();
+      const bindings = [], keys = [];
+      for (const [action, fallback] of Object.entries(EDITOR_SHORTCUT_DEFAULTS)) {
+        const combo = cfg[action] === undefined ? fallback : cfg[action];
+        if (!combo) continue;
+        const binding = parseEditorShortcut(combo);
+        if (!binding) continue;
+        bindings.push(binding);
+        keys.push(displayEditorShortcut(combo, platform));
+      }
+      return { bindings, keys, signature: JSON.stringify(bindings) };
+    }
+
+    function editorSurfaceFocused(frame) {
+      try {
+        if (!frame || !frame.isConnected || !document.hasFocus() || document.activeElement !== frame) return false;
+        const doc = frame.contentDocument;
+        const win = frame.contentWindow;
+        if (!doc || !win || !doc.hasFocus()) return false;
+        const active = doc.activeElement;
+        // Only the CM6 content or the table-cell text overlay owns B/I/U.
+        // Search fields, toolbar controls, settings dialogs, and focus in the
+        // iframe body must keep the host shortcut.
+        if (!active || !(active.closest(".cm-content") || active.closest(".mp-cell-overlay-text"))) return false;
+        if (doc.documentElement && doc.documentElement.dataset.mpReading === "1") return false;
+        const view = win.mpEngine && typeof win.mpEngine._view === "function" ? win.mpEngine._view() : null;
+        if (view && view.state && view.state.readOnly) return false;
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function reserveEditorShortcuts(frame, visible) {
+      if (!editorShortcutService || typeof editorShortcutService.registerFixed !== "function"
+        || editorShortcutService.runtime !== "desktop" || visible === false
+        || !editorSurfaceFocused(frame)) {
+        releaseEditorShortcutReservation(frame);
+        return;
+      }
+      const next = editorShortcutSnapshot();
+      if (!next.bindings.length) {
+        releaseEditorShortcutReservation(frame);
+        return;
+      }
+      if (editorShortcutDispose && editorShortcutOwner === frame && editorShortcutSignature === next.signature) return;
+      // A newly focused frame displaces the previous frame's reservation.
+      releaseEditorShortcutReservation();
+      try {
+        editorShortcutDispose = editorShortcutService.registerFixed({
+          id: EDITOR_SHORTCUT_ID,
+          label: () => "Markdown 编辑器快捷键",
+          keys: next.keys,
+          bindings: next.bindings,
+          group: "input",
+        });
+        editorShortcutSignature = next.signature;
+        editorShortcutOwner = frame;
+      } catch (e) {
+        editorShortcutDispose = null;
+        editorShortcutSignature = "";
+        editorShortcutOwner = null;
+      }
+    }
+
+    function hasListenerPair(target) {
+      return !!target
+        && typeof target.addEventListener === "function"
+        && typeof target.removeEventListener === "function";
+    }
+
+    function installEditorShortcutReservation(frame, visible) {
+      // Frozen web-client stubs and older hosts may expose only one half of the
+      // listener API. Installing on those would throw during React render and
+      // take the whole plugin down; return a no-op instead.
+      if (typeof document === "undefined" || typeof window === "undefined"
+        || !hasListenerPair(frame) || !hasListenerPair(document) || !hasListenerPair(window)) return () => {};
+      let disposed = false, timer = 0, innerDoc = null, innerWin = null;
+      const check = () => { if (!disposed) reserveEditorShortcuts(frame, visible()); };
+      const schedule = () => {
+        if (disposed) return;
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => { timer = 0; attachInner(); check(); }, 0);
+      };
+      const detachInner = () => {
+        if (!innerDoc) return;
+        try {
+          if (hasListenerPair(innerDoc)) {
+            innerDoc.removeEventListener("focusin", schedule, true);
+            innerDoc.removeEventListener("focusout", schedule, true);
+          }
+          if (hasListenerPair(innerWin)) innerWin.removeEventListener("pagehide", schedule);
+        } catch (e) { /* document already gone */ }
+        innerDoc = null; innerWin = null;
+      };
+      const attachInner = () => {
+        if (disposed) return;
+        let doc = null;
+        try { doc = frame.contentDocument; } catch (e) { doc = null; }
+        if (doc === innerDoc) return;
+        detachInner();
+        if (!doc) return;
+        innerDoc = doc;
+        innerWin = doc.defaultView || null;
+        try {
+          if (hasListenerPair(doc)) {
+            doc.addEventListener("focusin", schedule, true);
+            doc.addEventListener("focusout", schedule, true);
+          }
+          if (hasListenerPair(innerWin)) innerWin.addEventListener("pagehide", schedule);
+        } catch (e) { innerDoc = null; innerWin = null; }
+      };
+      frame.addEventListener("focus", schedule);
+      frame.addEventListener("blur", schedule);
+      frame.addEventListener("load", schedule);
+      document.addEventListener("focusin", schedule, true);
+      document.addEventListener("focusout", schedule, true);
+      window.addEventListener("focus", schedule);
+      window.addEventListener("blur", schedule);
+      document.addEventListener("visibilitychange", schedule);
+      const onStorage = (event) => {
+        if (!event || event.key === "mp-keys" || event.key === null) schedule();
+      };
+      window.addEventListener("storage", onStorage);
+      editorShortcutChecks.add(check);
+      attachInner();
+      const initial = setTimeout(() => { timer = 0; attachInner(); check(); }, 0);
+      check();
+      return () => {
+        disposed = true;
+        clearTimeout(timer);
+        clearTimeout(initial);
+        detachInner();
+        frame.removeEventListener("focus", schedule);
+        frame.removeEventListener("blur", schedule);
+        frame.removeEventListener("load", schedule);
+        document.removeEventListener("focusin", schedule, true);
+        document.removeEventListener("focusout", schedule, true);
+        window.removeEventListener("focus", schedule);
+        window.removeEventListener("blur", schedule);
+        document.removeEventListener("visibilitychange", schedule);
+        window.removeEventListener("storage", onStorage);
+        editorShortcutChecks.delete(check);
+        releaseEditorShortcutReservation(frame);
+      };
+    }
+
     /* ───────────────────────── 插件入口 ───────────────────────── */
 
     const inject = ["slots", "sidebarRight", "sessions", "layout"];   // sidebarRight 打开文档；sessions 直发；layout 面板导航（未声明时 ctx.get 拿不到）
@@ -7398,15 +11816,41 @@ const __test = {
     try { if (typeof window.__mpHandleLifecycleDispose === "function") window.__mpHandleLifecycleDispose(); } catch (e) { /* 忽略 */ }
     try { if (typeof window.__mpHandleFloorDispose === "function") window.__mpHandleFloorDispose(); } catch (e) { /* 忽略 */ }
     try { installHandleLifecycle(ctx); } catch (e) { /* 忽略 */ }
-    // 布局引擎（M0）：默认关闭，只在用户显式开启时挤压对话。
+    // 旧版自动物化的 enabled:false+center 在这里一次性改写为新默认（只写一次）；
+    // 带意图标记的关闭与非 center 布局不动。
+    try { migrateLayoutDefaults(window.localStorage); } catch (e) { /* 忽略 */ }
+    // 布局引擎（M0）：默认开启居中；只有显式关闭时才回到右侧栏。
     // 失败绝不影响插件其余能力（mountLayout 内部已 try/catch + 日志）。
     try { mountLayout(ctx); } catch (e) { /* 见 mountLayout */ }
+    // 设置里的「编辑区居中」立即生效：打开中的文档迁移到中间，关闭时回右栏。
+    try {
+      if (ctx && typeof ctx.effect === "function") {
+        ctx.effect(function () { return installLayoutSettingBridge(); }, "dsh-markdown-editor-typora: layout setting bridge");
+      }
+    } catch (e) { /* 旧宿主没有 effect 能力 */ }
       const log = (() => {
         try { return typeof ctx.logger === "function" ? ctx.logger("dsh-markdown-editor-typora") : console; } catch (e) { return console; }
       })();
       const get = (name) => {
         try { return ctx.get(name); } catch (e) { return undefined; }
       };
+      /* Optional service: old hosts without shortcuts still mount the editor.
+         Only Desktop has the native interception this reservation exists for. */
+      const activateEditorShortcuts = (scope) => {
+        try {
+          const shortcuts = scope && (scope.shortcuts || (scope.get && scope.get("shortcuts")));
+          if (!shortcuts || typeof shortcuts.registerFixed !== "function" || shortcuts.runtime !== "desktop") return;
+          editorShortcutService = shortcuts;
+          for (const check of [...editorShortcutChecks]) {
+            try { check(); } catch (e) { /* one frame failing must not block others */ }
+          }
+        } catch (e) { /* 保持原生物理键行为 */ }
+      };
+      try {
+        const direct = get("shortcuts");
+        if (direct) activateEditorShortcuts({ shortcuts: direct });
+        else if (typeof ctx.inject === "function") ctx.inject(["shortcuts"], (scope) => { activateEditorShortcuts(scope); });
+      } catch (e) { /* 旧宿主：不把 shortcuts 当挂载依赖 */ }
       const runEffect = (fn, label) => {
         try {
           if (typeof ctx.effect === "function") ctx.effect(fn, label);
@@ -7415,6 +11859,10 @@ const __test = {
           log.warn?.("dsh-markdown-editor-typora: effect failed (%s): %s", label, String(error && error.message ? error.message : error));
         }
       };
+
+      // 窄列输入区样式：客户端（重）加载时就主动把同 id 的旧样式原地升级到当前 CSS，
+      // 已打开的宿主页面不需要重启/重开；规则全部挂在 [data-mp-narrow-*] 上，没有标记时零效果。
+      runEffect(() => { ensureNarrowChatStyle(document); }, "dsh-markdown-editor-typora: narrow chat style");
 
       // DSH 0.2.2 adds will-change:transform to the sticky composer seat.
       // balance-dsh positions its fixed pill in viewport coordinates; retain
@@ -7430,6 +11878,15 @@ const __test = {
         (document.head || document.documentElement).appendChild(style);
         return () => { style.remove(); };
       }, "dsh-markdown-editor-typora: composer compatibility");
+
+      // ≤2.0.6-rc.2 注入过 #mp-stage::after（16px 全高热区），会压住编辑器
+      // 滚动条。本 factory 不创建它，并在启动/每次 apply/释放时按 id 清掉，
+      // 这样热更新后旧实例留下的样式不会继续生效。
+      runEffect(() => {
+        if (typeof document === "undefined") return;
+        removeStageHandleStyle(document);
+        return () => removeStageHandleStyle(document);
+      }, "dsh-markdown-editor-typora: retire stage handle pseudo-element");
 
       let tabTypeRegistered = false;
       const registerTabType = (tabs) => {
@@ -7492,6 +11949,21 @@ const __test = {
         }
       } catch (error) {
         log.warn?.("dsh-markdown-editor-typora: input face tap seed failed: %s", String(error && error.message ? error.message : error));
+      }
+
+      // ②-c 首页/新会话输入面：宿主的 hero composer 不渲染 conversation.composer.dock
+      //      （InputBar 只在 variant === "composer" 时渲染它）。conversation.input.left
+      //      在两个 variant 都会渲染，且是 session 作用域，标准 props 同样含 inputActions。
+      try {
+        if (ctx.slots && typeof ctx.slots.inject === "function") {
+          runEffect(() => ctx.slots.inject("conversation.input.left", () => ctx.slots.register({
+            name: "conversation.input.left",
+            id: "dsh-markdown-editor-typora-input-face-hero",
+            order: 900,
+          }, InputFaceTap)), "dsh-markdown-editor-typora: hero input face tap");
+        }
+      } catch (error) {
+        log.warn?.("dsh-markdown-editor-typora: hero input face tap seed failed: %s", String(error && error.message ? error.message : error));
       }
 
       // ③ M1 浮层舞台：编辑器的唯一挂载点。布局开关关闭时组件返回 null，不产生任何影响。
@@ -7592,8 +12064,30 @@ const __test = {
 
       // ③ sessions 旁路（cwd 解析用；服务晚到也没关系，每次 open 现取）。
       try { SessionsBridge.getSessions = () => get("sessions"); } catch (e) { /* 忽略 */ }
+      // ③-b 忙时派发：读取宿主 ui-conversation 的 busyEnter 与 uiSession 的
+      // running 状态。两者都是可选服务，缺失时退回 queue；不能写进顶层
+      // inject，否则未装 ui-settings 的宿主会连插件 apply 都跑不到。
+      try {
+        if (ctx && typeof ctx.inject === "function") {
+          ctx.inject(["configForms"], (scope) => {
+            try { hostConfigForms = scope.configForms || (scope.get && scope.get("configForms")) || null; }
+            catch (e) { hostConfigForms = null; }
+          });
+          ctx.inject(["uiSession"], (scope) => {
+            try { hostUiSession = scope.uiSession || (scope.get && scope.get("uiSession")) || null; }
+            catch (e) { hostUiSession = null; }
+          });
+        }
+      } catch (e) { /* 旧宿主没有这些服务 */ }
       ctx.effect(() => installWorkspaceNavigation(ctx), "dsh-markdown-editor-typora: workspace navigation");
       ctx.effect(() => installFileLinkInterceptor(), "dsh-markdown-editor-typora: document links");
+      /* 面板入口短路：宿主的 sidebar.panellist 点击会 layout.selectPanel(id)，
+         把 main slot 的 key 换成我们的面板页 —— 会话列因此整棵卸载再重建。
+         长聊天重挂正是"点 Markdown 就卡一下"的来源，而本插件的编辑面本来画在
+         shell.overlay 上、主区域右侧仍留着对话（见 EditorOverlayStage 注释）。
+         所以在捕获阶段吃掉这次点击：直接开/关工作台，不切换 main slot。
+         只拦我们自己的入口按钮；其它面板入口原样交给宿主。 */
+      ctx.effect(() => installPanelEntryShortcut(), "dsh-markdown-editor-typora: panel entry");
 
       // Rightbar preferences apply only to the editor-owned grid.
 

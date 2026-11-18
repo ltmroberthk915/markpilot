@@ -1000,3 +1000,10 @@ External edits to an open note now show up within 1–2 s; an unsaved draft surf
 The package is now `dsh-markdown-editor-typora` (the old `dsh-markdown-typora` stays at 1.3.x). This release carries external-edit refresh, theme persistence, sidebar handle restore, transparency re-apply, and hardening of the live refresh path.
 
 [Get DSH plugin 1.4.0](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-editor-typora-v1.4.0), or install `dsh-markdown-editor-typora@1.4.0`.
+
+
+## MarkPilot 3.7.0 / DSH 2.1.0
+
+Switch light and dark themes directly from the toolbar. The DSH AI panel uses a compact ∑ button. Includes recent table layout, formula selection, and multiline math improvements.
+
+[Desktop download](https://github.com/ltmroberthk915/markpilot/releases/tag/v3.7.0) · [DSH plugin download](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-editor-typora-v2.1.0)

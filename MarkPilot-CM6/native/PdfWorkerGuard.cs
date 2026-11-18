@@ -9,6 +9,26 @@ using System.Text;
 using System.Threading;
 using System.Web.Script.Serialization;
 
+// Two-stage memory guard. minAvailable* is the startup threshold (old name,
+// old 3072 MiB default). runtimeMinAvailable* is optional: when absent, both
+// stages keep the startup value, so an old config in a new helper is unchanged;
+// an old helper ignores the extra fields and uses the startup value for both
+// stages, so new JSON can never lower admission. Only two pure helpers, no
+// per-sample objects.
+public static class PdfMemoryPolicy {
+  public const int RuntimeFloorMB = 1024;
+  const ulong MiB = 1048576UL;
+  static void Require(bool ok, string message) { if (!ok) throw new InvalidOperationException(message); }
+  public static int RuntimeLimit(int startupMB, int runtimeMB) {
+    Require(startupMB >= 512, "explicit bounded memory thresholds required");
+    if (runtimeMB == 0) return startupMB;
+    Require(runtimeMB >= RuntimeFloorMB, "runtime memory threshold must be at least 1024 MiB");
+    Require(runtimeMB <= startupMB, "startup memory threshold must not be below the runtime threshold");
+    return runtimeMB;
+  }
+  public static bool Below(ulong actualBytes, int limitMB) { return actualBytes < (ulong)limitMB * MiB; }
+}
+
 // Owns only one isolated PDF process tree. The editor remains outside this Job.
 public static class PdfWorkerGuard {
   public sealed class Config {
@@ -24,6 +44,8 @@ public static class PdfWorkerGuard {
     public int maxPrivateMB { get; set; }
     public int minAvailableMB { get; set; }
     public int minAvailableCommitMB { get; set; }
+    public int runtimeMinAvailableMB { get; set; }
+    public int runtimeMinAvailableCommitMB { get; set; }
     public int cpuRatePercent { get; set; }
     public int maxDurationMs { get; set; }
     public int sampleIntervalMs { get; set; }
@@ -104,6 +126,12 @@ public static class PdfWorkerGuard {
   static readonly UTF8Encoding Utf8=new UTF8Encoding(false);
   static void Check(bool ok,string action){if(!ok)throw new Win32Exception(Marshal.GetLastWin32Error(),action);}
   static void Require(bool ok,string message){if(!ok)throw new InvalidOperationException(message);}
+  // Only failure paths allocate these fields. The JS layer turns them into the
+  // one short user sentence; no stage/resource terminology reaches the user.
+  static void RememberMemoryFailure(Dictionary<string,object> result,string stage,string resource,ulong actualBytes,int limitMB){
+    result["memoryErrorStage"]=stage;result["memoryErrorResource"]=resource;
+    result["memoryErrorActualMB"]=actualBytes/1048576.0;result["memoryErrorLimitMB"]=limitMB;
+  }
   static PerformanceInfo SystemPerformance(){var info=new PerformanceInfo();info.size=(uint)Marshal.SizeOf(typeof(PerformanceInfo));Check(GetPerformanceInfo(ref info,info.size),"Read system commit headroom");Require(info.commitLimit.ToUInt64()>=info.commitTotal.ToUInt64(),"invalid system commit counters");return info;}
   static ulong CommitAvailable(PerformanceInfo info){return checked((info.commitLimit.ToUInt64()-info.commitTotal.ToUInt64())*info.pageSize.ToUInt64());}
   static string Sha(string file){using(var input=File.OpenRead(NativePath(file)))using(var sha=SHA256.Create())return BitConverter.ToString(sha.ComputeHash(input)).Replace("-","").ToLowerInvariant();}
@@ -167,6 +195,8 @@ public static class PdfWorkerGuard {
     Require(c.jobMemoryMB==3072,"this frozen launcher uses a 3 GiB job cap");
     Require(c.maxPrivateMB>=512&&c.maxPrivateMB<c.jobMemoryMB&&c.minAvailableMB>=512,"explicit bounded memory thresholds required");
     Require(c.minAvailableCommitMB>=512&&c.cpuRatePercent>=1&&c.cpuRatePercent<=25,"explicit bounded system commit and CPU budgets required");
+    c.runtimeMinAvailableMB=PdfMemoryPolicy.RuntimeLimit(c.minAvailableMB,c.runtimeMinAvailableMB);
+    c.runtimeMinAvailableCommitMB=PdfMemoryPolicy.RuntimeLimit(c.minAvailableCommitMB,c.runtimeMinAvailableCommitMB);
     Require(c.maxDurationMs>=5000&&c.maxDurationMs<=900000&&c.sampleIntervalMs>=100&&c.sampleIntervalMs<=250,"bounded monitor timing required");
     foreach(string name in new[]{"guard-launch.json","guard-result.json","guard-samples.jsonl","guard-stop.json"})Require(!File.Exists(Path.Combine(c.runDir,name)),"fresh guard files required: "+name);
     return c;
@@ -186,12 +216,18 @@ public static class PdfWorkerGuard {
       Require(parentTime<=selfTime,"actual parent PID was reused before lifetime handle acquisition");
       Require(WaitForSingleObject(parentHandle,0)==258,"actual parent exited before worker admission");
       result["parentCreationFileTime"]=parentTime.ToString();result["parentLifetimeHandleRetained"]=true;
-      result["schema"]=1;result["machine"]=Environment.MachineName;result["launcherPid"]=launcherPid;result["launcherParentPid"]=parent;result["ownerToken"]=c.ownerToken;result["exePath"]=c.exePath;result["profilePath"]=c.profilePath;result["jobMemoryMB"]=c.jobMemoryMB;result["maxPrivateMB"]=c.maxPrivateMB;result["minAvailableMB"]=c.minAvailableMB;result["minAvailableCommitMB"]=c.minAvailableCommitMB;result["startedAt"]=DateTime.UtcNow.ToString("o");
+      result["schema"]=1;result["machine"]=Environment.MachineName;result["launcherPid"]=launcherPid;result["launcherParentPid"]=parent;result["ownerToken"]=c.ownerToken;result["exePath"]=c.exePath;result["profilePath"]=c.profilePath;result["jobMemoryMB"]=c.jobMemoryMB;result["maxPrivateMB"]=c.maxPrivateMB;result["minAvailableMB"]=c.minAvailableMB;result["minAvailableCommitMB"]=c.minAvailableCommitMB;result["runtimeMinAvailableMB"]=c.runtimeMinAvailableMB;result["runtimeMinAvailableCommitMB"]=c.runtimeMinAvailableCommitMB;result["startedAt"]=DateTime.UtcNow.ToString("o");
       var initialMemory=new MemoryStatus();initialMemory.length=(uint)Marshal.SizeOf(typeof(MemoryStatus));Check(GlobalMemoryStatusEx(ref initialMemory),"Read pre-admission system memory");
       result["initialAvailableMB"]=initialMemory.availablePhys/1048576.0;
-      Require(initialMemory.availablePhys>=(ulong)c.minAvailableMB*1048576UL,"MP_PDF_LOW_MEMORY: insufficient available memory before worker creation");
-      var initialPerformance=SystemPerformance();result["initialAvailableCommitMB"]=CommitAvailable(initialPerformance)/1048576.0;
-      Require(CommitAvailable(initialPerformance)>=(ulong)c.minAvailableCommitMB*1048576UL,"MP_PDF_LOW_MEMORY: insufficient system commit headroom before worker creation");
+      if(PdfMemoryPolicy.Below(initialMemory.availablePhys,c.minAvailableMB)){
+        RememberMemoryFailure(result,"startup","available",initialMemory.availablePhys,c.minAvailableMB);
+        throw new InvalidOperationException("MP_PDF_LOW_MEMORY: insufficient available memory before worker creation");
+      }
+      var initialPerformance=SystemPerformance();ulong initialCommit=CommitAvailable(initialPerformance);result["initialAvailableCommitMB"]=initialCommit/1048576.0;
+      if(PdfMemoryPolicy.Below(initialCommit,c.minAvailableCommitMB)){
+        RememberMemoryFailure(result,"startup","commit",initialCommit,c.minAvailableCommitMB);
+        throw new InvalidOperationException("MP_PDF_LOW_MEMORY: insufficient system commit headroom before worker creation");
+      }
       job=CreateJobObject(IntPtr.Zero,null);Require(job!=IntPtr.Zero,"CreateJobObject failed");var limits=new ExtendedLimits();limits.Basic.Flags=0x2000u|0x200u;limits.JobMemory=new UIntPtr((ulong)c.jobMemoryMB*1048576UL);
       Check(SetInformationJobObject(job,9,ref limits,(uint)Marshal.SizeOf(typeof(ExtendedLimits))),"Set job memory + kill-on-close");
       var cpuLimit=new CpuRateControl{flags=0x1u|0x4u,rate=(uint)c.cpuRatePercent*100u};
@@ -226,11 +262,11 @@ public static class PdfWorkerGuard {
         var performance=SystemPerformance();ulong commitAvailable=CommitAvailable(performance);
         peakPrivateMB=Math.Max(peakPrivateMB,privateBytes/1048576.0);peakWorkingMB=Math.Max(peakWorkingMB,workingBytes/1048576.0);
         last=new{at=DateTime.UtcNow.ToString("o"),elapsedMs=total.ElapsedMilliseconds,rootPid=app.pid,pids=pids,metrics=metrics,privateMB=privateBytes/1048576.0,workingSetMB=workingBytes/1048576.0,cpuSeconds=cpu,availableMB=memory.availablePhys/1048576.0,totalPhysicalMB=memory.totalPhys/1048576.0,availableCommitMB=commitAvailable/1048576.0,systemCommitMB=performance.commitTotal.ToUInt64()*performance.pageSize.ToUInt64()/1048576.0,systemCommitLimitMB=performance.commitLimit.ToUInt64()*performance.pageSize.ToUInt64()/1048576.0,phase=Stage(Path.Combine(c.runDir,"stage.json"))};if(sampleLog!=null)sampleLog.WriteLine(Json.Serialize(last));sampleCount++;
-        if(privateBytes>=(long)c.maxPrivateMB*1048576L){reason="owned private bytes threshold";Check(TerminateJobObject(job,10),"Private threshold owned job stop");break;}
-        if(memory.availablePhys<(ulong)c.minAvailableMB*1048576UL)lowMemorySamples++;else lowMemorySamples=0;
-        if(lowMemorySamples>=2){reason="system available memory threshold";Check(TerminateJobObject(job,10),"Available memory owned job stop");break;}
-        if(commitAvailable<(ulong)c.minAvailableCommitMB*1048576UL)lowCommitSamples++;else lowCommitSamples=0;
-        if(lowCommitSamples>=2){reason="system commit memory threshold";Check(TerminateJobObject(job,10),"System commit owned job stop");break;}
+        if(privateBytes>=(long)c.maxPrivateMB*1048576L){RememberMemoryFailure(result,"private","private",privateBytes<0?0UL:(ulong)privateBytes,c.maxPrivateMB);reason="owned private bytes threshold";Check(TerminateJobObject(job,10),"Private threshold owned job stop");break;}
+        lowMemorySamples=PdfMemoryPolicy.Below(memory.availablePhys,c.runtimeMinAvailableMB)?lowMemorySamples+1:0;
+        if(lowMemorySamples>=2){RememberMemoryFailure(result,"runtime","available",memory.availablePhys,c.runtimeMinAvailableMB);reason="system available memory threshold";Check(TerminateJobObject(job,10),"Available memory owned job stop");break;}
+        lowCommitSamples=PdfMemoryPolicy.Below(commitAvailable,c.runtimeMinAvailableCommitMB)?lowCommitSamples+1:0;
+        if(lowCommitSamples>=2){RememberMemoryFailure(result,"runtime","commit",commitAvailable,c.runtimeMinAvailableCommitMB);reason="system commit memory threshold";Check(TerminateJobObject(job,10),"System commit owned job stop");break;}
         if(total.ElapsedMilliseconds>=c.maxDurationMs){reason="owned total duration threshold";Check(TerminateJobObject(job,10),"Duration owned job stop");break;}
         uint idleParentWait=WaitForSingleObject(parentHandle,(uint)c.sampleIntervalMs);
         if(idleParentWait!=0&&idleParentWait!=258)throw new Win32Exception(Marshal.GetLastWin32Error(),"Wait actual parent between samples");

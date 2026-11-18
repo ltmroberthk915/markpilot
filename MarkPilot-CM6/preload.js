@@ -161,6 +161,11 @@ contextBridge.exposeInMainWorld('mpHost', {
   outsideChange: (filePath) => ipcRenderer.invoke('doc:outside-change', { filePath }),
   // 当前文档路径（导出为文件夹时用来解析相对图片路径）
   docInfo: () => ipcRenderer.invoke('doc:info'),
+  // 阅读位置：主进程按当前窗口已获准打开的真实文件绑定，渲染侧只送锚点
+  readingGet: () => ipcRenderer.invoke('reading:get'),
+  readingSave: (payload) => ipcRenderer.invoke('reading:save', payload || {}),
+  readingFlush: (payload) => ipcRenderer.sendSync('reading:flush', payload || {}),
+  readingRelease: () => ipcRenderer.invoke('reading:release'),
   // 「文件 → 最近打开」：清单 / 清空（打开与置顶走既有的 openPath，不另开一条路）
   recentList: () => ipcRenderer.invoke('recent:list'),
   recentClear: () => ipcRenderer.invoke('recent:clear'),

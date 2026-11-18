@@ -22,7 +22,7 @@ const mainPath = process.env.MP_MAIN_JS ? path.resolve(process.env.MP_MAIN_JS)
   : path.join(root, 'dsh-markpilot', 'src-cm6', 'main.js');
 const source = readFileSync(mainPath, 'utf8');
 
-const DECL = 'const floatingPointerStarts = new WeakMap(), exactFloatingClicks = new WeakSet();';
+const DECL = 'const floatingPointerStarts = new WeakMap();';
 const MARKER = 'const floatingSelectionStyle = EditorView.mouseSelectionStyle.of((owner, down) => {';
 const CORE_FN = 'function mathSnapRange(spans, r, previousMain) {';
 const FILTER = 'const mathPointerSelectionSnap = EditorState.transactionFilter.of((tr) => {';
@@ -90,15 +90,15 @@ const snapCore = source.includes(CORE_FN)
   ? new Function('EditorSelection', extractFn(source, CORE_FN) + '\n;return mathSnapRange;')(EditorSelection)
   : null;
 /** 用与指定 bundle 同一 exactFloatingClicks 实例编译真实过滤器（旁路豁免才可见）。 */
-function compileFilterFor(bundle) {
-  return new Function('EditorState', 'EditorSelection', 'Transaction', 'mathSpansField', 'exactFloatingClicks', 'mathSnapRange',
+function compileFilterFor() {
+  return new Function('EditorState', 'EditorSelection', 'Transaction', 'mathSpansField', 'mathSnapRange',
     extractStmt(source, FILTER) + '\n;return mathPointerSelectionSnap;')(
-    stubs.EditorState, EditorSelection, stubs.Transaction, mathSpansField, bundle.exactFloatingClicks, snapCore);
+    stubs.EditorState, EditorSelection, stubs.Transaction, mathSpansField, snapCore);
 }
 function compileFloat(blockText) {
-  const fn = new Function('EditorView', 'EditorSelection', 'viewportIntent', 'regionIndexField', 'floatSourcePosition', 'mathSnapRange', 'mathSpansField',
-    blockText + '\n;return { floatingPointerStarts, exactFloatingClicks, floatingSelectionStyle };');
-  return fn(stubs.EditorView, EditorSelection, stubs.viewportIntent, regionIndexField, stubs.floatSourcePosition, snapCore, mathSpansField);
+  const fn = new Function('EditorView', 'EditorSelection', 'viewportIntent', 'regionIndexField', 'floatSourcePosition', 'pointerSourcePosition',
+    blockText + '\n;return { floatingPointerStarts, floatingSelectionStyle };');
+  return fn(stubs.EditorView, EditorSelection, stubs.viewportIntent, regionIndexField, stubs.floatSourcePosition, (owner, event) => event.__glyphPos ?? owner.__docPos);
 }
 const newBundle = () => compileFloat(extractFloatBlock(source));
 
@@ -127,7 +127,7 @@ function applyCM(owner, style, event, filter) {
   const raw = style.get(event);
   if (raw && !raw.eq(owner.state.selection)) {
     const before = owner.state.selection;
-    const out = filter({ docChanged: false, annotation: () => 'select.pointer', selection: raw,
+    const out = filter({ docChanged: false, annotation: () => 'select.pointer', isUserEvent: type => type === 'select.pointer', selection: raw,
       state: owner.state, startState: { selection: before } });
     owner.state.selection = Array.isArray(out) ? out[1].selection : raw;
   }
@@ -174,7 +174,7 @@ test('真正的后续 Ctrl+A 与外来同类 select.pointer 让位且粘滞', ()
   const foreign = EditorSelection.single(0, 30);
   owner.state.selection = foreign;
   assert.equal(style.get(mkEvent(250, 25)), foreign, '必须原样让位给外来选区');
-  const alien = { docChanged: false, annotation: () => 'select.pointer', selection: EditorSelection.single(26, 60),
+  const alien = { docChanged: false, annotation: () => 'select.pointer', isUserEvent: type => type === 'select.pointer', selection: EditorSelection.single(26, 60),
     state: owner.state, startState: { selection: owner.state.selection } };
   const out = filter(alien);
   owner.state.selection = Array.isArray(out) ? out[1].selection : alien.selection;
@@ -216,23 +216,22 @@ test('组字（composition）让位且粘滞', () => {
   assert.equal(style.get(mkEvent(244, 24)), owner.state.selection, '让位粘滞：组字结束后也不复活');
 });
 
-test('shift-at-down 锚点保留与 exactFloatingClicks 登记（检验 get 返回实例；护栏）', () => {
+test('Shift+指针保留原锚点', () => {
   const bundle = newBundle();
   const owner = makeOwner();
   const { style, filter, downRaw } = startGesture(bundle, owner, { shift: true });
   assert.equal(owner.state.selection.main.anchor, 28, 'shift 按下沿用既有锚点');
-  assert.ok(bundle.exactFloatingClicks.has(downRaw), 'shift 精确点击登记的是 get 返回实例');
+  assert.deepEqual(main(downRaw), [28, 28]);
   owner.__docPos = 25;
   assert.deepEqual(main(applyCM(owner, style, mkEvent(232, null, { shift: true }), filter).applied), [28, 25]);
 
   const plain = newBundle();
   const plainStart = startGesture(plain, owner);
-  assert.ok(!plain.exactFloatingClicks.has(plainStart.downRaw), '非 shift 不登记');
   assert.equal(owner.state.selection.main.head, 28, '非 shift 落点＝down 的源码位');
   assert.equal(plainStart.style.update(), false, 'update() 语义保持');
 });
 
-test('reverse-to-prose：跨界合法 snap（28..52→24..52）后手势必须继续到 29..4', () => {
+test('reverse-to-prose：跨界拖选保持原锚点', () => {
   const bundle = newBundle();
   const owner = makeOwner();
   const filter = compileFilterFor(bundle);
@@ -246,8 +245,8 @@ test('reverse-to-prose：跨界合法 snap（28..52→24..52）后手势必须�
     owner.__docPos = head;
     trace.push(applyCM(owner, style, mkEvent(x, null), filter).applied);
   }
-  assert.ok(trace.some((s) => main(s).join('..') === '24..52'), '中途必须出现过合法 snap 落账 24..52');
-  assert.deepEqual(main(owner.state.selection), [29, 4], '终态必须是 closing fence 29..4');
+  assert.ok(trace.some((s) => main(s).join('..') === '28..52'), '跨界时锚点保持在源码字符上');
+  assert.deepEqual(main(owner.state.selection), [28, 4], '反向拖回仍然保持锚点 28');
 });
 
 test('共享核心与真实过滤器逐例一致，且元数据（goalColumn/bidiLevel/assoc）保留', () => {
@@ -275,7 +274,7 @@ test('共享核心与真实过滤器逐例一致，且元数据（goalColumn/bid
     const sel = EditorSelection.create([range], 0);
     const before = EditorSelection.create([prevRange], 0);
     owner.state.selection = before;
-    const out = compileFilterFor(newBundle())({ docChanged: false, annotation: () => 'select.pointer',
+    const out = compileFilterFor()({ docChanged: false, annotation: () => 'select', isUserEvent: type => type === 'select',
       selection: sel, state: owner.state, startState: { selection: before } });
     const applied = Array.isArray(out) ? out[1].selection : sel;
     const core = snapCore(owner.state.field(mathSpansField).spans, range, before.main);
@@ -289,7 +288,7 @@ test('共享核心与真实过滤器逐例一致，且元数据（goalColumn/bid
   }
 });
 
-test('Shift+down 跨 span（锚在外段）＋继续拖：down 落账原始端点，后续按真实吸附继续', () => {
+test('Shift+down 跨 span（锚在外段）＋继续拖：down 落账原始端点，后续仍可逐字符拖动', () => {
   const bundle = newBundle();
   const owner = makeOwner({ sel0: [20, 20] });
   const { style, filter, downRaw } = startGesture(bundle, owner, { shift: true });
@@ -300,7 +299,7 @@ test('Shift+down 跨 span（锚在外段）＋继续拖：down 落账原始端�
     owner.__docPos = head;
     trace.push(applyCM(owner, style, mkEvent(x, null), filter).applied);
   }
-  assert.deepEqual(main(trace[1]), [20, 29], 'head 26 内含、锚 20 在 span 外 ⇒ 吸附为 20..29');
+  assert.deepEqual(main(trace[1]), [20, 26], '从外部拖至公式内部时精确定位字符 26');
   assert.deepEqual(main(owner.state.selection), [20, 4], '继续拖到 20..4，全程无让位');
 });
 
