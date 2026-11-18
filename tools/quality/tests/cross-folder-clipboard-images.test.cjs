@@ -74,7 +74,7 @@ async function dshFrame(token) {
   const win={parent,addEventListener:(name,fn)=>listeners.set(name,fn)};
   const context={window:win,document,location:new URL(url),URL,console,setTimeout,clearTimeout,setInterval,clearInterval,queueMicrotask,
     AbortController,fetch:async()=>({status:404,headers:{get:()=>'text/plain'}}),localStorage:{getItem:()=>null}};
-  vm.runInNewContext(fs.readFileSync(path.join(root,'dsh-markdown-typora/renderer-cm6/dsh-bridge.js'),'utf8'),context);
+  vm.runInNewContext(fs.readFileSync(path.join(root,'dsh-markdown-editor-typora/renderer-cm6/dsh-bridge.js'),'utf8'),context);
   win.handler.on('open',()=>{win.mpEngine={documentSession:()=>({epoch:1,sourceRevision:0})};});
   const down=()=>listeners.get('message')({source:parent,data:{__dshmd:true,dir:'down',type:'open',content:{
     protocol:2,serial:1,content:'![](x.png)',kind:'open',expected:null,docToken:token,applyId:'test-open',rootPath:'D:/session/'+token}}});

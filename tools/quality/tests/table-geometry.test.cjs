@@ -7,7 +7,7 @@ test('a reused row immediately paints its computed initial widths before deferre
  const node=ast.body.find(n=>n.type==='ClassDeclaration'&&n.id.name==='TableRowWidget');
  const method=node.body.body.find(n=>n.key.name==='toDOM');
  const cells=[0,1].map(()=>({dataset:{mpRow:'10',mpFrom:'11',mpTo:'12'},hasAttribute:()=>false,removeAttribute(){}}));
- const cols=[{style:{width:'50%'}},{style:{width:'50%'}}],table={firstElementChild:{children:cols},rows:[{cells}]},wrap={firstElementChild:table};
+ const cols=[{style:{width:'50%'}},{style:{width:'50%'}}],table={firstElementChild:{children:cols},rows:[{cells,classList:{toggle(){}}}]},wrap={firstElementChild:table};
  const scope={cachedTableGeometry:()=>({fittedWidth:400}),tableWidthMetadata:()=>null,mathGeometryVersion:1,
   observeTableGeometry(){},tableRowDOMOwners:new WeakMap(),tableRowDOMViews:new WeakMap()};
  const render=Function('scope','with(scope){return function(inputView,reusableWrap){'+source.slice(method.value.body.start+1,method.value.body.end-1)+'};}')(scope);

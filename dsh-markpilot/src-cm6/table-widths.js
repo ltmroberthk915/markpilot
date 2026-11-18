@@ -170,7 +170,7 @@ function readRows(g) {
     if(parseFloat(getComputedStyle(m.table).width)!==g.avail) return null;
     const cells=[...m.table.querySelectorAll('th,td')];
     if(!cells.length || cells.some(cell=>cell.classList.contains('mp-cell-editing') ||
-        [...cell.querySelectorAll('*')].some(el=>!allowed.has(el.tagName)))) return null;
+        [...cell.querySelectorAll('*')].some(el=>!allowed.has(el.tagName) && !(el.tagName === 'SPAN' && el.hasAttribute('data-mp-text-from'))))) return null;
     const scale=m.table.getBoundingClientRect().width/g.avail;
     if(!finite(scale)) return null;
     scales.push(scale);

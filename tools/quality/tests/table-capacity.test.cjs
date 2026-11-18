@@ -23,5 +23,5 @@ test('table width scanning accepts 140000 rows and preserves exact column maxima
  const scan=Function('scope','with(scope){'+code+';return scanTables;}')(scope);
  const text=['| 名称 | b |','| --- | --- |',...Array(140000).fill('| x | y |')];text[text.length-1]='| 最大列宽文本 | longest-value |';
  const actual=scan(Text.of(text),[]);assert.equal(actual.length,1);assert.equal(actual[0].rows.length,140000);
- assert.deepEqual(actual[0].weights,[12,13]);assert.deepEqual(actual[0].widths,tables.fitWidths([12,13]));
+ assert.deepEqual(actual[0].weights,[12,13]);assert.deepEqual(actual[0].widths,tables.fitWidths([12,13].map(Math.sqrt)));
 });

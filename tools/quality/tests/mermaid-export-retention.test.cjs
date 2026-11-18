@@ -2,7 +2,13 @@
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 const source = fs.readFileSync(path.resolve(__dirname, '../../../dsh-markpilot/src-cm6/main.js'), 'utf8');
-const from = source.indexOf('window.mpMermaid = {'), to = source.indexOf('\nfunction mathWidget', from);
+const from = source.indexOf('window.mpMermaid = {');
+/* This unit is the Mermaid export object only. Later sections of main.js (the
+ * Markdown-fence preview widget and its DOM helpers) are unrelated to export
+ * retention and must not be evaluated in this narrow VM bootstrap. Stop at the
+ * first maintained boundary after the object, with the old anchor as fallback. */
+const fencePreview = source.indexOf('\n/* ══ 显式 Markdown 围栏', from);
+const to = fencePreview > from ? fencePreview : source.indexOf('\nfunction mathWidget', from);
 assert(from >= 0 && to > from);
 function setup({ warm = [], bad = null, makeSvg = src => '<svg>' + src + '</svg>', changeTheme = false } = {}) {
   const cache = new Map(), calls = []; let theme = 'light';

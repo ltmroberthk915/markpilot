@@ -1,8 +1,24 @@
-> **更名（1.4.0 起）：** 本插件包名改为 **`dsh-markdown-editor-typora`**（原 `dsh-markdown-typora` 停在 1.3.x）。安装：`dsh plugin --profile desktop add dsh-markdown-editor-typora@1.4.0`。
+# MarkPilot for DSH 2.0.22
+
+表格里同时有文字和公式时，点哪一条公式就只有那一条展开成源码，其余保持排版；点旁边的文字不会再让整格的公式一起露出来。在已排版的公式上点某个字符，光标落到它在源码中的对应位置，前面增删文字后依然准确。一格词还没上屏时直接点另一格，这段中文会先落到原来那一格，随后可以继续输入；选区里有公式时，复制和剪切给出 Markdown 原文。
+
+在「导出」中选择 PDF，即可将正文、表格、公式和流程图保存为 A4 文档。安装正式版请运行 `dsh plugin --profile desktop add dsh-markdown-editor-typora@2.0.22`。
+
+# MarkPilot for DSH 2.0.21
+
+编辑器默认居中，左边选文件，右边聊 AI。点任意表格单元格编辑公式时可就地对照排版，工具岛上的脚注按钮可在引用与定义之间跳转。主题、页面、阅读和快捷键集中在「更多 → 编辑器设置」。
+
+在「导出」中选择 PDF，即可将正文、表格、公式和流程图保存为 A4 文档。安装正式版请运行 `dsh plugin --profile desktop add dsh-markdown-editor-typora@2.0.21`。
+
+> 自 1.4.0 起，插件包名为 **`dsh-markdown-editor-typora`**。安装 2.0.20 正式版可运行 **`dsh plugin --profile desktop add dsh-markdown-editor-typora@2.0.20`**。旧包 `dsh-markdown-typora` 停留在 1.3.x。
 
 # dsh-markdown-typora
 
 [![开放插件市场](https://img.shields.io/endpoint?url=https%3A%2F%2Fdshopen.org%2Fbadge%2Fdsh-markdown-editor-typora.json)](https://dshopen.org/zh/plugins/dsh-markdown-editor-typora/)
+
+## 2.0.20 · 原位预览 Markdown 示例
+
+在标记为 `markdown` 或 `md` 的围栏里写流程图、表格和公式，移出光标即可看到结果，点回去继续编辑源码。
 
 ## MarkPilot for DSH 1.1 · IDE 式 Markdown × AI 工作台
 
@@ -11,13 +27,14 @@
 ![DSH 中的 Markdown 编辑器与 AI 对话并排，选中文段一键插入对话](https://raw.githubusercontent.com/ltmroberthk915/markpilot/main/docs/screenshots/3.6.6/dsh-insert-to-chat.jpg)
 
 - **选中即聊，精准交给 AI。** 选中文段，一键把 Markdown 源码和文件路径插入当前对话输入框；支持 Ctrl/Cmd+Shift+Enter，也可用 `@mp` 引用当前文档。检查后再发送，上下文由你掌控。
+- **选中即改，直接交给对话。** 选中文段点「修改此处」，说明要怎么改后点「提交给对话」，这段选区、文件与行定位和说明会作为一条消息提交；输入框里已有的草稿与附件不会被发送或覆盖。只想先讨论时用「引用」或 Ctrl/Cmd+Shift+Enter，只进入草稿，等你确认后再发送。
 - **像 IDE 一样安排工作空间。** 文件、正文、对话并排，拖动分栏分配空间；收起工具栏专注写作，关闭编辑器恢复原生布局。
 - **项目切换，思路不断。** 每个工作目录记住最近打开的笔记；同目录切会话保留文档，跨目录可跟随项目，也可固定当前文档。
 - **灵感来了，先写再存。** 直接打开空白稿，首次保存落在所属工作目录；最近文档、文件列表、空白起笔任你选，无历史时另设打开方式。
 - **技术写作，也能赏心悦目。** Typora 式即时渲染、可编辑公式与表格、离线 Mermaid、十套主题与透明外观。
 - **保存有反馈，写作少打断。** 自动保存、版本冲突提示与草稿恢复；未保存持续显示，已保存三秒后消失。
 
-**开始使用：** `dsh plugin --profile desktop add dsh-markdown-typora@1.1.0`。重启 DSH，点击左侧 **Markdown**；打开策略位于 **设置 → Markdown 编辑器 → 打开与切换**。
+**开始使用：** 从本仓库构建的 `dsh-markdown-editor-typora-2.0.0.tgz` 安装（`dsh plugin --profile desktop add <绝对路径>/dsh-markdown-editor-typora-2.0.0.tgz`）。重启 DSH，点击左侧 **Markdown**；打开策略位于 **设置 → Markdown 编辑器 → 打开与切换**。
 
 
 
@@ -142,25 +159,21 @@ The editor engine is the same accepted build that ships with MarkPilot 3.6.17. S
 
 ## Install
 
-### From npm
+### 2.0.0
 
-```sh
-dsh plugin --profile web add dsh-markdown-typora
-dsh plugin --profile desktop add dsh-markdown-typora
-```
+- 文件生命周期：missing/改名候选/只读逃生/另存为/恢复中心。
+- P5 安全切片：state 快照、写守卫、磁盘 AI 写归档、真实 SQLite 锁 fail-closed。
+- 2.0.0 已打包，Desktop 已安装；完整重启验收待做。
 
-Or open **Settings → Plugins → Add plugin** and enter `dsh-markdown-typora`. Restart the host afterwards; the plugin then appears on the **Plugins** page and opens from the right sidebar.
+Install the exact tarball, not a package-name/latest lookup:
 
-### From a GitHub release
+- Desktop: **Settings → Plugins → Add plugin**, choose the absolute path to `dsh-markdown-editor-typora-2.0.0.tgz`. Desktop profile is managed by the Electron app; `dsh plugin --profile desktop …` is rejected by the CLI.
+- Web/host profile: `dsh plugin --profile web add /absolute/path/dsh-markdown-editor-typora-2.0.0.tgz`
+- Verify SHA256 against `SHA256SUMS.txt` before installing.
+- Restart the host afterwards; check **Plugins** and the **Markdown** entry.
 
-Download `dsh-markdown-typora-0.3.12.tgz` from the [MarkPilot releases](https://github.com/ltmroberthk915/markpilot/releases) and add it to the profile that runs your host:
+Older 2.0.0/rc.1/rc.2 tarballs are pre-GA and must not be installed.
 
-```sh
-dsh plugin --profile web add ./dsh-markdown-typora-0.3.12.tgz
-dsh plugin --profile desktop add ./dsh-markdown-typora-0.3.12.tgz
-```
-
-When the npm registry lists 0.3.12, installing by package name above gives this build; if the registry copy still lags, use the TGZ above to get exactly 0.3.12.
 ### Manual (development checkout)
 
 The plugin is the `dsh-markdown-typora/` subdirectory of the [MarkPilot repository](https://github.com/ltmroberthk915/markpilot). To load a checkout as a bundle:

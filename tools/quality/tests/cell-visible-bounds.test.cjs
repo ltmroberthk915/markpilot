@@ -72,3 +72,9 @@ test('事故归因：742→743 与旧路径 7423 都是最小 diff（损坏在�
   assert.deepEqual(cellTextChange(' 742 ', ' 743 '), { from: 3, to: 4, insert: '3', source: ' 743 ' });
   assert.deepEqual(cellTextChange(' 742 ', ' 7423'), { from: 4, to: 5, insert: '3', source: ' 7423' });
 });
+
+test('active cell padding preserves spaces intentionally typed before the source suffix', async () => {
+  const { cellCaretEdge } = await source;
+  assert.deepEqual(cellCaretEdge(' note  ', 'End', false, 4, {start: 1, end: 6}), {anchor: 6, head: 6});
+  assert.deepEqual(cellCaretEdge(' note  ', 'Home', true, 6, {start: 1, end: 6}), {anchor: 6, head: 1});
+});

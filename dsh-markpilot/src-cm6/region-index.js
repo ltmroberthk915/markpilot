@@ -17,10 +17,25 @@ export function createRegionIndex(readRegions, dependencies = []) {
     let nextId = previous?.nextId ?? 0;
     const old = new Map(), rightEnds = new Map();
     const unique = (map,key,r) => map.set(key,map.has(key) ? null : r);
+    // Collect changed ranges once; prior regions are already sorted by `from`,
+    // so the "wholly removed" test scans both lists with moving pointers
+    // (O(R + C)) instead of iterating every range for every region (O(R × C)).
+    // Same predicate: removed iff some change has a <= r.from && b >= r.to && b > a.
+    const changed = [];
+    if (changes) changes.iterChangedRanges((a, b) => { if (b > a) changed.push(a, b); });
+    const changedCount = changed.length >> 1;
+    let scanAt = 0, farthestRight = -1;
+    const whollyRemoved = (from, to) => {
+      if (!changedCount) return false;
+      while (scanAt < changedCount && changed[scanAt * 2] <= from) {
+        const b = changed[scanAt * 2 + 1];
+        if (b > farthestRight) farthestRight = b;
+        scanAt++;
+      }
+      return farthestRight >= to;
+    };
     for (const r of previous?.regions || []) {
-      let removed = false;
-      changes?.iterChangedRanges((a, b) => { if (a <= r.from && b >= r.to && b > a) removed = true; });
-      if (removed) continue;
+      if (whollyRemoved(r.from, r.to)) continue;
       const from = changes ? changes.mapPos(r.from, 1) : r.from;
       const to = changes ? changes.mapPos(r.to, -1) : r.to;
       const key = keyOf(r,from,to);
@@ -95,4 +110,29 @@ export function regionsBetween(index, from, to, kind) {
   const out = [];
   for (; at < rows.length && rows[at].from <= to; at++) if (rows[at].to >= from) out.push(rows[at]);
   return out;
+}
+
+/* Source-display predicate shared by fence lines and the Mermaid projection.
+   A collapsed cursor is on the region at either endpoint; a non-empty selection
+   must overlap at least one source character (half-open [from,to) overlap).
+   Deliberately independent of `editing`: a selection ending exactly at a block
+   head must not reveal it, in either direction. */
+export function selectionTouchesRegion(region, range) {
+  if (!region || !range) return false;
+  if (!range.empty) return range.from < region.to && range.to > region.from;
+  return range.head >= region.from && range.head <= region.to;
+}
+
+/* Line starts whose fence must stay visually collapsed. A block is untouched
+   only when every selection range misses it; the caller has the authoritative
+   markdownContext.blocks (from/closeFrom), so this is O(blocks × ranges) and
+   never scans the document. */
+export function hiddenFenceLines(blocks, ranges) {
+  const hidden = [];
+  for (const block of blocks || []) {
+    if ((ranges || []).some((r) => selectionTouchesRegion(block, r))) continue;
+    hidden.push(block.from);
+    if (block.closeFrom != null) hidden.push(block.closeFrom);
+  }
+  return hidden;
 }
