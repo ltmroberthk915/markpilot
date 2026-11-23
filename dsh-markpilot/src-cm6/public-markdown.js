@@ -40,12 +40,12 @@
 import { Text } from '@codemirror/state';
 import { scanSingleDollarMath } from './single-dollar-math.js';
 import { parser as lezerParser, GFM } from '@lezer/markdown';
+import { frontMatterSyntax, sourceFrontMatter } from './frontmatter.js';
 
-const mdParser = lezerParser.configure(GFM);
+const mdParser = lezerParser.configure([GFM, frontMatterSyntax]);
 
 const CODE_NODES = new Set(['InlineCode', 'FencedCode', 'CodeBlock']);
 const COMMENT_NODES = new Set(['Comment', 'CommentBlock']);
-const FRONT_MATTER = /^\uFEFF?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
 const EMPTY_COMMENT = /<!---->/g;
 const HTML_BLOCK_OPEN = /^<(?:[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?\/?>|\/[A-Za-z][A-Za-z0-9-]*\s*>|!|\?)/;
 
@@ -178,7 +178,7 @@ function isEscaped(source, index) {
 }
 
 function frontMatterRange(source) {
-  const match = FRONT_MATTER.exec(source);
+  const match = sourceFrontMatter.exec(source);
   return match ? { from: 0, to: match[0].length } : null;
 }
 

@@ -7,6 +7,7 @@ import { foldKeymap } from '@codemirror/language';
 import { completionKeymap } from '@codemirror/autocomplete';
 import { Tree, TreeBuffer, NodeProp, TreeFragment, Parser } from '@lezer/common';
 import { codeBlockAt } from './markdown-context.js';
+import { frontMatterOf } from './frontmatter.js';
 import { createRawTreeCodec, createReadyPartial, copyPendingPrefix } from './worker-tree-codec.js';
 
 export function createAsyncMarkdown(base, { threshold = 128 * 1024 } = {}) {
@@ -29,8 +30,9 @@ export function createAsyncMarkdown(base, { threshold = 128 * 1024 } = {}) {
       const s = inserted.toString(); mayHTML ||= s.includes('<');
       mayContainer ||= markers.test(s) || markers.test(doc.lineAt(from).text) || markers.test(doc.lineAt(to).text);
     });
+    const compatibleHeader = before && frontMatterOf(before.doc)?.to === frontMatterOf(doc)?.to;
     return { doc, revision: ++revision, status: 'pending', promise, settle, wire: null, mayContainer, mayHTML, changedFrom,
-      forceNative: !!(before && armedDoc === before.doc), fragments: before ? TreeFragment.applyChanges(before.fragments, ranges) : [] };
+      forceNative: !!(before && armedDoc === before.doc), fragments: compatibleHeader ? TreeFragment.applyChanges(before.fragments, ranges) : [] };
   };
   const field = StateField.define({
     create: state => entry(state.doc),
@@ -200,6 +202,16 @@ export function createAsyncMarkdown(base, { threshold = 128 * 1024 } = {}) {
       const outer = new class extends Parser {
         createParse(input, fragments, ranges) {
           const context = ParseContext.get(), current = context?.state.field(field, false);
+          // Closing an initially unclosed header can change an old horizontal
+          // rule thousands of lines before the edit. Discard fragments that
+          // still describe that prefix with its previous Markdown meaning.
+          if (context && fragments.length && ranges[0]?.from === 0) {
+            const end = frontMatterOf(context.state.doc)?.to;
+            if (fragments.some(f => {
+              const first = f.tree.topNode.firstChild;
+              return (first?.name === 'FrontMatter' ? first.to : undefined) !== end;
+            })) fragments = [];
+          }
           if (current && current.doc === context.state.doc && !current.forceNative &&
               (current.status === 'pending' || current.status === 'ready') &&
               current.doc.length === input.length && ranges.length === 1 &&

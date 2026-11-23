@@ -12,6 +12,7 @@
 import { tableLead, withTableLead, isFenceAt, isSeparatorBody, tableSpanOf } from "./tables.js";
 import { codeBlockAt, quoteLead, scanFenceLines, codeBody, inFrontMatter, listMarkerOf } from './markdown-context.js';
 import { EditorSelection } from '@codemirror/state';
+import { sourceFrontMatter } from './frontmatter.js';
 import { SearchQuery, getSearchQuery, setSearchQuery } from '@codemirror/search';
 import { reserveImageInsertion, captureImageDocument } from './image-insertion.js';
 import { mathSourcePosition } from './math-source-map.js';
@@ -1171,7 +1172,7 @@ export function installExtras(deps) {
     const publicMd = (nested || publicized) ? String(md) : publicMarkdown(String(md));
     /* 【#54】导出正文剥离文档开头的 YAML front-matter（与编辑面同口径；Typora/常规导出链都不把元数据
        当正文）。判据与 markdown-context.inFrontMatter 同一正则；不匹配则原样输出。 */
-    const frontMatter = nested ? null : /^\uFEFF?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(publicMd);
+    const frontMatter = nested ? null : sourceFrontMatter.exec(publicMd);
     const sourceBody = frontMatter ? publicMd.slice(frontMatter[0].length) : publicMd;
     /* 脚注只由共享解析器定位；这里把引用换成行内占位符、把定义区间抹成空白（保留换行），
        块解析与行内 Markdown 仍是原来那一条链。nested 调用只消费占位符，不重复收集。
@@ -4428,7 +4429,7 @@ export function installExtras(deps) {
   setImageModePref(imageModePref());
 
   function imageModeOf(doc) {
-    const m = /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(String(doc || ""));
+    const m = sourceFrontMatter.exec(String(doc || ""));
     if (!m) return imageModePref();          /* 【task-17】没有 front-matter ⇒ 用全局偏好（默认 inline） */
     for (const line of m[1].split(/\r?\n/)) {
       /* 单一的键值行解析：键名大小写不敏感由 k[1].toLowerCase() 判 —— 只留这一条判定路径 */

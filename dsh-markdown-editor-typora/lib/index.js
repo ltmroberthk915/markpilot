@@ -47,6 +47,11 @@ import {
 } from './save-failure.js';
 import { createSessionManager, allowedActions } from './document-sessions.js';
 import { createEditIsolation } from './edit-isolation.js';
+import { installReferenceScope, referenceSigner } from './reference-scope.js';
+import { installSourceEvidence } from './source-evidence.js';
+import { installAttachmentImageTool } from './attachment-image.js';
+import { createAnswerWriter } from './answer-write.js';
+import { inspectMarkdownFile } from './markdown-inspection.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize, sep, extname, basename, resolve as pathResolve, isAbsolute, relative as pathRelative }  from 'node:path';
 
@@ -340,8 +345,8 @@ const MODEL_TOOL = Symbol('markdown model tool');
 export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
-const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'reading', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'documents.session', 'documents.recoveryList', 'documents.recoveryRead', 'documents.recoveryDiscard', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'documents.captureSelection', 'documents.readSelection', 'documents.editSelection', 'documents.editPrepare', 'documents.editArm', 'documents.editStatus', 'documents.editAbort', 'export/pdf', 'export/pdfCancel', 'diag']);
-const SESSION_MUTATING_ENDPOINTS = new Set(['open', 'save', 'edit', 'live', 'docs/create', 'docs/saveAs', 'docs/archive', 'documents.applyEdits', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.undoGroups', 'documents.merge3', 'documents.reviewGroup', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftClear']);
+const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'reading', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'documents.session', 'documents.recoveryList', 'documents.recoveryRead', 'documents.recoveryDiscard', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'documents.reference', 'documents.answerOffer', 'documents.writeAnswer', 'documents.captureSelection', 'documents.readSelection', 'documents.editSelection', 'documents.editPrepare', 'documents.editArm', 'documents.editStatus', 'documents.editAbort', 'export/pdf', 'export/pdfCancel', 'diag']);
+const SESSION_MUTATING_ENDPOINTS = new Set(['open', 'save', 'edit', 'documents.writeAnswer', 'live', 'docs/create', 'docs/saveAs', 'docs/archive', 'documents.applyEdits', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.undoGroups', 'documents.merge3', 'documents.reviewGroup', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftClear']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
 let lastDiag = null;
 
@@ -873,6 +878,7 @@ export function createHost(options = {}) {
           if (at - entry.at > READING_OPEN_TTL_MS || candidate !== key) openedReadingPaths.delete(candidate);
         }
       }
+      return canonical;
     } catch { /* reading positions are optional; never block open */ }
   }
   async function readingTarget(raw) {
@@ -963,7 +969,38 @@ export function createHost(options = {}) {
   const liveStreams = new Set();
   // Mutable internals: `apply()` installs the pre-step edit-isolation service
   // after createHost returns, and the route must see that exact instance.
-  const hostInternals = { watchers, liveStreams, lookupDocument, documents, fileIdentities, editIsolation: null };
+  const selectionCalls = new WeakMap();
+  const referenceScope = {
+    ready: false, sign: referenceSigner(live.directory),
+    readDocument: (path, exec) => dispatch('documents.read', { path }, MODEL_TOOL, exec),
+    // The section-scoped markdown write commits here: same endpoint, same
+    // policy resolution, same guarded writer as a normal markdown call. The
+    // payload already carries the revision that was just validated.
+    apply: (payload, exec) => {
+      const agent = exec?.agent;
+      return dispatch('documents.applyEdits', payload, MODEL_TOOL,
+        { agent, signal: exec?.signal }, { source: 'markdown-tool' });
+    },
+    trustedSelection(exec) {
+      const held = selectionCalls.get(exec.toolSet);
+      return !!held && exec.agent === held.agent && exec.callId === held.callId && exec.name === 'markdown'
+        && exec.arguments?.action === held.args.action && exec.arguments.path === held.args.path
+        && exec.arguments.selectionId === held.args.selectionId;
+    },
+    async runSelection(toolSet, call, run) {
+      selectionCalls.set(toolSet, call);
+      try { return await run(); } finally { selectionCalls.delete(toolSet); }
+    },
+  };
+  const answerSession = key => options.sessions?.()?.get(key.sessionId);
+  const answerWriter = createAnswerWriter({
+    directory: live.directory,
+    resolve: key => referenceScope.ready && referenceScope.resolveAnswer?.(answerSession(key), key),
+    group: (path, id) => live.getAgentGroup(path, id),
+    read: (path, key) => dispatch('documents.read', {path}, MODEL_TOOL, { agent: {session: answerSession(key)} }),
+    apply: (payload, key, internal) => dispatch('documents.applyEdits', payload, MODEL_TOOL, {agent: {session: answerSession(key)}}, internal),
+  });
+  const hostInternals = { watchers, liveStreams, lookupDocument, documents, fileIdentities, editIsolation: null, referenceScope };
 
   function watchKeyOf(target) {
     return String(target?.targetKey ?? target?.displayPath ?? '');
@@ -1249,6 +1286,26 @@ export function createHost(options = {}) {
     return createHash('sha256').update(String(text).replace(/\r\n?/g, '\n').replace(/^\uFEFF/, '')).digest('hex');
   }
 
+  // 只有 providerVersion 与规范路径都与记录吻合，持久记录才降格为组 id 提示；
+  // 真正裁决在 live.join 内，用 agent_group 的 source/undone 自证。
+  function reviewJoinHint(payload, canonical, version) {
+    const raw = payload?.review;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    if (typeof raw.baseVersion !== 'string' || raw.baseVersion !== String(version)) return null;
+    // 身份按平台既有 canonical 精确比对，不折叠大小写、不改写路径。
+    if (typeof canonical !== 'string' || !canonical) return null;
+    if (process.platform === 'win32') {
+      const winKey = canonical.replace(/\\/g, '/').toLowerCase();
+      if (String(raw.pathKey ?? '') !== winKey) return null;
+    } else if (String(raw.pathKey ?? '') !== canonical) return null;
+    if (!Array.isArray(raw.groups) || raw.groups.length === 0 || raw.groups.length > 20) return null;
+    const groups = [];
+    for (const id of raw.groups) {
+      if (typeof id !== 'string' || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id) || groups.includes(id)) return null;
+      groups.push(id);
+    }
+    return { baseVersion: raw.baseVersion, groups };
+  }
   async function apiOpen(payload, authority, resolvedTarget, invocation) {
     const path = typeof payload?.path === 'string' ? payload.path : '';
     if (!path) return badRequest('path is required');
@@ -1273,7 +1330,8 @@ export function createHost(options = {}) {
       if (payload.live === true && baseline && authority !== MODEL_TOOL) {
         const canonical=await canonicalTarget(target);
         const seed=text.replace(/\r\n?/g,'\n');
-        const joined=await live.join(canonical,seed,baseline);
+        // 持久审阅记录沿本次 open 下传交由 join 核验；不改变任何写入守卫。
+        const joined=await live.join(canonical,seed,baseline,reviewJoinHint(payload,canonical,after.version));
         if (closed) { live.leave(joined.client);throw codedError('MP_LIVE_CLOSED','editor host stopped'); }
         leases.set(joined.client,{canonical:pathKey(canonical)});
         value.live={client:joined.client,epoch:joined.epoch,version:joined.version,diskHash:joined.diskHash,dirty:joined.text!==seed,savedVersion:joined.savedVersion,
@@ -1281,7 +1339,7 @@ export function createHost(options = {}) {
           ...(Array.isArray(joined.recovered)?{recovered:joined.recovered}:{})};
         value.text=joined.text;
       }
-      if (authority !== MODEL_TOOL) await rememberReadingTarget(target);
+      if (authority !== MODEL_TOOL) value.referencePath = await rememberReadingTarget(target);
       return {ok:true,value};
     }
     throw codedError('FS_STALE_VERSION','file changed during read; retry after the external write finishes');
@@ -2044,7 +2102,7 @@ export function createHost(options = {}) {
     });
   }
 
-  async function dispatch(endpoint, payload, authority, execution) {
+  async function dispatch(endpoint, payload, authority, execution, internal) {
     try {
       let invocation;
       if (authority === MODEL_TOOL) {
@@ -2059,6 +2117,14 @@ export function createHost(options = {}) {
         invocation.signal?.throwIfAborted();
       }
       switch (endpoint) {
+        case 'documents.inspect': {
+          if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
+          if (typeof payload?.path !== 'string' || !payload.path) return badRequest('path is required');
+          const target = await fs.resolve(payload.path, resolveOptions(payload, invocation));
+          if (typeof fs.readBytes !== 'function') return badRequest('当前文件提供方不支持原始字节读取');
+          const inspection = await inspectMarkdownFile(fs, target, invocation.signal, textCodec.decodeDocument);
+          return { ok: true, value: { displayPath: target.displayPath, inspection } };
+        }
         case 'open': return await apiOpen(payload, authority, undefined, invocation);
         case 'save': return await apiSave(payload);
         case 'stat': return await apiStat(payload);
@@ -2067,6 +2133,22 @@ export function createHost(options = {}) {
           if (authority === MODEL_TOOL) return badRequest('editor UI authority required');
           return await apiReading(payload);
         case 'edit': return await apiEdit(payload, invocation);
+        case 'documents.answerOffer':
+        case 'documents.writeAnswer':
+          if (authority === MODEL_TOOL) return badRequest('editor-only action');
+          return await answerWriter(payload, endpoint === 'documents.writeAnswer');
+        case 'documents.reference':
+          if (authority === MODEL_TOOL || !referenceScope.ready) return badRequest('当前宿主的引用保护不可用');
+          if (typeof payload?.sessionId !== 'string' || !payload.sessionId || payload.sessionId.length > 256) return badRequest('缺少当前对话');
+          if (typeof payload.path !== 'string' || !payload.path || /[\r\n]/u.test(payload.path)) return badRequest('引用缺少文件名');
+          if (payload.readonly === true) return { ok: true, value: { path: payload.path, readonly: true } };
+          if (!isAbsolute(payload.path)) return badRequest('引用需要完整文件路径');
+          {
+            const canonical = await realpath(payload.path);
+            const opened = openedReadingPaths.get(pathKey(canonical));
+            if (opened?.path !== canonical || payload.expectedPath !== canonical) return badRequest('文件目标已变动，请重新打开后引用');
+            return { ok: true, value: { path: canonical, signature: referenceScope.sign(payload.sessionId, canonical) } };
+          }
         case 'documents.captureSelection':
           if (authority === MODEL_TOOL) return badRequest('captureSelection is editor-only');
           return await documents.captureSelection(payload);
@@ -2097,7 +2179,7 @@ export function createHost(options = {}) {
           return await documents.read(payload, invocation);
         case 'documents.applyEdits':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
-          return await documents.applyEdits(payload, invocation, invocation?.policy);
+          return await documents.applyEdits(payload, invocation, invocation?.policy, internal);
         case 'documents.state':
           if (authority !== MODEL_TOOL) return badRequest('model tool authority required');
           if (typeof payload?.path !== 'string' || !payload.path) return await documents.state(payload, invocation);
@@ -2579,12 +2661,17 @@ export function apply(ctx, config = {}) {
       log,
       rootDir: PLUGIN_ROOT,
       sandboxPolicy: () => safeGet(ctx, 'sandboxPolicy'),
+      sessions: () => safeGet(ctx, 'sessions'),
       connectionProvider: () => safeGet(ctx, 'connection'),
     });
   } catch (error) {
     log.warn?.('%s: host init failed: %s', name, String(error?.message ?? error));
     return;
   }
+
+  installReferenceScope(ctx, host._internals.referenceScope, log);
+  installSourceEvidence(ctx, log);
+  installAttachmentImageTool(ctx, { log, toDefinition: createRegistryMarkdownToolDefinition });
 
   // Isolated "修改此处": the UI prompt is a single marked Session submission;
   // the pre-step listener consumes it and runs a history-free model call before
@@ -2593,6 +2680,7 @@ export function apply(ctx, config = {}) {
     const isolation = createEditIsolation({
       ctx,
       documents: host._internals.documents,
+      runSelection: host._internals.referenceScope.runSelection,
       log,
     });
     host._internals.editIsolation = isolation;
@@ -2988,6 +3076,8 @@ export function createMarkdownToolDefinition(dispatch) {
   return {
     name: 'markdown',
     description: [
+      '要新增、追加或插入内容，优先用 insert。比如“在附录 H 后新增 I”用 position:"after", heading:"附录 H", newString:新章节。标题只用于定位，原章节及其子节全部保留。段落或列表旁用唯一 anchorText，文件首尾用 start/end。明确的插入直接执行，冲突时先重读定位。',
+      'inspect 只读已保存的磁盘字节（最多 8 MiB），检查编码、BOM、行数、CRLF/LF/CR、U+FFFD、顶层 Markdown 标题、表格分隔行与代码围栏；保存后校验文件直接调用此动作。',
       'UI 已内联修改目标原文（消息中带 selectionId）时直接调用 editSelection；不要再 read/readSelection。',
       '读写 Markdown（及任意文本）文件。read 返回“当前正文”——包含用户在 MarkPilot 编辑器里尚未保存的修改；',
       'read 可带 fromLine/toLine/lineCount/maxBytes 做有界按行读取：1-based、含首尾行，返回 totalLines、窗口原文 text、每行绝对行号与 from/to/end 数值偏移、truncated/nextLine；不带这些参数时返回全文（全文超过单次显示预算时分页，见下）。',
@@ -3007,11 +3097,14 @@ export function createMarkdownToolDefinition(dispatch) {
       'readSelection 只读取该捕获引用（有界 32 KiB），不消费引用；需要最新原文仍用 read。',
     ].join(' '),
     parameters: {
-      action: { type: 'string', required: true, description: 'read = 读当前正文；edit = 字面/整块替换；blocks = 列块 ID；batch = 原子多处编辑；merge3 = 三方合并；undo = 撤销最近一组 AI 编辑；editSelection = 替换 UI 捕获的选区；readSelection = 有界读取捕获选区。', enum: ['read', 'edit', 'blocks', 'batch', 'merge3', 'undo', 'editSelection', 'readSelection'] },
+      action: { type: 'string', required: true, description: 'insert = 在指定位置新增；edit = 替换；read = 读当前正文；inspect = 检查磁盘；blocks = 列标题；batch = 原子多处编辑；merge3 = 三方合并；undo = 按 groupId 撤销一次插入或最近一组 AI 编辑；editSelection/readSelection = 修改或读取捕获的选区。', enum: ['read', 'edit', 'blocks', 'batch', 'merge3', 'undo', 'editSelection', 'readSelection', 'inspect', 'insert'] },
+      position: { type: 'string', enum: ['before', 'after', 'start', 'end'], description: 'insert 的插入位置。before/after 搭配 heading 或 anchorText 二选一，start/end 直接用于文件首尾。' },
+      heading: { type: 'string', description: '目标章节标题或唯一的标题简称。after 在整个章节及其子节之后插入。' },
+      anchorText: { type: 'string', description: '段落、列表项或行内的唯一原文；文字本身完整保留。' },
       path: { type: 'string', required: true, description: '文件的绝对路径。' },
       cwd: { type: 'string', description: '可选：相对路径的解析基准目录。' },
       blockId: { type: 'string', description: 'action=edit 可选：从 blocks 结果拿到的 section ID；与 oldString 二选一。' },
-      groupId: { type: 'string', description: 'action=undo 必填：edit 返回的 groupId。' },
+      groupId: { type: 'string', description: 'action=undo 必填，传要撤回的 insert 或 edit 返回的 groupId。插入后的独立改动在有完整编辑记录时可以保留。' },
       baseText: { type: 'string', description: 'action=merge3 必填：共同祖先正文。' },
       otherText: { type: 'string', description: 'action=merge3 必填：另一侧正文。' },
       edits: {
@@ -3027,7 +3120,7 @@ export function createMarkdownToolDefinition(dispatch) {
         },
       },
       oldString: { type: 'string', description: 'action=edit 必填（与 fromLine/toLine 二选一）：要替换的原文字面量；不带行号时须在当前正文唯一，重复则 FS_AMBIGUOUS_EDIT。' },
-      newString: { type: 'string', description: 'action=edit 必填：替换后的文字面量。行区间替换时表示整段新内容，可多行；服务端按原段 EOL 归一。' },
+      newString: { type: 'string', description: 'insert 时仅填写要增加的文字，edit 时填写替换后的文字。' },
       replaceAll: { type: 'boolean', description: 'action=edit 可选：替换所有出现（默认 false，最多 1000 处）；不能与 fromLine/toLine 同用。' },
       fromLine: { type: 'number', description: 'read：1-based 起始行；edit：1-based 第一行（含）。行号只对同一次 read 的 version 有效。' },
       toLine: { type: 'number', description: 'read：1-based 结束行（含）；edit：1-based 最后一行（含，默认等于 fromLine）。' },
@@ -3046,6 +3139,12 @@ export function createMarkdownToolDefinition(dispatch) {
         properties: {
           ok: { type: 'boolean', required: true },
           action: { type: 'string', required: true },
+          inspection: { type: 'object', additionalProperties: false, properties: {
+            ...Object.fromEntries(['bytes', 'crlf', 'lf', 'cr', 'lines', 'replacementCharacters', 'h2', 'h3',
+              'tableDelimiterRows', 'fencesOpened', 'fencesClosed'].map(key => [key, { type: 'integer', required: true }])),
+            encoding: { type: 'string', required: true }, sha256: { type: 'string', required: true }, bom: { type: 'boolean', required: true },
+            endsWithNewline: { type: 'boolean', required: true }, unclosedFenceLine: { required: true, oneOf: [{ type: 'integer' }, { type: 'null' }] },
+          } },
           readToken: { type: 'string' },
           blockId: { type: 'string' },
           groupId: { type: 'string' },
@@ -3157,6 +3256,7 @@ export function createMarkdownToolDefinition(dispatch) {
             },
           },
           selectionId: { type: 'string' },
+          destination: { type: 'string' },
           replayed: { type: 'boolean' },
           stale: { type: 'boolean' },
           expiresAt: { type: 'number' },
@@ -3217,10 +3317,13 @@ export function createMarkdownToolDefinition(dispatch) {
           },
         },
       },
+      presentationMeta: (_args, value) => value.ok && value.action === 'insert' && value.groupId
+        ? { markPilotInsert: { path: value.displayPath, groupId: value.groupId } } : {},
       render: (args, value) => {
         if (value?.ok !== true) {
           return textBlock(`markdown ${String(args?.action ?? '')} 失败：${value?.error?.code ?? 'error'} — ${value?.error?.message ?? ''}`);
         }
+        if (value.action === 'inspect') return textBlock('磁盘文件 ' + value.displayPath + '\n' + JSON.stringify(value.inspection));
         // A successful write whose audit group could not be persisted has no
         // undo id. Say so instead of leaving the caller to try a dead id.
         const groupWarning = value.groupPersisted === false
@@ -3251,6 +3354,11 @@ export function createMarkdownToolDefinition(dispatch) {
           }
           return textBlock(`三方合并完成：${value.displayPath ?? ''}${value.changed === false ? '（无变化）' : ''}；${value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘'}；新版本：${String(value.version ?? '')}${value.groupId ? '；groupId：' + value.groupId : ''}${groupWarning}`);
         }
+        if (value.action === 'insert') {
+          const location = args.heading || args.anchorText?.slice(0, 40);
+          const where = value.destination || (location ? location + (args.position === 'before' ? '之前' : '之后') : args.position === 'start' ? '文件开头' : '文件末尾');
+          return textBlock(`已在${where}插入文字（${value.saved ? '已写盘' : '已进入编辑器'}）。${value.groupId ? 'groupId：' + value.groupId : ''}${groupWarning}`);
+        }
         if (value.action === 'batch') {
           const count = Array.isArray(value.applied) ? value.applied.length : 0;
           return textBlock(`已批量应用 ${count} 处编辑：${value.displayPath ?? ''}${value.changed === false ? '（内容未变）' : ''}；${value.saved === true ? '已写盘' : '仅进入编辑器缓冲区，未写盘'}；新版本：${String(value.version ?? '')}${value.groupId ? '；groupId：' + value.groupId : ''}${groupWarning}`);
@@ -3278,7 +3386,11 @@ export function createMarkdownToolDefinition(dispatch) {
       },
     },
     async execute(args, execution) {
-      const action = args?.action === 'edit' ? 'edit' : args?.action === 'blocks' ? 'blocks'
+      if (args?.action === 'inspect') {
+        const result = await dispatch('documents.inspect', { path: args.path, cwd: args.cwd }, MODEL_TOOL, execution);
+        return result.ok ? { ok: true, action: 'inspect', ...result.value } : { ok: false, action: 'inspect', error: result.error };
+      }
+      const action = args?.action === 'insert' ? 'insert' : args?.action === 'edit' ? 'edit' : args?.action === 'blocks' ? 'blocks'
         : args?.action === 'batch' ? 'batch' : args?.action === 'merge3' ? 'merge3'
           : args?.action === 'undo' ? 'undo' : args?.action === 'editSelection' ? 'editSelection'
             : args?.action === 'readSelection' ? 'readSelection' : 'read';
@@ -3298,8 +3410,11 @@ export function createMarkdownToolDefinition(dispatch) {
             ranges: Array.isArray(value.ranges) ? value.ranges : [],
           };
         }
-        if (action === 'editSelection') {
+        if (action === 'editSelection' || (action === 'insert' && args.selectionId)) {
+          if (action === 'insert' && Object.keys(args).some(key => !['action', 'selectionId', 'path', 'newString', 'cwd'].includes(key)))
+            return { ok: false, action, error: { code: 'MP_INSERT_INVALID', message: '选区补写使用已绑定的章节' } };
           const result = await dispatch('documents.editSelection', {
+            action,
             path: args?.path, cwd: args?.cwd, selectionId: args?.selectionId,
             newString: args?.newString, replacements: args?.replacements,
           }, MODEL_TOOL, execution);
@@ -3308,7 +3423,7 @@ export function createMarkdownToolDefinition(dispatch) {
           return {
             ok: true, action, selectionId: value.selectionId,
             version: value.version, revisionId: value.revisionId, readToken: value.version,
-            displayPath: value.displayPath, changed: value.changed,
+            displayPath: value.displayPath, changed: value.changed, ...(value.destination ? {destination: value.destination} : {}),
             source: value.source, dirty: value.dirty === true, saved: value.saved === true,
             replayed: value.replayed === true,
             ranges: Array.isArray(value.ranges) ? value.ranges : [],
@@ -3353,9 +3468,12 @@ export function createMarkdownToolDefinition(dispatch) {
             ...(value.checkpoint?.archivePath ? { checkpointPath: value.checkpoint.archivePath } : {}),
           };
         }
-        if (action === 'batch') {
+        if (action === 'batch' || action === 'insert') {
+          if (action === 'insert' && (args.position === undefined || ['oldString', 'edits', 'replaceAll', 'fromLine', 'toLine', 'blockId', 'selectionId'].some(key => args[key] !== undefined)))
+            return { ok: false, action, error: { code: 'MP_INSERT_INVALID', message: '插入需要 position，不能混用替换范围' } };
           const result = await dispatch('documents.applyEdits', {
-            path: args?.path, cwd: args?.cwd, edits: args?.edits,
+            path: args?.path, cwd: args?.cwd,
+            ...(action === 'insert' ? { position: args.position, heading: args.heading, anchorText: args.anchorText, newString: args.newString } : { edits: args.edits }),
             baseVersion: args?.baseVersion, baseRevisionId: args?.baseRevisionId,
           }, MODEL_TOOL, execution);
           if (result.ok !== true) return { ok: false, action, error: result.error };
@@ -3491,7 +3609,7 @@ export function createRegistryMarkdownToolDefinition(spec) {
     name: spec.name,
     description: spec.description,
     parameters,
-    output: { schema: outputSchema, render: spec.output.render },
+    output: { schema: outputSchema, render: spec.output.render, presentationMeta: spec.output.presentationMeta },
     async execute(args, execution) { return spec.execute(args, execution); },
   };
 }

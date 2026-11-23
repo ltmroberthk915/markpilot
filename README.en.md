@@ -1,5 +1,7 @@
 > **Renamed in 1.4.0:** the package is now **`dsh-markdown-editor-typora`** (was `dsh-markdown-typora`). Install/upgrade with `dsh plugin --profile desktop add dsh-markdown-editor-typora@1.4.0`; the old package stays at 1.3.x and is no longer updated. Older entries below keep their historical package names.
 
+[MarkPilot 3.7.1 for Windows](https://github.com/ltmroberthk915/markpilot/releases/latest) · [MarkPilot for DSH on npm](https://www.npmjs.com/package/dsh-markdown-editor-typora)
+
 # MarkPilot
 
 [![开放插件市场](https://img.shields.io/endpoint?url=https%3A%2F%2Fdshopen.org%2Fbadge%2Fdsh-markdown-editor-typora.json)](https://dshopen.org/zh/plugins/dsh-markdown-editor-typora/)

@@ -1,4 +1,5 @@
 import { StateField } from '@codemirror/state';
+import { frontMatterOf, updateFrontMatter, sourceFrontMatter } from './frontmatter.js';
 
 // Fenced code has one owner. Commands, projections and exports use this index;
 // none of them toggles an independent "inside fence" flag.
@@ -57,13 +58,14 @@ function lineContainers(text, pos, previous, lazy, containers) {
   return result;
 }
 // Fence ownership and semantic parent records share this single line pass.
-export function scanFenceLines(lines, details = null) {
+export function scanFenceLines(lines, details = null, skipLines = 0) {
   const blocks = [];
   const records = [], containers = [];
   let open = null, pos = 0, number = 0, previousTo = 0, previousPath = [], lazy = false;
   for (const text of lines) {
     number++;
     const to = pos + text.length;
+    if (number <= skipLines) { previousTo = to; pos = to + 1; continue; }
     let current = null;
     if (open) {
       current = consumeContainers(text, open.ownerPath);
@@ -98,7 +100,7 @@ export function scanFenceLines(lines, details = null) {
   if (details) Object.assign(details,{records,containers});
   return result;
 }
-export const scanFencedBlocks = doc => scanFenceLines(doc.iterLines());
+export const scanFencedBlocks = doc => scanFenceLines(doc.iterLines(), null, frontMatterOf(doc)?.endLine);
 
 export function blockAt(blocks, pos) {
   let low = 0, high = blocks.length;
@@ -118,7 +120,7 @@ export function codeBody(text, block) {
 }
 let containerEpoch = 0;
 function scanContext(doc, previous = null, changes = null) {
-  const details = {}, blocks = scanFenceLines(doc.iterLines(),details), epoch = previous?.epoch || ++containerEpoch;
+  const details = {}, blocks = scanFenceLines(doc.iterLines(),details,frontMatterOf(doc)?.endLine), epoch = previous?.epoch || ++containerEpoch;
   let nextId = previous?.nextId || 0;
   const key = c=>`${c.kind}:${c.from}:${c.width}`, old = new Map((previous?.containers || []).map(c=>[key({...c,from:changes?changes.mapPos(c.from,1):c.from}),c]));
   for (const c of details.containers) c.id = old.get(key(c))?.id || `c${epoch}:${++nextId}`;
@@ -167,7 +169,7 @@ export const markdownContext = StateField.define({
   create(state) { return scanContext(state.doc); },
   update(value, tr) {
     if (!tr.docChanged) return value;
-    if (needsScan(tr,value)) return scanContext(tr.state.doc,value,tr.changes);
+    if (updateFrontMatter(tr) || needsScan(tr,value)) return scanContext(tr.state.doc,value,tr.changes);
     const map = p => tr.changes.mapPos(p, 1);
     const parents=new Map(value.containers.map(c=>[c,{...c,from:map(c.from),to:map(c.to)}]));
     for(const [old,c] of parents)c.parent=parents.get(old.parent)||null;
@@ -183,9 +185,9 @@ export const codeBlockAt = (state, pos) => blockAt(state.field(markdownContext, 
 /** 【#41·2026-10-18】光标是否落在**开头那段 front-matter 块**内（与 imageModeOf 同一套正则，口径一致）。
  *  块级命令（toolbar/extras）与图片插入共用这一份判据，避免前缀/模板写进 YAML。 */
 export function inFrontMatter(doc, pos) {
-  const m = /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(String(doc || ""));
+  const m = sourceFrontMatter.exec(String(doc || ""));
   if (!m) return false;
-  return typeof pos === "number" && pos <= m[0].length;
+  return typeof pos === "number" && pos >= 0 && pos <= m[0].replace(/\r?\n$/, '').length;
 }
 
 /** 【#45·2026-10-18】行首列表标记识别（任务 / 无序 / 有序），前缀命令互转时先剥旧标记。

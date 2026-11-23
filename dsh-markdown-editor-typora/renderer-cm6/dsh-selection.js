@@ -217,8 +217,8 @@
 
   function hide() {
     if (btn && btn.getAttribute('data-on') === '1') stats.hidden += 1;
-    if (btn) btn.setAttribute('data-on', '0');
-    if (editBtn) editBtn.setAttribute('data-on', '0');
+    if (btn && btn.getAttribute('data-on') !== '0') btn.setAttribute('data-on', '0');
+    if (editBtn && editBtn.getAttribute('data-on') !== '0') editBtn.setAttribute('data-on', '0');
     lastTransform = null;
   }
 
@@ -271,8 +271,8 @@
       editBtn.style.transform = e;
       lastTransform = { p: p, e: e };
     }
-    btn.setAttribute('data-on', '1');
-    editBtn.setAttribute('data-on', '1');
+    if (!wasVisible) btn.setAttribute('data-on', '1');
+    if (editBtn.getAttribute('data-on') !== '1') editBtn.setAttribute('data-on', '1');
     if (!wasVisible) stats.shown += 1;
   }
 

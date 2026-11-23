@@ -288,7 +288,7 @@
   }
 
   function frontMatterEnd(text) {
-    const m = /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(text);
+    const m = /^\uFEFF?---[ \t]*\r?\n(?:[\s\S]*?\n)?(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/.exec(text);
     return m ? m[0].length : 0;
   }
 

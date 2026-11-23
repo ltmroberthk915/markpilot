@@ -117,7 +117,7 @@ const DEFINITION_START = /^( {0,3})\[\^[^\]\r\n]+\]:/;
 const CONTINUATION_START = /^(?: {4,}|\t)/;
 const QUOTE_PREFIX = /^ {0,3}>[ \t]?/;
 // front-matter 的 `---` 围栏不是结构字符，但会让其中的定义整段变成 opaque；改动围栏必须重扫。
-const FRONT_MATTER_FENCE = /^\uFEFF?---[ \t]*$/;
+const FRONT_MATTER_FENCE = /^(?:\uFEFF?---|\.\.\.)[ \t]*$/;
 
 /** 行首（可带引用前缀）是否进入 4 空格/Tab 缩进代码区。
  *  parser 的 CodeBlock 只看块级上下文；这里只回答“这一行是否带代码缩进”，
