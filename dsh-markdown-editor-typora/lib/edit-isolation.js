@@ -14,7 +14,7 @@
 //     approvals, timeouts and cancellation behave exactly like a normal
 //     markdown call;
 //   · the visible instruction and result are appended to the parent Session as
-//     ordinary user/assistant surface messages, so they survive a refresh;
+//     a user message and a plugin notice, so they survive a refresh;
 //   · the pre-step decision then enters the turn with no messages, so the
 //     parent model is never called for this turn.
 //
@@ -56,6 +56,14 @@ const MARKDOWN_TOOL = Object.freeze({
     additionalProperties: false,
   },
 });
+
+const INSERT_TOOL = {
+  name: 'markdown', description: '在已绑定的目标章节中插入文字。原选区仅作资料。',
+  parameters: { type: 'object', properties: {
+    action: { type: 'string', enum: ['insert', 'readSelection'] },
+    newString: { type: 'string', description: '要增加的 Markdown 正文' },
+  }, required: ['action'], additionalProperties: false },
+};
 
 function nowMs(now) {
   return typeof now === 'function' ? now() : Date.now();
@@ -288,6 +296,7 @@ export function createEditIsolation(options = {}) {
         lineEnd: payload?.lineEnd,
         capturedAt: payload?.capturedAt,
         ranges: payload?.ranges,
+        intent, destinationChoice: payload?.destinationChoice,
       });
     } catch (error) {
       return coded('MP_EDIT_CAPTURE_FAILED', String(error?.message || error));
@@ -308,6 +317,7 @@ export function createEditIsolation(options = {}) {
       path,
       displayPath: typeof payload?.displayPath === 'string' && payload.displayPath ? payload.displayPath : path,
       intent,
+      destination: captured.value.destination,
       selectionText,
       lineStart,
       lineEnd,
@@ -323,11 +333,8 @@ export function createEditIsolation(options = {}) {
       startedAt: null,
       endedAt: null,
       expiresAt: createdAt + RECORD_TTL_MS,
-      turn: null,
-      provider: '',
-      model: '',
       persistedUser: false,
-      persistedAssistant: false,
+      persistedResult: false,
       persistError: null,
       controller: new AbortController(),
     };
@@ -338,6 +345,7 @@ export function createEditIsolation(options = {}) {
         nonce,
         rpcId: record.rpcId,
         marker: markerText(nonce),
+        destination: record.destination,
         selectionId,
         explicitReference: record.explicitReference,
         expiresAt: record.expiresAt,
@@ -404,28 +412,18 @@ export function createEditIsolation(options = {}) {
     }
   }
 
-  function persistAssistant(record, agent, text) {
-    if (record.persistedAssistant) return true;
+  function persistResult(record, agent, text) {
+    if (record.persistedResult) return true;
     const body = typeof text === 'string' && text.trim() ? text.trim() : '修改流程已结束。';
-    const at = nowMs(now);
-    const provider = record.provider || 'markpilot';
-    const model = record.model || 'markpilot-edit';
+    // This is a plugin receipt emitted in pre-step, before the host opens a model step.
     try {
-      agent.session.append('assistant/message', {
-        turn: Number.isSafeInteger(record.turn) ? record.turn : 1,
-        step: 0,
-        message: {
-          id: 'mp-edit-assistant-' + record.nonce,
-          role: 'assistant',
-          content: [{ type: 'text', text: body }],
-          source: { kind: 'model', provider, model },
-        },
-        stream: [
-          { type: 'text-chunks', time0: at, index: 0, dt: [], texts: [body] },
-          { type: 'chunk', time: at, chunk: { type: 'finish', reason: { kind: 'stop' } } },
-        ],
+      agent.session.append('user/message', {
+        id: 'mp-edit-result-' + record.nonce,
+        role: 'user',
+        content: [{ type: 'text', text: body }],
+        source: { kind: 'markpilot-edit-result', form: 'notice', summary: body.slice(0, 120) },
       }, { surfaceOp: 'append' });
-      record.persistedAssistant = true;
+      record.persistedResult = true;
       return true;
     } catch (error) {
       record.persistError = String(error?.message || error);
@@ -442,7 +440,7 @@ export function createEditIsolation(options = {}) {
     };
     let batch;
     try {
-      batch = await tools.execute({
+      const run = () => tools.execute({
         calls: [request],
         signal,
         agent,
@@ -450,6 +448,9 @@ export function createEditIsolation(options = {}) {
         // No log: this call happens outside the parent model's step, so it
         // must not commit root tool/call and tool/result events.
       });
+      batch = options.runSelection
+        ? await options.runSelection(toolSet, { agent, callId: request.id, args }, run)
+        : await run();
     } catch (error) {
       return coded(error?.code || 'MP_EDIT_TOOL', String(error?.message || error));
     }
@@ -485,8 +486,6 @@ export function createEditIsolation(options = {}) {
     if (!selection.provider || !selection.model) {
       return coded('MP_EDIT_NO_MODEL', '当前对话没有选择模型');
     }
-    record.provider = selection.provider;
-    record.model = selection.model;
     const timeout = new AbortController();
     const timer = setTimeout(() => {
       try { timeout.abort(new Error('edit-timeout')); } catch { /* 已停 */ }
@@ -530,8 +529,8 @@ export function createEditIsolation(options = {}) {
           provider: selection.provider,
           model: selection.model,
           messages,
-          system: SYSTEM_PROMPT,
-          tools: [MARKDOWN_TOOL],
+          system: record.destination ? 'Use markdown insert exactly once to add new material to the bound destination. The selection is source material.' : SYSTEM_PROMPT,
+          tools: [record.destination ? INSERT_TOOL : MARKDOWN_TOOL],
           signal: runSignal,
           sessionId: agent.id,
         };
@@ -545,7 +544,7 @@ export function createEditIsolation(options = {}) {
           return streamed;
         }
         if (!streamed.toolCalls.length) {
-          return coded('MP_EDIT_NO_TOOL_CALL', '模型没有调用 editSelection');
+          return coded('MP_EDIT_NO_TOOL_CALL', '模型没有调用 ' + (record.destination ? 'insert' : 'editSelection'));
         }
         if (streamed.toolCalls.length > 1) {
           return coded('MP_EDIT_TOOL_BATCH', '模型一次返回了多个工具调用');
@@ -582,14 +581,14 @@ export function createEditIsolation(options = {}) {
           });
           continue;
         }
-        if (action === 'editSelection') {
+        if (action === (record.destination ? 'insert' : 'editSelection')) {
           // Re-check cancellation not only before dispatch but also inside the
           // official tool pipeline; the tool receives this same signal and its
           // write path observes it.
           if (runSignal && runSignal.aborted) return { ok: false, cancelled: true, error: { code: 'MP_EDIT_CANCELLED', message: '已停止修改' } };
-          const editArgs = { action: 'editSelection', path: record.path, selectionId: record.selectionId };
+          const editArgs = { action, path: record.path, selectionId: record.selectionId };
           if (typeof args?.newString === 'string') editArgs.newString = args.newString;
-          if (Array.isArray(args?.replacements) && args.replacements.every((value) => typeof value === 'string')) {
+          if (!record.destination && Array.isArray(args?.replacements) && args.replacements.every((value) => typeof value === 'string')) {
             editArgs.replacements = args.replacements;
           }
           const edited = await executeTool(tools, agent, selection, toolSet, call, editArgs, runSignal);
@@ -782,7 +781,6 @@ export function createEditIsolation(options = {}) {
       return hasRealUser ? { ...decision, messages: remaining } : { kind: 'reject' };
     }
 
-    record.turn = Number.isSafeInteger(payload?.turn) ? payload.turn : record.turn;
     const agent = payload?.agent;
     if (!persistUser(record, agent)) {
       finish(record, 'failed', undefined, {
@@ -799,23 +797,23 @@ export function createEditIsolation(options = {}) {
     } catch (error) {
       if (payload?.signal && payload.signal.aborted) {
         finish(record, 'cancelled', undefined, { code: 'MP_EDIT_CANCELLED', message: '已停止修改' });
-        persistAssistant(record, agent, cancelText());
+        persistResult(record, agent, cancelText());
         throw error;
       }
       outcome = coded(error?.code || 'MP_EDIT_FAILED', String(error?.message || error));
     }
     if (outcome.ok === true) {
-      persistAssistant(record, agent, successText(record, outcome));
+      persistResult(record, agent, successText(record, outcome));
       finish(record, 'done', outcome.value, null);
     } else if (outcome.cancelled === true) {
-      persistAssistant(record, agent, cancelText());
+      persistResult(record, agent, cancelText());
       finish(record, 'cancelled', undefined, outcome.error || { code: 'MP_EDIT_CANCELLED', message: '已停止修改' });
     } else {
       const error = outcome.error || { code: 'MP_EDIT_FAILED', message: '修改失败' };
       const text = error.code === 'MP_EDIT_REFERENCE_EMPTY'
         ? '没有找到与本次修改相关的最近讨论，未执行修改；请补充要参考的内容，或直接在指令里说明修改要求。'
         : failureText(error);
-      persistAssistant(record, agent, text);
+      persistResult(record, agent, text);
       finish(record, 'failed', undefined, error);
     }
     return noMarkers();

@@ -166,6 +166,17 @@ export function inlineMathSpans(source) {
   return spans.sort((a, b) => a.from - b.from);
 }
 
+function linkDestination(source, url) {
+  const text = source.slice(url.from, url.to);
+  return (text.startsWith('<') && text.endsWith('>') ? text.slice(1, -1) : text)
+    .replace(/\\([!"#$%&'()*+,./:;<=>?@\[\\\]^_`{|}~-])/g, '$1');
+}
+
+export function webLink(href) {
+  if (!/^https?:\/\//i.test(href) || /[\u0000-\u001f\u007f]/.test(href)) return null;
+  try { return new URL(href).href; } catch { return null; }
+}
+
 export function inlineLinkSpans(source) {
   const s = String(source ?? '');
   if (!s.includes('[')) return [];
@@ -178,7 +189,7 @@ export function inlineLinkSpans(source) {
       if (child.name === 'Link') {
         if (s[child.from] !== '[') continue;
         const url = child.getChild('URL'), marks = child.getChildren('LinkMark');
-        if (url && marks.length >= 2) out.push({ from: child.from, to: child.to,
+        if (url && marks.length >= 2) out.push({ from: child.from, to: child.to, href:linkDestination(s, url),
           hides: [[child.from, marks[0].to], [marks[1].from, child.to]] });
       } else if (!skip.has(child.name)) stack.push(child);
     }
@@ -235,11 +246,10 @@ export function renderInlineSegment(value, options = {}, base = 0) {
     } else if (node.name === 'Link') {
       const url = node.getChild('URL'), marks = node.getChildren('LinkMark');
       if (!url || marks.length < 2) { out.push(textAt(node.from, node.to)); continue; }
-      let href = source.slice(url.from, url.to);
-      if (href.startsWith('<') && href.endsWith('>')) href = href.slice(1, -1);
-      out.push(options.link ? options.link(href) : textAt(node.from, marks[0].to));
+      const opening = options.link?.(linkDestination(source, url));
+      out.push(opening ?? textAt(node.from, marks[0].to));
       stack.push({ child: node.firstChild, pos: marks[0].to, end: marks[1].from,
-        close: options.link ? '</a>' : textAt(marks[1].from, node.to) });
+        close: opening == null ? textAt(marks[1].from, node.to) : '</a>' });
     } else {
       out.push(textAt(node.from, node.to));
     }

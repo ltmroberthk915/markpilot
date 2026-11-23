@@ -16,7 +16,9 @@ import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/lang
 import { tags as t } from "@lezer/highlight";
 import { basicSetup } from "codemirror";
 import { undo, redo, isolateHistory, undoDepth, invertedEffects, redoDepth } from "@codemirror/commands";
-import { StreamLanguage, LanguageDescription, LanguageSupport } from "@codemirror/language";
+import { Language, StreamLanguage, LanguageDescription, LanguageSupport } from "@codemirror/language";
+import { frontMatterOf, frontMatterSyntax } from './frontmatter.js';
+import { frontMatterView, documentLinkGestures, linkAttributes } from './document-markup-view.js';
 import { python } from "@codemirror/legacy-modes/mode/python";
 import { javascript, json } from "@codemirror/legacy-modes/mode/javascript";
 import { css } from "@codemirror/legacy-modes/mode/css";
@@ -53,7 +55,7 @@ import { installToolbar, wrap as wrapInline, TOOLBAR_ACTIONS } from "./toolbar.j
 import { installExtras } from "./extras.js";
 import { createFootnotesExtension, footnoteGoTo, footnoteIndex, footnoteInsert, footnoteJumpAt, footnoteMove, footnoteNav, footnoteStats } from './footnotes-view.js';
 import { scanSingleDollarMath, singleDollarLineKey } from './single-dollar-math.js';
-import { inlineCodeSpans, renderInline, inlineLinkSpans, inlineEmphasisSpans, inlineMathSpans, hasUnescapedDollar, singleLineDisplayTex } from './inline-format.js';
+import { inlineCodeSpans, renderInline, inlineLinkSpans, webLink, inlineEmphasisSpans, inlineMathSpans, hasUnescapedDollar, singleLineDisplayTex } from './inline-format.js';
 /* 【3.6.21 渲染修复·sem】公开文法区间（与导出端同一份）：真注释只来自完整 parser 的一次全文分析。
  * 依赖 sem 作者交付的 ./public-markdown.js；签名以 analyzePublic(source, opts).comments 为准
  * （[{from,to,block,closed}]，UTF-16、end-exclusive；供编辑态与公开态共用）。 */
@@ -1538,7 +1540,7 @@ const mathSpansField = StateField.define({
         singleBoundaryChanged = true;
     });
     const map = p => tr.changes.mapPos(p, 1);
-    if (!context.rebuilt && !singleBoundaryChanged && plan && !blockAt(context.blocks, plan.after.from)) {
+    if (!context.rebuilt && !singleBoundaryChanged && plan && plan.after.from > (frontMatterOf(tr.state.doc)?.to ?? -1) && !blockAt(context.blocks, plan.after.from)) {
       const owners = rangesTouching(value.spans, plan.before.from, plan.before.to);
       const noSyntax = plan.changes.every(c => !/[$`\r\n]/.test(c.removed + c.added));
       let from = plan.before.from, to = plan.before.to;
@@ -1590,7 +1592,7 @@ function scanMathSpans(doc, blocks = scanFencedBlocks(doc), structure = scanStru
         texFrom: line.from + atom.from + atom.width + lead });
     }
   }
-  for (let i = 1; i <= doc.lines; i++) {
+  for (let i = (frontMatterOf(doc)?.endLine ?? 0) + 1; i <= doc.lines; i++) {
     const line = doc.line(i);
     const t = line.text;
     if (blockAt(blocks, line.from)) {
@@ -2173,6 +2175,7 @@ const quoteSoftBreakKeys = Prec.highest(keymap.of([
  *  telari 字号/字重/下边线。代码围栏行 mp-code、引用行 mp-quote 同场扫描。 */
 
 function scanLineStyles(doc, blocks = scanFencedBlocks(doc), structure = null) {
+  const yamlEnd = frontMatterOf(doc)?.to ?? -1;
   const headings = [];
   const styled = []; // { line, cls }
   const hrs = []; // 水平分割线（---/***/___ 整行）
@@ -2181,6 +2184,7 @@ function scanLineStyles(doc, blocks = scanFencedBlocks(doc), structure = null) {
   let codeN = 0;         // 当前代码块的计数（进块清 0，出块也清 0 ⇒ 每个块各自从 1 开始）
   let from = 0;
   for (const t of doc.iterLines()) {
+    if (from <= yamlEnd) { from += t.length + 1; continue; }
     const code = blockAt(blocks, from);
     if (code) {
       const line = doc.lineAt(from);
@@ -2346,7 +2350,7 @@ function scanTables(doc, blocks = scanFencedBlocks(doc)) {
   const tables = [];
   /* 分隔行判据与 tables.js / 扩展包**同源**（含 en/em dash，见 tables.js 的说明）。 */
   const isSep = (t) => isSeparatorBody(t);
-  let i = 1;
+  let i = (frontMatterOf(doc)?.endLine ?? 0) + 1;
   while (i <= doc.lines) {
     const line1 = doc.line(i);
     const code = blockAt(blocks, line1.from);
@@ -2487,6 +2491,10 @@ function cellHTML(text) {
   const attr = s => esc(s).replace(/"/g, '&quot;');
   return renderInline(text, {
     cellOffsets: true,
+    link: href => {
+      const url = webLink(href);
+      return url ? '<a ' + Object.entries(linkAttributes(url)).map(([k,v]) => k + '="' + attr(v) + '"').join(' ') + '>' : null;
+    },
     code: (source, from) => '<code class="mp-cell-code" data-mp-text-from="' + from + '">' + esc(source) + '</code>',
     math: (tex, display, span) => {
       const html = renderMathHTML(tex, false);
@@ -3204,6 +3212,7 @@ class TableRowWidget extends WidgetType {
         let cellSource = this.cells[k] || '';
         if (hasSrc && inputView.state.doc.length >= b) cellSource = inputView.state.doc.sliceString(a, b);
         const layout = document.createElement('div'); layout.className = 'mp-cell-layout'; layout.setAttribute('aria-hidden', 'true');
+        layout.inert = true;
         /* 【只解码一次】mapped 文本是 source 与 rendered 的唯一口径。
            带转义的管道 / <br> 若在这里和 renderedCellLayout 里各解一次，会被重复解码。 */
         const mappedCell = mappedCellSource(cellSource).text;
@@ -3304,24 +3313,39 @@ function tablePointerPosition(owner, event, target = owner.dom.ownerDocument.ele
 // the rendered table stable until release so later mouse events hit the same rows.
 function continueTableSelection(owner, event, anchor, head) {
   const doc = owner.state.doc;
+  /* Cell→table handoff starts mid-gesture: the selection anchor is the overlay
+     we are about to hide. Focusing contentDOM now lets the browser fold that
+     dead anchor to the content start, which CM (focused) then syncs into the
+     state as offset 0. Never focus while the pointer is down. */
+  const priorFocus = owner.dom.ownerDocument.activeElement;
+  const deferFocus = event.type !== 'mousedown' ||
+    !!priorFocus?.closest?.('.mp-cell-overlay, .mp-cell-overlay-text');
   deactivateCellOverlay();
   const token = ++tableFreezeToken;
   const select = pos => EditorSelection.single(anchor, pos);
   owner.dispatch({effects:[setActiveCell.of(null), setTableSel.of(null), setTablePointerFreeze.of({token, range:null, cellDrag:true})],
     selection: select(head), userEvent:'select.pointer'});
-  owner.focus();
+  if (!deferFocus) owner.focus();
   const controller = new AbortController();
   const target = owner.dom.ownerDocument, opts = {capture:true, signal:controller.signal};
   const scroller = owner.scrollDOM;
   let x = event.clientX, y = event.clientY, frame = 0, lastSelection = owner.state.selection;
+  /* Ownership: only a document that still has focus, with no rival focused
+     control, and only while this handoff owns the freeze, may keep selecting. */
+  function focusIsOurs() {
+    return target.hasFocus() && !owner.hasFocus &&
+      (!target.activeElement || target.activeElement === target.body || target.activeElement === priorFocus);
+  }
   function finish() {
+    if (controller.signal.aborted) return;
     controller.abort();
     cancelAnimationFrame(frame);
     if (owner.state.field(tablePointerFreezeField, false)?.token === token)
       owner.dispatch({effects:setTablePointerFreeze.of(null)});
   }
   function isCurrent() {
-    return !controller.signal.aborted && owner.state.doc === doc && !owner.composing && owner.hasFocus &&
+    return !controller.signal.aborted && owner.state.doc === doc && !owner.composing &&
+      (deferFocus ? focusIsOurs() : owner.hasFocus) &&
       owner.state.selection.eq(lastSelection) && owner.state.field(tablePointerFreezeField, false)?.token === token;
   }
   function updateEndpoint() {
@@ -3354,8 +3378,24 @@ function continueTableSelection(owner, event, anchor, head) {
   scroller.addEventListener('scroll', () => { if (!frame && !controller.signal.aborted) updateEndpoint(); }, opts);
   updateEndpoint();
 
+  /* Only a trusted, unmodified left release may hand the caret over, and only
+     after the freeze is gone and the final endpoint is rendered. Every other
+     ending releases the freeze and leaves focus where the user put it. */
+  function release(e) {
+    if (!deferFocus) { finish(); return; }
+    if (!e.isTrusted || e.button !== 0 || e.ctrlKey || e.altKey || e.metaKey || !isCurrent()) { finish(); return; }
+    x = e.clientX; y = e.clientY;
+    updateEndpoint();
+    if (controller.signal.aborted) return;
+    e.preventDefault();
+    const reveal = owner.dom.isConnected && focusIsOurs() &&
+      owner.state.selection.eq(lastSelection) && owner.state.field(tablePointerFreezeField, false)?.token === token;
+    finish();
+    if (reveal) owner.focus();
+  }
   target.addEventListener('mousemove', move, opts);
-  for (const name of ['mouseup','pointercancel','mousedown','keydown','compositionstart'])
+  target.defaultView.addEventListener('mouseup', release, opts);
+  for (const name of ['pointercancel','mousedown','keydown','compositionstart'])
     target.addEventListener(name, finish, opts);
   target.defaultView.addEventListener('blur', finish, {signal:controller.signal});
   event.preventDefault();
@@ -6393,6 +6433,7 @@ const publicAnnotationsField = StateField.define({
   },
 });
 function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc), annotations = EMPTY_PUBLIC_ANNOTATIONS) {
+  const yamlEnd = frontMatterOf(doc)?.to ?? -1;
   const ann = annotations || EMPTY_PUBLIC_ANNOTATIONS;
   const commentRanges = ann.comments || [], parserCodeRanges = ann.code || [];
   const marks = []; // { from, to, hides: [[a,b],...], bullet? } wrapper 与隐藏件
@@ -6416,6 +6457,7 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc), annotat
   for (const t of doc.iterLines()) {
     const line = { from, to: from + t.length, text: t };
     from += t.length + 1;
+    if (line.from <= yamlEnd) continue;
     /* 【引用区前缀·唯一判据】所有"行首"假定一律先过 `tableLead()`（= tables.js 里那条唯一前缀正则，
      *  与表格 widget/命令/导出三处同源）。`qoff` ＝ 引用前缀（`>`、`> `、`> > `、`>\t` 等）的长度，
      *  `c` ＝ **去掉前缀后的内容**。改前这里全部直接拿 `t` 做行首判据 ⇒ 四类形态在引用区里全被前缀挡掉：
@@ -6679,6 +6721,7 @@ function scanInlineMarks(doc, mathSpans, blocks = scanFencedBlocks(doc), annotat
         inCodeSpan(a, b) || overlapsMath(base + a, base + b));
       if (blocked || hideBlocked) continue;
       push(span.from, span.to, span.hides);
+      marks[marks.length - 1].href = webLink(span.href);
       take(span.from, span.to);
     }
     /* 【尖括号自动链接 `<https://…>` / `<mailto:…>`】与链接同一观感：**两侧尖括号都隐去**、文字保留。
@@ -6717,7 +6760,7 @@ const inlineMarksField = StateField.define({
     /* 行首不再有独立闸门：缩进/围栏等结构变化会由 publicAnnotationsField 的签名/标记闸门
      * 触发重算并抬高 version ⇒ annotationsFresh；普通行首打字照旧走单行局部路径。 */
     const commentDelim = !!plan && (/<!--|-->/.test(plan.before.text) || /<!--|-->/.test(plan.after.text));
-    if (!context.rebuilt && plan && !annotationsFresh && !commentDelim &&
+    if (!context.rebuilt && plan && plan.after.from > (frontMatterOf(tr.state.doc)?.to ?? -1) && !annotationsFresh && !commentDelim &&
         !blockAt(context.blocks, plan.after.from) && !publicCodeBlockAt(annotations, plan.after.from) &&
         !publicCodeBlockAt(annotations, plan.before.from) &&
         !/<!--|-->|^\s*(?:\d+[.)]|[-+*])\s/.test(plan.before.text.slice(quoteLead(plan.before.text).off)) &&
@@ -6897,7 +6940,7 @@ class QuoteMarkWidget extends WidgetType {
   }
   ignoreEvent() { return true; }
 }
-const inlineMarkDecorations = EditorView.decorations.compute(["selection", inlineMarksField, tableDataField, tableSourceRangeField, tablePointerFreezeField, imgBaseField, imgPreviewField, regionIndexField, regionSessionField], (state) => {
+const inlineMarkDecorations = EditorView.decorations.compute(["selection", EditorState.readOnly, inlineMarksField, tableDataField, tableSourceRangeField, tablePointerFreezeField, imgBaseField, imgPreviewField, regionIndexField, regionSessionField], (state) => {
   const out = [];
   const tables = state.field(tableDataField, false) || [];
   const inTable = (pos) => tables.some((t) => pos >= t.from && pos <= t.to);   // 表格行走块级 widget，行内装饰必须让位
@@ -6924,7 +6967,11 @@ const inlineMarkDecorations = EditorView.decorations.compute(["selection", inlin
       out.push(Decoration.replace({ widget: new QuoteMarkWidget(depth) }).range(mark.from, mark.to));
       continue;
     }
-    if (inSel) continue; // 光标在包裹段 → 显示源码标记
+    if (mark.href && !inTable(mark.from)) {
+      const from = mark.hides[0][1], to = mark.hides[1][0];
+      if (from < to) out.push(Decoration.mark({tagName:'a', attributes:linkAttributes(mark.href)}).range(from,to));
+    }
+    if (inSel && !(mark.href && state.readOnly)) continue; // 光标在包裹段 → 显示源码标记
     /* 【下划线 <u>…</u>·2026-10-11 已按"隐藏区间"落地 ✓】走过的三条路（留档，别再回头）：
        ① `hides` 零宽替换 + **单个 width** ⇒ 开闭标记长度不等（3 与 4）⇒ 屏幕上留 `>` 与 `</`、
           外加两个高亮拆出来的游离 `u` 字形 ✗（**真因**见上面 `scan()` 的 openLen/closeLen 注释 ✓）；
@@ -8804,6 +8851,11 @@ ${editorKaiRuleCss()}
  * 行级 widget：table-layout fixed＋colgroup 比例列宽（各行列宽一致＝视觉对齐） */
 .mp-table-wrap { margin: 0; padding: 0; overflow-x: auto; }
 table.mp-row { table-layout: fixed; width: 100%; border-collapse: collapse; }
+.mp-frontmatter-preview { margin: .5em 0; padding: .35em .8em; border: 1px solid var(--mp-border); border-radius: 5px; background: var(--mp-codeBg); color: var(--mp-fg); font-size: .92em; }
+.mp-metadata-row { display: grid; grid-template-columns: minmax(6ch, 30%) minmax(0, 1fr); gap: .8em; min-height: 1.35em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mp-metadata-literal { display: block; color: var(--mp-fg); }
+.mp-frontmatter-source { font-family: var(--mp-font-mono), monospace; }
+.cm-editor .mp-doc-link { color: var(--mp-primary); text-decoration: underline; text-underline-offset: .13em; overflow-wrap: anywhere; }
 /* 【列内边距自适应】左右内边距本是给正文留的气口，但在窄格里它正是把公式挤出格外的
    那 32px（实测 670px 窗口下 V(t,x) 所在列内容宽仅 31.95px，而公式需要 50.19px ⇒ 被裁）。
    这里只声明变量与默认值；**按列实际宽度收窄由 JS 负责**（applyCellPadX，在量宽后逐列写值）。
@@ -10075,12 +10127,21 @@ const inlineCodeCapsule = ViewPlugin.fromClass(class {
     view.plugin(plugin)?.decorations || Decoration.none),
 });
 
+function initialDocument(text) {
+  if (!/^\uFEFF?---(?:[ \t]*\r?\n)/.test(text)) return {doc:text};
+  const doc = Text.of(text.split(/\r\n?|\n/));
+  const header = frontMatterOf(doc);
+  // An unopened document starts in its body. Restored selections and later
+  // remote edits use their own positions, including positions inside YAML.
+  return header && header.to < doc.length ? {doc, selection:{anchor:header.to + 1}} : {doc};
+}
 function boot(content) {
   if (view) return;
   installZoomWrap();     // 【缩放解耦】先给 #editor 套一层缩放外壳（工具栏/状态栏在 body 上，不在里面）
   applyEnginePrefs();    // 缩放/岛尺寸/版心/状态栏四件套：装编辑器之前先把 token 写好（首帧即正确）
   if (!document.querySelector(".mp-statusbar")) buildStatusBar();
-  const asyncSyntax = createAsyncMarkdown(markdownLanguage);
+  const asyncSyntax = createAsyncMarkdown(new Language(markdownLanguage.data,
+    markdownLanguage.parser.configure(frontMatterSyntax), [], markdownLanguage.name));
   /* Copied text followed immediately by a Ctrl/Cmd+click is overwhelmingly
      an attempt to place the caret at the paste target, not an intentional
      multi-cursor add: users often keep Ctrl down after Ctrl+C and click the
@@ -10113,9 +10174,11 @@ function boot(content) {
   let mathComposition = null;
   view = new EditorView({
     state: EditorState.create({
-      doc: content,
+      ...initialDocument(content),
       extensions: documentExtensions = [
         markdownContext,
+        frontMatterView,
+        documentLinkGestures(href => post('openLink', href), () => copyHeldMod),
         editPlan,
         mathCompletion(), // Open candidates have priority over structural Enter/Tab.
         asyncSyntax.extension, // Prepare native tree queries before basicSetup; math candidates stay first.
@@ -10774,7 +10837,7 @@ function boot(content) {
       if (!checkpoint) return false;
       try {
       const old = view.state;
-      const state = EditorState.create({ doc: typeof text === 'string' ? text : '', extensions: documentExtensions });
+      const state = EditorState.create({ ...initialDocument(typeof text === 'string' ? text : ''), extensions: documentExtensions });
       /* 【CAND-2·2026-10-17】改前只搬 extras/key 两个 compartment，阅读位落回默认 [] ⇒ 阅读态下
          打开另一个文档后 readOnly 归零、而 dataset.mpReading 仍是阅读态（CSS 继续藏光标）⇒ 键入静默改稿。
          阅读位是**状态**，换文档必须原样搬过去。 */

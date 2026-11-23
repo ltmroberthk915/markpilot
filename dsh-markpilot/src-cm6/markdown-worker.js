@@ -3,7 +3,8 @@
 import { parser, GFM, Subscript, Superscript, Emoji } from '@lezer/markdown';
 import { Tree, TreeBuffer, NodeProp } from '@lezer/common';
 import { createRawTreeCodec } from './worker-tree-codec.js';
-const rawParser = parser.configure([GFM, Subscript, Superscript, Emoji]);
+import { frontMatterSyntax } from './frontmatter.js';
+const rawParser = parser.configure([GFM, Subscript, Superscript, Emoji, frontMatterSyntax]);
 const codec = createRawTreeCodec({ Tree, TreeBuffer, NodeProp });
 let text = '', revision = 0, timer;
 onmessage = ({ data }) => {

@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 const plugin=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const source=path.resolve(plugin,'../MarkPilot-CM6/shell'),dest=path.join(plugin,'host');
-const files=['document-store.js','live-documents.js','text-codec.js','safe-file.js','native-worker-lease.js','native-worker-path.ps1','native/file-worker.exe','native/file-worker.exe.build.json'];
+const files=['document-store.js','live-documents.js','text-codec.js','safe-file.js','reading-position-store.js','native-worker-lease.js','native-worker-path.ps1','native/file-worker.exe','native/file-worker.exe.build.json'];
 export function syncHost(check=false) {
   const manifest=[];
   const entries=[...files.map(file=>[file,fs.readFileSync(path.join(source,file))]),['package.json',Buffer.from('{"type":"commonjs"}\n')]];

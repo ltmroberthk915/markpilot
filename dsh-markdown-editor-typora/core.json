@@ -1,8 +1,8 @@
 {
   "core": "MarkPilot CM6",
-  "version": "3.7.0",
+  "version": "3.7.1",
   "source": "../MarkPilot-CM6/renderer/cm6",
-  "syncedAt": "2026-11-16T17:39:16.923Z",
+  "syncedAt": "2026-11-22T17:47:34.759Z",
   "generator": "scripts/sync-core.mjs",
   "files": [
     {
@@ -312,8 +312,8 @@
     },
     {
       "path": "app.js",
-      "sha256": "c55d1d22973ec62a4e0f886ef91c4d6c5c3c4a95d889e02907cd00bc3f6ce5f7",
-      "bytes": 1672191
+      "sha256": "b916e4889069bf477b20e1ce72f20f9cabe02fd09d493276cc8a224c39d4f6ca",
+      "bytes": 1678600
     },
     {
       "path": "fonts/KaTeX_AMS-Regular-CYEKBG2K.woff",
@@ -617,8 +617,8 @@
     },
     {
       "path": "markdown-worker.js",
-      "sha256": "48cc1d24f2472c1476639fe340cd32545e0b73c6a007d080d7ecff6ef1e1ca12",
-      "bytes": 63411
+      "sha256": "6457a5f4134ade88a3c5fcc2248972e961a9af580e1221b133380fc84f78f5f1",
+      "bytes": 64053
     },
     {
       "path": "mermaid.min.js",
@@ -626,5 +626,5 @@
       "bytes": 3572661
     }
   ],
-  "coreHash": "4481e20a15f2e84e598492f3dd1e79aa7e670a14bd24cf0c438c3ff6dba88241"
+  "coreHash": "b4b77cdb98be8b57c94c8b980bf801256c634002fea298acfc9a283a632cd7eb"
 }

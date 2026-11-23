@@ -55,6 +55,10 @@ function database(directory) {
       CREATE TABLE IF NOT EXISTS changes (
         epoch TEXT NOT NULL REFERENCES rooms(epoch) ON DELETE CASCADE, version INTEGER NOT NULL,
         client TEXT NOT NULL, seq INTEGER NOT NULL, delta TEXT NOT NULL, group_id TEXT, PRIMARY KEY(epoch,version));
+      CREATE TABLE IF NOT EXISTS change_undo (
+        epoch TEXT, version INTEGER, group_id TEXT NOT NULL, targets TEXT NOT NULL,
+        PRIMARY KEY(epoch,version),
+        FOREIGN KEY(epoch,version) REFERENCES changes(epoch,version) ON DELETE CASCADE);
       CREATE TABLE IF NOT EXISTS recovery (
         source TEXT NOT NULL, recoveryPath TEXT PRIMARY KEY, epoch TEXT NOT NULL,
         version INTEGER NOT NULL, saved INTEGER NOT NULL, at INTEGER NOT NULL,
@@ -371,10 +375,67 @@ function orphanCandidates(db) {
     const clients = db.prepare('SELECT pid FROM clients WHERE epoch=?').all(epoch);
     if (clients.some(({pid}) => alive(pid))) continue; // live session, untouched
     const room = db.prepare('SELECT file,epoch,version,saved FROM rooms WHERE epoch=?').get(epoch);
+    // 有未决且可证实归属的 agent 组：park 会换掉 epoch 并丢掉撤销入口，
+    // 交给该文件自己的 join 带凭据判定；不依赖本次打开的是哪个文件，
+    // 否则先开 B 的那一趟扫描就会把 A 的房间 park 掉。
+    if (room && holdsUndoableGroup(db, room)) continue;
     if (room) out.push(room);
     if (out.length >= RECOVERY_BATCH) break;
   }
   return out;
+}
+// 只有「未决 + 可证实归属」的旧 room 才保留：它保住原 epoch 与 journal，
+// 撤销入口才不会随 park 后的新房间一起消失。判据全来自库本身，客户端记录只当定位提示。
+function roomSources(room) {
+  const out = [room.file];
+  try { const alt = fileKey(room.file); if (alt && alt !== room.file) out.push(alt); } catch { /* 不可解析：只用原值 */ }
+  return out;
+}
+function holdsUndoableGroup(db, room) {
+  if (room.version === room.saved) return false;
+  const sources = roomSources(room);
+  try {
+    return !!db.prepare('SELECT 1 AS hit FROM changes AS c JOIN agent_group AS g ON g.group_id=c.group_id'+
+      ' WHERE c.epoch=? AND c.version>? AND g.undone_at IS NULL AND g.source IN ('+sources.map(()=>'?').join(',')+')'+
+      ' AND g.at>=? AND g.group_id IN (SELECT group_id FROM agent_group ORDER BY rowid DESC LIMIT 32) LIMIT 1')
+      .get(room.epoch, room.saved, ...sources, Date.now() - 604800000);
+  } catch { return false; } // 旧库缺表/缺列：仍走原 park，绝不丢草稿
+}
+function adoptableRoom(db, room, disk, hint) {
+  if (!room || !hint || !Array.isArray(hint.groups) || hint.groups.length !== 1) return null;
+  const groupId = hint.groups[0];
+  if (typeof groupId !== 'string') return null;
+  const canonicalSha = text => digest(Buffer.from(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text, 'utf8'));
+  
+  if (room.version === room.saved || room.disk !== disk.hash) return null;
+  if (Number(room.saved) < Number(room.floor || 0)) return null;
+  const sources = roomSources(room), cutoff = Date.now() - 604800000;
+  try {
+    const tail = db.prepare('SELECT version,group_id,client FROM changes WHERE epoch=? AND version>? ORDER BY version').all(room.epoch, room.saved);
+    if (!tail.length || tail.length !== room.version - room.saved) return null;
+    let aiFirst = null, aiLast = null, seen = false;
+    for (let i = 0; i < tail.length; i++) {
+      const row = tail[i];
+      if (row.version !== room.saved + i + 1) return null;
+      if (row.group_id == null) {
+        if (row.client === 'agent') return null;
+        if (aiFirst != null) seen = true;
+        continue;
+      }
+      if (seen || row.client !== 'agent' || row.group_id !== groupId) return null;
+      if (aiFirst == null) aiFirst = row.version;
+      aiLast = row.version;
+    }
+    if (aiFirst == null) return null;
+    const recent = db.prepare('SELECT group_id,source,undone_at,at,result_revision,base_revision FROM agent_group ORDER BY rowid DESC LIMIT 32').all();
+    const g = recent.find(r => r.group_id === groupId), newest = g && recent.find(r => r.source === g.source);
+    if (!g || g.undone_at != null || sources.indexOf(g.source) < 0 || !(Number(g.at) >= cutoff) || newest !== g) return null;
+    const rev = 'rev1:live:' + room.epoch + ':';
+    const resultRevision = rev + aiLast + ':' + canonicalSha(materialize(db, room, aiLast));
+    if (g.result_revision !== resultRevision) return null;
+    if (g.base_revision !== rev + (aiFirst - 1) + ":" + canonicalSha(materialize(db, room, aiFirst - 1))) return null;
+    return { epoch: room.epoch, groupId, resultRevision, version: room.version, sha256: canonicalSha(materialize(db, room)) };
+  } catch { return null; }
 }
 function retireClean(db, room) {
   atomic(db, () => {
@@ -808,7 +869,7 @@ class LiveDocuments {
       return {removed:Number(result.changes || 0), remaining:totals.n, bytes:totals.bytes};
     });
   }
-  async join(filePath, initialText, expectedDiskHash) {
+  async join(filePath, initialText, expectedDiskHash, hint) {
     if (typeof initialText !== 'string') throw fault('MP_LIVE_JOIN','缺少已打开的正文');
     const file = await canonicalFile(filePath), key = fileKey(file);
     return withFileCommit(file, async () => {
@@ -824,12 +885,23 @@ class LiveDocuments {
       // sweeper's semantics: clean rooms go, dirty rooms park a recovery copy
       // first. A failed park keeps the room — and with it the draft.
       let existing = roomFor(db, key);
-      if (existing && existing.version !== existing.saved &&
-          !db.prepare('SELECT pid FROM clients WHERE epoch=?').all(existing.epoch).some(({pid}) => alive(pid)))
+      // 证明成立才保留死房间；客户端记录只是定位提示，不做权限。
+      // 证明不成立时仍走原来的先 park 后新建，epoch 绝不盲改。
+      const live = !!existing && db.prepare('SELECT pid FROM clients WHERE epoch=?').all(existing.epoch).some(({pid}) => alive(pid));
+      const adopt = live ? null : adoptableRoom(db, existing, disk, hint);
+      if (!live && !adopt && existing && existing.version !== existing.saved)
         await parkRecovery(db, this.directory, existing);
       const joined = atomic(db, () => {
         let room = roomFor(db, key);
         if (room) {
+          // 事务内核对同一快照：epoch/version/sha/组 id 任一变化即拒绝。
+          if (adopt) {
+            const now = adoptableRoom(db, room, disk, hint);
+            if (!now || now.groupId !== adopt.groupId || now.resultRevision !== adopt.resultRevision ||
+                now.sha256 !== adopt.sha256 || room.epoch !== adopt.epoch ||
+                room.version !== adopt.version || room.disk !== disk.hash)
+              throw conflict('未决修改的来源已改变，请重新载入');
+          }
           for (const lease of db.prepare('SELECT id,pid FROM clients WHERE epoch=?').all(room.epoch))
             if (!alive(lease.pid)) {
               db.prepare('DELETE FROM clients WHERE id=?').run(lease.id);
@@ -916,8 +988,10 @@ class LiveDocuments {
         }
       }
       if (version > lease.ack) db.prepare('UPDATE clients SET ack=? WHERE id=?').run(version,client);
-      const updates = db.prepare('SELECT version,client,seq,delta,group_id AS groupId FROM changes WHERE epoch=? AND version>? ORDER BY version').all(epoch,version)
-        .map(({delta,...row}) => ({...row,changes:JSON.parse(delta)}));
+      const updates = db.prepare('SELECT c.version,c.client,c.seq,c.delta,c.group_id AS groupId,u.group_id AS undoGroupId,u.targets AS undoTargets FROM changes c LEFT JOIN change_undo u ON u.epoch=c.epoch AND u.version=c.version WHERE c.epoch=? AND c.version>? ORDER BY c.version').all(epoch,version)
+        .map(({delta,undoGroupId,undoTargets,...row}) => undoGroupId == null
+          ? {...row,changes:JSON.parse(delta)}
+          : {...row,groupId:undoGroupId,changes:JSON.parse(delta),undoOf:JSON.parse(undoTargets)});
       if (changes !== undefined) compact(db,room);
       return {...head(room),updates};
     };
@@ -1035,6 +1109,10 @@ class LiveDocuments {
     return withFileCommit(file, async () => {
       const db = this.db;
       await sweepOrphans(db, this.directory);
+      const orphan = roomFor(db,key);
+      if (orphan && orphan.version !== orphan.saved && !db.prepare('SELECT pid FROM clients WHERE epoch=?').all(orphan.epoch).some(({pid}) => alive(pid))) {
+        await parkRecovery(db, this.directory, orphan);
+      }
       const before = roomFor(db,key);
       let sealed = null;
       if (before && before.saved !== before.version) {
@@ -1323,7 +1401,7 @@ class LiveDocuments {
   // the normal exchange() update stream. The transaction re-checks epoch,
   // version and the materialized base text, so a concurrent editor save or
   // peer edit can never be appended on top of a stale base.
-  async append(filePath, {epoch, baseVersion, baseText, changes, actor='agent', groupId=null, group=null, clearResolved=false, expectedMembers=null, requireReplaySafe=false} = {}) {
+  async append(filePath, {epoch, baseVersion, baseText, changes, actor='agent', groupId=null, group=null, clearResolved=false, expectedMembers=null, requireReplaySafe=false, undoOf=null} = {}) {
     if (typeof baseText !== 'string') throw fault('MP_LIVE_APPEND', '缺少权威正文');
     if (typeof epoch !== 'string' || !epoch) throw fault('MP_LIVE_APPEND', '缺少协同会话');
     if (!Number.isSafeInteger(baseVersion) || baseVersion < 0) throw fault('MP_LIVE_APPEND', '无效的协同版本');
@@ -1331,6 +1409,20 @@ class LiveDocuments {
     if (groupId != null && !/^[0-9a-f-]{36}$/i.test(String(groupId))) throw fault('MP_LIVE_APPEND', '无效的编辑组');
     if (expectedMembers != null && (typeof expectedMembers !== 'string' || !/^[0-9a-f]{64}$/.test(expectedMembers)))
       throw fault('MP_LIVE_APPEND', '无效的成员校验值');
+    let undoGroupId = null, undoTargets = null;
+    if (undoOf != null) {
+      if (groupId == null) throw fault('MP_LIVE_APPEND', '无效的撤销来源');
+      if (!Array.isArray(undoOf) || undoOf.length < 1 || undoOf.length > 20) throw fault('MP_LIVE_APPEND', '无效的撤销来源');
+      const undoSeen = new Set();
+      for (const target of undoOf) {
+        if (typeof target !== 'string' || !/^[0-9a-f-]{36}$/i.test(target)) throw fault('MP_LIVE_APPEND', '无效的撤销来源');
+        const normalized = target.toLowerCase();
+        if (undoSeen.has(normalized)) throw fault('MP_LIVE_APPEND', '无效的撤销来源');
+        undoSeen.add(normalized);
+      }
+      undoGroupId = String(groupId);
+      undoTargets = JSON.stringify([...undoSeen]);
+    }
     const file = await canonicalFile(filePath), key = fileKey(file);
     const filename = path.join(path.resolve(this.directory), 'rooms.sqlite');
     if (!localStoreUsable(filename)) throw fault('MP_LIVE_NO_ROOM', '文档没有共享会话，请重新读取后再试');
@@ -1374,6 +1466,9 @@ class LiveDocuments {
           if (groupRecorded) insertAgentGroupRow(db, key, groupRow, Date.now(), actor);
           db.prepare('INSERT INTO changes(epoch,version,client,seq,delta,group_id) VALUES(?,?,?,?,?,?)')
             .run(room.epoch, version, actor, 0, JSON.stringify(changes), logGroupId);
+          if (undoGroupId != null)
+            db.prepare('INSERT INTO change_undo(epoch,version,group_id,targets) VALUES(?,?,?,?)')
+              .run(room.epoch, version, undoGroupId, undoTargets);
           db.prepare('UPDATE rooms SET version=?,length=? WHERE epoch=?').run(version, length, room.epoch);
           // A revoked resolved-conflict marker must keep blocking live.save even
           // though rooms.disk still has the external hash. Use an empty sentinel
@@ -1476,7 +1571,7 @@ class LiveDocuments {
       // not the edit). Keep that room; the next join parks it as a recovery
       // draft. A delivered agent edit (ack >= version) is safe to retire — the
       // editor's normal save/recovery path owns it by then.
-      const room = db.prepare('SELECT version,saved FROM rooms WHERE epoch=?').get(member.epoch);
+      const room = db.prepare('SELECT file,epoch,version,saved FROM rooms WHERE epoch=?').get(member.epoch);
       const maxAck = db.prepare('SELECT MAX(ack) AS v FROM clients WHERE epoch=?').get(member.epoch)?.v;
       const unackedAgent = room
         ? db.prepare("SELECT MAX(version) AS v FROM changes WHERE epoch=? AND client='agent' AND version>?")
@@ -1486,7 +1581,7 @@ class LiveDocuments {
       db.prepare('DELETE FROM client_caps WHERE client=?').run(client);
       const remaining = db.prepare('SELECT COUNT(*) AS c FROM clients WHERE epoch=?').get(member.epoch).c;
       if (remaining > 0) return;
-      const keep = unackedAgent != null && (maxAck == null || unackedAgent > maxAck);
+      const keep = (unackedAgent != null && (maxAck == null || unackedAgent > maxAck)) || (!!room && holdsUndoableGroup(db, room));
       if (!keep) {
         db.prepare('DELETE FROM rooms WHERE epoch=?').run(member.epoch);
         db.prepare('DELETE FROM client_caps WHERE epoch=?').run(member.epoch);

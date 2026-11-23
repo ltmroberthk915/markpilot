@@ -11,6 +11,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { isAbsolute, join, sep } from 'node:path';
 import { tmpdir } from 'node:os';
+import { headingParser } from './vendor/heading-parser.js';
 import { classifyStorageFailure } from './save-failure.js';
 
 const LIVE_REVISION = /^rev1:live:([^:]+):(\d+):([0-9a-f]{64})$/;
@@ -443,28 +444,31 @@ function hasLoneSurrogate(text) {
 // against a stale read cannot silently target a different section.
 export function parseDocumentBlocks(text) {
   const src = String(text);
-  const lineAt = [];
-  let from = 0;
-  while (from <= src.length) {
-    const nl = src.indexOf('\n', from);
-    const end = nl < 0 ? src.length : nl;
-    lineAt.push({ from, end, text: src.slice(from, end).replace(/\r$/, '') });
-    if (nl < 0) break;
-    from = nl + 1;
-  }
   const starts = [];
-  let fence = null;
-  for (const line of lineAt) {
-    const trimmed = line.text.replace(/^\s{0,3}/, '');
-    if (fence) {
-      const close = new RegExp('^\\s{0,3}' + (fence.char === '`' ? '`' : '~') + '{' + fence.length + ',}\\s*$');
-      if (close.test(line.text)) fence = null;
-      continue;
+  const bom = src.charCodeAt(0) === 0xfeff ? 1 : 0;
+  const normalized = normalizeEol(src.slice(bom));
+  // Markdown front matter is opaque to the editor. Keep source offsets by
+  // skipping the complete header only when its closing delimiter exists.
+  const frontMatter = /^(---|\+\+\+)[ \t]*\n(?:[^\n]*\n)*?\1[ \t]*(?:\n|$)/.exec(normalized);
+  const offset = frontMatter?.[0].length || 0;
+  const body = normalized.slice(offset);
+  const root = headingParser.parse(body).topNode;
+  const lines = documentLineEntries(src);
+  let line = lines.next().value, lineStart = 0;
+  for (let node = root.firstChild; node; node = node.nextSibling) {
+    const match = /^(ATX|Setext)Heading([1-6])$/.exec(node.name);
+    if (!match) continue;
+    // Only direct children of Document are sections. A heading inside a
+    // blockquote, list, HTML block, or code example cannot end a section.
+    const pos = offset + node.from;
+    while (line.eol && pos > lineStart + line.to - line.from) {
+      lineStart += line.to - line.from + 1;
+      line = lines.next().value;
     }
-    const f = /^(`{3,}|~{3,})/.exec(trimmed);
-    if (f) { fence = { char: f[1][0], length: f[1].length }; continue; }
-    const m = /^(#{1,6})\s+(.+?)\s*$/.exec(line.text);
-    if (m) starts.push({ from: line.from, level: m[1].length, title: m[2] });
+    const title = match[1] === 'ATX'
+      ? body.slice(node.firstChild.to, node.to).replace(/[ \t]+#+[ \t]*$/, '').trim()
+      : body.slice(node.from, node.lastChild.from).trim().split(/\n/).map(part => part.trim()).join(' ');
+    starts.push({ from: line.from, level: Number(match[2]), title });
   }
   const ranges = [];
   for (let i = 0; i < starts.length; i++) {
@@ -501,6 +505,110 @@ export function parseDocumentBlocks(text) {
 export function findDocumentBlock(text, blockId) {
   if (typeof blockId !== 'string' || !/^b\d+-[0-9a-f]{8}$/.test(blockId)) return null;
   return parseDocumentBlocks(text).find((block) => block.id === blockId) || null;
+}
+
+// A selection supplies context. Resolve its separate destination against the
+// same revision before offering the model any write capability.
+function selectionDestination(text, intent, choice, revision) {
+  if (!intent) return null;
+  const quoted = [];
+  const unquoted = intent.replace(/“([^”]*)”|「([^」]*)」|"([^"]*)"/gu, (_, a, b, c) => {
+    quoted.push(a ?? b ?? c);
+    return '\u0001' + (quoted.length - 1) + '\u0002';
+  });
+  const clauses = unquoted.split(/[，,。；;！!？?\n]/u).map(s => s.trim()).filter(Boolean);
+  const afterVerb = /(?:补(?:充|写)?(?:到|至|入|进)|放到|追加(?:至|到)|插入(?:到|至)?|添加(?:至|到)|写入|加到)\s*(.*)$/u;
+  const beforeVerb = /(?:在|向)\s*(.+?)(?:的)?(?:末尾|结尾|末端)?\s*(?:追加|补充|插入|新增|添加)/u;
+  const locate = s => {
+    const before = beforeVerb.exec(s);
+    if (before && !/^(?:此处|这里|选区|原文|当前段落)(?:内|中)?$/u.test(before[1])) return before[1];
+    const after = afterVerb.exec(s);
+    if (!after) return undefined;
+    // A bare "插入文字" inside the selection retains its original meaning.
+    if (after[0].startsWith('插入') && !/^插入(?:到|至|附录|第|文末|文件|文档)/u.test(after[0].replace(/\s/gu, ''))) return undefined;
+    return after[1];
+  };
+  const clause = clauses.findLast(s => locate(s) !== undefined);
+  if (!clause) return null;
+  if (/(?:不要|不用|不必|别|是否|要不要|如果|假如)|[吗呢]\s*$/u.test(clause) || /[?？]\s*$/u.test(unquoted) ||
+      clauses.slice(clauses.lastIndexOf(clause) + 1).some(s => /不要|不用|不必|先不|取消|别|算了|只(?:在对话|给我看|展示|讨论)|先给我看/u.test(s)))
+    throw coded('MP_EDIT_INTENT_REQUIRED', '请明确要修改选区还是补写到章节。');
+  const requested = locate(clause).replace(/\u0001(\d+)\u0002/gu, (_, i) => quoted[Number(i)]).trim();
+  const target = requested.replace(/(?:的?合适位置|里面|末尾|末端|中|里)$/u, '').trim() || requested;
+  if (/^(?:文末|文件末尾|文档末尾|正文末尾)$/u.test(requested)) return { position: 'end', title: '文末' };
+  const blocks = parseDocumentBlocks(text).filter(b => b.kind === 'heading');
+  const normalize = s => s.replace(/\s+/gu, '').toLowerCase();
+  const title = normalize(target);
+  const appendix = /^(?:附录\s*([a-z\d一二三四五六七八九十]+)?|([a-z\d]+)\s*节)$/iu.exec(target);
+  const exact = blocks.filter(b => normalize(b.title) === title);
+  let hits = exact;
+  if (appendix && !appendix[1] && !appendix[2]) {
+    hits = blocks.filter(b => /^附录(?:\s*(?:[A-Za-z]+|\d+|[一二三四五六七八九十]+))?(?=$|[\s：:（(—–-])/u.test(b.title));
+  } else if (!hits.length && appendix) {
+    const code = normalize(appendix[1] || appendix[2]);
+    hits = blocks.filter(b => normalize(/^附录\s*([a-z\d一二三四五六七八九十]+)(?=$|[\s：:（(—–-])/iu.exec(b.title)?.[1] || '') === code);
+  } else if (!hits.length && /^(?:合适位置|适当位置|相应章节)$/u.test(target)) {
+    hits = blocks;
+  } else if (!hits.length) {
+    hits = blocks.filter(b => normalize(b.title).startsWith(title) && /^[：:（(—–-]/u.test(normalize(b.title).slice(title.length)));
+  }
+  if (!hits.length) throw coded('MP_INSERT_NOT_FOUND', '没有找到“' + target + '”，请核对目标章节。');
+  let block = hits[0];
+  if (choice) {
+    block = hits.find(b => b.id === choice.id);
+    if (choice.revision !== revision || !block) throw coded('MP_SELECTION_STALE', '目标章节已变化，请重新选择。');
+  } else if (hits.length > 1) {
+    throw coded('MP_EDIT_CHOOSE_DESTINATION', '请选择要补写的章节。', { revision,
+      choices: hits.map(b => ({ id: b.id, label: b.title + ' · 第 ' + (b.ordinal) + ' 个标题' })) });
+  }
+  return { position: 'after', title: block.title, id: block.id };
+}
+
+// An insert carries precisely one zero-width change. The reference is never
+// part of the replacement span, including whitespace supplied at a section edge.
+export function planDocumentInsertion(text, { position, heading, anchorText, newString }, boundBlockId) {
+  if (typeof newString !== 'string' || !newString || hasLoneSurrogate(newString))
+    throw coded('MP_INSERT_INVALID', '新增文字为空或包含不完整的字符');
+  const anchored = position === 'before' || position === 'after';
+  if ((!anchored && position !== 'start' && position !== 'end')
+      || Number(heading !== undefined) + Number(anchorText !== undefined) !== Number(anchored))
+    throw coded('MP_INSERT_INVALID', 'before/after 需要唯一的 heading 或 anchorText；start/end 直接定位文件端点');
+  const bom = text.charCodeAt(0) === 0xfeff ? 1 : 0;
+  let at = position === 'start' ? bom : text.length;
+  if (heading !== undefined) {
+    if (typeof heading !== 'string' || !heading.trim() || /[\r\n]/.test(heading))
+      throw coded('MP_INSERT_INVALID', 'heading 应为单行标题');
+    const selector = /^(?:(#{1,6})[ \t]+)?(.+)$/.exec(heading.trim());
+    const title = selector[2].replace(/[ \t]+#+$/, '');
+    const blocks = parseDocumentBlocks(text).filter(b => b.kind === 'heading');
+    const scoped = blocks.filter(b => (!selector[1] || b.level === selector[1].length) && (!boundBlockId || b.id === boundBlockId));
+    const exact = scoped.filter(b => b.title === title);
+    const hits = exact.length ? exact : scoped.filter(b => b.title.startsWith(title) && /^[：:（(\s—–-]/u.test(b.title.slice(title.length)));
+    if (hits.length !== 1) throw coded(hits.length ? 'MP_INSERT_AMBIGUOUS' : 'MP_INSERT_NOT_FOUND',
+      hits.length ? '标题不唯一，请用更完整的标题或唯一原文定位' : '没有找到该标题，请用 blocks 或 read 核对位置');
+    const target = hits[0];
+    const next = blocks.slice(blocks.indexOf(target) + 1).find(b => b.level <= target.level);
+    at = position === 'before' ? target.from : next?.from ?? text.length;
+  } else if (anchorText !== undefined) {
+    if (typeof anchorText !== 'string' || !anchorText || hasLoneSurrogate(anchorText))
+      throw coded('MP_INSERT_INVALID', 'anchorText 需要非空原文');
+    const escaped = normalizeEol(anchorText).split('\n').map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const pattern = new RegExp(escaped.join('(?:\\r\\n|\\r(?!\\n)|(?<!\\r)\\n)'), 'g');
+    pattern.lastIndex = bom;
+    const hit = pattern.exec(text);
+    if (!hit) throw coded('MP_INSERT_NOT_FOUND', '没有找到定位原文，请重新读取');
+    pattern.lastIndex = hit.index + 1;
+    if (pattern.test(text)) throw coded('MP_INSERT_AMBIGUOUS', '定位原文出现多次，请提供更长的唯一原文');
+    at = position === 'before' ? hit.index : hit.index + hit[0].length;
+  }
+  const eol = detectDocumentEol(text) || '\n';
+  let insert = normalizeEol(newString).replace(/\n/g, eol);
+  if (heading !== undefined) {
+    const left = text.slice(bom, at), right = text.slice(at);
+    if (left && !/(?:\r\n|[\r\n])$/.test(left) && !/^[\r\n]/.test(insert)) insert = eol + eol + insert;
+    if (right && !/[\r\n]$/.test(insert)) insert += eol + eol;
+  }
+  return { from: at, to: at, insert };
 }
 
 // Line diff shared by merge/resolve. The previous implementation allocated an
@@ -908,7 +1016,9 @@ export function createDocumentsService(deps) {
   }
 
   function selectionPathMatches(ref, a) {
-    return !!ref && !!a && ref.canonical && a.canonical && canonicalKey(ref.canonical) === canonicalKey(a.canonical);
+    // Both values are provider-resolved canonical paths. Case folding here
+    // could admit a different file in a case-sensitive Windows directory.
+    return !!ref && !!a && !!ref.canonical && ref.canonical === a.canonical;
   }
 
   function verifySelectionRanges(text, ranges, { context = true } = {}) {
@@ -955,6 +1065,7 @@ export function createDocumentsService(deps) {
     return {
       selectionId: ref.id, path: ref.path, sessionId: ref.sessionId,
       originRevision: ref.originRevision, revision: ref.originRevision,
+      ...(ref.destination ? { destination: ref.destination } : {}),
       expiresAt: ref.expiresAt,
       // UI capability advert: the model can inspect this reference within the
       // hard read budget; the UI must not promise more than the server enforces.
@@ -1075,6 +1186,9 @@ export function createDocumentsService(deps) {
       return fail(selectionStale('capture revision is not the current document revision', { currentRevisionId: a.revisionId, reason: 'revision' }), a);
     let ranges;
     try { ranges = normalizeSelectionRanges(a.text, payload?.ranges); } catch (error) { return fail(error, a); }
+    let destination;
+    try { destination = selectionDestination(a.text, payload.intent, payload.destinationChoice, a.revisionId); }
+    catch (error) { return fail(error, a); }
     pruneSelectionRefs();
     if (selectionRefs.size >= SELECTION_MAX) return fail(coded('MP_SELECTION_LIMIT', 'too many live selection references'), a);
     const parsed = parseRevisionId(a.revisionId);
@@ -1084,7 +1198,7 @@ export function createDocumentsService(deps) {
       originEpoch: parsed?.kind === 'live' ? parsed.epoch : null,
       originVersion: parsed?.kind === 'live' ? parsed.version : null,
       originTextSha: sha256Text(a.text), originLength: a.text.length,
-      ranges, createdAt: Date.now(), expiresAt: Date.now() + SELECTION_TTL_MS,
+      ranges, destination, createdAt: Date.now(), expiresAt: Date.now() + SELECTION_TTL_MS,
       state: 'pending', result: null, fingerprint: null,
     };
     selectionRefs.set(ref.id, ref);
@@ -1147,7 +1261,9 @@ export function createDocumentsService(deps) {
 
     const replacements = Array.isArray(payload?.replacements) ? payload.replacements
       : (typeof payload?.newString === 'string' ? [payload.newString] : null);
-    if (!replacements || (ref.ranges.length === 1 ? replacements.length !== 1 : replacements.length !== ref.ranges.length)
+    if (Boolean(ref.destination) !== (payload.action === 'insert'))
+      return fail(selectionInvalid('操作与捕获的写入位置不符'), a);
+    if (!replacements || replacements.length !== (ref.destination ? 1 : ref.ranges.length)
       || replacements.some((value) => typeof value !== 'string'))
       return fail(selectionInvalid('newString is required for one range; replacements must match the captured range count'), a);
     const fingerprint = sha256Text(JSON.stringify(replacements));
@@ -1157,6 +1273,8 @@ export function createDocumentsService(deps) {
       return fail(coded('MP_SELECTION_USED', 'selection reference was already consumed'), a);
     }
     if (ref.state === 'applying') return fail(coded('MP_SELECTION_BUSY', 'selection reference is already being written'), a);
+    if (ref.destination && ref.originRevision !== a.revisionId)
+      return fail(selectionStale('文档已变化，请重新选择补写位置'), a);
 
     let ranges;
     try { ranges = await materializeSelection(ref, a); } catch (error) { return fail(error, a); }
@@ -1173,18 +1291,26 @@ export function createDocumentsService(deps) {
     ref.state = 'applying';
     selectionLocks.set(key, locks.concat([{ id: ref.id, from: ranges[0].currentFrom, to: ranges[ranges.length - 1].currentTo }]));
     try {
+      const target = ref.destination;
+      const insertion = target && { position: target.position, ...(target.id ? {heading: target.title} : {}), newString: replacements[0] };
+      if (insertion) {
+        const { from } = planDocumentInsertion(a.text, insertion, target.id);
+        if (ranges.some(range => range.currentFrom < from && from < range.currentTo))
+          throw selectionInvalid('补写位置落在资料选区内，请缩小选区');
+      }
       const result = await applyEdits({
         path: payload?.path, cwd: payload?.cwd,
         baseRevisionId: a.revisionId,
-        edits: ranges.map((range, index) => ({ from: range.currentFrom, to: range.currentTo, insert: replacements[index] })),
-      }, invocation, policy);
+        ...(insertion || { edits: ranges.map((range, index) => ({ from: range.currentFrom, to: range.currentTo, insert: replacements[index] })) }),
+      }, invocation, policy, { boundBlockId: target?.id });
       if (result.ok !== true) { ref.state = 'pending'; return result; }
       const value = result.value;
       const summary = {
         selectionId: ref.id, version: value.version, revisionId: value.revisionId,
         displayPath: value.displayPath, changed: value.changed, source: value.source,
         dirty: value.dirty === true, saved: value.saved === true,
-        ranges: ranges.map((range, index) => ({
+        ...(target ? { destination: target.title } : {}),
+        ranges: target ? [] : ranges.map((range, index) => ({
           from: range.currentFrom, to: range.currentTo,
           removedLength: range.currentTo - range.currentFrom,
           insertedLength: replacements[index].length,
@@ -1718,8 +1844,9 @@ export function createDocumentsService(deps) {
       : (typeof payload?.baseVersion === 'string' ? payload.baseVersion : '');
     const isBlock = typeof payload?.blockId === 'string' && payload.blockId.length > 0;
     const isLine = payload?.fromLine !== undefined || payload?.toLine !== undefined;
-    const groupId = randomUUID();
-    const groupKind = isLine ? 'line-edit' : isBlock ? 'block-edit' : 'edit';
+    const isInsert = payload?.position !== undefined;
+    const groupId = options.groupId || randomUUID();
+    const groupKind = isInsert ? 'insert' : isLine ? 'line-edit' : isBlock ? 'block-edit' : 'edit';
     const groupMetadata = (auditChanges) => ({ groupId, kind: groupKind, baseRevision: a.revisionId, changes: auditChanges });
     const groupStateFromAppend = async (result, resultRevision, auditChanges) => {
       // A provider that records the group in the append transaction proves it
@@ -1733,13 +1860,22 @@ export function createDocumentsService(deps) {
     };
     const isOldString = typeof payload?.oldString === 'string';
     const isEdits = Array.isArray(payload?.edits);
+    if (isInsert && (isLine || isBlock || isOldString || isEdits || payload.replaceAll !== undefined))
+      return fail(coded('MP_INSERT_INVALID', '插入不能同时替换原文'), a);
     if (isLine && (isBlock || isOldString || isEdits || payload?.replaceAll === true))
       return fail(coded('bad-request', 'line range edits are mutually exclusive with oldString/blockId/edits/replaceAll'), a);
 
     try {
       let changes, newText, diskBase = null, block = null, linePlan = null;
       if (isBlock && isOldString) return fail(coded('bad-request', 'blockId and oldString are mutually exclusive'), a);
-      if (isBlock) {
+      if (isInsert) {
+        // Even a self-contained locator is guarded by the revision it was
+        // resolved against. A concurrent edit must never move this insertion.
+        if (a.source === 'buffer') requireBufferBase(a, rawBase || a.revisionId);
+        else diskBase = requireDiskBase(a, rawBase || a.revisionId, { required: true });
+        changes = validateEdits(a.text, [planDocumentInsertion(a.text, payload, options.boundBlockId)], { allowCr: a.source === 'disk' });
+        newText = applyChanges(a.text, changes);
+      } else if (isBlock) {
         if (typeof payload.newString !== 'string') return fail(coded('bad-request', 'newString is required'), a);
         block = findDocumentBlock(a.text, payload.blockId);
         if (!block) return fail(coded('MP_BLOCK_NOT_FOUND', 'block id no longer matches this document; read blocks again'), a);
@@ -1835,12 +1971,16 @@ export function createDocumentsService(deps) {
           const memberGuard = a.room.members > 0 && typeof a.room.memberFingerprint === 'string'
             ? { expectedMembers: a.room.memberFingerprint, requireReplaySafe: true }
             : {};
-          result = await (enqueue || ((_key, action) => action()))(a.canonical, () => live.append(a.canonical, {
-            epoch: a.room.epoch, baseVersion: a.room.version, baseText: a.text, changes, actor: 'agent', groupId,
-            group: groupMetadata(auditChanges),
-            ...memberGuard,
-            ...(clearResolved ? { clearResolved: true } : {}),
-          }));
+          result = await (enqueue || ((_key, action) => action()))(a.canonical, () => {
+            options.check?.();
+            return live.append(a.canonical, {
+              epoch: a.room.epoch, baseVersion: a.room.version, baseText: a.text, changes, actor: 'agent', groupId,
+              group: groupMetadata(auditChanges),
+              ...memberGuard,
+              ...(clearResolved ? { clearResolved: true } : {}),
+              ...(Array.isArray(options.undoOf) && options.undoOf.length ? { undoOf: options.undoOf } : {}),
+            });
+          });
         } catch (error) {
           if (error?.code === 'MP_LIVE_STALE' || error?.code === 'MP_LIVE_MEMBERS_CHANGED') {
             let currentRevisionId = null;
@@ -1908,6 +2048,7 @@ export function createDocumentsService(deps) {
         const groupState = await persistAgentGroup(a, groupId, groupKind, value.revisionId, auditChanges);
         return { ok: true, value: applyGroupState(value, groupId, groupState, archived, null) };
       }
+      options.check?.();
       const result = await save({ path: payload.path, cwd: payload.cwd ?? invocation?.cwd, text: newText, baseVersion: diskBase, rejectIfMirror: true });
       if (!result || result.ok !== true) return result || fail(coded('FS_IO_ERROR', 'save failed'), a);
       const version = String(result.value.version);
@@ -1962,6 +2103,7 @@ export function createDocumentsService(deps) {
     const classified = classifyStorageFailure(error);
     const code = classified.code;
     const value = { code, message };
+    if (code === 'MP_EDIT_CHOOSE_DESTINATION') value.details = { choices: error.choices, revision: error.revision };
     if (classified.sqliteCode !== undefined) value.sqliteCode = classified.sqliteCode;
     if (classified.storageFamily !== undefined) value.storageFamily = classified.storageFamily;
     if (classified.prewrite === true) value.prewrite = true;
@@ -2279,6 +2421,14 @@ export function createDocumentsService(deps) {
     } };
   }
 
+  // Identical bytes may have been independently retyped. Insertion receipts
+  // require the original revision or a completely provable edit history.
+  function auditRevisionMatches(groups) {
+    return groups.some(group => group.kind === 'insert')
+      ? (a, b) => typeof a === 'string' && a === b
+      : sameRevisionContent;
+  }
+
   async function reviewGroups(payload) {
     let target;
     try { target = await resolve(payload, {}); } catch (error) { return fail(error, null); }
@@ -2314,12 +2464,13 @@ export function createDocumentsService(deps) {
           || typeof group.resultRevision !== 'string' || !group.resultRevision)) {
           chainOk = false; chainReason = 'missing-revision';
         } else {
+          const matches = auditRevisionMatches(groups);
           for (let index = 1; index < groups.length; index += 1) {
-            if (!sameRevisionContent(groups[index - 1].resultRevision, groups[index].baseRevision)) {
+            if (!matches(groups[index - 1].resultRevision, groups[index].baseRevision)) {
               chainOk = false; chainReason = 'broken-chain'; break;
             }
           }
-          if (chainOk && !sameRevisionContent(groups[groups.length - 1].resultRevision, a.revisionId)) {
+          if (chainOk && !matches(groups[groups.length - 1].resultRevision, a.revisionId)) {
             chainOk = false; chainReason = 'not-current';
           }
         }
@@ -2359,7 +2510,8 @@ export function createDocumentsService(deps) {
         }
       } catch { reviewRestorableReason = 'selective-plan-failed'; }
     }
-    return { ok: true, value: { groups, chainOk, chainReason, currentRevisionId, reviewRestorable, reviewRestorableReason } };
+    return { ok: true, value: { groups, chainOk, chainReason, currentRevisionId, reviewRestorable, reviewRestorableReason,
+      providerVersion: authorityState?.providerVersion ?? null } };
   }
 
   // Mark the audit groups undone. Prefer the host's single-statement helper so
@@ -2473,7 +2625,7 @@ export function createDocumentsService(deps) {
   // that (a) the current text is the group's result plus logged non-agent
   // changes, and (b) none of those changes intersects the AI inverse. Any gap,
   // compaction, later AI group or overlap means "keep the draft".
-  async function planSelectiveUndo(a, groups) {
+  async function planSelectiveUndo(a, groups, { allowLaterGroups = false } = {}) {
     if (groups.length !== 1) return { unproven: 'multi-group-selective' };
     if (a.source !== 'buffer' || !a.room) return { unproven: 'no-live-history' };
     if (typeof live.readRoomVersion !== 'function') return { unproven: 'history-api-unavailable' };
@@ -2493,8 +2645,9 @@ export function createDocumentsService(deps) {
     if (rows.length !== a.room.version - parsed.version) return { unproven: 'history-gap' };
     for (let index = 0; index < rows.length; index += 1) {
       if (rows[index].version !== parsed.version + 1 + index) return { unproven: 'history-gap' };
-      // A later AI group would be the real "last group"; never undo underneath it.
-      if (rows[index].groupId) return { unproven: 'later-agent-group' };
+      // Ordinary edit undo targets the last group. An explicit insertion
+      // receipt can cross another group only when its inverse stays disjoint.
+      if (rows[index].groupId && !allowLaterGroups) return { unproven: 'later-agent-group' };
       if (!Array.isArray(rows[index].changes) || rows[index].changes.length === 0) return { unproven: 'history-gap' };
     }
     const inverted = invertAgentGroup(snapshot.text, group.changes);
@@ -2544,8 +2697,9 @@ export function createDocumentsService(deps) {
       if (!group || group.undoneAt) return fail(coded('MP_GROUP_NOT_FOUND', 'agent group is already undone or missing'), a);
       groups.push(group);
     }
+    const matches = auditRevisionMatches(groups);
     for (let i = 1; i < groups.length; i += 1) {
-      if (!sameRevisionContent(groups[i].baseRevision, groups[i - 1].resultRevision))
+      if (!matches(groups[i].baseRevision, groups[i - 1].resultRevision))
         return fail(coded('MP_GROUP_STALE', 'agent groups are not a contiguous edit sequence'), a);
     }
     // Undoing a conflict-resolution group must re-expose the original conflict.
@@ -2553,7 +2707,7 @@ export function createDocumentsService(deps) {
     // the same room transaction; clearing before the append would make the
     // append itself refuse as a conflict.
     const hadConflictGroup = groups.some((group) => group.kind === 'conflict-resolve');
-    const currentMatches = sameRevisionContent(groups[groups.length - 1].resultRevision, a.revisionId);
+    const currentMatches = matches(groups[groups.length - 1].resultRevision, a.revisionId);
     let plan;
     if (currentMatches) {
       try { plan = { targetText: planGroupUndo(groups, a.text), selective: false }; }
@@ -2592,7 +2746,7 @@ export function createDocumentsService(deps) {
       edits: plan.selective ? plan.edits : [{ from: 0, to: a.text.length, insert: plan.targetText }],
       baseRevisionId: a.revisionId,
       ...(hadConflictGroup ? { clearResolved: true } : {}),
-    }, invocation, policy, { allowCr: true });
+    }, invocation, policy, { allowCr: true, undoOf: groupIds });
     if (!result || result.ok !== true) return result || fail(coded('FS_IO_ERROR', 'undo failed'), a);
     const marked = await markGroupsUndone(a.canonical, groupIds);
     return {
@@ -2624,22 +2778,25 @@ export function createDocumentsService(deps) {
     if (!group || group.undoneAt) return fail(coded('MP_GROUP_NOT_FOUND', 'agent group is already undone or missing'), a);
     if (group.kind === 'conflict-resolve')
       return fail(coded('MP_GROUP_NOT_ALLOWED', 'conflict resolution groups can only be undone from the editor'), a);
-    const currentMatches = sameRevisionContent(group.resultRevision, a.revisionId);
+    const currentMatches = auditRevisionMatches([group])(group.resultRevision, a.revisionId);
     const recent = await live.listAgentGroups(a.canonical, 20);
     const latest = recent.find((entry) => !entry.undoneAt);
-    if (!currentMatches && (!latest || latest.groupId !== groupId))
-      return fail(stale(a, 'not-latest'), a);
-    if (currentMatches && (!latest || latest.groupId !== groupId))
-      return fail(coded('MP_GROUP_NOT_LATEST', 'only the latest agent edit group can be undone'), a);
+    const latestMatches = latest?.groupId === groupId;
+    // Explicit insert receipts can be undone underneath later independent AI
+    // changes. Even if the current bytes happen to match, require the complete
+    // intervening live history, so a retyped identical passage stays intact.
+    const earlierInsert = group.kind === 'insert' && !latestMatches;
+    if (!latestMatches && !earlierInsert)
+      return fail(currentMatches ? coded('MP_GROUP_NOT_LATEST', 'only the latest agent edit group can be undone') : stale(a, 'not-latest'), a);
     let plan;
-    if (currentMatches) {
+    if (currentMatches && !earlierInsert) {
       try {
         const inverted = invertAgentGroup(a.text, group.changes);
         requireGroupBaseIdentity(group, inverted.baseText);
         plan = { targetText: inverted.baseText, edits: inverted.inverse, selective: false };
       } catch (error) { return fail(error, a); }
     } else {
-      plan = await planSelectiveUndo(a, [group]);
+      plan = await planSelectiveUndo(a, [group], { allowLaterGroups: group.kind === 'insert' });
       if (plan.unproven) return fail(stale(a, plan.unproven), a);
     }
     if (plan.targetText === a.text) {
@@ -2660,7 +2817,7 @@ export function createDocumentsService(deps) {
     // Same internal CR allowance as undoGroups: inverse bytes may be CRLF.
     const result = await applyEdits({
       path: payload.path, cwd: payload.cwd, edits: plan.edits, baseRevisionId: a.revisionId,
-    }, invocation, policy, { allowCr: true });
+    }, invocation, policy, { allowCr: true, undoOf: [groupId] });
     if (!result || result.ok !== true) return result || fail(coded('FS_IO_ERROR', 'undo failed'), a);
     const marked = await markGroupsUndone(a.canonical, [groupId]);
     return {

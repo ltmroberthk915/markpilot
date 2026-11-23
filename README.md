@@ -1,5 +1,7 @@
 > **更名（1.4.0 起）：** 插件包名从 `dsh-markdown-typora` 改为 **`dsh-markdown-editor-typora`**。安装/升级：`dsh plugin --profile desktop add dsh-markdown-editor-typora@1.4.0`；旧包停在 1.3.x，不再更新。下文旧版本记录里的旧包名保留原样。
 
+[MarkPilot 3.7.1 for Windows](https://github.com/ltmroberthk915/markpilot/releases/latest) · [MarkPilot for DSH on npm](https://www.npmjs.com/package/dsh-markdown-editor-typora)
+
 # MarkPilot · 万可百律
 
 [![开放插件市场](https://img.shields.io/endpoint?url=https%3A%2F%2Fdshopen.org%2Fbadge%2Fdsh-markdown-editor-typora.json)](https://dshopen.org/zh/plugins/dsh-markdown-editor-typora/)
