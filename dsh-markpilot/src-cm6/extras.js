@@ -31,6 +31,15 @@ import { deleteGrapheme } from './grapheme-delete.js';
    Markdown 脚注解析器**；未解析引用（resolved:false）保持原文，导出侧不会凭空造活链接。
    契约见 `.mp-verify/math-notes/pdf/README.md` 的「共享接口」一节。 */
 import { footnoteExportPlan } from './footnote-export.js';
+/* 【文章版式·书页/研报】配方只从 article-recipes.js 取（契约见该文件头）；本条只消费。
+   来源：当前持久设置（article-edition 的 readStoredEdition）+ 导出那一刻的界面明暗。 */
+import { readStoredEdition, normalizeEdition, resolveEditionTone, EDITION_STORAGE_KEY,
+  EDITION_KINDS, EDITION_VARIANTS, EDITION_LABELS, EDITION_VARIANT_LABELS, EDITION_DESCRIPTIONS,
+  editionNumbering, exportEditionCss } from './article-edition.js';
+import { getArticleRecipe, articleDocumentCss } from './article-recipes.js';
+import { buildArticleOutput, publishPreviewDocument } from './article-publish.js';
+import { selfContainMedia, rasterizeSvgToPng } from './edition-math.js';
+import { interfaceIsDark } from './edition-view.js';
 /* 【Typora 社区主题·2026-10-09】用户想直接用 Typora 的主题 CSS。
    改写逻辑**不在这里另写一份**：2.x 线早有一份纯函数实现（`user-theme.mjs` 的 adaptTyporaTheme）
    ——`#write` → 我们的写作区、`:root` 变量挂到作用域属性上、带相对 url() 的 @font-face 丢掉、
@@ -145,6 +154,28 @@ html[data-mp-statusbar="1"] .mp-pop { bottom: auto; }
 .mp-key { display: inline-block; min-width: 58px; padding: 1px 7px; border: 1px solid var(--mp-border); border-radius: 5px;
   background: color-mix(in srgb, var(--mp-bg) 86%, var(--mp-fg)); font: 12px/1.6 var(--mp-font-mono); cursor: pointer; }
 .mp-key.editing { border-color: var(--mp-primary); color: var(--mp-primary); }
+/* 【发布面板·2026-11-25】只影响 .mp-pub 自己（版式/目标/宽度/预览舞台）。
+   预览是沙箱 iframe（srcdoc＝与导出同一份文档），所以这里只管外壳：
+   舞台固定高度、可滚；手机档把 iframe 压到 390px 居中。
+   【两条实测缺陷】
+    ① .mp-pub-row 的 display:flex 压过了 HTML 的 [hidden]{display:none} ⇒ 深色宿主下
+       仍显示微信专属的「外链文末编号/同址去重」，且切目标时开关不跟着消失。
+       这里显式 [hidden]{display:none !important}；
+    ② 按钮/下拉当时继承 UA 默认黑字，在深色面板底色上几乎看不见。
+       面板控件一律用宿主的 fg/bg/border 令牌（正文颜色不归这里管——那是发布件的事）。 */
+.mp-pub { display:flex; flex-direction:column; gap:6px; color:var(--mp-fg); }
+.mp-pub [hidden] { display:none !important; }
+.mp-pub-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.mp-pub-row label { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--mp-fg); }
+.mp-pub-row select { padding:3px 6px; border:1px solid var(--mp-border); border-radius:5px;
+  background:var(--mp-bg); color:var(--mp-fg); font:12px var(--mp-font-body); }
+.mp-pub-row .mp-key { min-width:auto; color:var(--mp-fg); background:color-mix(in srgb, var(--mp-bg) 86%, var(--mp-fg)); }
+.mp-pub-row .mp-key[aria-selected="true"] { color:var(--mp-fg); border-color:var(--mp-primary); }
+.mp-pub-row .mp-key[disabled] { opacity:.55; cursor:not-allowed; }
+.mp-pub .k { color:color-mix(in srgb, var(--mp-fg) 78%, var(--mp-bg)); }
+.mp-pub-stage { min-height:150px; }
+.mp-pub-empty { padding:24px 8px; text-align:center; border:1px dashed var(--mp-border); border-radius:8px; }
+.mp-pub-frame { transition:none; }
 /* 【编辑器设置·2026-11-16】小窗也能用：面板自身可滚、左右两列各自滚；
    高度按视口收（不写死 540px 的旧上限），极矮时外层滚动而不是把内容裁掉。 */
 .mp-settings { width:min(760px,calc(100vw - 48px)); box-sizing:border-box; overflow:auto; max-height:calc(100vh - 16px); }
@@ -201,15 +232,28 @@ const PALETTES = [
      V3 的 telari-dark 后来改用中性暗色 #1f2126，V2 的深蓝只留在 TELARI 首帧/导出兜底；
      这里把它作为第 10 套内置主题恢复，不改变现有「宋韵 深色」。 */
   { id: 'telari-blue-dark', name: '宋韵 深蓝', dark: true, vars: { '--mp-bg': '#2E3440', '--mp-fg': '#C3C7CF', '--mp-heading': '#EAEDF3', '--mp-muted': '#A4A8AE', '--mp-faint': '#76797F', '--mp-primary': '#28AAF1', '--mp-border': '#4B505B', '--mp-codeBg': '#232935', '--mp-capsule': '#232935', '--mp-quoteBg': '#353C4A', '--mp-quoteBar': '#53607A', '--mp-sel': 'rgba(40,170,241,0.28)', '--mp-kw': '#E4E7FF', '--mp-str': '#5EB597', '--mp-com': '#757E84', '--mp-num': '#C97F3D', '--mp-typ': '#96DCFF' } },
+  /* 【宋韵 深蓝 浅色·同族补齐】深蓝家族的浅色面：同一套冷灰蓝纸面（#ECEEF2 底、
+     #3B4252 正文、#88C0D0 主色）的镜像，六级语法梯子按同一亮度族重排，
+     与深色不是"反相"而是各自独立调过的可读值（与 notion/solarized 两族的既有做法一致）。 */
+  { id: 'telari-blue-light', name: '宋韵 深蓝 浅色', dark: false, vars: { '--mp-bg': '#ECEEF2', '--mp-fg': '#3B4252', '--mp-heading': '#2E3440', '--mp-muted': '#5E6B7F', '--mp-faint': '#8C97A6', '--mp-primary': '#2B6C8F', '--mp-border': '#D3D8E0', '--mp-codeBg': '#E3E7ED', '--mp-capsule': '#E6EAF0', '--mp-quoteBg': '#E0E5EC', '--mp-quoteBar': '#A9B3C1', '--mp-sel': 'rgba(43,108,143,0.24)', '--mp-kw': '#5E4B8B', '--mp-str': '#2F6B4F', '--mp-com': '#6C7787', '--mp-num': '#A05A28', '--mp-typ': '#1F5E7A' } },
   { id: 'notion-dark', name: 'Notion 深色', dark: true, vars: { '--mp-bg': '#191919', '--mp-fg': '#d4d4d4', '--mp-heading': '#dcdcdc', '--mp-muted': '#9b9b9b', '--mp-faint': '#6f6f6f', '--mp-primary': '#529cca', '--mp-border': '#2f2f2f', '--mp-codeBg': '#242424', '--mp-capsule': '#242424', '--mp-quoteBg': '#2a2a2a', '--mp-quoteBar': '#555555', '--mp-sel': 'rgba(82,156,202,0.26)', '--mp-kw': '#c191ff', '--mp-str': '#6fbf73', '--mp-com': '#808080', '--mp-num': '#e0a76a', '--mp-typ': '#6fb2d2' } },
   { id: 'notion-light', name: 'Notion 浅色', dark: false, vars: { '--mp-bg': '#ffffff', '--mp-fg': '#37352f', '--mp-heading': '#2d2b27', '--mp-muted': '#787774', '--mp-faint': '#a5a29c', '--mp-primary': '#2383e2', '--mp-border': '#e9e9e7', '--mp-codeBg': '#f7f6f3', '--mp-capsule': '#f3f3f3', '--mp-quoteBg': '#ededec', '--mp-quoteBar': '#c1c1bf', '--mp-sel': 'rgba(35,131,226,0.26)', '--mp-kw': '#9065b0', '--mp-str': '#448361', '--mp-com': '#787774', '--mp-num': '#d9730d', '--mp-typ': '#0b6e99' } },
   { id: 'solarized-dark', name: 'Solarized 深', dark: true, vars: { '--mp-bg': '#002b36', '--mp-fg': '#93a1a1', '--mp-heading': '#a6b2b2', '--mp-muted': '#657b83', '--mp-faint': '#586e75', '--mp-primary': '#268bd2', '--mp-border': '#0b3f4a', '--mp-codeBg': '#073642', '--mp-capsule': '#09323c', '--mp-quoteBg': '#0d3640', '--mp-quoteBar': '#2b545e', '--mp-sel': 'rgba(38,139,210,0.26)', '--mp-kw': '#859900', '--mp-str': '#2aa198', '--mp-com': '#586e75', '--mp-num': '#d33682', '--mp-typ': '#b58900' } },
   { id: 'solarized-light', name: 'Solarized 浅', dark: false, vars: { '--mp-bg': '#fdf6e3', '--mp-fg': '#657b83', '--mp-heading': '#53656b', '--mp-muted': '#93a1a1', '--mp-faint': '#b3a68a', '--mp-primary': '#268bd2', '--mp-border': '#eee8d5', '--mp-codeBg': '#f4eeda', '--mp-capsule': '#f4efdd', '--mp-quoteBg': '#efebda', '--mp-quoteBar': '#cecfc3', '--mp-sel': 'rgba(38,139,210,0.26)', '--mp-kw': '#859900', '--mp-str': '#2aa198', '--mp-com': '#93a1a1', '--mp-num': '#d33682', '--mp-typ': '#b58900' } },
   { id: 'github-dark', name: 'GitHub 深色', dark: true, vars: { '--mp-bg': '#0d1117', '--mp-fg': '#c9d1d9', '--mp-heading': '#d3d9e0', '--mp-muted': '#8b949e', '--mp-faint': '#6e7681', '--mp-primary': '#58a6ff', '--mp-border': '#21262d', '--mp-codeBg': '#161b22', '--mp-capsule': '#181d23', '--mp-quoteBg': '#1e2228', '--mp-quoteBar': '#464d55', '--mp-sel': 'rgba(88,166,255,0.26)', '--mp-kw': '#ff7b72', '--mp-str': '#a5d6ff', '--mp-com': '#8b949e', '--mp-num': '#79c0ff', '--mp-typ': '#ffa657' } },
+  /* 【GitHub 浅色·同族补齐】GitHub 官方 Primer 浅色：底 #ffffff、正文 #24292f、主色 #0969da，
+     六级语法取 primer 的 coral/blue/gray/orange 一套，与深色各自独立而非反相。 */
+  { id: 'github-light', name: 'GitHub 浅色', dark: false, vars: { '--mp-bg': '#ffffff', '--mp-fg': '#24292f', '--mp-heading': '#1f2328', '--mp-muted': '#57606a', '--mp-faint': '#8c959f', '--mp-primary': '#0969da', '--mp-border': '#d0d7de', '--mp-codeBg': '#f6f8fa', '--mp-capsule': '#f6f8fa', '--mp-quoteBg': '#eef1f4', '--mp-quoteBar': '#afb8c1', '--mp-sel': 'rgba(9,105,218,0.22)', '--mp-kw': '#cf222e', '--mp-str': '#0a3069', '--mp-com': '#6e7781', '--mp-num': '#0550ae', '--mp-typ': '#953800' } },
   { id: 'sepia-light', name: '护眼米黄', dark: false, vars: { '--mp-bg': '#f7f1e3', '--mp-fg': '#3f3a33', '--mp-heading': '#34302a', '--mp-muted': '#7d7466', '--mp-faint': '#a89e8f', '--mp-primary': '#b5651d', '--mp-border': '#e3d9c6', '--mp-codeBg': '#efe6d4', '--mp-capsule': '#ece6d8', '--mp-quoteBg': '#e6e1d3', '--mp-quoteBar': '#bfb6a4', '--mp-sel': 'rgba(181,101,29,0.26)', '--mp-kw': '#8c5a2b', '--mp-str': '#4f7942', '--mp-com': '#8a8172', '--mp-num': '#a8562b', '--mp-typ': '#2f6f8f' } },
+  /* 【护眼米黄 深色·同族补齐】纸黄家族的夜间面：暖褐底 #26221c、米白正文 #ded6c6，
+     主色沿用家族赭石 #d9a05b 的提亮版；六级语法按暖色族重排，不回落宋韵。 */
+  { id: 'sepia-dark', name: '护眼米黄 深色', dark: true, vars: { '--mp-bg': '#26221c', '--mp-fg': '#ded6c6', '--mp-heading': '#efe8da', '--mp-muted': '#a99e8b', '--mp-faint': '#7e7565', '--mp-primary': '#d9a05b', '--mp-border': '#3a342b', '--mp-codeBg': '#2e2921', '--mp-capsule': '#302b23', '--mp-quoteBg': '#332e26', '--mp-quoteBar': '#5b5347', '--mp-sel': 'rgba(217,160,91,0.26)', '--mp-kw': '#d9a05b', '--mp-str': '#9fb86a', '--mp-com': '#877d6d', '--mp-num': '#e08c5a', '--mp-typ': '#7fbfd0' } },
     /* 【柔和淡绿进主题列表·2026-10-09 用户要求】它本来只是「更多 → 配色」里的**阅读配色**；
        现在同样作为**主题配色**可选（同一套底色，补全浅色主题需要的语法色 token）。 */
     { id: 'green-light', name: '柔和淡绿', dark: false, vars: { '--mp-bg': '#e5eee2', '--mp-fg': '#2e4032', '--mp-heading': '#243026', '--mp-muted': '#516655', '--mp-faint': '#7c8f7e', '--mp-primary': '#245c68', '--mp-border': '#a7bca4', '--mp-codeBg': '#d5e2d2', '--mp-capsule': '#d5e2d2', '--mp-quoteBg': '#dde8da', '--mp-quoteBar': '#a7bca4', '--mp-sel': 'rgba(36,92,104,0.22)', '--mp-kw': '#31605c', '--mp-str': '#3f6b45', '--mp-com': '#6f8574', '--mp-num': '#8a5a2b', '--mp-typ': '#2f6070' } },
+    /* 【柔和淡绿 深色·同族补齐】绿家族的夜间面：深墨绿底 #1b241d、浅苔白正文 #cfdccc，
+       主色沿用家族青绿 #4f9aa6 的提亮版；六级语法按绿族重排，不回落宋韵。 */
+    { id: 'green-dark', name: '柔和淡绿 深色', dark: true, vars: { '--mp-bg': '#1b241d', '--mp-fg': '#cfdccc', '--mp-heading': '#e2ecdf', '--mp-muted': '#93a795', '--mp-faint': '#6b7d6d', '--mp-primary': '#4f9aa6', '--mp-border': '#2c3a2f', '--mp-codeBg': '#212c23', '--mp-capsule': '#232f26', '--mp-quoteBg': '#253128', '--mp-quoteBar': '#455849', '--mp-sel': 'rgba(79,154,166,0.26)', '--mp-kw': '#6fd0c4', '--mp-str': '#8fce8a', '--mp-com': '#71856f', '--mp-num': '#d8a75f', '--mp-typ': '#7fc4c9' } },
 ];
 const EMOJI = ['😀','😄','😁','😅','😂','🙂','😉','😊','😍','🤔','😐','😴','😭','😡','👍','👎','👏','🙏','💪','🎉','✨','🔥','💡','✅','❌','⚠️','❓','❗','⭐','📌','📎','📝','📖','📊','📈','📉','🔍','🔧','⚙️','🚀','🐛','🌱','🌸','☕','🍵','🎯','⏰','🧠','💬','📅','🔒','🔑'];
 
@@ -484,7 +528,8 @@ export function installExtras(deps) {
     byId: (id) => PALETTES.find((x) => x.id === id) || null,
     current: () => currentPalette,
     apply: (id) => themeApply(id),
-    /* 同族明暗邻居；族内无邻居的两套（GitHub 深色 / 护眼米黄）回落到宋韵 */
+    /* 同族明暗邻居。补齐后每个家族都有 dark/light 两边 ⇒ 不再回落宋韵；
+     * 兜底分支只在登记表本身缺项时生效（例如用户导入的 CSS 主题被选中）。 */
     sibling: (id) => {
       const p = PALETTES.find((x) => x.id === id);
       if (p) { const fam = p.id.replace(/-(dark|light)$/, ''); const s = PALETTES.find((x) => x.id === fam + (p.dark ? '-light' : '-dark')); if (s) return s.id; }
@@ -572,6 +617,21 @@ export function installExtras(deps) {
   /* 【脚注入口】一个动作覆盖三种上下文：光标在引用上 → 跳到定义；在定义里 → 回到
      本次触发的那一处引用；在普通正文 → 在光标处插入引用并把定义追加到文末。
      与正文上标/定义回链共用 footnotes-view.js 的同一套导航，不另造第二套落点逻辑。 */
+  /* 【AI 润色】唯一实现：正文右键的 explicit 动作与宿主 action 共用。
+     为什么不复用 toolbarClick：它用 `commands.run(..., {focus:'control'})`，会把焦点交给
+     "控制面"，而润色内核按 live selection 取目标、并要求编辑器仍持有焦点 ⇒ 焦点被抢走时
+     选区虽然还在，面板却会立在错误的所有者上。这里直接调 open()，焦点留在正文。
+     未选中时内核自己 toast「请先选中要润色的文字」，这里不重复第二次。 */
+  function openAiRewrite() {
+    const api = window.mpSelectionRewrite;
+    if (!api || typeof api.open !== 'function') {
+      toast('AI 润色内核未就绪（请更新到含该模块的版本）', 3000);
+      return 'unsupported';
+    }
+    try { return api.open(); }
+    catch (error) { toast('AI 润色失败：' + String((error && error.message) || error)); return 'error'; }
+  }
+
   function runFootnote() {
     const view = getView();
     const result = footnoteAction ? footnoteAction(view) : null;
@@ -594,6 +654,9 @@ export function installExtras(deps) {
     quote: 'Mod-Shift-q', list: 'Mod-l', save: 'Mod-s', outline: 'Mod-Shift-o', export: '',
     footnote: 'Mod-Alt-n',
   };
+  /* 【AI 润色快捷键已移除·2026-11-27】原本 `Mod-Alt-r` 由 aiRewriteKeys 挂进 keymap。
+     现按要求删除该 CM keymap、常量 AI_REWRITE_KEY 与 helper aiRewriteFromKeyboard：
+     AI 润色只保留**真实选区右键**的 explicit 动作与宿主 action（openAiRewrite 仍在）。 */
   const ACTIONS = {
     /* 行内格式全部走 toolbar.js 的同一个 wrap（唯一实现；落点规则与工具栏按钮逐字节一致）。 */
     bold: (v) => deps.wrapInline(v, '**'), italic: (v) => deps.wrapInline(v, '*'),
@@ -955,12 +1018,51 @@ export function installExtras(deps) {
   // HTML RAWTEXT ends at a literal closing style tag even inside a CSS string.
   // CSS escapes retain the original value without exposing an HTML delimiter.
   const cssRawText = css => String(css).replace(/</g, '\\3c ');
+  /* ── 文章版式（书页 / 研报）· 唯一读取点 ───────────────────────────────────
+     设置存在 article-edition 的键里；导出/复制/草稿**同一时刻**各取一次，
+     因此"预览是什么、粘出去就是什么"。plain ⇒ 所有旧路径逐字节不变。 */
+  const currentEdition = () => readStoredEdition();
+  const editionTone = () => resolveEditionTone(currentEdition(), interfaceIsDark(document));
+  /** 研报的章节编号计数器：**只在入口建一次**，随 opts 传进纯生成器（见 mdBodyChunks 的注释）。
+   *  其他版式返回 null ⇒ 生成器逐字节等于旧输出。 */
+  const exportHeadingNumbers = () => (currentEdition().kind === 'report' ? editionNumbering('report') : null);
+  /** 导出页/预览页的全部样式：配色 token 快照 + 基础作者层 + （有版式时）配方文档样式 + 纸面规则。 */
+  const editionCssText = () => {
+    const e = currentEdition();
+    if (e.kind === 'plain') return '';
+    const recipe = getArticleRecipe(e.kind, editionTone());
+    return articleDocumentCss(recipe) + '\n'
+      + exportEditionCss(e.kind, e.variant === 'follow' ? null : editionTone());
+  };
+  /** htmlHead 的可选第二样式块：有版式时把配方 CSS 追加进去（与旧规则合并、不替换）。 */
+  const editionHtmlHeadExtra = () => (currentEdition().kind === 'plain' ? '' : `<style>${cssRawText(editionCssText())}</style>\n`);
+  /* 版式根包裹：`.mp-article` 是配方选择器的根；plain 直接返回正文（导出件结构逐字节不变）。 */
+  const articleWrapOpen = () => {
+    const e = currentEdition();
+    if (e.kind === 'plain') return '';
+    return `<div class="mp-article" data-mp-article-recipe="${e.kind}" data-mp-article-variant="${editionTone()}">\n`;
+  };
+  const articleWrapClose = () => (currentEdition().kind === 'plain' ? '' : '\n</div>');
+  /** 研报章节编号：给 `<hN>` 前插入真实文本（导出/复制/草稿三处同一实现；编辑面是行属性）。 */
+  const numberHeadings = (html) => {
+    const e = currentEdition();
+    if (e.kind !== 'report') return html;
+    const numbering = editionNumbering('report');
+    return String(html).replace(/<h([1-6])([^>]*)>([\s\S]*?)<\/h\1>/gi, (whole, lvl, attrs, inner) => {
+      const text = numbering.next(Number(lvl));
+      if (!text) return whole;
+      return '<h' + lvl + attrs + '><span class="mp-edition-num">' + esc(text) + '</span>' + inner + '</h' + lvl + '>';
+    });
+  };
   const htmlHead = (title, mathCss = '') => '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n'
     + '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'none\'; style-src \'unsafe-inline\'; img-src data: blob: file: https: http:; font-src data: file:; base-uri \'none\'; form-action \'none\'">\n'
     + `<title>${esc(String(title || 'MarkPilot 导出'))}</title>\n<style>${cssRawText(colorTokenSnapshot())}</style>\n<style>${cssRawText(exportCssText())}</style>\n`
+    + editionHtmlHeadExtra()
     + (mathCss ? `<style>${cssRawText(mathCss)}</style>\n` : '')
-    + '</head>\n<body>\n';
+    + '</head>\n<body>\n' + articleWrapOpen();
+  /* 导出尾：有版式时先闭合 `.mp-article` 包裹，再闭合文档（plain 时逐字节等于旧 literal）。 */
   const HTML_TAIL = '\n</body>\n</html>\n';
+  const htmlTail = () => articleWrapClose() + HTML_TAIL;
   const mdTitle = (md) => ((md.split('\n').find((l) => /^#\s+/.test(l)) || '# MarkPilot 导出').replace(/^#\s+/, '').trim() || 'MarkPilot 导出');
   const safeFileName = (s) => String(s).replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim().slice(0, 60) || 'markpilot';
 
@@ -1016,15 +1118,20 @@ export function installExtras(deps) {
    *  用的，静态导出页毫无用处，却让每处公式的 HTML 近乎翻倍（实测 1,649 → 3,448 B/式；
    *  本篇 5,643 式 ⇒ 白扛 ~5MB）。只做字符串剥离，不重渲染、不影响编辑面 DOM。 */
   const stripSrcMap = (html) => String(html).replace(/ data-typora-source-(?:start|end)="[^"]*"/g, "");
+  /* 【TeX 来源·唯一真源】公式的原始表达式就在**这里**（内核刚解析出的 token）：
+     发布件（知乎 ztext-math / 图片 alt）与编辑面都靠它，**绝不从 KaTeX 最终 HTML 反推**
+     （那只能拿到字形，拿不回 `r^{2}` 的源码；实测反例：data-tex 全为空）。
+     attrEsc 负责引号/尖括号转义 ⇒ 属性值逐字节等于用户写的 TeX。 */
+  const texAttr = (tex) => ` data-mp-tex="${attrEsc(String(tex))}"`;
   function mathInlineHtml(tex) {
     const html = mathApi ? mathApi(String(tex), false) : null;
-    return html == null ? `<code>${esc(String(tex))}</code>` : `<span class="mp-math">${stripSrcMap(html)}</span>`;
+    return html == null ? `<code>${esc(String(tex))}</code>` : `<span class="mp-math"${texAttr(tex)}>${stripSrcMap(html)}</span>`;
   }
   function mathBlockHtml(tex, attrs = '') {
     const t = String(tex == null ? "" : tex);
     if (!t.trim()) return `<div class="mp-math-block"${attrs}></div>`;
     const html = mathApi ? mathApi(t, true) : null;
-    return html == null ? `<pre class="mp-math"${attrs}>${esc(t)}</pre>` : `<div class="mp-math-block"${attrs}>${stripSrcMap(html)}</div>`;
+    return html == null ? `<pre class="mp-math"${attrs}>${esc(t)}</pre>` : `<div class="mp-math-block"${attrs}${texAttr(t)}>${stripSrcMap(html)}</div>`;
   }
   /* ── 导出页的 KaTeX 样式与字体（离线可排版）──────────────────────────────
    * 取的是**引擎自己正在用的那份** KaTeX CSS（渲染面 <link> 的 app.css），不另抄一份：
@@ -1163,6 +1270,11 @@ export function installExtras(deps) {
   const MATH_TEX_MAX = 32 * 1024;
   function* mdBodyChunks(md, opts = {}) {
     const { srcMap = null, chunkChars = CHUNK_CHARS, math = false, mermaidSvgs = null, nested = false, footnotes = false, footPlan = null, publicized = false } = opts;
+    /* 【研报章节编号】计数器由**入口**传进来（opts.headingNumbers）：mdBodyChunks 本身不读宿主设置 ——
+       它是纯生成器，被导出/打印/发布/单测直接调用，自己去看 localStorage 会让这些调用互相影响。
+       研报入口传 editionNumbering('report')；其余（含 plain/书页）传 null ⇒ 逐字节等于旧输出。
+       嵌套层经 {...opts} 自动沿用同一个计数器 ⇒ 引用块/列表里的标题也按文档顺序编号。 */
+    const headingNumbers = opts.headingNumbers || null;
     /* 【公开快照·只做一次】非嵌套调用先取一次变长公开快照（新文档）：
        · 入口层（exportHtml/exportFolder/打印页/copyRich）已经取过快照，传 publicized:true
          ⇒ 这里**不再解析**（消除"公开 md 二次解析"；快照不是源文偏移空间，重复处理只会白跑）；
@@ -1352,7 +1464,7 @@ export function installExtras(deps) {
         const blankCount = pendingBlank.length;
         const block = pendingBlank.concat(leaf.block); pendingBlank = [];
         const outer = take(); if (outer) yield outer;
-        yield* mdBodyChunks(block.join('\n'), { ...opts, nested: true, footPlan: foot, lineBase: lineBase + i - blankCount });
+        yield* mdBodyChunks(block.join('\n'), { ...opts, nested: true, headingNumbers, footPlan: foot, lineBase: lineBase + i - blankCount });
         i = leaf.end - 1;
         continue;
       }
@@ -1371,7 +1483,7 @@ export function installExtras(deps) {
           k++;
         }
         const outer = take(); if (outer) yield outer;
-        yield* mdBodyChunks(childLines.join('\n'), { ...opts, nested: true, footPlan: foot, lineBase: lineBase + i });
+        yield* mdBodyChunks(childLines.join('\n'), { ...opts, nested: true, headingNumbers, footPlan: foot, lineBase: lineBase + i });
         i = k - 1;
         continue;
       }
@@ -1389,7 +1501,7 @@ export function installExtras(deps) {
         const outer = take(); if (outer) yield outer;
         push(`<blockquote${lineAttr(i)}>`);
         const open = take(); if (open) yield open;
-        yield* mdBodyChunks(group.join('\n'), { ...opts, nested: true, footPlan: foot, lineBase: lineBase + i });
+        yield* mdBodyChunks(group.join('\n'), { ...opts, nested: true, headingNumbers, footPlan: foot, lineBase: lineBase + i });
         push('</blockquote>');
         i = k - 1;
         continue;
@@ -1487,7 +1599,13 @@ export function installExtras(deps) {
             }
           } else {
             closeList();
-            if (h) push(`<h${h[1].length}${lineAttr(i)}>${inlineMd(h[2] || '', srcMap, math, foot)}</h${h[1].length}>`);
+            if (h) {
+              /* 【研报章节编号·真实输出】编号是正文里的一层 `<span class="mp-edition-num">`，
+                 与导出/复制/草稿同一实现；plain/书页不产生它（旧字节不变）。
+                 编号只在**本文档渲染这一趟**里递增，与挂起/并发导出互不影响（见 footnote 局部化同款纪律）。 */
+              const numText = headingNumbers ? headingNumbers.next(h[1].length) : '';
+              push(`<h${h[1].length}${lineAttr(i)}>${numText ? `<span class="mp-edition-num">${esc(numText)}</span>` : ''}${inlineMd(h[2] || '', srcMap, math, foot)}</h${h[1].length}>`);
+            }
             else {
               if (isHrLine(line)) push(`<hr${lineAttr(i)}>`);
               else if (!line.trim()) push('');
@@ -1571,7 +1689,7 @@ export function installExtras(deps) {
     try {
     const msMathCss = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0;
     const head = htmlHead(title, mathCss);
-    function* chunks() { yield head; yield* mdBodyChunks(pub, { publicized: true, math: true, footnotes: true, srcMap: images.map, mermaidSvgs: mermaidStat?.svgs }); yield HTML_TAIL; }
+    function* chunks() { yield head; yield* mdBodyChunks(pub, { publicized: true, math: true, footnotes: true, headingNumbers: exportHeadingNumbers(), srcMap: images.map, mermaidSvgs: mermaidStat?.svgs }); yield htmlTail(); }
     const msBuild = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0;
     if (dir) {                                   // ① 桌面版：写到用户选的位置
       const beg = await window.mpHost.exportBeginHtml({ dir, name: safeFileName(title) });
@@ -1684,10 +1802,10 @@ export function installExtras(deps) {
     const title = mdTitle(pub);
     let head = htmlHead(title, mathCss);
     head = head.replace('</head>', `<style>${cssRawText(PLUGIN_PRINT_CSS)}</style>\n</head>`);
-    const body = mdToHtml(pub, { publicized: true, math: true, footnotes: true, srcMap: images.map, mermaidSvgs: mermaidStat?.svgs });
+    const body = mdToHtml(pub, { publicized: true, math: true, footnotes: true, headingNumbers: exportHeadingNumbers(), srcMap: images.map, mermaidSvgs: mermaidStat?.svgs });
     const hint = forPdf ? '' : '<div class="mp-print-hint">正在打开系统打印对话框。若没有弹出，请按 Ctrl+P'
       + '（或浏览器菜单 → 打印），目标选择“另存为 PDF”。</div>\n';
-    return { html: head + hint + body + HTML_TAIL, title, mermaidStat, forPdf, images: images.summary };
+    return { html: head + hint + body + htmlTail(), title, mermaidStat, forPdf, images: images.summary };
   }
   async function waitPopupReady(win) {
     try {
@@ -1879,6 +1997,10 @@ export function installExtras(deps) {
       + `</table><p class="k" style="margin:12px 0 6px">或者直接复制：</p><table>`
       + row('copy-rich', '复制为知乎/微信格式', '整篇富文本进剪贴板，直接粘到公众号/知乎编辑器。', true)
       + row('copy-table', '复制表格到 Excel', '光标在表格里时可用，制表符分隔。', true)
+      + `</table><p class="k" style="margin:12px 0 6px">发布：</p><table>`
+      /* 【发布面板·2026-11-25】格式与目标在这里**先选再预览**：论文版式、微信（外链编号/去重）、
+         知乎（保留原文链接）都有独立入口，且与「复制为…」共用同一份输出（见 buildWechatArticle）。 */
+      + row('publish', '发布预览与复制…', '先选版式与目标，手机/桌面宽度预览后再复制或发草稿。', true)
       + `</table><p class="k" style="margin:12px 0 6px">图表：</p><table>`
       /* 【灰色入口·2026-10-11 用户要求】"主题暂时保留灰色入口，具体功能不做" ✓ ——
          放一个**禁用态**的入口，把当前实际行为写清楚（跟随编辑器深/浅色 ✓），
@@ -1896,6 +2018,7 @@ export function installExtras(deps) {
           else if (k === 'folder') await exportFolder();
           else if (k === 'copy-rich') await copyRich();
           else if (k === 'copy-table') await copyTable();
+          else if (k === 'publish') openPublishPanel('wechat');
         } catch (e) { toast('操作失败：' + String((e && e.message) || e)); }
       };
     });
@@ -1974,8 +2097,8 @@ export function installExtras(deps) {
         if (!r?.ok) throw new Error(r?.error || '写入失败');
       };
       await append(htmlHead(title, mathCss));
-      for (const chunk of mdBodyChunks(pub, { publicized: true, srcMap, math: true, footnotes: true, mermaidSvgs: mermaidStat?.svgs })) { await append(chunk); chunks++; }
-      await append(HTML_TAIL);
+      for (const chunk of mdBodyChunks(pub, { publicized: true, srcMap, math: true, footnotes: true, headingNumbers: exportHeadingNumbers(), mermaidSvgs: mermaidStat?.svgs })) { await append(chunk); chunks++; }
+      await append(htmlTail());
       const fin = await host.exportFinishHtml({ id: beg.id });
       if (!fin || !fin.ok) throw new Error((fin && fin.error) || '写入失败');
       const ms = ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0;
@@ -1995,61 +2118,419 @@ export function installExtras(deps) {
   }
   /** 最近一次导出的统计（探针/报告取证用，不参与业务逻辑） */
   let lastExport = null;
-  /** 复制为知乎/微信格式：clipboard 写 text/html（全内联样式），粘进知乎编辑器即为富文本 */
-  async function copyRich() {
-    const richToken = window.mpHost && typeof window.mpHost.beginClipboardIntent === 'function' ? window.mpHost.beginClipboardIntent('copy') : null;
-    const v = getView(); if (!v) return;
+  /* ══ 发布投影（微信 / 知乎 / 预览）· 单一实现 ══════════════════════════════════
+   * 三个消费者：发布面板的预览、复制按钮、以及「发送到公众号草稿箱」。
+   * 它们**必须**共用 buildArticleOutput（见 article-publish.js）—— 否则会出现
+   * "预览好看、粘出来难看"或"草稿少图"。这里只负责取文档、准备公式/图表、写剪贴板。
+   *
+   * 失败口径：任何一步失败都如实提示并返回 { ok:false }，不静默、不返回半成品。 */
+
+  /** 当前文档的公开正文（含公式/图表/脚注），供所有发布出口共用。 */
+  async function buildPublishSource() {
+    const v = getView();
+    if (!v) return { ok: false, error: 'no-view' };
     const md = v.state.doc.toString();
-    /* 【公开快照】copyRich 是"粘到知乎/公众号/微信"的公开通道：text/html 与 text/plain
-       都不带编辑注释；普通源码 Ctrl+C/Ctrl+X、保存、AI 选区仍走源文（sourceTextPayload 不动）。
-       · html 走 render 模式（删注释后补空格/必要时加 \ 转义，防止接出新的块级语法）；
-       · text/plain 走 text 模式（纯文本不再按 Markdown 解析，不把护栏用的反斜杠带给用户）。
-       无 "<!--" 的文档两条都是零解析快路径；有注释时才各取一次（不是把公开结果再解析一遍）。 */
+    /* 公开快照：注释不进公开产物（与导出/复制同一条链）；text 模式给纯文本回退。 */
     const pub = publicMarkdown(md);
     const pubText = publicMarkdown(md, { mode: 'text' });
-    const inlineCss = (html) => html
-      .replace(/<strong>/g, '<strong style="font-weight:600">')
-      .replace(/<h1>/g, '<h1 style="font-size:24px;font-weight:600;margin:22px 0 10px">').replace(/<h2>/g, '<h2 style="font-size:20px;font-weight:600;margin:20px 0 8px">')
-      .replace(/<h3>/g, '<h3 style="font-size:17px;font-weight:600;margin:18px 0 8px">')
-      .replace(/<p>/g, '<p style="margin:10px 0;line-height:1.75">')
-      .replace(/<blockquote>/g, '<blockquote style="border-left:3px solid #dfe2e5;padding-left:12px;color:#6a737d;margin:10px 0">')
-      .replace(/<pre><code>/g, '<pre style="background:#f6f8fa;padding:12px;border-radius:6px;overflow:auto;font-size:13px"><code>')
-      .replace(/<code>/g, '<code style="background:#f6f8fa;padding:1px 4px;border-radius:3px;font-size:13px">')
-      .replace(/<table>/g, '<table style="border-collapse:collapse;margin:12px 0">')
-      /* 【β2·§6.2 单一写者】带 text-align 的格**先合并**盒子样式（顺序在裸标签规则之前）：
-         不合并的话中/右对齐格不再匹配裸 <td>，在知乎/微信里那一列会**丢边框**；
-         而"再拼一段 style"会产生两个 style 属性（第二个被忽略，同样丢样式）。 */
-      .replace(/<td style="text-align:(center|right)"/g, '<td style="border:1px solid #dfe2e5;padding:6px 12px;text-align:$1"')
-      .replace(/<th style="text-align:(center|right)"/g, '<th style="border:1px solid #dfe2e5;padding:6px 12px;background:#f6f8fa;text-align:$1"')
-      .replace(/<td>/g, '<td style="border:1px solid #dfe2e5;padding:6px 12px">')
-      .replace(/<th>/g, '<th style="border:1px solid #dfe2e5;padding:6px 12px;background:#f6f8fa;text-align:left">')
-      .replace(/<hr>/g, '<hr style="border:0;border-top:1px solid #e1e4e8;margin:18px 0">');
-    /* 【mermaid 预渲染·复制路径】与导出同一范式：先 await 一次补齐缓存，再同步生成 ✓
-       （少了这一步，复制到知乎/微信时图表位置会变成源码块 —— 与"导出有图、复制没图"的不一致 ✗）。 */
-    let mermaidStat = null, html;
+    let mathCss = '';
+    try { if (mathApi) mathCss = await buildMathCss(); } catch { /* 公式样式失败不阻断复制 */ }
+    /* 【本地图片必须变成可搬走的图】发布件是离开本机的产品：`file:///D:/…/a.png` 与
+       相对 `sample.png` 在公众号/知乎里都是裂图，而且把用户磁盘路径写进了正文。
+       复用导出同一条受权读取链（embedImageRefs + 宿主 readFileBase64），把能读到的本地图
+       内联成 data URL；外链保持原样（由目标站点自己取）；读不到的**如实计数**并提示，
+       不静默丢图、也不假装已经可搬。 */
+    const refs = collectImageRefs(pub);
+    let images = { map: null, summary: { images: refs.length, embedded: 0, existing: 0, remote: 0, failed: 0, bytes: 0, failures: [] } };
     try {
-      if (window.mpMermaid?.prerender) mermaidStat = await window.mpMermaid.prerender(pub);
-      html = inlineCss(mdToHtml(pub, { publicized: true, mermaidSvgs: mermaidStat?.svgs }));
-    } catch (e) { toast('复制失败：' + (e?.message || e)); return false; }
-    finally { mermaidStat?.svgs?.clear(); }
-    const hostRich = window.mpHost;
-    if (hostRich && typeof hostRich.beginClipboardIntent === 'function') {
-      const ok = await writeClip({ text: pubText, html }, richToken);
-      toast(ok ? '已复制富文本（可直接粘到知乎/公众号编辑器）' : '复制失败：剪贴板不可用');
-      return ok;
+      images = await embedImageRefs(refs, window.__mpDocDir || null, async (url, maxBytes) => {
+        if (!hostReadable()) return { ok: false, error: '当前宿主不支持读取本地图片' };
+        return window.mpHost.readFileBase64(fileUrlToPath(url), { maxBytes });
+      });
+    } catch (error) {
+      images = { map: null, summary: { images: refs.length, embedded: 0, existing: 0, remote: 0, failed: refs.length, bytes: 0, failures: [{ reason: String((error && error.message) || error) }] } };
+    }
+    let mermaidStat = null;
+    try { if (window.mpMermaid?.prerender) mermaidStat = await window.mpMermaid.prerender(pub); } catch { /* 图表失败保留源码块 */ }
+    let html;
+    try {
+      html = mdToHtml(pub, { publicized: true, math: true, footnotes: true, headingNumbers: exportHeadingNumbers(), srcMap: images.map, mermaidSvgs: mermaidStat?.svgs });
+    } finally { mermaidStat?.svgs?.clear(); }
+    return { ok: true, pub, pubText, html, mathCss, title: mdTitle(pub), images: images.summary };
+  }
+
+  /** 主题 token 快照（导出/发布取色用；与导出页 colorTokenSnapshot 同一份取值口径）。 */
+  function themeTokens() {
+    const root = document.documentElement, cs = getComputedStyle(root), out = {};
+    for (const k of SNAPSHOT_TOKENS) {
+      const v = (root.style.getPropertyValue('--mp-' + k) || cs.getPropertyValue('--mp-' + k) || '').trim();
+      if (v) out[k] = v;
+    }
+    return out;
+  }
+
+  /**
+   * 公开文章地址：**只接受显式的 http(s)**。本机文件路径（磁盘、用户名）绝不外发到
+   * 微信「原文：」或导出件的 canonical —— 那种泄露是不可逆的。
+   */
+  function publicArticleUrl(value) {
+    const text = String(value == null ? '' : value).trim();
+    if (!text) return '';
+    try {
+      const url = new URL(text);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+      if (!url.hostname) return '';
+      return url.href;
+    } catch { return ''; }
+  }
+
+  /**
+   * 微信/知乎/预览的**唯一投影**（面板、复制、「发送到草稿箱」共用）。
+   *
+   * 【自包含媒体·2026-11-25 实测反例】目标编辑器不带任何外部 CSS：KaTeX 的上标靠
+   * `.vlist{display:inline-table}` 那几条类规则，类名在、CSS 不在 ⇒ `$r^2$` 粘出来是“r2”。
+   * 所以发布件里公式/图表**换成图片**（微信 PNG、知乎 SVG + data-tex/alt 的 TeX 来源），
+   * 目标与预览取**同一份结果**。草稿因此也不需要再栅格化一次（输出里已没有 .mp-math 节点）。
+   * @param {{target?:'wechat'|'zhihu'|'document',linkNotes?:boolean,dedupe?:boolean,sourceUrl?:string,media?:boolean}} opts
+   */
+  async function buildWechatArticle(opts = {}) {
+    /* 复制意图：必须在**点击那一刻**、任何耗时预渲染之前取得（宿主按手势发 token）。
+       预渲染之后才取 = 手势已过期，写剪贴板静默失败。 */
+    const intent = opts.__intent !== undefined ? opts.__intent : null;
+    const source = await buildPublishSource();
+    if (!source.ok) return source;
+    const edition = currentEdition();
+    const tone = resolveEditionTone(edition, interfaceIsDark(document));
+    const target = opts.target === 'zhihu' ? 'zhihu' : 'wechat';
+    const out = buildArticleOutput({
+      html: source.html, edition, tone,
+      variant: edition.variant,
+      tokens: themeTokens(), title: source.title, mathCss: source.mathCss,
+      /* 默认空：只有调用方**显式**给了 http(s) 公开地址才写「原文：」与 canonical。 */
+      sourceUrl: publicArticleUrl(opts.sourceUrl),
+      linkNotes: opts.linkNotes !== false,
+      dedupe: opts.dedupe !== false,
+    });
+    /* 【媒体自包含】只在要贴出去/预览的那一份上做；导出静态页仍用矢量 KaTeX 与自带 CSS。
+       opts.media === false 时跳过（探针要对比"裸载荷"时用）。 */
+    let media = { math: 0, diagrams: 0, rasterized: 0, failed: [] };
+    let wechatHtml = out.wechatHtml, zhihuHtml = out.zhihuHtml;
+    if (opts.media !== false && (out.summary.formulas || out.summary.diagrams)) {
+      const mathCss = source.mathCss || '';
+      const run = async (html, t) => {
+        try {
+          return await selfContainMedia(html, { target: t, mathCss, rasterize: rasterizeSvgToPng });
+        } catch (error) {
+          return { html, stats: { math: 0, diagrams: 0, rasterized: 0, failed: [{ label: '媒体', reason: String((error && error.message) || error) }] } };
+        }
+      };
+      const wx = await run(out.wechatHtml, 'wechat');
+      const zh = await run(out.zhihuHtml, 'zhihu');
+      wechatHtml = wx.html; zhihuHtml = zh.html;
+      media = { ...wx.stats, failed: wx.stats.failed.concat(zh.stats.failed) };
+      if (media.failed.length) toast('有 ' + media.failed.length + ' 处公式/图表没能转成图片，粘贴后可能排版不准');
+    }
+    return {
+      ok: true, ...out, wechatHtml, zhihuHtml,
+      bodyHtml: source.html, text: source.pubText, title: source.title, mathCss: source.mathCss,
+      intent, images: source.images, media,
+      previewHtml: target === 'zhihu' ? zhihuHtml : wechatHtml,
+    };
+  }
+
+  /**
+   * 复制到剪贴板：text/html（内联样式）+ text/plain。
+   * 契约（原复制契约）：
+   *  · token 在**点击时**取得，随请求一并传入；过时/取消/文档切换 ⇒ 停止（不再写、不再重试）；
+   *  · 受信宿主明示无效（ok:false 且宿主支持 token 协议）⇒ 直接如实失败，**不**退到无 token 重试；
+   *  · 最后一级 textarea/execCommand **只能复制纯文本** ⇒ 明确提示"只复制了纯文本"，绝不谎报格式已复制。
+   * @returns {Promise<'rich'|'text'|false>}
+   */
+  async function copyPublishHtml(html, text, label, options = {}) {
+    const h = window.mpHost;
+    const token = options.intent !== undefined && options.intent !== null ? options.intent : null;
+    const usable = !!token;
+    if (h && typeof h.writeClipboard === 'function') {
+      let result = null;
+      try { result = await h.writeClipboard({ text, html }, token); } catch { result = { ok: false, error: 'exception' }; }
+      if (result && result.ok === true) { toast(label); return 'rich'; }
+      /* 受信宿主给了 token 却明示失败 ⇒ 这次复制**已经作废**（意图过期/文档切换/宿主拒绝）。
+         旧实现会再不带 token 试一次、再退到系统剪贴板 —— 那样会绕过宿主的意图校验，
+         既不安全也会把"失败"包装成成功。这里如实报告。 */
+      if (usable) {
+        const reason = result && typeof result.error === 'string' && result.error ? result.error : '剪贴板不可用';
+        toast('复制失败：' + reason);
+        return false;
+      }
+      /* 没有 token（宿主不支持意图协议的老版本）：保持原来的无 token 通道一次。 */
     }
     try {
       await navigator.clipboard.write([new ClipboardItem({
         'text/html': new Blob([html], { type: 'text/html' }),
-        'text/plain': new Blob([pubText], { type: 'text/plain' }),
+        'text/plain': new Blob([text], { type: 'text/plain' }),
       })]);
-      toast('已复制富文本（可直接粘到知乎/公众号编辑器）');
-    } catch (e) {
+      toast(label);
+      return 'rich';
+    } catch { /* 落到纯文本 */ }
+    /* 最后一级只有纯文本：明确说是纯文本，不冒充"已复制微信/知乎格式"。 */
+    try {
       const ta = document.createElement('textarea');
-      ta.value = html; document.body.appendChild(ta); ta.select();
-      document.execCommand('copy'); ta.remove();
-      toast('已复制 HTML（浏览器不支持富文本剪贴板，已退化为 HTML 源码）');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand('copy'); ta.remove();
+      toast(ok ? '已复制纯文本（当前环境不支持富文本剪贴板，粘贴后没有排版）' : '复制失败：剪贴板不可用');
+      return ok ? 'text' : false;
+    } catch { toast('复制失败：剪贴板不可用'); return false; }
+  }
+
+  /**
+   * 复制为知乎 / 微信格式。
+   * 旧入口（导出面板的「复制为知乎/微信格式」）继续可用：未选版式时输出与旧行为一致；
+   * 选了版式时按配方内联，并把外链编号/去重（微信）或保留原文链接（知乎）落到剪贴板里。
+   * @param {'wechat'|'zhihu'} target
+   */
+  async function copyArticle(target = 'wechat', options = {}) {
+    /* ① 点击时取意图（在任何 await 之前）。
+       ② 记下此刻的文档与版本：预渲染可能要几百毫秒，期间换文档/改文本就必须停。 */
+    const intent = window.mpHost && typeof window.mpHost.beginClipboardIntent === 'function'
+      ? window.mpHost.beginClipboardIntent('copy') : null;
+    const v = getView(), docAtClick = v ? v.state.doc : null;
+    const built = await buildWechatArticle({ ...options, target, __intent: intent });
+    if (!built.ok) { toast('复制失败：' + (built.error || '无法读取当前文档')); return false; }
+    const now = getView();
+    if (!now || !docAtClick || now.state.doc !== docAtClick) {
+      if (intent && window.mpHost && typeof window.mpHost.cancelClipboardIntent === 'function') { try { window.mpHost.cancelClipboardIntent(intent, 'document-changed'); } catch { /* 忽略 */ } }
+      toast('文档已经变了，这次复制已取消（请重新复制）');
+      return false;
     }
+    const isWechat = target !== 'zhihu';
+    const html = isWechat ? built.wechatHtml : built.zhihuHtml;
+    const label = isWechat ? '已复制微信格式（可直接粘到公众号编辑器）' : '已复制知乎格式（可直接粘到知乎编辑器）';
+    const outcome = await copyPublishHtml(html, built.text, label, { intent });
+    return outcome !== false;
+  }
+
+  /** 兼容旧签名：复制为知乎/微信格式（默认微信；输出与面板同一条链）。 */
+  async function copyRich() { return copyArticle('wechat'); }
+
+  /* ══ 发布面板（选目标 → 预览 → 复制 / 发草稿）· 2026-11-25 ══════════════════
+   * 入口：工具栏「导出」→「发布预览与复制…」，以及「更多」菜单里的一条同名项。
+   * 面板里能做的三件事：
+   *   · 选**版式**（默认 / 书页 / 研报）与**明暗**（跟随界面 / 浅 / 深）——写的是持久设置，
+   *     与编辑器首帧同一份值，所以预览、复制、草稿与编辑面永远同款；
+   *   · 选**目标**（微信 / 知乎 / 静态文档），在**手机宽度 390px** 与**桌面宽度**之间切换预览
+   *     （真 iframe：同一份 documentHtml，不是另画一张）；微信目标另有「文末编号」「同址去重」两个开关；
+   *   · 复制 / 发送到草稿箱：直接复用 buildWechatArticle / copyArticle / openWechatDraftDialog。
+   * 预览用的 iframe 是 sandbox 且不带脚本（与导出页同一份 CSP），只负责"长什么样"。 */
+  const PUBLISH_WIDTHS = [
+    { id: 'phone', label: '手机 390', width: 390 },
+    { id: 'desktop', label: '桌面 100%', width: 0 },
+  ];
+  function publishPanelState() {
+    const e = currentEdition();
+    return {
+      kind: e.kind, variant: e.variant,
+      target: 'wechat', width: 'phone',
+      linkNotes: true, dedupe: true,
+    };
+  }
+  function openPublishPanel(initialTarget) {
+    let state = publishPanelState();
+    if (initialTarget === 'zhihu' || initialTarget === 'document') state.target = initialTarget;
+    dialog('发布预览与复制', `
+      <div class="mp-pub">
+        <p class="k" data-pub="editionBrief" style="margin:2px 0 8px"></p>
+        <div class="mp-pub-row" role="tablist" aria-label="发布目标">
+          ${['wechat:微信', 'zhihu:知乎', 'document:静态文档'].map((pair) => {
+            const [id, label] = pair.split(':');
+            return `<button type="button" class="mp-key" data-pub-target="${id}" role="tab">${label}</button>`;
+          }).join('')}
+        </div>
+        <div class="mp-pub-row" data-pub="wxopts" hidden>
+          <label style="cursor:pointer"><input type="checkbox" data-pub="linkNotes"${state.linkNotes ? ' checked' : ''} style="accent-color:var(--mp-primary)"> 外链文末编号</label>
+          <label style="cursor:pointer"><input type="checkbox" data-pub="dedupe"${state.dedupe ? ' checked' : ''} style="accent-color:var(--mp-primary)"> 同址去重</label>
+        </div>
+        <div class="mp-pub-row">
+          <span class="k">预览宽度</span>
+          ${PUBLISH_WIDTHS.map((w) => `<button type="button" class="mp-key" data-pub-width="${w.id}">${w.label}</button>`).join('')}
+          <span class="k" data-pub="stat" style="margin-left:auto"></span>
+        </div>
+        <div class="mp-pub-stage" data-pub="stage"><div class="mp-pub-empty k">正在准备预览…</div></div>
+        <div class="mp-pub-row" style="margin-top:10px">
+          <button type="button" class="mp-key" data-pub-act="copy">复制</button>
+          <button type="button" class="mp-key" data-pub-act="draft">发送到公众号草稿箱…</button>
+          <button type="button" class="mp-key" data-pub-act="refresh">重新预览</button>
+          <span class="k" data-pub="hint" style="margin-left:auto"></span>
+        </div>
+      </div>`);
+    const d = dlgEl; if (!d) return;
+    const q = (sel) => d.querySelector(sel);
+    let lastBuilt = null, building = 0, iframe = null;
+    const setStat = (text) => { const el = q('[data-pub="stat"]'); if (el) el.textContent = text || ''; };
+    const setHint = (text) => { const el = q('[data-pub="hint"]'); if (el) el.textContent = text || ''; };
+    const syncControls = () => {
+      /* 【版式/明暗已迁到设置·2026-11-27】发布面板不再提供这两组控件，
+         只显示当前版式与明暗的**只读简短文字**（改请去「编辑器设置 → 主题与字体」）。
+         这里每次同步都重新读持久状态，因此设置里改了，面板重开即是新值。 */
+      const curEdition = currentEdition();
+      state.kind = curEdition.kind;
+      state.variant = curEdition.variant;
+      const brief = q('[data-pub="editionBrief"]');
+      if (brief) {
+        const kindLabel = EDITION_LABELS[curEdition.kind] || curEdition.kind;
+        /* 【明暗标签·2026-11-27】只有书页/研报才投影纸面、才有"版式明暗"。
+           plain（默认宋韵）不投影纸面，底色完全由主题/工具栏决定 ⇒
+           **取实际界面明暗**（interfaceIsDark，与 mpArticleEdition.isDark() 同源），
+           绝不借用存储里那份 article variant（否则会出现"底色浅、却宣称深色"的假话）。
+           follow 仍显示实际生效的浅/深并注明跟随界面；显式档显示所选明暗。 */
+        let varLabel;
+        if (curEdition.kind === 'plain') {
+          varLabel = (interfaceIsDark(document) ? '深色' : '浅色') + '（随界面）';
+        } else if (curEdition.variant === 'follow') {
+          const actual = editionTone() === 'dark' ? '深色' : '浅色';
+          varLabel = actual + '（跟随界面）';
+        } else {
+          varLabel = EDITION_VARIANT_LABELS[curEdition.variant] || curEdition.variant;
+        }
+        /* 提示文案简化：不再写拗口的『设置 →「编辑器设置 › 主题与字体」』 */
+        brief.textContent = kindLabel + ' · ' + varLabel + '　编辑器设置 › 主题与字体';
+      }
+      d.querySelectorAll('[data-pub-target]').forEach((el) => {
+        const on = el.dataset.pubTarget === state.target;
+        el.setAttribute('aria-selected', String(on));
+        el.style.background = on ? 'color-mix(in srgb, var(--mp-primary) 22%, transparent)' : '';
+      });
+      d.querySelectorAll('[data-pub-width]').forEach((el) => {
+        const on = el.dataset.pubWidth === state.width;
+        el.style.background = on ? 'color-mix(in srgb, var(--mp-primary) 22%, transparent)' : '';
+      });
+      const wx = q('[data-pub="wxopts"]'); if (wx) wx.hidden = state.target !== 'wechat';
+      const draftBtn = q('[data-pub-act="draft"]');
+      if (draftBtn) draftBtn.disabled = state.target !== 'wechat';
+    };
+    const stage = q('[data-pub="stage"]');
+    const renderPreview = (built) => {
+      if (!stage) return;
+      if (!built || !built.ok) {
+        stage.innerHTML = '<div class="mp-pub-empty k">预览失败：' + esc(String((built && built.error) || '未知')) + '</div>';
+        setStat('');
+        setHint('预览失败');
+        return;
+      }
+      const width = state.width === 'phone' ? 390 : 0;
+      const extra = width ? `width:${width}px;max-width:100%` : 'width:100%';
+      const box = document.createElement('div');
+      box.className = 'mp-pub-frame';
+      box.style.cssText = extra + ';margin:0 auto';
+      iframe = document.createElement('iframe');
+      iframe.setAttribute('sandbox', '');
+      iframe.setAttribute('title', '文章预览');
+      iframe.style.cssText = 'display:block;width:100%;height:440px;border:1px solid var(--mp-border);border-radius:8px;background:#fff';
+      /* 【预览必须是目标的真实载荷】改前用 built.documentHtml || built.wechatHtml ⇒ 微信与知乎
+         两个目标拿到**逐字节相同**的导出文档（还带着 MarkPilot 的 CSS），看起来永远是对的。
+         现在：微信/知乎都预览"将被粘贴出去的那份 HTML"，外面只套一个**没有 MarkPilot CSS** 的
+         空白页 —— 公式上标、外链编号、普通链接在目标里是什么样，这里就是什么样。
+         静态文档目标仍预览导出文档（那才是它自己的产物）；没有版式时退回目标载荷。 */
+      let previewDoc;
+      if (state.target === 'document' && built.documentHtml) {
+        previewDoc = built.documentHtml;
+      } else {
+        const targetKind = state.target === 'zhihu' ? 'zhihu' : 'wechat';
+        previewDoc = publishPreviewDocument(targetKind === 'zhihu' ? built.zhihuHtml : built.wechatHtml,
+          { target: targetKind, title: built.title });
+      }
+      iframe.srcdoc = previewDoc;
+      box.appendChild(iframe);
+      stage.innerHTML = '';
+      stage.appendChild(box);
+      const s = built.summary || {};
+      setStat(`图 ${s.images || 0} · 公式 ${s.formulas || 0} · 图表 ${s.diagrams || 0} · 表 ${s.tables || 0} · 脚注 ${s.footnotes || 0} · 外链 ${s.links || 0}`);
+      const media = built.media || {};
+      setHint((state.target === 'wechat'
+        ? '微信：外链变文末编号' + (state.dedupe ? '（同址合并）' : '（逐条编号）')
+        : state.target === 'zhihu' ? '知乎：保留普通链接、公式带 TeX 来源' : '静态文档：导出/打印与复制同源')
+        + (media.rasterized ? ' · 公式/图表已转图片 ' + media.rasterized : '')
+        + (media.failed && media.failed.length ? ' · ' + media.failed.length + ' 处未能转图' : ''));
+    };
+    const rebuild = async () => {
+      const ticket = ++building;
+      setHint('正在准备…');
+      let built;
+      try {
+        built = await buildWechatArticle({ target: state.target, linkNotes: state.linkNotes, dedupe: state.dedupe });
+      } catch (error) {
+        built = { ok: false, error: String((error && error.message) || error) };
+      }
+      /* 【异步过时结果】后一次点选可能先到；只允许最新一次落地（不允许旧结果覆盖新状态）。 */
+      if (ticket !== building || !d.isConnected) return null;
+      lastBuilt = built;
+      /* 【失败必须可见地结束】任何一步抛错/返回失败都要落到"预览失败：原因"，
+         绝不能停在"正在准备预览…"（实测：拼预览页时一个未定义函数就让面板永远转圈）。 */
+      try {
+        renderPreview(built);
+      } catch (error) {
+        renderPreview({ ok: false, error: '预览渲染失败：' + String((error && error.message) || error) });
+      }
+      setHint(built && built.ok ? '' : '见下方原因');
+      return built;
+    };
+    syncControls();
+    rebuild();
+    d.querySelectorAll('[data-pub]').forEach((el) => {
+      if (el.tagName !== 'SELECT' && el.type !== 'checkbox') return;
+      el.addEventListener('change', () => {
+        const key = el.dataset.pub;
+        /* 【版式/明暗控件已移出本面板·2026-11-27】原来这里处理 kind / variant 两个 select；
+           两组三选现已迁到「编辑器设置 → 主题与字体」，写入同一持久状态，本处不再有对应控件，
+           故删除该分支（避免死代码与第二套写入路径）。 */
+        if (key === 'linkNotes') state.linkNotes = el.checked;
+        else if (key === 'dedupe') state.dedupe = el.checked;
+        else return;
+        rebuild();
+      });
+    });
+    d.querySelectorAll('[data-pub-target]').forEach((el) => {
+      el.addEventListener('click', () => { state.target = el.dataset.pubTarget; syncControls(); rebuild(); });
+    });
+    d.querySelectorAll('[data-pub-width]').forEach((el) => {
+      el.addEventListener('click', () => { state.width = el.dataset.pubWidth; syncControls(); renderPreview(lastBuilt); });
+    });
+    d.querySelectorAll('[data-pub-act]').forEach((el) => {
+      el.addEventListener('click', async () => {
+        const act = el.dataset.pubAct;
+        if (act === 'refresh') { rebuild(); return; }
+        if (act === 'copy') {
+          const target = state.target === 'zhihu' ? 'zhihu' : 'wechat';
+          const ok = await copyArticle(target, { linkNotes: state.linkNotes, dedupe: state.dedupe });
+          setHint(ok ? '已写入剪贴板' : '复制失败（见上方提示）');
+          return;
+        }
+        if (act === 'draft') {
+          closeDlg();
+          await openWechatDraftDialog({ linkNotes: state.linkNotes, dedupe: state.dedupe });
+        }
+      });
+    });
+  }
+
+  /**
+   * 「发送到公众号草稿箱」的唯一入口。
+   * 原生菜单（window.mpWechat.open）与发布面板的草稿按钮都走这里 ⇒ 同一份当前微信配方输出。
+   * getArticle 每次调用都**重新取文档**；对话框在打开时调用一次。
+   */
+  async function openWechatDraftDialog(options = {}) {
+    let mod;
+    try { mod = await import('./wechat-draft-dialog.js'); }
+    catch (error) { toast('发送失败：对话框模块不可用'); return { ok: false, error: String((error && error.message) || error) }; }
+    if (!mod || typeof mod.openWechatDraft !== 'function') return { ok: false, error: 'no-dialog' };
+    const getArticle = async () => {
+      const built = await buildWechatArticle({ ...options, target: 'wechat' });
+      if (!built.ok) throw new Error(built.error || '无法读取当前文档');
+      /* 契约（见 wechat-draft-dialog.js 文件头）：正文 HTML 片段 + 标题；公式/图表保留
+         .mp-math/.mp-math-block/.mp-mermaid 供对话框栅格化成可上传 PNG。 */
+      return { title: built.title || '', html: built.wechatHtml };
+    };
+    try { return await mod.openWechatDraft({ getArticle, toast }); }
+    catch (error) { toast('发送失败：' + ((error && error.message) || error)); return { ok: false, error: String((error && error.message) || error) }; }
   }
 
   /* ── 表格：行列增删（纯文本操作，一次 dispatch）+ 复制为 TSV/HTML（粘 Excel 成真表格） ── */
@@ -2822,6 +3303,25 @@ export function installExtras(deps) {
     add("代码块", tb("code"));
     add("分割线", tb("line"));
     add("图片", tb("upload"));
+    sep();
+    /* 【AI 润色选区】右键前的真实非空选区才展示：右键的 mousedown 会把光标落到点击处、
+       把选区收掉，所以先在命令里恢复 savedSel 再 open()；内核按 live selection 取目标。
+       无可用选区时整块「AI」都不渲染。 */
+    {
+      const r = savedSel && (savedSel.main || savedSel.range || savedSel.ranges?.[0]);
+      const from = r ? (r.from ?? r.anchor) : NaN;
+      const to = r ? (r.to ?? r.head) : NaN;
+      if (Number.isFinite(from) && Number.isFinite(to) && from !== to) {
+        title("AI");
+        add("AI 润色选区…", () => {
+          const v = getView();
+          if (!v) return;
+          try { v.dispatch({ selection: savedSel, userEvent: 'select' }); } catch { return; }
+          try { v.focus(); } catch { /* 焦点尽力而为 */ }
+          try { openAiRewrite(); } catch (error) { toast('AI 润色失败：' + String((error && error.message) || error)); }
+        });
+      }
+    }
     h.appendChild(pop);
     /* 落点在视口外就翻边（与其它弹层同一口径） */
     const pr = pop.getBoundingClientRect();
@@ -3122,6 +3622,31 @@ export function installExtras(deps) {
       + `<label style="margin-left:14px">间隔 <input id="mp-autosave-seconds" type="number" min="1" max="3600" step="1" value="30" disabled style="width:72px" aria-label="自动保存间隔（秒）"> 秒</label></td></tr>`
       + `</table>`;
     const curTheme = PALETTES.find(p => p.id === currentPalette) || PALETTES[0];
+    /* 【文章版式与明暗迁入主题·2026-11-27】原来这两组三选在「发布预览与复制」面板里，
+       现在归到本页的「主题与字体」：版式（宋韵默认 / 书页 / 研报）与明暗（跟随界面 / 浅 / 深）。
+       写入仍走同一个持久状态（article-edition 键 / mpArticleEdition.set 降级路径），
+       所以编辑面、阅读面、导出图、复制与草稿拿到的是**同一份值**，不产生第二套真源。 */
+    const editNow = currentEdition();
+    /* 只两行带组标签的控件：fieldset/legend 提供可访问组名，不放当前值与解释文字。 */
+    const editionSec = `<fieldset style="border:0;padding:0;margin:12px 0 0">`
+      + `<legend class="k" style="padding:0"><b style="color:var(--mp-fg)">文章版式</b></legend>`
+      + `<p style="margin:2px 0 10px">`
+      + EDITION_KINDS.concat(['plain']).map((k) =>
+        `<label style="margin-right:14px;cursor:pointer;white-space:nowrap" title="${esc(EDITION_DESCRIPTIONS[k] || '')}">`
+        + `<input type="radio" name="mp-edition-kind" value="${k}"${k === editNow.kind ? ' checked' : ''} `
+        + `style="accent-color:var(--mp-primary)"> ${EDITION_LABELS[k] || k}</label>`).join('')
+      + `</p></fieldset>`
+      /* 【明暗仅对书页/研报有意义·2026-11-27】plain（默认宋韵）根本不投影纸面，
+         底色完全由主题/工具栏决定 ⇒ plain 时**隐藏**这一组（不借用存储的 variant 冒充）。
+         已存的 variant 原样保留在持久状态里，下次切回书页/研报即恢复原选择。 */
+      + `<fieldset data-edition-variant-fieldset style="border:0;padding:0;margin:0 0 8px${editNow.kind === 'plain' ? ';display:none' : ''}">`
+      + `<legend class="k" style="padding:0"><b style="color:var(--mp-fg)">明暗</b></legend>`
+      + `<p style="margin:2px 0 0">`
+      + EDITION_VARIANTS.map((v) =>
+        `<label style="margin-right:14px;cursor:pointer;white-space:nowrap">`
+        + `<input type="radio" name="mp-edition-variant" value="${v}"${v === editNow.variant ? ' checked' : ''} `
+        + `style="accent-color:var(--mp-primary)"> ${EDITION_VARIANT_LABELS[v] || v}</label>`).join('')
+      + `</p></fieldset>`;
     const themeSec = `<p><label>内置配色 <select id="mp-settings-palette" title="导入的 CSS 主题会覆盖内置配色">${PALETTES.map(p => `<option value="${p.id}"${p.id === curTheme.id ? ' selected' : ''}>${p.name}</option>`).join('')}</select></label></p>`
       + `<table>`
       + `<tr><td style="white-space:nowrap">CSS 主题</td><td>`
@@ -3148,7 +3673,7 @@ export function installExtras(deps) {
     const keysSec = `<table id="mp-keys" title="点击键位后按下新组合键；Esc 取消，退格恢复默认">${shortcutRowsHtml()}</table>`;
     const sections = [
       ['general', '常规与保存', generalSec],
-      ['theme', '主题与字体', themeSec + fontsSec],
+      ['theme', '主题与字体', themeSec + editionSec + fontsSec],
       ['layout', '页面', layoutSec],
       ['interface', '界面与大纲', interfaceSec],
       ['reading', '阅读', readingSec],
@@ -3184,6 +3709,42 @@ export function installExtras(deps) {
       const sel = d.querySelector('#mp-settings-palette'); if (sel) sel.value = pal.id;
     };
     d.querySelector('#mp-settings-palette').onchange = event => { applyPalette(event.target.value); syncThemeControls(); };
+    /* 【版式/明暗】两组三选，写入唯一持久状态：有 API 走 mpArticleEdition.set
+       （它自己负责样式与事件）；API 真缺失时才回落到原存储键 + 变更事件。
+       不再额外调 refreshAppearance —— 那会重载用户 CSS。 */
+    const syncEditionRadios = () => {
+      const e = currentEdition();
+      d.querySelectorAll('input[name="mp-edition-kind"]').forEach((el) => { el.checked = el.value === e.kind; });
+      d.querySelectorAll('input[name="mp-edition-variant"]').forEach((el) => { el.checked = el.value === e.variant; });
+      /* plain 时隐藏「明暗」整组（宋韵不投影纸面，底色由主题/工具栏决定）；
+         切回书页/研报立刻恢复三选并回显**已存**的 variant（不覆盖它）。 */
+      const varField = d.querySelector('[data-edition-variant-fieldset]');
+      if (varField) varField.style.display = e.kind === 'plain' ? 'none' : '';
+    };
+    const applyEdition = (patch) => {
+      const cur = currentEdition();
+      const next = normalizeEdition({
+        kind: patch.kind !== undefined ? patch.kind : cur.kind,
+        variant: patch.variant !== undefined ? patch.variant : cur.variant,
+      });
+      const api = window.mpArticleEdition;
+      if (api && typeof api.set === 'function') {
+        api.set(next);
+      } else {
+        /* 仅 API 真缺失时的降级：写原存储 + 广播原事件（与历史调用方一致） */
+        try { localStorage.setItem(EDITION_STORAGE_KEY, JSON.stringify(next)); } catch { }
+        try { document.dispatchEvent(new CustomEvent('mp-article-edition-changed', { detail: next })); } catch { }
+      }
+      syncEditionRadios();
+      return next;
+    };
+    d.querySelectorAll('input[name="mp-edition-kind"]').forEach((el) => {
+      el.onchange = () => { if (el.checked) applyEdition({ kind: el.value }); };
+    });
+    d.querySelectorAll('input[name="mp-edition-variant"]').forEach((el) => {
+      el.onchange = () => { if (el.checked) applyEdition({ variant: el.value }); };
+    });
+    syncEditionRadios();
     /* 【阅读配色·2026-11-16】原「阅读配色与排版…」弹层的两个选择并入本页：直接改、立即可见，
        不再有第二个入口；选配色时若不在阅读模式就顺带进入（与原弹层语义一致）。 */
     d.querySelectorAll('input[name="mp-reading-palette"]').forEach((el) => {
@@ -3961,6 +4522,10 @@ export function installExtras(deps) {
         return true;
       }
       case 'document-export': exportDialog(); return true;
+      /* 【发布面板】微信/知乎/静态文档的选目标 + 预览 + 复制/草稿（与导出面板同一入口族）。 */
+      case 'publish-panel': openPublishPanel(opts && opts.target); return true;
+      case 'publish-wechat': openPublishPanel('wechat'); return true;
+      case 'publish-zhihu': openPublishPanel('zhihu'); return true;
       case 'surface-settings': settingsDialog('interface'); return true;
       case 'reading-mode': toggleReading(); return true;
       case 'reading-palette': settingsDialog('reading'); return true;
@@ -3985,6 +4550,9 @@ export function installExtras(deps) {
       /* 【脚注】岛上 x¹ 按钮的唯一实现：插入 / 跳到定义 / 返回引用三态由 runFootnote 判定
          （与正文上标、定义回链共用 footnotes-view.js 的导航）。 */
       case 'footnote': runFootnote(); return true;
+      /* 【AI 润色选区】稳定 action id（宿主/壳层菜单用）。选区必须在到达这里之前恢复
+         （见 bodyMenu 的 savedSel）；无选区时内核自己提示，这里不重复。 */
+      case 'ai-rewrite': openAiRewrite(); return true;
       default: return false;
     }
   }
@@ -4032,20 +4600,28 @@ export function installExtras(deps) {
       p.setAttribute('aria-label', '更多');
       const heading = label => { const el = document.createElement('div'); el.className = 'mp-pop-title'; el.setAttribute('role', 'presentation'); el.textContent = label; p.appendChild(el); };
       const sep = () => { const el = document.createElement('div'); el.className = 'mp-pop-sep'; el.setAttribute('role', 'separator'); p.appendChild(el); };
-      const add = (label, fn, hint = '') => {
+      const add = (label, fn, hint = '', id = '') => {
         const el = document.createElement('div'); el.className = 'mp-pop-item'; el.tabIndex = 0; el.setAttribute('role','menuitem');
+        /* 稳定 id：键鼠探针按 id 定位菜单项（不按文案挑，文案以后可能微调）。 */
+        if (id) el.dataset.mpMenu = id;
         el.innerHTML = `<span>${label}</span><span class="k">${hint}</span>`;
         el.onclick = () => { closePop(); fn(el); };
         bindMenuKeyboard(p, el);
         p.appendChild(el);
       };
       heading('文档');
-      add('重新加载', reloadDoc, '从磁盘重读');
-      add('图片操作…', el => openImageActions(anchor, { keyboard: el.dataset.mpKeyActivate === '1' }), '网址 / 批量转换');
+      add('重新加载', reloadDoc, '从磁盘重读', 'reload');
+      add('图片操作…', el => openImageActions(anchor, { keyboard: el.dataset.mpKeyActivate === '1' }), '网址 / 批量转换', 'images');
+      /* 【已移除重复项·2026-11-27】此处原有一条与正文右键菜单完全重复的
+         「AI 润色选区…」入口。按本轮要求删除：AI 润色只保留**真实选区右键**的
+         explicit 动作与宿主 action（见 bodyMenu 与宿主命令分发）。 */
+      /* 【发布入口·2026-11-25】与工具栏「导出 → 发布预览与复制…」同一个面板：
+         选目标（微信/知乎/静态文档）、预览、复制、发草稿。不新开分隔线（保持两条分隔线的定稿）。 */
+      add('发布预览与复制…', () => openPublishPanel('wechat'), '微信 / 知乎 / 静态文档', 'publish');
       sep();
-      add('编辑器设置…', () => settingsDialog('general'), '主题 / 页面 / 阅读 / 快捷键');
+      add('编辑器设置…', () => settingsDialog('general'), '主题 / 页面 / 阅读 / 快捷键', 'settings');
       sep();
-      add('帮助', help); add('关于', about);
+      add('帮助', help, '', 'help'); add('关于', about, '', 'about');
       /* 鼠标打开不抢首项焦点（否则会出现无意义的蓝色焦点框）；键盘打开才接。 */
       if (opts.keyboard) focusFirstMenuItem(p);
     });
@@ -5541,6 +6117,19 @@ export function installExtras(deps) {
       })] : [])],
     toast, /* 【#38】块级命令的表内拒绝提示与引擎其他提示同一条通道（toolbar.js 调用） */
     toolbarClick, applyPalette, toggleOutline, refreshOutline, exportHtml, exportFolder, exportPdf, buildPrintHtml: buildPluginPrintHtml, copyRich, copyTable, tableOp, setAlign, alignAt, about, help, shortcutDialog, rebindKeys, PALETTES,
+    /* 【发布面·2026-11-25】面板/复制/草稿的唯一出口（预览与草稿同源；wechat 原生菜单也走这里）。 */
+    openPublishPanel, buildWechatArticle, copyArticle, copyWechat: (o) => copyArticle('wechat', o), copyZhihu: (o) => copyArticle('zhihu', o),
+    openWechatDraft: openWechatDraftDialog,
+    /* 【AI 润色】用户入口与宿主命令共用的唯一动作（菜单/快捷键/壳层菜单都调它）。 */
+    openAiRewrite,
+    /* 版式选择（面板/外部命令共用）：走宿主的唯一写者，不是在本文件再贴一遍根属性。 */
+    setArticleEdition: (edition) => {
+      const next = normalizeEdition(edition);
+      if (window.mpArticleEdition && typeof window.mpArticleEdition.set === 'function') return window.mpArticleEdition.set(next);
+      try { localStorage.setItem(EDITION_STORAGE_KEY, JSON.stringify(next)); } catch { /* 无存储 */ }
+      return next;
+    },
+    currentArticleEdition: () => currentEdition(),
     /* 【大纲公式显示】只读取证通道（mathCssStat 同款范式）：缓存真实命中/未命中与占用，探针读它，不另造状态。 */
     outlineMathStat: () => ({ items: outlineMathCache.size, bytes: outlineMathBytes, hits: outlineMathHits, misses: outlineMathMisses }),
     /* 【Typora 社区主题】安装/移除/读数：`installTyporaThemeFromText` 是**核心**（对话框与探针同源），

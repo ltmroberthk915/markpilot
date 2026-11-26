@@ -97,7 +97,7 @@ test('workspace host APIs preserve cwd isolation and draft creation boundaries',
       await writeFile(globalHistory,'broken json');assert.equal((await recent({op:'list',workspace:fresh})).ok,false);
       await writeFile(globalHistory,valid);
     });
-    await t.test('known receipt first-save behavior on POSIX',{skip:process.platform==='win32'?'Windows atomic-worker cases are exercised by the private native acceptance suite':false},async t=>{
+    await t.test('known receipt first-save behavior',async t=>{
       const p=draft(cwd,'literal {title}\r\n中文 🌙');
       const first=expectOk(await create(p));
       assert.equal(await readFile(target(p),'utf8'),p.exactText);

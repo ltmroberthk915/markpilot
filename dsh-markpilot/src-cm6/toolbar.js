@@ -327,7 +327,7 @@ function linePrefix(view, prefix, ordered = false) {
     const line = st.doc.line(i);
     n++;
     /* 【普查实测·2026-10-10】有序列表传的是空前缀 ⇒ startsWith("") 恒真，永远走"删前缀"分支而 prefix 长度为 0 ⇒ 空操作。
-     /* 空前缀一律视为"没有"，交给下面的 ordered 正则判定。 */
+    /* 空前缀一律视为"没有"，交给下面的 ordered 正则判定。 */
     /* 【引用容器·2026-10-17 实测缺陷】前缀必须插在 `> ` 之后：改前用 `line.from` 绝对行首，
        `> t` 点「无序列表」得到 `- > t`、点「标题」得到 `# > t` —— 引用容器被顶掉，
        屏幕上原来的引用块消失、内容变成普通行（两个按钮同一根因）。
@@ -459,12 +459,23 @@ const ACTIONS = {
      让面板自己的聚焦成为最后一次写焦点（顺序即语义）。 */
   "find-replace": (v) => { v.focus(); openSearchPanel(v); },
   "theme-toggle": () => {
-    // 【单一渲染事务】不再绕过面板直接看 editor-theme 自己翻：委托 window.mpTheme（唯一写者）。
-    // 语义＝翻到**同族明暗邻居**；无邻居的两套（GitHub 深色 / 护眼米黄）回落到宋韵，由 mpTheme.sibling 定义。
-    const cur = (() => { try { return localStorage.getItem("editor-theme") || "telari-dark"; } catch { return "telari-dark"; } })();
-    if (window.mpTheme && window.mpTheme.apply) { window.mpTheme.apply(window.mpTheme.sibling(cur)); return; }
-    const next = /dark$/.test(cur) ? "telari-light" : "telari-dark";
-    if (window.mpEngine && window.mpEngine.setTheme) window.mpEngine.setTheme(next);
+    /* 翻转方向由**当前生效纸面**（book/report 的 snapshot.tone）决定；底层 UI 必须同向。
+     * 显式 variant ⇒ 同 kind 改到目标变体；follow ⇒ 存储不动、靠根属性 observer 重解析。 */
+    const api = window.mpArticleEdition, theme = window.mpTheme;
+    const snap = api?.snapshot?.();
+    const ed = api?.current?.() || {};
+    const base = theme?.byId?.(theme?.current?.()) || null;
+    const wantDark = snap?.tone ? snap.tone !== 'dark' : !base?.dark;
+    const hasEdition = ed.kind === 'book' || ed.kind === 'report';
+
+    if (!hasEdition) {                       // 普通配色：逐族翻面
+      if (base) theme.apply(theme.sibling(base.id));
+      else if (window.mpEngine?.setTheme) window.mpEngine.setTheme(wantDark ? 'telari-dark' : 'telari-light');
+      return;
+    }
+    /* 底层 UI 只在族内换到目标明暗那一面（同族补齐后不再回落宋韵）。 */
+    if (base && !!base.dark !== wantDark) theme.apply(theme.sibling(base.id));
+    if (ed.variant !== 'follow') api.set({ kind: ed.kind, variant: wantDark ? 'dark' : 'light' });
   },
 };
 
@@ -608,8 +619,17 @@ export function installToolbar(view) {
   };
   // 高度联动：换行后条会变高，正文 padding-top 必须跟着走（否则正文被压住）
   const sync = () => {
-    const h = Math.ceil(bar.getBoundingClientRect().height) || 32;
-    document.documentElement.style.setProperty("--mp-toolbar-h", h + "px");
+    /* 【micro·不可见即早退】display:none（宿主把编辑面藏起来）/ 折叠动画首帧 / 尚未布局时，
+       getBoundingClientRect().height **不是正值** ⇒ 这一帧既没有可信高度，也没有可信宽度：
+       隐藏元素上 getComputedStyle 仍会给出 CSS 自身的 paddingLeft+Right，fitNeeded 会把
+       "自己的内边距" 算成一个正值，于是对**看不见的状态**判出 row；下一次真正显示时
+       先按 row 钉死 nowrap（32px），真实宽度不够又切 stack（82px）⇒ 用户看到先 32 后 82。
+       所以这里直接 return：不写 --mp-toolbar-h，也绝不调用 syncFit()。
+       只有"确实可见的真实布局"才允许记高度并做 fit 判定；
+       正常拖动分隔条 / 窗口 resize 时 h > 0，语义与改前完全一致。 */
+    const h = bar.getBoundingClientRect().height;
+    if (!(h > 0)) return;
+    document.documentElement.style.setProperty("--mp-toolbar-h", Math.ceil(h) + "px");
     syncFit();
   };
   sync();

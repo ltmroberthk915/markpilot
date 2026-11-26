@@ -71,7 +71,9 @@ function makeStorage(init) {
 test('设置：空存储返回默认值', async () => {
   const L = await getLayout();
   const s = L.readSettings(makeStorage());
-  assert.equal(s.enabled, false);
+  assert.equal(s.enabled, true);
+  assert.equal(s.enabledExplicit, false);
+  assert.equal(s.passiveOpenMode, 'workbench');
   assert.equal(s.mode, 'center');
   assert.equal(s.chatWidth, 420);
   assert.equal(s.docsFolder, '');
@@ -129,8 +131,22 @@ test('设置：坏存档不抛，回默认', async () => {
   const st = makeStorage([[SETTINGS_KEY, '{not json']]);
   assert.doesNotThrow(() => L.readSettings(st));
   const s = L.readSettings(st);
-  assert.equal(s.enabled, false);
+  assert.equal(s.enabled, true);
+  assert.equal(s.passiveOpenMode, 'workbench');
   assert.equal(s.chatWidth, 420);
+});
+
+test('仅手动打开和显式关闭布局分别保留，修改其他设置不会恢复接管', async () => {
+  const L = await getLayout();
+  const st = makeStorage();
+  L.writeSettings(st, { passiveOpenMode: 'native' });
+  assert.equal(L.readSettings(st).enabled, true);
+  L.writeSettings(st, { enabled: false });
+  L.writeSettings(st, { chatWidth: 512 });
+  const reopened = L.readSettings(makeStorage([[SETTINGS_KEY, st.raw(SETTINGS_KEY)], [LEGACY_KEY, st.raw(LEGACY_KEY)]]));
+  assert.equal(reopened.passiveOpenMode, 'native');
+  assert.equal(reopened.enabled, false);
+  assert.equal(reopened.enabledExplicit, true);
 });
 
 test('设置：文档字段可往返', async () => {

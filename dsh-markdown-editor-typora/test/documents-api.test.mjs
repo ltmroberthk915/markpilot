@@ -48,6 +48,29 @@ async function makeWorld(name, text) {
 }
 function execution(cwd) { return { agent: { session: { header: { cwd } } } }; }
 
+test('the receipt undoes only its insertion and cannot delete identical text retyped by the user', async t => {
+  const w = await makeWorld('insert-undo', 'old');
+  t.after(() => w.restore());
+  const live = new LiveDocuments({ directory: w.live });
+  const host = createHost({ fs: provider(w.file), liveDocuments: live, log: { warn() {} } });
+  t.after(() => host.close());
+  await live.join(w.file, 'old');
+  const tool = createMarkdownToolDefinition(host.dispatch);
+  const insert = (position, newString) => tool.execute({ action: 'insert', path: w.file, position, newString }, execution(w.root));
+  const undo = groupId => host.dispatch('documents.undoGroup', { path: w.file, groupId });
+  const first = await insert('start', 'first');
+  const later = await insert('end', 'later');
+  assert.ok(first.groupId && later.groupId && first.groupId !== later.groupId);
+  assert.equal((await undo(first.groupId)).ok, true);
+  assert.equal((await live.readRoom(w.file)).text, 'oldlater');
+  for (const edit of [{ from: 3, to: 8, insert: '' }, { from: 3, to: 3, insert: 'later' }]) {
+    const room = await live.readRoom(w.file);
+    await live.append(w.file, { epoch: room.epoch, baseVersion: room.version, baseText: room.text, changes: [edit], actor: 'participant' });
+  }
+  assert.equal((await undo(later.groupId)).error.reason, 'intervening-overlap');
+  assert.equal((await live.readRoom(w.file)).text, 'oldlater');
+});
+
 test('B3-API1 documents.read sees the live buffer and no HTTP authority can call it', async () => {
   const w = await makeWorld('read', 'hello\n');
   try {
@@ -213,19 +236,22 @@ test('B3-API6 HTTP POST to documents.* is rejected before any authority is infer
   }
 });
 
-async function otherProcessOwns(dir) {
+async function moveMemberToOtherProcess(dir, client, { legacy = false } = {}) {
   const { DatabaseSync } = await import('node:sqlite');
   const db = new DatabaseSync(path.join(dir, 'rooms.sqlite'));
-  try { db.prepare('UPDATE clients SET pid=?').run(process.ppid); }
+  try {
+    assert.equal(db.prepare('UPDATE clients SET pid=? WHERE id=?').run(process.ppid, client).changes, 1);
+    if (legacy) assert.equal(db.prepare('DELETE FROM client_caps WHERE client=?').run(client).changes, 1);
+  }
   finally { db.close(); }
 }
 
-test('B3-API7 a room owned only by another process is disk authority; dirty elsewhere is refused', async () => {
+test('B3-API7 an older remote member uses disk authority and protects its unsaved edits', async () => {
   const cleanWorld = await makeWorld('elsewhere-clean', 'hello\n');
   try {
     const liveDocs = new LiveDocuments({ directory: cleanWorld.live });
     const joined = await liveDocs.join(cleanWorld.file, 'hello\n');
-    await otherProcessOwns(cleanWorld.live);
+    await moveMemberToOtherProcess(cleanWorld.live, joined.client, { legacy: true });
     const host = createHost({ fs: provider(cleanWorld.file), liveDocuments: liveDocs, log: { warn() {} } });
     const read = await host.dispatch('documents.read', { path: cleanWorld.file }, MODEL_TOOL, execution(cleanWorld.root));
     assert.equal(read.value.source, 'disk');
@@ -249,7 +275,7 @@ test('B3-API7 a room owned only by another process is disk authority; dirty else
       epoch: joined.epoch, baseVersion: 0, baseText: 'hello\n', actor: 'agent',
       changes: [{ from: 5, to: 5, insert: '!' }],
     });
-    await otherProcessOwns(dirtyWorld.live);
+    await moveMemberToOtherProcess(dirtyWorld.live, joined.client, { legacy: true });
     const host = createHost({ fs: provider(dirtyWorld.file), liveDocuments: liveDocs, log: { warn() {} } });
     const read = await host.dispatch('documents.read', { path: dirtyWorld.file }, MODEL_TOOL, execution(dirtyWorld.root));
     assert.equal(read.value.source, 'disk');
@@ -261,8 +287,38 @@ test('B3-API7 a room owned only by another process is disk authority; dirty else
     assert.equal(apply.ok, false);
     assert.equal(apply.error.code, 'MP_DOC_UNSAVED_ELSEWHERE');
     assert.equal(await fs.readFile(dirtyWorld.file, 'utf8'), 'hello\n');
+    assert.equal((await liveDocs.readRoom(dirtyWorld.file)).text, 'hello!\n');
     host.close();
   } finally { dirtyWorld.restore(); }
+});
+
+test('a replay-capable remote member retains its draft across an agent edit, stale retry and single-group undo', async t => {
+  const w = await makeWorld('remote-draft', 'hello\n');
+  t.after(() => w.restore());
+  const live = new LiveDocuments({ directory: w.live });
+  const member = await live.join(w.file, 'hello\n');
+  await moveMemberToOtherProcess(w.live, member.client);
+  const host = createHost({ fs: provider(w.file), liveDocuments: live, log: { warn() {} } });
+  t.after(() => host.close());
+  const model = (name, data = {}) => host.dispatch('documents.' + name, {path: w.file, ...data}, MODEL_TOOL, execution(w.root));
+  const initial = await model('read');
+  assert.equal(initial.value.source, 'buffer');
+  assert.equal(initial.value.writable, true);
+  assert.equal((await live.readRoom(w.file)).localMembers, 0);
+  await live.exchange(member.client, {epoch: member.epoch, version: 0, seq: 1, changes: [{from: 5, to: 5, insert: ' 我的草稿'}]});
+  const stale = await model('applyEdits', {baseRevisionId: initial.value.revisionId, oldString: 'hello', newString: 'stale'});
+  assert.equal(stale.error.code, 'MP_DOC_STALE');
+  const dirty = await model('read');
+  assert.equal(dirty.value.text, 'hello 我的草稿\n');
+  assert.equal(dirty.value.dirty, true);
+  const edited = await model('applyEdits', {baseRevisionId: dirty.value.revisionId, oldString: 'hello', newString: 'updated'});
+  assert.equal(edited.ok, true, JSON.stringify(edited));
+  assert.equal(edited.value.saved, false);
+  assert.equal((await live.readRoom(w.file)).text, 'updated 我的草稿\n');
+  const undo = await host.dispatch('documents.undoGroup', {path: w.file, groupId: edited.value.groupId});
+  assert.equal(undo.ok, true, JSON.stringify(undo));
+  assert.equal((await live.readRoom(w.file)).text, dirty.value.text);
+  assert.equal(await fs.readFile(w.file, 'utf8'), 'hello\n');
 });
 
 test('B4.1-API1 markdown blocks/edit blockId goes through the live room and returns a group id', async () => {
@@ -395,6 +451,11 @@ test('B4.2B-API1 trusted UI can review and undo an AI group without model author
     assert.equal(reviewed.ok, true, JSON.stringify(reviewed));
     assert.equal(reviewed.value.groupId, applied.value.groupId);
     assert.equal(Array.isArray(reviewed.value.changes), true);
+    const restored = await host.dispatch('documents.reviewGroups', {path: w.file, groupIds: [applied.value.groupId]});
+    const opened = await host.dispatch('open', {path: w.file});
+    assert.equal(opened.ok, true);
+    assert.equal(restored.value.providerVersion, opened.value.version);
+    assert.equal(restored.value.reviewRestorable, true);
     const undone = await host.dispatch('documents.undoGroup', { path: w.file, groupId: applied.value.groupId });
     assert.equal(undone.ok, true, JSON.stringify(undone));
     const after = await host.dispatch('documents.read', { path: w.file }, MODEL_TOOL, execution(w.root));

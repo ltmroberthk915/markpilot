@@ -57,7 +57,9 @@ function make(options={}){
  refs[0].current={contentWindow:win};
  const cleanups=effects.map(effect=>effect()).filter(value=>typeof value==='function');
  const cleanup=()=>{for(const dispose of [...cleanups].reverse())dispose();};
- const st=refs[2].current;st.doc.win=win;
+ const st=refs.find(ref=>ref.current?.doc && ref.current?.actions)?.current;
+ if(!st)throw Error('Editor document state was not mounted');
+ st.doc.win=win;
  return{uiHistory,test:mod.__test,render(){rendering=true;refCursor=0;try{return mod.__test.EditorTabBodyInner(componentProps);}finally{rendering=false;}},setUiForRender(value){ui={...ui,...value};},st,posts,requests,storage,slots,timers,cleanup,message,transport,held,engine,draftStore,setFetch:f=>fetchHandler=f,setCwd:value=>{cwd=value;},ui:()=>ui,
   edit(text,composing=false){if(!engine.session)throw Error('Renderer not initialized');const before={...engine.session},beforeLength=engine.text.length;engine.session={...before,sourceRevision:before.sourceRevision+1};engine.text=text;engine.composing=composing;message('document-delta',{protocol:2,docToken:engine.token,before,after:{...engine.session},beforeLength,afterLength:text.length,changes:[{from:0,to:beforeLength,insert:text}],composing,lastApply:engine.lastApply});},
   composition(value){engine.composing=value;message('composition',{protocol:2,docToken:engine.token,session:{...engine.session},composing:value});},

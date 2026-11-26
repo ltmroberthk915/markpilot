@@ -1,3 +1,9 @@
+# MarkPilot 3.7.4 · DSH plugin 2.1.10
+
+Theme settings bring together the book, research report, and default layouts. Each theme keeps its own light and dark appearance. File switching includes an unsaved-changes prompt and per-file draft and caret recovery. Publishing previews are available for WeChat, Zhihu, and static documents.
+
+[Windows installer and portable build](https://github.com/ltmroberthk915/markpilot/releases/tag/v3.7.4) · [DSH plugin and installation instructions](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-editor-typora-v2.1.10)
+
 > **Renamed in 1.4.0:** the package is now **`dsh-markdown-editor-typora`** (was `dsh-markdown-typora`). Install/upgrade with `dsh plugin --profile desktop add dsh-markdown-editor-typora@1.4.0`; the old package stays at 1.3.x and is no longer updated. Older entries below keep their historical package names.
 
 [MarkPilot 3.7.1 for Windows](https://github.com/ltmroberthk915/markpilot/releases/latest) · [MarkPilot for DSH on npm](https://www.npmjs.com/package/dsh-markdown-editor-typora)

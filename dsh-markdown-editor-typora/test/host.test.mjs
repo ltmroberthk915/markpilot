@@ -383,11 +383,17 @@ test('apply(ctx) 挂 prefix 路由；open/save/stat/edit 走 mock ctx.fs 与真�
     const eventMain = eventData(await sseMain.waitFor((raw) => raw.includes('event: change')));
     assert.equal(eventMain.version, v2);
     assert.equal(eventMain.path, normalize('D:/docs/a.md'));
-    // scoped SSE 隔离（本轮行为变更）：a.md 的写不得推给 other.md 的订阅者 ——
-    // 其他文件的正文/版本信息不跨订阅者泄漏；客户端也不再需要按 path 过滤别人的内容。
-    // 同文件正例已在上一断言（sseMain 收到 change）；此处只等一个短静默窗再判无。
+    // A missing file receives its own initial change frame. Inspect every
+    // frame on that subscription so an update for a different file fails.
+    await sseOther.waitFor(raw => raw.includes('event: change') && eventData(raw)?.missing === true);
     await new Promise((resolve) => setTimeout(resolve, 250));
-    assert.equal(sseOther.countChangeEvents(), 0, 'other.md 订阅者不得收到 a.md 的 change（scoped SSE）');
+    for (const raw of sseOther.events.filter(raw => raw.includes('event: change'))) {
+      const data = eventData(raw);
+      assert.equal(data.path, normalize('D:/docs/other.md'));
+      assert.equal(data.targetKey, normalize('D:/docs/other.md'));
+      assert.equal(data.missing, true);
+      assert.equal(data.version, '');
+    }
 
     // stat 返回新版本
     const stat = await postJson(port, '/dsh-markdown-editor-typora/api/stat', { path: 'D:/docs/a.md' });
@@ -767,7 +773,7 @@ test('markdown 工具定义：0.2.1 defineTool 形态（output.schema/render）+
   assert.ok(spec.output && spec.output.schema && typeof spec.output.render === 'function');
 
   const read = await spec.execute({ action: 'read', path: 'D:/a.md' });
-  assert.deepEqual(plain(read), { ok: true, action: 'read', text: '# hi', version: rev, revisionId: rev, readToken: rev, displayPath: 'D:/a.md', source: 'disk', dirty: false });
+  assert.deepEqual(plain(read), { ok: true, action: 'read', text: '# hi', version: rev, revisionId: rev, readToken: rev, displayPath: 'D:/a.md', source: 'disk', dirty: false, writable: true });
   assert.equal(calls[0].endpoint, 'documents.read');
 
   const edited = await spec.execute({ action: 'edit', path: 'D:/a.md', oldString: 'a', newString: 'b', baseVersion: rev });

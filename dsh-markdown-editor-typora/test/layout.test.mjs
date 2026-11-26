@@ -312,10 +312,10 @@ test('引擎：给根打上 data-mp-layout 标记（供 CSS 隐藏宿主宽度�
 
 /* ── 配置 ────────────────────────────────────────────────────────── */
 
-test('配置：缺省关闭（不影响现有用户）', async () => {
+test('配置：默认启用居中布局', async () => {
   const L = await getLayout();
   const cfg = L.readLayoutConfig(null);
-  assert.equal(cfg.enabled, false);
+  assert.equal(cfg.enabled, true);
   assert.equal(cfg.mode, 'center');
   assert.equal(cfg.chatWidth, 420);
 });
@@ -323,7 +323,7 @@ test('配置：缺省关闭（不影响现有用户）', async () => {
 test('配置：坏 JSON / 脏值回默认并钳制', async () => {
   const L = await getLayout();
   const bad = { getItem: () => '{not json' };
-  assert.equal(L.readLayoutConfig(bad).enabled, false);
+  assert.equal(L.readLayoutConfig(bad).enabled, true);
 
   const dirty = { getItem: () => JSON.stringify({ enabled: true, mode: 'sideways', chatWidth: 99999 }) };
   const cfg = L.readLayoutConfig(dirty);
@@ -346,10 +346,16 @@ test('配置：存取往返 + 钳制', async () => {
   assert.equal(back.chatWidth, 900);
 });
 
-test('mountLayout：未开启时不启动、返回 null', async () => {
+test('mountLayout：首次启动时等待会话根，不提前改写布局', async (t) => {
   const L = await getLayout();
-  // 无 window.localStorage ⇒ readLayoutConfig 回默认 enabled:false
-  assert.equal(L.mountLayout({}), null);
+  const win = {};
+  const { FakeMO } = makeFakeMO();
+  const doc = { querySelectorAll: () => [], body: makeEl('div') };
+  t.after(() => win.__mpLayoutDispose?.());
+  const engine = L.mountLayout({}, { doc, win, MutationObserver: FakeMO, limitMs: 1000 });
+  assert.ok(engine.__waiter);
+  assert.equal(engine.snapshot().active, false);
+  assert.equal(engine.snapshot().writes, 0);
 });
 
 /* ── 等根出现再激活（真实缺陷回归）────────────────────────────────── */
@@ -417,7 +423,8 @@ test('mountLayout：开启但暂无会话根时返回引擎并挂上等待器', 
 
 test('mountLayout：关闭时不启动', async () => {
   const L = await getLayout();
-  const storage = { getItem: () => null, setItem: () => {} };
+  const storage = { getItem: key => key === 'dsh.markpilot.layout.v1'
+    ? JSON.stringify({enabled: false, enabledExplicit: true, mode: 'center'}) : null };
   const doc = { querySelectorAll: () => [], body: makeEl('div') };
   assert.equal(L.mountLayout({}, { doc, win: {}, storage, limitMs: 1000 }), null);
 });

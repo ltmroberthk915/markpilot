@@ -72,6 +72,20 @@ function installClipboardCapture() {
 }
 installClipboardCapture();
 /* MP_COPY_INTENT_END */
+/* 【公众号草稿·3.7.1】带超时的 invoke：主进程卡住/窗口正在关闭时给**明确错误**而不是无限等待。
+ * 注意：超时只说明"本端不再等"，不代表远端没做——建草稿那一步的"结果不明确"由主进程
+ * 自己的 pending 标记负责（见 shell/wechat-draft-service.js），这里不改那层语义。 */
+function wxInvoke(channel, args, timeoutMs) {
+  let timer = 0;
+  const pending = Array.isArray(args) ? ipcRenderer.invoke(channel, ...args) : ipcRenderer.invoke(channel);
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve({ ok: false, code: 'MP_WX_TIMEOUT_LOCAL', timeout: true,
+      error: '等待宿主响应超时。若正在创建草稿，结果可能已经生效——请到公众号后台草稿箱核对后再决定是否重发。' }), timeoutMs);
+  });
+  return Promise.race([pending, timeout])
+    .catch((error) => ({ ok: false, code: 'MP_WX_IPC', error: String((error && error.message) || error) }))
+    .finally(() => { if (timer) clearTimeout(timer); });
+}
 contextBridge.exposeInMainWorld('mpHost', {
   info: () => ipcRenderer.invoke('app:info'),
   health: () => ipcRenderer.invoke('app:health'),
@@ -161,6 +175,18 @@ contextBridge.exposeInMainWorld('mpHost', {
   outsideChange: (filePath) => ipcRenderer.invoke('doc:outside-change', { filePath }),
   // 当前文档路径（导出为文件夹时用来解析相对图片路径）
   docInfo: () => ipcRenderer.invoke('doc:info'),
+  /* 【选区 AI 润色·3.7.2】渲染进程零网络：选区经主进程出网去真实 provider。
+     回执 {ok:true,text,provider,model} / {ok:false,code,message}，不抛异常。
+     ⚠️ AbortSignal **过不了 IPC** —— 所以取消走独立通道 `aiRewriteCancel(requestId)`，
+     由主进程按 id 精确 abort 真网络请求（shell/ai-rewrite.js 的 inflight 表）。
+     渲染侧仍会自己按 session.id 丢弃迟到回包，两层都有。
+     `aiDiag` 只读：告诉用户当前会用哪个服务、可信配置文件在哪，永不回显密钥。 */
+  aiRewrite: (payload, options = {}) => ipcRenderer.invoke('ai:rewrite', payload || {},
+    { requestId: String(options.requestId || '') }),
+  aiRewriteCancel: (requestId) => ipcRenderer.invoke('ai:rewrite-cancel',
+    { requestId: String(requestId || '') }),
+  aiStatus: () => ipcRenderer.invoke('ai:status'),
+  aiDiag: () => ipcRenderer.invoke('ai:diag'),
   // 阅读位置：主进程按当前窗口已获准打开的真实文件绑定，渲染侧只送锚点
   readingGet: () => ipcRenderer.invoke('reading:get'),
   readingSave: (payload) => ipcRenderer.invoke('reading:save', payload || {}),
@@ -206,4 +232,21 @@ contextBridge.exposeInMainWorld('mpHost', {
   onSetting: (cb) => ipcRenderer.on('setting', (_e, payload) => cb(payload)),
   onDoc: (cb) => ipcRenderer.on('doc', (_e, payload) => cb(payload)),
   onTheme: (cb) => ipcRenderer.on('theme', (_e, payload) => cb(payload)),
+  /* ── 发送到公众号草稿箱（3.7.1）─────────────────────────────────────────────
+   * 分工与安全边界（与 MarkPilot-CM6/main.js 的 wx:* 处理器一一对应）：
+   *  · 渲染进程**零网络**（CSP connect-src 'none'）、**永远拿不到 secret**：
+   *    wxStatus 只回 { configured, appId, keystore, problem, pending, lastDraft }；
+   *    wxConfigure 把 appid/secret 交给主进程后用系统密钥库加密落盘，回执不含 secret；
+   *  · 只建草稿：这里没有、也不会加"发布/群发"的方法；
+   *  · 图片读盘全在主进程：wxPickCover 让用户自己选本地文件；正文图只接受本地路径/data:，
+   *    远程 URL 一律拒绝（不把宿主变成通用下载器）；
+   *  · 每次调用都有超时兜底：主进程卡住时给的是**明确错误**，而不是无限等待。
+   *    「结果不明确」的语义由主进程判定（草稿可能已建好），这里只保证不挂死。 */
+  wxStatus: () => wxInvoke('wx:status', undefined, 15000),
+  wxConfigure: (payload) => wxInvoke('wx:configure', [payload || {}], 20000),
+  wxClear: () => wxInvoke('wx:clear', undefined, 20000),
+  wxVerify: () => wxInvoke('wx:verify', undefined, 45000),
+  wxPickCover: () => wxInvoke('wx:pickCover', undefined, 120000),
+  wxCreateDraft: (payload) => wxInvoke('wx:createDraft', [payload || {}], 180000),
+  wxAcknowledge: () => wxInvoke('wx:acknowledge', undefined, 15000),
 });

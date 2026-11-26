@@ -6,7 +6,10 @@ import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 const plugin=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const source=path.resolve(plugin,'../MarkPilot-CM6/shell'),dest=path.join(plugin,'host');
-const files=['document-store.js','live-documents.js','text-codec.js','safe-file.js','reading-position-store.js','native-worker-lease.js','native-worker-path.ps1','native/file-worker.exe','native/file-worker.exe.build.json'];
+// wechat-* / capped-read / data-image* 是「发送到公众号草稿箱」在 DSH 侧的复用闭包：
+// lib/wechat-draft.js 只做 DSH 适配，端点白名单、multipart、errcode、pending 语义仍来自这里。
+const files=['document-store.js','live-documents.js','text-codec.js','safe-file.js','reading-position-store.js','native-worker-lease.js','native-worker-path.ps1','native/file-worker.exe','native/file-worker.exe.build.json',
+  'wechat-api.js','wechat-transport.js','wechat-credentials.js','wechat-draft-service.js','capped-read.js','data-image-bytes.js','data-images.cjs'];
 export function syncHost(check=false) {
   const manifest=[];
   const entries=[...files.map(file=>[file,fs.readFileSync(path.join(source,file))]),['package.json',Buffer.from('{"type":"commonjs"}\n')]];

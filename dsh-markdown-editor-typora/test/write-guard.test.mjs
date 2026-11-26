@@ -90,11 +90,10 @@ test('a policy intent does not bypass a dirty room', async () => {
   await assert.rejects(() => call(h, 'fs/write-intent', { kind: 'createIfAbsent' }), (error) => error.code === 'MP_DOC_DIRTY');
 });
 
-test('lookup failure fails open (does not block AI writes)', async () => {
+test('a failed document lookup cannot authorize a write', async () => {
   const h = makeCtx();
   makeGuard({ lookup: async () => { throw new Error('db locked'); } }).install(h.ctx);
-  const { result } = await call(h, 'fs/write-intent', BASE);
-  assert.deepEqual(result, BASE);
+  await assert.rejects(() => call(h, 'fs/write-intent', BASE), { code: 'MP_DOC_LOOKUP_FAILED' });
 });
 
 test('clean room whose file disappeared is fail-open for creation', async () => {

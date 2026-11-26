@@ -1,8 +1,8 @@
 {
   "core": "MarkPilot CM6",
-  "version": "3.7.1",
+  "version": "3.7.4",
   "source": "../MarkPilot-CM6/renderer/cm6",
-  "syncedAt": "2026-11-22T17:47:34.759Z",
+  "syncedAt": "2026-11-26T17:40:36.259Z",
   "generator": "scripts/sync-core.mjs",
   "files": [
     {
@@ -312,8 +312,8 @@
     },
     {
       "path": "app.js",
-      "sha256": "b916e4889069bf477b20e1ce72f20f9cabe02fd09d493276cc8a224c39d4f6ca",
-      "bytes": 1678600
+      "sha256": "4bfb2e712aa6d77c60726afe1415bd6ce768e6e28636b01e440351481b295e36",
+      "bytes": 1804118
     },
     {
       "path": "fonts/KaTeX_AMS-Regular-CYEKBG2K.woff",
@@ -626,5 +626,5 @@
       "bytes": 3572661
     }
   ],
-  "coreHash": "b4b77cdb98be8b57c94c8b980bf801256c634002fea298acfc9a283a632cd7eb"
+  "coreHash": "54723a8fc729c948654aa9142b8d1a654ec411912e3b74256cc1811765e6081d"
 }

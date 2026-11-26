@@ -274,3 +274,83 @@ test('a link-opened local document lands in the workbench',async()=>{
   assert.equal(ok,true);assert.equal(f.W.state().docsModeOn,true);
   assert.equal(f.W.state().workbenchDoc.path,'D:/A/AGENTS.md');f.dispose();
  });
+test('a late workspace restore cannot replace the document parked for another editor', async () => {
+  const document = { getElementById: () => null, querySelector: () => null };
+  const f = make({ document });
+  try {
+    const entry = { path: 'D:/A/working.md', address: 'dsh-resource://file/absolute/D%3A/A/working.md', workspace: 'D:/A', sessionId: 'A' };
+    await f.W.chooseWorkbenchDoc(entry);
+    let finish;
+    f.setFetch(() => new Promise(resolve => { finish = resolve; }));
+    const pending = f.W.openWorkspace(f.context(), { auto: true });
+    assert.equal(typeof finish, 'function');
+    f.W.setWorkbenchParked(true);
+    finish({ ok: true, value: { items: ['D:/A/late.md'] } });
+    await pending;
+    f.setOpenTabs([{ kind: 'native', sessionId: 'A', contentId: 'dsh-resource://file/absolute/D%3A/A/other.md' }]);
+    assert.equal(f.W.adoptOpenNativeDocs(), false);
+    f.W.selectMarkdownWorkspace();
+    assert.equal(f.W.state().workbenchDoc, entry);
+    assert.equal(f.W.state().docsModeOn, true);
+    assert.equal(f.W.workspaceAutoOpenSuppressed(f.context().key), false);
+  } finally { f.dispose(); }
+});
+
+test('manual-only mode leaves passive files with the host and keeps the Markdown entry available', async () => {
+  const f = make({ settings: { passiveOpenMode: 'native', workspaceOpenMode: 'blank' } });
+  try {
+    const tab = { contentId: 'dsh-resource://file/absolute/D%3A/A/note.md', visible: true };
+    f.setOpenTabs([{ ...tab, sessionId: 'A', kind: 'native' }]);
+    assert.equal(f.W.routePassiveNativeDoc(tab, 'A', true), false);
+    assert.equal(f.W.adoptOpenNativeDocs(), false);
+    await f.W.openWorkspace(f.context(), { auto: true });
+    assert.equal(f.W.state().docsModeOn, false);
+    await f.W.openWorkspace(f.context());
+    assert.equal(f.W.state().docsModeOn, true);
+    assert.equal(f.W.readSettings({ getItem: k => f.storage.get(k) }).passiveOpenMode, 'native');
+  } finally { f.dispose(); }
+});
+test('changing the default handler leaves an open tab and its editor mounted', () => {
+  const f = make({ settings: { passiveOpenMode: 'overlay' } });
+  try {
+    const props = { useTabInfo: () => ({ tab: { visible: true } }) };
+    const handler = f.W.buildTabDefinition();
+    const address = 'dsh-resource://file/session/A/open.md';
+    assert.equal(handler.canOpen(address), true);
+    const previous = f.render(f.W.EditorTabBody, props).type;
+    f.storage.set('dsh.markpilot.settings.v1', JSON.stringify({ enabled: true, passiveOpenMode: 'native' }));
+    assert.equal(handler.canOpen(address), false);
+    assert.equal(f.render(f.W.EditorTabBody, props).type, previous);
+  } finally { f.dispose(); }
+});
+
+test('the manual native Files picker expires when the user leaves it or picks a document', async () => {
+  let click;
+  const document = {
+    addEventListener: (name, fn) => { if (name === 'click') click = fn; },
+    removeEventListener() {},
+    querySelector: () => null
+  };
+  const f = make({ document, settings: { passiveOpenMode: 'native', workspaceOpenMode: 'files' } });
+  const tree = { getAttribute: () => 'D:/A' };
+  const row = { getAttribute: () => 'notes/first.md' };
+  const button = { closest: () => row };
+  const file = { closest: selector => selector.startsWith('[data-files-navigator]') ? tree : selector.startsWith('li[') ? button : null };
+  const elsewhere = { closest: () => null };
+  const activate = target => {
+    let consumed = false;
+    click({ target, preventDefault() { consumed = true; }, stopImmediatePropagation() {} });
+    return consumed;
+  };
+  const dispose = f.W.installFileLinkInterceptor();
+  try {
+    await f.W.openWorkspace(f.context());
+    assert.equal(activate(elsewhere), false);
+    assert.equal(activate(file), false);
+    await f.W.openWorkspace(f.context());
+    assert.equal(activate(file), true);
+    await drain();
+    assert.equal(f.W.state().workbenchDoc.path, 'D:/A/notes/first.md');
+    assert.equal(activate(file), false);
+  } finally { dispose(); f.dispose(); }
+});

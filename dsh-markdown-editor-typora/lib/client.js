@@ -6131,6 +6131,9 @@ function chainReadingClose(savePromise, release) {
 }
 
 const __test = {
+      createArticleForwarder,
+      /* ARTICLE_METHODS 在 factory 内更后面才初始化（const）；用取值器避免 TDZ。 */
+      articleMethods: () => ARTICLE_METHODS,
       createDraftStore,
       chainReadingClose,
       createReadingLeaseKeeper,
@@ -6278,13 +6281,229 @@ const __test = {
       try { return typeof navigator !== "undefined" ? navigator.clipboard : null; } catch (e) { return null; }
     }
 
-    function handleHostInvoke(content, post) {
+    /* ─────────────── 文章 / AI / 公众号：iframe 上行转发（父工作台） ───────────────
+     * 子层（编辑器 iframe）只认 `window.mpHost.<方法>`；父层把它转成
+     * `POST /dsh-markdown-editor-typora/api/article/<方法>`。
+     *
+     * 纪律（每条都能被 test/article-workbench-client.test.mjs 单独盯住）：
+     *  ① **cmd 就是对外公共方法名**；只转发白名单里的方法，其它 cmd 仍按原样回 null
+     *     （不猜、不做通用转发）。
+     *  ② **绑定只用父层的真值**：当前 docToken/代次、tabId、文档路径、当前工作台对话 sessionId。
+     *     子层 payload 里若出现 ownerId / sessionId / docToken / path 之类，一律**丢弃**——
+     *     子层不能自证身份（同目录换稿不会改变任何父层真值）。
+     *  ③ 每次调用带父层 `binding` 快照；文档切换/关闭后**旧代次的回包一律丢弃**，只回一个
+     *     MP_ARTICLE_DOC_CHANGED，绝不把旧稿的结果投到新稿。
+     *  ④ 服务端要求先绑定时走 `article/bind` 拿 capability；capability 只活在内存里，
+     *     代次一变立即作废（退场时 `article/unbind`，同代幂等）。
+     *  ⑤ 转发不改变任何本地编辑状态：不写编辑器、不碰草稿、不改保存闸门。
+     *
+     * 实现放在模块作用域的 `createArticleForwarder`，产品路径与测试调用**同一份实现**。
+     */
+
+    /**
+     * 造一个"iframe 上行 → 服务端 article/*"转发器。
+     * 纯逻辑（只依赖注入的 `api`），产品路径与单测用同一份实现。
+     *
+     * **线上形状以 `.mp-verify/edition-current/plugin-server-contract.md` 为准：字段全部在顶层**
+     * （`bind` 收 `{sessionId,path,docToken,tabId}`；其余方法收 `{capability,docToken,...}`），
+     * 不套 `binding: {...}` 外壳。iframe 的 `{payload,requestId}` 也在这里展平成服务端字段。
+     *
+     * @param {{api:Function}} deps `api(endpoint, payload)`：服务端调用
+     */
+    function createArticleForwarder(deps) {
+      const call = typeof deps?.api === "function" ? deps.api : null;
+      if (!call) throw new Error("createArticleForwarder: api is required");
+
+      /** 子层**不许自证**的字段：出现即丢弃（不是覆盖、不是合并——是彻底不看）。 */
+      const UNTRUSTED_FIELDS = Object.freeze([
+        "ownerId", "owner", "sessionId", "docToken", "generation", "tabId",
+        "path", "docPath", "dir", "workspace", "current", "isCurrent", "binding", "capability",
+      ]);
+      /** 服务端"需要（重新）绑定"的信号：只有这两个码才值得再 bind 一次。
+       *  `MP_ARTICLE_STALE`（docToken 变了）不算——那是文档换了，必须如实上报。 */
+      const BIND_SIGNALS = new Set(["MP_ARTICLE_UNBOUND", "MP_ARTICLE_BIND_REQUIRED"]);
+      /** 内存 capability：只在同代绑定内复用；代次/文档一变即作废。 */
+      const capabilities = new Map();
+
+      /** 只保留调用参数本身；子层自报的身份/位置字段一律剔除。 */
+      function sanitizeArgs(args) {
+        const out = {};
+        if (!args || typeof args !== "object" || Array.isArray(args)) return out;
+        for (const key of Object.keys(args)) {
+          if (UNTRUSTED_FIELDS.includes(key)) continue;
+          out[key] = args[key];
+        }
+        return out;
+      }
+
+      /** 父层真值 → **顶层**四个绑定字段（契约 §2；子层的任何声明都进不到这里）。 */
+      function bindingPayload(binding) {
+        const b = binding || {};
+        return {
+          sessionId: typeof b.sessionId === "string" ? b.sessionId : "",
+          path: typeof b.path === "string" ? b.path : "",
+          docToken: typeof b.docToken === "string" ? b.docToken : "",
+          tabId: typeof b.tabId === "string" ? b.tabId : "",
+        };
+      }
+
+      /** 服务端是否在说"需要（重新）绑定"。 */
+      function needsBind(result) {
+        if (!result || result.ok === true) return false;
+        const codes = [];
+        if (result.error && typeof result.error === "object") codes.push(result.error.code);
+        codes.push(result.code);
+        return codes.some((code) => typeof code === "string" && BIND_SIGNALS.has(code));
+      }
+
+      /** 绑定是否仍是"当前这一代"（文档切换 / 关闭 / 代次变化 ⇒ false）。 */
+      function bindingAlive(binding) {
+        if (!binding || typeof binding !== "object") return false;
+        try {
+          return typeof binding.alive === "function" ? binding.alive() === true : true;
+        } catch (e) { return false; }
+      }
+
+      function bindingKey(binding) {
+        const b = bindingPayload(binding);
+        if (!b.tabId || !b.docToken) return null;
+        return [b.tabId, b.docToken, String(binding && Number.isSafeInteger(binding.generation) ? binding.generation : "")].join("\u0000");
+      }
+
+      /**
+       * iframe 的 args → 服务端 method 自己的字段。
+       * 两个已知形状差异在这里一次展平（其余方法原样透传）：
+       *  · aiRewrite：iframe 上行 `{payload:{selection,instruction,...}, requestId}`，
+       *    服务端只收 `{requestId,text,instruction?,from?,to?}`；
+       *  · wxPickCover：iframe 上行 `{name,mime,bytesBase64}`，服务端收 `{name,mime,dataUrl}`。
+       */
+      function flattenArgs(method, args) {
+        const clean = sanitizeArgs(args);
+        if (method === "aiRewrite") {
+          /* 真实 iframe 形状是 `{payload:{selection,instruction,...}, requestId}`；
+             也容忍"已经展平"的调用方（`selection`/`text` 直接给在顶层）。 */
+          const payload = clean.payload && typeof clean.payload === "object" ? clean.payload : clean;
+          const text = typeof payload.selection === "string" ? payload.selection
+            : (typeof payload.text === "string" ? payload.text : "");
+          const out = { requestId: clean.requestId };
+          out.text = text;
+          if (typeof payload.instruction === "string" && payload.instruction) out.instruction = payload.instruction;
+          if (Number.isFinite(clean.from)) out.from = clean.from;
+          if (Number.isFinite(clean.to)) out.to = clean.to;
+          return out;
+        }
+        if (method === "wxPickCover" && typeof clean.bytesBase64 === "string" && clean.bytesBase64) {
+          const mime = String(clean.mime || "").toLowerCase();
+          const out = { name: clean.name };
+          if (mime === "image/png" || mime === "image/jpeg") {
+            out.mime = mime;
+            out.dataUrl = "data:" + mime + ";base64," + clean.bytesBase64;
+          }
+          return out;
+        }
+        return clean;
+      }
+
+      async function bind(binding) {
+        const key = bindingKey(binding);
+        if (!key) return { ok: false, error: { code: "MP_ARTICLE_BINDING", message: "缺少当前文档绑定，拒绝绑定" } };
+        let reply;
+        try { reply = await call("article/bind", bindingPayload(binding)); }
+        catch (error) { return { ok: false, error: { code: "MP_ARTICLE_TRANSPORT", message: String(error && error.message ? error.message : error) } }; }
+        const capability = reply && reply.ok === true
+          ? (reply.capability || (reply.value && reply.value.capability) || null)
+          : null;
+        if (!capability) {
+          return reply && reply.ok === true
+            ? { ok: false, error: { code: "MP_ARTICLE_BINDING", message: "服务端没有返回 capability" } }
+            : reply;
+        }
+        capabilities.set(key, { capability: capability, at: Date.now() });
+        return { ok: true, capability: capability };
+      }
+
+      /** 一次转发：先直连；服务端要求绑定就先 bind，再带 capability 重试**一次**。 */
+      async function run(method, args, binding) {
+        const key = bindingKey(binding);
+        const cached = key ? capabilities.get(key) : null;
+        const fields = flattenArgs(method, args);
+        const docToken = String((binding && binding.docToken) || "");
+        const base = Object.assign({}, fields, { docToken: docToken });
+        if (cached) base.capability = cached.capability;
+        let result;
+        try { result = await call("article/" + method, base); }
+        catch (error) { return { ok: false, error: { code: "MP_ARTICLE_TRANSPORT", message: String(error && error.message ? error.message : error) } }; }
+        if (!needsBind(result)) return result;
+        if (key) capabilities.delete(key);          // 过期/无效的 capability 立刻作废，不反复用
+        const bound = await bind(binding);
+        if (!bound || bound.ok !== true) return bound;
+        const retry = Object.assign({}, base, { capability: bound.capability });
+        try { return await call("article/" + method, retry); }
+        catch (error) { return { ok: false, error: { code: "MP_ARTICLE_TRANSPORT", message: String(error && error.message ? error.message : error) } }; }
+      }
+
+      /**
+       * 对外的一次调用：结果只有在**这一代绑定仍然有效**时才返回，
+       * 否则统一回 MP_ARTICLE_DOC_CHANGED —— 旧稿的回包绝不落到新稿上。
+       */
+      async function callChecked(method, args, binding) {
+        const result = await run(method, args, binding);
+        if (bindingAlive(binding)) return result;
+        return {
+          ok: false,
+          error: { code: "MP_ARTICLE_DOC_CHANGED", message: "文档已切换或关闭，这次结果不再投递" },
+        };
+      }
+
+      /** 退场（文档切换 / 关闭 / 卸载）：作废这一代的 capability，并通知服务端解绑（幂等、失败不抛）。 */
+      async function release(binding) {
+        const key = bindingKey(binding);
+        const held = key ? capabilities.get(key) : null;
+        if (key) capabilities.delete(key);
+        if (!key || !held) return { ok: true, released: false };
+        /* 契约 §3：后续请求是 `{capability, docToken, ...}` —— unbind 也一样，且字段在顶层。
+           bindingPayload() 已经给出 docToken，这里只补 capability（不重复写同一个字段）。 */
+        const payload = Object.assign({}, bindingPayload(binding), { capability: held.capability });
+        try { await call("article/unbind", payload); }
+        catch (e) { return { ok: true, released: true, warning: String(e && e.message ? e.message : e) }; }
+        return { ok: true, released: true };
+      }
+
+      return {
+        methods: ARTICLE_METHODS,
+        handles: (cmd) => typeof cmd === "string" && ARTICLE_METHOD_SET.has(cmd),
+        call: callChecked,
+        bind,
+        release,
+        forget: release,
+        reset: () => { capabilities.clear(); },
+        inspect: () => ({ methods: ARTICLE_METHODS, held: [...capabilities.keys()] }),
+        /* 纯函数出口（单测直接覆盖；不给运行时用）。 */
+        _internals: { sanitizeArgs, bindingPayload, flattenArgs, needsBind, bindingAlive, bindingKey, bindSignals: () => [...BIND_SIGNALS] },
+      };
+    }
+
+    /** 允许从 iframe 转发的公共方法名（= 服务端 `article/<方法>` 的路由段）。 */
+    const ARTICLE_METHODS = Object.freeze([
+      "aiRewrite", "aiRewriteCancel", "aiStatus", "aiDiag",
+      "wxStatus", "wxConfigure", "wxClear", "wxVerify", "wxPickCover", "wxCreateDraft", "wxAcknowledge",
+    ]);
+    const ARTICLE_METHOD_SET = new Set(ARTICLE_METHODS);
+    const articleForwarder = createArticleForwarder({ api: (endpoint, payload) => api(endpoint, payload) });
+
+    function handleHostInvoke(content, post, binding) {
       const id = content && content.id;
+      const bound = typeof binding === "function" ? binding() : (binding || null);
       const done = (result) => post("host-result", { id: id, result: result });
       const fail = (error) => post("host-result", { id: id, error: String(error && error.message ? error.message : error) });
       try {
         const cmd = content && content.cmd;
         const args = (content && content.args) || {};
+        if (typeof cmd === "string" && articleForwarder.handles(cmd)) {
+          if (!bound) { fail(new Error("MP_ARTICLE_BINDING: 当前没有可信的文档绑定")); return; }
+          articleForwarder.call(cmd, args, bound).then(done, fail);
+          return;
+        }
         if (cmd === "clipboard-write-text") {
           const clipboard = clipboardOf();
           if (!clipboard || typeof clipboard.writeText !== "function") { fail(new Error("clipboard unavailable")); return; }
@@ -6956,6 +7175,11 @@ const __test = {
     var workbenchDoc = null, workspaceIntent = 0, workspaceNotice = "";
     var manualFilePicker = null;
     var editorLeaveGuards = new Map();
+    /* 最近一次离开文档时"保留到了哪一档"（clean | journal | slot）。
+       只在内存里、只用于切档后的可见回执文案；不缓存正文、不落盘。 */
+    var lastLeaveRetention = null;
+    /* 归属票据是按**规范文件路径**分条保存的（见 rememberLeaveTicket / leaveTicketForPath），
+       不是单个全局变量 —— A/B 各自留下自己的票，切回谁就查谁的。 */
     var workspaceService = null;
     const WORKSPACE_DRAFT_KEY = "dsh.markpilot.workspace-drafts.v1";
     function workspaceKey(path) {
@@ -6979,7 +7203,253 @@ const __test = {
         return { sessionId:id, cwd:cwd||"", key:workspaceKey(cwd) };
       } catch(e) { return {sessionId:"",cwd:"",key:""}; }
     }
-    function workspaceMessage(message) { workspaceNotice=message; bumpOverlay(); }
+    function workspaceMessage(message) {
+      workspaceNotice = String(message == null ? "" : message);
+      bumpOverlay();
+    }
+    /**
+     * 只清掉"切档成功留存"这类**状态性**回执。
+     * 不碰两类必须留在屏幕上的提示：
+     *   · 拒绝切档（含"尚未安全留存"）—— 用户要靠它知道刚才为什么没切；
+     *   · 其它操作错误（例如"无法保留空白草稿"）—— 同样需要人看到。
+     */
+    var RETAINED_NOTICE_PREFIXES = ["已保留「", "已记下「"];
+    function clearWorkspaceDetail() {
+      if (!workspaceNotice) return;
+      var isRetained = false;
+      for (var prefix of RETAINED_NOTICE_PREFIXES) {
+        if (workspaceNotice.indexOf(prefix) === 0) { isRetained = true; break; }
+      }
+      if (!isRetained) return;
+      workspaceNotice = "";
+      bumpOverlay();
+    }
+
+    /* ── 切档现场：按文件的选区/光标（不含正文）────────────────────────────
+     * 现状缺口（本次修复的根因之一）：切文档会按 depKey 重建整代 iframe
+     * （见 EditorTabBodyInner 的 [depKey] effect 与 iframe key）。正文有按文件
+     * 的 journal（recoveryStore）兜底、滚动有按文件的阅读位置租约兜底，但
+     * **selection.main 的 anchor/head 从来没有持久层** —— 切回 A 只能拿到空光标。
+     *
+     * 这里只补"位置 + 票据"，不复制正文：
+     *   · 键 = workspaceKey(绝对路径)，与工作区空白草稿同口径；
+     *   · 每次**离开文档**只写一次（不是按键级、不轮询、不请求全文）；
+     *   · 记录带 pathKey/docToken/baseVersion/textLength/pageId；
+     *   · 两件事严格分开判定：
+     *       光标/选区恢复 —— 只要"正文版本 + 长度"可验证一致就恢复（含崩溃后的新页面）；
+     *       脏草稿自动采纳 —— 只有本页面（pageId 相同）亲手切走的才自动续编；
+     *       否则仍走原来的恢复横幅，的安全提示一条都不少。
+     */
+    const SELECTION_KEY_PREFIX = "dsh.markpilot.selection.v1:";
+    const SELECTION_INDEX_KEY = "dsh.markpilot.selection.v1.index";
+    const SELECTION_LIMIT = 64;
+    var pageInstanceId = (function () {
+      try {
+        if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") return globalThis.crypto.randomUUID();
+      } catch (e) { /* 旧内核没有 randomUUID */ }
+      return "page-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+    })();
+
+    function selectionKeyOf(pathKey) { return SELECTION_KEY_PREFIX + String(pathKey || ""); }
+
+    function selectionStorage() {
+      try { return window.localStorage; } catch (e) { return null; }
+    }
+
+    function isSelectionPosition(value, max) {
+      return Number.isSafeInteger(value) && value >= 0 && value <= max;
+    }
+
+    /** 读一份按文件的现场；形状任何一步不合法都当作没有（绝不抛到切档路径上）。 */
+    function readSelectionRecord(pathKey) {
+      var store = selectionStorage();
+      if (!store || !pathKey) return null;
+      try {
+        var raw = store.getItem(selectionKeyOf(pathKey));
+        if (typeof raw !== "string" || !raw) return null;
+        var value = JSON.parse(raw);
+        if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+        if (value.v !== 1 || value.pathKey !== pathKey || typeof value.path !== "string" || !value.path) return null;
+        if (typeof value.pageId !== "string" || !value.pageId) return null;
+        if (!Number.isSafeInteger(value.textLength) || value.textLength < 0) return null;
+        if (!isSelectionPosition(value.anchor, value.textLength) || !isSelectionPosition(value.head, value.textLength)) return null;
+        return value;
+      } catch (e) { return null; }
+    }
+
+    /** 写一份按文件的现场。索引只做 LRU 上限，写失败一律静默（不阻断切档）。 */
+    /**
+     * 写一份按文件的现场。索引只做 LRU 上限，写失败一律静默（不阻断切档）。
+     *
+     * 短路只为免掉**无意义**的重复写，不改变任何可恢复性：
+     *   · 已有旧记录且"同文件 + 同版本 + 同 anchor + 同 head" ⇒ 位置本就没变，
+     *     连时间戳都不用刷新，直接返回；
+     *   · 没有任何旧记录，且位置就是 (0,0) 原点 ⇒ 记下来也没有可恢复的信息，跳过；
+     *   · 其余情况（含 clean 文档移动过光标）一律正常写。
+     */
+    function writeSelectionRecord(record) {
+      var store = selectionStorage();
+      if (!store || !record || !record.pathKey) return false;
+      var nextJson = null;
+      try { nextJson = JSON.stringify(record); } catch (e0) { return false; }
+      var previous = null;
+      try {
+        var raw = store.getItem(selectionKeyOf(record.pathKey));
+        if (typeof raw === "string" && raw) {
+          try { previous = JSON.parse(raw); } catch (e1) { previous = null; }
+        }
+      } catch (e2) { previous = null; }
+      /* 相同位置也要核对**归属**：docToken / pageId 任一不同，就是别人的（或旧代的）票据，
+         必须覆盖写成本次的，否则会留下错误的所有者。 */
+      if (previous && previous.v === 1
+        && previous.pathKey === record.pathKey
+        && previous.path === record.path
+        && previous.baseVersion === record.baseVersion
+        && previous.anchor === record.anchor
+        && previous.head === record.head
+        && previous.textLength === record.textLength
+        && previous.docToken === record.docToken
+        && previous.pageId === record.pageId) {
+        return true;   // 位置与归属都没变：无需重写
+      }
+      /* 没有旧记录时，原点位置本身携带的信息是"光标在开头"，这与"无记录"在后续判定里
+         并不等价（无记录 ⇒ 无法确认归属 ⇒ 不能自动续编）。为了不让脏文档在开头时
+         失去续编能力，这里仍要写下这条记录；只有 clean 且本页无旧记录的场景才由
+         captureDocScene 的调用方自然跳过（clean 不需要票据）。 */
+      try {
+        store.setItem(selectionKeyOf(record.pathKey), nextJson);
+      } catch (e) { return false; }
+      try {
+        var index = JSON.parse(store.getItem(SELECTION_INDEX_KEY) || "[]");
+        if (!Array.isArray(index)) index = [];
+        if (index[0] === record.pathKey && index.length <= SELECTION_LIMIT) return true;
+        var next = [record.pathKey].concat(index.filter(function (key) { return key !== record.pathKey; }));
+        for (var dropped of next.slice(SELECTION_LIMIT)) {
+          try { store.removeItem(selectionKeyOf(dropped)); } catch (e3) { /* 配额/权限失败忽略 */ }
+        }
+        store.setItem(SELECTION_INDEX_KEY, JSON.stringify(next.slice(0, SELECTION_LIMIT)));
+      } catch (e4) { /* 索引失败不影响本次记录 */ }
+      return true;
+    }
+
+    /** 这份现场是不是本页面亲手留下的（唯一允许"自动采纳脏草稿"的条件）。 */
+    function ownedSelectionRecord(record) {
+      return !!record && record.pageId === pageInstanceId;
+    }
+
+    /**
+     * 本次离开时真正成功留存下来的"票据"，**按规范文件路径分条**存放。
+     *
+     * 为什么必须有：`readLatest(path)` 以路径为索引，同一路径在同一磁盘版本上完全可能
+     * 同时存在其它窗口/会话写下的 docToken 草稿；只核对路径 + pageId + 磁盘 base 无法
+     * 区分"我保留的那一份"和"别人的那一份"，会把别人的草稿误认成本页面的续编内容。
+     *
+     * 为什么必须是 Map 而不是单个变量：A 脏离开写 A 的票，B 脏离开会覆写成 B ——
+     * 切回 A 时就查不到自己的票，按文件续编被破坏。这里按 pathKey 分条保存，
+     * 同一条路径只保留最新一次（替换旧项），容量上限 64 条，只存元数据、不存正文。
+     */
+    const LEAVE_TICKET_LIMIT = 64;
+    var leaveTickets = new Map();
+
+    function rememberLeaveTicket(ticket) {
+      if (!ticket || typeof ticket !== "object") return;
+      var pathKey = String(ticket.pathKey || "");
+      if (!pathKey) return;
+      var entry = {
+        pathKey: pathKey,
+        docToken: typeof ticket.docToken === "string" ? ticket.docToken : "",
+        pageId: typeof ticket.pageId === "string" ? ticket.pageId : "",
+        baseVersion: typeof ticket.baseVersion === "string" && ticket.baseVersion ? ticket.baseVersion : null,
+        session: ticket.session && Number.isSafeInteger(ticket.session.epoch)
+          ? { epoch: ticket.session.epoch, sourceRevision: ticket.session.sourceRevision } : null,
+        at: Number.isFinite(ticket.at) ? ticket.at : 0,
+        kind: typeof ticket.kind === "string" ? ticket.kind : "",
+      };
+      // 同一路径只留最新一条（Map 保持插入顺序，先删后插保证它排到队尾）。
+      leaveTickets.delete(pathKey);
+      leaveTickets.set(pathKey, entry);
+      while (leaveTickets.size > LEAVE_TICKET_LIMIT) {
+        var oldest = leaveTickets.keys().next();
+        if (oldest.done) break;
+        leaveTickets.delete(oldest.value);
+      }
+    }
+
+    /** 打开某份文件时按**它自己的**路径查票；查不到就是没有（绝不回退到别人的票）。 */
+    function leaveTicketForPath(pathKey) {
+      if (!pathKey) return null;
+      return leaveTickets.get(String(pathKey)) || null;
+    }
+
+    /**
+     * 读到的草稿槽是否就是本页面刚才亲手保留的那一份。
+     * 只有返回 true 才允许自动续编；false 一律走原来的恢复横幅（不猜、不合并）。
+     *
+     * 判据只认"同一份草稿身份"，不要求内容快照完全静止：
+     *   · docToken 必须相同 —— 这是 journal 的键，不同窗口/会话不可能撞上；
+     *   · 会话必须同一 epoch 且 revision **不低于**留存值 —— 留存之后同一代文档
+     *     继续编辑/压缩检查点会推进 revision，那仍是同一份草稿，不是别人的；
+     *   · 留存时若带了时间戳（槽位兜底无会话），时间戳必须一致。
+     */
+    function slotOwnsLeaveTicket(slot, ticket) {
+      if (!slot || !ticket || !ticket.docToken) return false;
+      if (slot.docToken !== ticket.docToken) return false;
+      if (ticket.pageId && pageInstanceId !== ticket.pageId) return false;
+      if (ticket.session) {
+        var session = slot.session;
+        if (!session || !Number.isSafeInteger(session.epoch) || !Number.isSafeInteger(session.sourceRevision)) return false;
+        if (session.epoch !== ticket.session.epoch) return false;
+        if (session.sourceRevision < ticket.session.sourceRevision) return false;
+      } else {
+        // legacy 槽侧：没有会话，只能用留存时间戳确认（拿不到时间戳就算歧义）。
+        if (!ticket.at) return false;
+        if (Number(slot.ts) !== ticket.at) return false;
+      }
+      if (ticket.baseVersion !== null && slot.baseVersion !== ticket.baseVersion) return false;
+      return true;
+    }
+
+    /**
+     * 取当前代 iframe 的编辑器 view。同一个 iframe 内 dsh-selection.js /
+     * dsh-interaction.js 用的就是 `mpEngine._view()` 这一条访问器；父窗口同源
+     * 直读，不新增桥消息、不复制正文。
+     */
+    function viewOfWindow(win) {
+      if (!win || win === window) return null;
+      try {
+        var engine = win.mpEngine;
+        var view = engine && typeof engine._view === "function" ? engine._view() : null;
+        return view && view.state ? view : null;
+      } catch (e) { return null; }
+    }
+
+    /** 读一次选区/光标（离开文档时调用一次；不轮询）。 */
+    function captureSelectionFromWindow(win) {
+      var view = viewOfWindow(win);
+      if (!view || !view.state.selection) return null;
+      try {
+        var main = view.state.selection.main;
+        if (!main || !Number.isSafeInteger(main.anchor) || !Number.isSafeInteger(main.head)) return null;
+        return { anchor: main.anchor, head: main.head, textLength: view.state.doc.length };
+      } catch (e) { return null; }
+    }
+
+    /** 把现场写回同一份正文。滚动一律交给按文件的阅读位置租约，此处不抢。 */
+    function applySelectionToWindow(win, record) {
+      var view = viewOfWindow(win);
+      if (!view || !record || typeof view.dispatch !== "function") return false;
+      var length;
+      try { length = view.state.doc.length; } catch (e) { return false; }
+      if (record.textLength !== length) return false;
+      if (!isSelectionPosition(record.anchor, length) || !isSelectionPosition(record.head, length)) return false;
+      var anchor = record.anchor, head = record.head;
+      try {
+        var current = view.state.selection.main;
+        if (current && current.anchor === anchor && current.head === head) return true;
+        view.dispatch({ selection: { anchor: anchor, head: head }, scrollIntoView: false });
+        return true;
+      } catch (e) { return false; }
+    }
     /** 当前展示的文档属于哪个工作目录：× 关闭记的是「你关掉的那份文档」的目录，不是此刻会话的目录。 */
     function displayedDocWorkspaceKey() {
       try {
@@ -7038,11 +7508,33 @@ const __test = {
         window.localStorage.setItem(WORKSPACE_EDITOR_KEY, JSON.stringify(all));
       } catch (e) { /* 存储不可用时按未记忆处理 */ }
     }
+    /**
+     * 切档闸门：任何会换掉当前文档的入口（点击列表/切工作区/切回 A/关编辑区）都先过这里。
+     * 失败时保持原文、不切档，并说清是哪个文件、下一步怎么做。
+     *
+     * 文案纪律：必须保留"尚未安全留存"这一契约短语（既有 UI/测试按它匹配），
+     * 且不得把拦截原因说死成"写入失败" —— 守卫同时会因 composing / saving /
+     * 待应用的编辑器状态而拒绝，那些都不是存储故障。所以只陈述事实：文档尚未安全留存。
+     */
+    function workspaceLeaveBlocker() {
+      var name = "";
+      for (var entry of openDocs.values()) {
+        if (entry && entry.path) { name = String(entry.basename || entry.path); break; }
+      }
+      var target = name ? "「" + name + "」" : "当前文档";
+      return target + "尚未安全留存，已保持原样、未切换。可按 Ctrl+S 保存后再试。";
+    }
+    /** 原契约：成功返回复核函数，失败返回 null（由调用方用 workspaceMessage 说明原因）。 */
     async function prepareWorkspaceLeave(refusal) {
       var leases=[];
+      lastLeaveRetention = null;   // 每次离开重新判定，绝不沿用上一次的回执
       for (var guard of editorLeaveGuards.values()) {
         var lease=await guard();
-        if (!lease) { workspaceMessage(refusal || "当前文档尚未安全留存，请完成输入或保存后再切换。"); return null; }
+        if (!lease) {
+          var message = workspaceLeaveBlocker();
+          workspaceMessage(refusal ? (refusal + " " + message) : message);
+          return null;
+        }
         leases.push(lease);
       }
       return () => leases.every(check=>check());
@@ -7089,14 +7581,58 @@ const __test = {
         }
       });
     }
+    /**
+     * 切档成功后的可见回执：只在**确有未保存内容被留存**时出现。
+     *   · clean（无改动）—— 完全不提示，并清掉上一次切换留下的陈旧回执；
+     *                      干净切档保持原有的静默，位置记录只是后台状态。
+     *   · journal + 位置写到盘 —— 草稿与光标位置都在，切回自动续编；
+     *   · journal + 位置未写成 —— 只声明正文并注明"光标位置未能保存"。
+     */
+    function announceRetainedScene(previous) {
+      var kept = lastLeaveRetention;
+      lastLeaveRetention = null;
+      if (!kept || kept.kind === "clean") {
+        // 干净切档不提示，且不能让上一轮的"已保留…"继续挂在界面上。
+        clearWorkspaceDetail();
+        return;
+      }
+      if (!previous || !previous.path) return;
+      if (kept.path && workspaceKey(kept.path) !== workspaceKey(previous.path)) return;
+      var name = previous.name || basenameOf(previous.path);
+      var body = kept.kind === "journal"
+        ? "未保存草稿"
+        : "未保存正文（草稿级备份）";
+      var sceneText = kept.scene
+        ? "与光标位置"
+        : "（光标位置未能保存）";
+      workspaceMessage("已保留「" + name + "」的" + body + sceneText + "；切回该文件会继续编辑未保存的内容（尚未写入磁盘，按 Ctrl+S 保存）。");
+    }
+    /** 离开前从当前活动的文档代抓一份"将要被保留的是哪份文件"的身份快照。 */
+    function retainedSceneOfCurrent() {
+      var path = workbenchDoc && workbenchDoc.path ? workbenchDoc.path : "";
+      if (!path) {
+        for (var item of overlayDocs.values()) {
+          if (!item || !item.tab || item.tab.contentId == null) continue;
+          var parsed = parseFileAddress(item.tab.contentId);
+          if (!parsed || !parsed.path) continue;
+          path = absolutePath(parsed.path, currentCwd(parsed.sessionId));
+          if (path) break;
+        }
+      }
+      if (!path) return null;
+      return { path: path, name: basenameOf(path) };
+    }
     async function chooseWorkbenchDoc(entry) {
       if (workbenchParked) return false;
       var intent=++workspaceIntent;
+      var previous = retainedSceneOfCurrent();
       var check=await prepareWorkspaceLeave();
       if (!check || intent!==workspaceIntent || !check()) return false;
+      // 换成同一份文件不提示（列表里点当前行）。
+      if (previous && entry && entry.path && workspaceKey(previous.path) === workspaceKey(entry.path)) previous = null;
       workbenchDoc=entry; workspaceNotice=""; docsModeOn=true; clearClosedOverlayKeys();
       setWorkspaceAutoOpenSuppressed(workspaceKey(entry && entry.workspace), false);
-      enableWorkbench(); bumpOverlay(); return true;
+      enableWorkbench(); bumpOverlay(); announceRetainedScene(previous); return true;
     }
     async function activateNativeOverlay(next) {
       if (workbenchParked) return;
@@ -8556,14 +9092,85 @@ const __test = {
           });
         }
         refreshPath();
+        /* 切走时的现场留存：本 guard 是唯一的"离开此文档"闸门。
+         * ① 先捕获选区/光标（同源直读一次）并按文件写下现场；
+         * ② 脏文档再走既有 journal checkpoint；
+         * ③ checkpoint 不可用时，退一步用既有 recovery 槽做**带正文的**兜底留存，
+         *    并把"保留到什么程度"记进 lastLeaveRetention，供切档后的可见回执如实说明；
+         * ④ 都失败 ⇒ 返回 null 阻止切档，由 prepareWorkspaceLeave 给出文件名与下一步。
+         *
+         * 归属票据：只要正文真的留存成功，就把"这份草稿是我写的"按**该文件的路径**记进
+         * leaveTickets（有界 Map）；切回某份文件时只查它自己那一条（见 leaveTicketForPath
+         * + slotOwnsLeaveTicket），避免把同一路径下其它窗口的同版本草稿误认成续编内容，
+         * 也不会因为 B 随后离开而覆盖掉 A 的票。 */
+        /**
+         * 捕获当前代的选区/光标并按文件写下现场。
+         * 只在**用户主动离开**（切档闸门 / 关闭）调用；清理阶段 iframe 已摘除时
+         * captureSelectionFromWindow 返回 null ⇒ 不写，绝不会用原点覆盖已有记录。
+         */
+        function captureDocScene() {
+          if (!doc.opened || doc.dead || doc.untitled || !doc.absPath) return null;
+          var frame = frameRef.current;
+          // iframe 已不在文档里（卸载中/已切到别的文档）⇒ 读不到真实选区，放弃本次捕获，
+          // 避免把"读不到"误当成"光标在开头"而覆盖已保存的位置。
+          if (!frame || !frame.isConnected) return null;
+          var captured = captureSelectionFromWindow(currentFrameWin());
+          if (!captured) return null;
+          var pathKey = workspaceKey(doc.absPath);
+          var record = {
+            v: 1,
+            pathKey: pathKey,
+            path: doc.absPath,
+            pageId: pageInstanceId,
+            docToken: doc.token,
+            baseVersion: typeof doc.lastVersion === "string" ? doc.lastVersion : null,
+            textLength: captured.textLength,
+            anchor: captured.anchor,
+            head: captured.head,
+            at: Date.now(),
+          };
+          if (!writeSelectionRecord(record)) return null;
+          return record;
+        }
+        /** 带正文的兜底保留（复用既有 recovery 槽，不新增第二套格式）。 */
+        async function retainDirtyFallback(text) {
+          try {
+            const seq = doc.editSeq;
+            writeRecovery(text, doc.composing || !!doc.pendingApply);
+            const slot = readRecoverySlot(null, doc.absPath);
+            if (!slot || slot.path !== doc.absPath || slot.text !== text || doc.editSeq !== seq) return 0;
+            return slot.ts || Date.now();
+          } catch (e) { return 0; }
+        }
         editorLeaveGuards.set(doc.token, async () => {
           if (!alive()) return ()=>true;
           if (doc.saving || doc.composing || doc.pendingApply || doc.applyUnknown) return null;
-          if (!doc.dirty) return ()=>alive() && !doc.dirty && !doc.saving && !doc.composing && !doc.pendingApply && !doc.applyUnknown;
+          /* 无论脏净都先捕获一次现场（clean 也可能只是"移动了光标"——那正是要保住的场景）。
+             重复写的抑制交给 writeSelectionRecord 的短路，不在这里提前放弃捕获。 */
+          var scene = null;
+          try { scene = captureDocScene(); } catch (e0) { scene = null; }
+          if (!doc.dirty) {
+            lastLeaveRetention = { path: doc.absPath, kind: "clean", scene: !!scene };
+            return ()=>alive() && !doc.dirty && !doc.saving && !doc.composing && !doc.pendingApply && !doc.applyUnknown;
+          }
           const seq=doc.editSeq, pulled=await pullText();
           if (pulled.stale || !alive() || doc.editSeq!==seq || doc.composing) return null;
           const receipt=await checkpointRecovery(pulled.text,pulled.session,true);
-          if (receipt?.ok!==true || receipt.durable!==true) return null;
+          if (receipt?.ok!==true || receipt?.durable!==true) {
+            // journal 不可用：用既有 recovery 槽兜底。成功才放行，并如实标注"草稿级"保留。
+            const retainedAt = await retainDirtyFallback(pulled.text);
+            if (!retainedAt || !alive() || doc.editSeq !== seq) return null;
+            lastLeaveRetention = { path: doc.absPath, kind: "slot", at: retainedAt, scene: !!scene };
+            // 槽位兜底没有可核验的引擎会话：票据只带 docToken + 留存时间戳。
+            rememberLeaveTicket({ pathKey: workspaceKey(doc.absPath), docToken: doc.token,
+              pageId: pageInstanceId, baseVersion: typeof doc.lastVersion === "string" ? doc.lastVersion : null,
+              session: null, at: retainedAt, kind: "slot" });
+            return ()=>alive() && doc.editSeq===seq && !doc.saving && !doc.composing && !doc.pendingApply && !doc.applyUnknown;
+          }
+          lastLeaveRetention = { path: doc.absPath, kind: "journal", scene: !!scene };
+          rememberLeaveTicket({ pathKey: workspaceKey(doc.absPath), docToken: doc.token,
+            pageId: pageInstanceId, baseVersion: typeof doc.lastVersion === "string" ? doc.lastVersion : null,
+            session: pulled.session || null, at: Date.now(), kind: "journal" });
           return ()=>alive() && doc.editSeq===seq && !doc.saving && !doc.composing && !doc.pendingApply && !doc.applyUnknown;
         });
         cleanups.push(()=>editorLeaveGuards.delete(doc.token));
@@ -8748,6 +9355,19 @@ const __test = {
           }
         }
 
+        /** iframe 上行转发用的**父层真值**：子层声明的一律不采信。
+         *  sessionId 取"当前工作台对话"，文档身份取这一代 doc 的 token/代次/路径。 */
+        function hostInvokeBinding() {
+          return {
+            tabId: String((tab && (tab.occurrenceId || tab.id)) || ""),
+            docToken: String(doc.token || ""),
+            generation: doc.gen,
+            path: String(doc.absPath || ""),
+            sessionId: String(currentConversationSessionId() || workspaceContext().sessionId || ""),
+            alive: alive,
+          };
+        }
+
         function draftStore() { return recoveryStore; }
         doc.storageError = error => showNotice("恢复记录尚未持久化：" + String(error.message || error.code));
         function inspectStoreResult(result) { if(result?.ok===false)showNotice('恢复记录尚未持久化：'+String(result.error||result.code||'storage unavailable')); return result; }
@@ -8783,6 +9403,24 @@ const __test = {
         /* ── 阅读位置（插件优先租约在宿主业务层；这里只做当前文档代的票据映射）──
          * 打开/重载完成（apply-result.applied）后取一次位置；之后引擎只在真实用户滚动时
          * 上行锚点，保存合并进行；关 tab 前 flush + release，插件关闭后桌面才可接管。 */
+        /**
+         * 光标/选区复位：正文刚应用成功时调用一次。
+         * 与滚动完全解耦 —— 滚动由 startReadingPosition() 的按文件租约负责，
+         * 这里 dispatch 一律 scrollIntoView:false，绝不抢走已保存的阅读位置。
+         */
+        function placeSceneSelectionOnOpen() {
+          if (!alive() || doc.untitled || !doc.absPath || doc.dead) return false;
+          const record = readSelectionRecord(workspaceKey(doc.absPath));
+          return placeSceneSelection(record, doc.editSeq);
+        }
+        /** 版本校验在父层做；长度校验必须对**当前 view**做，不能拿记录里的长度自比。 */
+        function placeSceneSelection(record, expectedEditSeq) {
+          if (!alive() || !record) return false;
+          if (Number.isSafeInteger(expectedEditSeq) && doc.editSeq !== expectedEditSeq) return false;
+          const base = typeof doc.lastVersion === 'string' && doc.lastVersion ? doc.lastVersion : null;
+          if (record.baseVersion !== base) return false;
+          return applySelectionToWindow(currentFrameWin(), record);
+        }
         function newReadingSessionId(token) {
           const suffix = (typeof crypto !== 'undefined' && crypto.randomUUID)
             ? crypto.randomUUID()
@@ -9041,6 +9679,15 @@ const __test = {
               if(consumed?.docToken && consumed.docToken!==tokenAtApply){try{Promise.resolve(draftStore()?.clear?.(pathAtApply,consumed.docToken,consumed.session)).then(inspectStoreResult).catch(error=>showNotice('恢复记录清理失败：'+String(error)));}catch(e){}}
             });
             doc.recovery=null;doc.recoveryBackupFailed=false;
+            /* 用户点了「恢复」并已应用草稿：此时正文=草稿，光标必须回到**这份文件**记录的位置。
+               下面那条 clean 分支要求 !doc.dirty，这里永远不满足；自动续编分支又要求本页票据，
+               刷新后的新页面没有。所以恢复成功后单独补一次 selection 复位：
+               placeSceneSelection 自己核对 baseVersion 与 textLength，不一致就放弃（绝不按错位置），
+               且只写 selection、不采纳任何草稿、不碰正文。用户随后的真实输入优先（下面再断言 editSeq）。 */
+            const atRestore=doc.editSeq;
+            Promise.resolve().then(()=>{
+              if(alive() && doc.editSeq===atRestore && !doc.pendingApply) placeSceneSelectionOnOpen();
+            });
           }else if(pending.opts.discard){clearRecoverySlot(null,doc.absPath);doc.recovery=null;clearPersistedReview();}
           if(doc.dead){persistCurrentRecovery();return;}
           if (doc.review) {
@@ -9049,9 +9696,53 @@ const __test = {
           } else {
             showPhase(doc.dirty?'dirty':'ready',restore?'已恢复未保存内容（未写盘，按 Ctrl+S 保存）':pending.firstOpen?'':'已同步磁盘更新');
           }
-          if(doc.dirty && !doc.composing && !restore)scheduleSave(SAVE_DEBOUNCE_MS);
+          /* 首开自动排保存的条件必须排除「正文本身就是回来接续的未存草稿」：
+             restore=true（用户点过恢复）本来就排除；但 browser 刷新 / 共享房间重开走的是
+             firstOpen + value.live.dirty，此时 doc.dirty 也为 true 而 restore 为 false，
+             旧条件会把"磁盘正文 + 草稿"在 1500ms 后自动写回磁盘（A 被改写、B 不变的真凶）。
+             这类内容的落盘只能由用户在 live 房间里的显式保存驱动：用户一有真实输入，
+             onDirty/acceptDelta 各自会重新 scheduleSave，语义不变。 */
+          if(doc.dirty && !doc.composing && !restore && !doc.draftRecovered)scheduleSave(SAVE_DEBOUNCE_MS);
+          /* 干净首开（无待采纳草稿）时的光标复位：此时正文已定、排队增量已消费，
+             只写 selection、不请求滚动；脏草稿的复位在下面的分支里另行处理。 */
+          if (pending.firstOpen && !pending.edits.length && !restore) {
+            const atOpen = doc.editSeq;
+            Promise.resolve().then(() => { if (alive() && doc.editSeq === atOpen && !doc.dirty) placeSceneSelectionOnOpen(); });
+          }
+          /* 首开正文**就是未存草稿**（本页刷新前的共享/已恢复草稿）时，上面那条 clean 分支不跑：
+             它要求 !doc.dirty。此时正文是"磁盘+草稿"，但选区记录是同一个 pathKey + 同一个
+             baseVersion 写的，placeSceneSelection 自身会核对 baseVersion 与 textLength ⇒ 若草稿
+             让长度变了就会拒绝，绝不会把光标按到错位置。这里只补一次 selection 复位，
+             **不采纳任何来源的草稿、不碰正文**。 */
+          if (pending.firstOpen && !restore && !pending.edits.length && doc.draftRecovered) {
+            const atRecovered = doc.editSeq;
+            Promise.resolve().then(() => {
+              if (alive() && doc.editSeq === atRecovered && !doc.pendingApply) placeSceneSelectionOnOpen();
+            });
+          }
           if(pending.firstOpen){
             const atEdit=doc.editSeq;
+            /* 两件事分开判定：
+               ① 光标/选区复位：只要"正文版本 + 长度"可验证一致即可（含崩溃后新页面）；
+               ② 脏草稿自动采纳：**不以光标记录为前置条件**。光标记录可能在
+                  "光标就在开头且此前无记录"或"同路径同版同位置重复进入"时不存在，
+                  但草稿本身完全有效；此时靠票据（路径 + 本页 pageId + 同基准版本）
+                  + 草稿槽自身的 docToken 归属来判定，仍只采纳本页亲手留存的那一份。
+                  外部/其它页面的草稿：票据 pageId 不同或 docToken 不匹配 ⇒ 一律横幅。 */
+            const sceneBase = typeof doc.lastVersion === 'string' ? doc.lastVersion : null;
+            const scenePathKey = doc.untitled || !doc.absPath ? "" : workspaceKey(doc.absPath);
+            const record = scenePathKey ? readSelectionRecord(scenePathKey) : null;
+            /* 按**这份文件自己的**路径取票（不是全局变量）：A 与 B 各自留票互不覆盖，
+               查不到就是没有，绝不回退到别的文件的票。 */
+            const ticket = scenePathKey ? leaveTicketForPath(scenePathKey) : null;
+            /* 时间戳不参与方向比较：captureDocScene 先于 rememberLeaveTicket 执行。 */
+            const ticketForThisDoc = !!ticket && ticket.pageId === pageInstanceId
+              && ticket.baseVersion === sceneBase;
+            /* 有记录时必须与本票同 token 且是本页写的；没有记录时交给票 + slot 自身判归属。 */
+            const sceneCompatible = !record
+              || (ownedSelectionRecord(record) && record.baseVersion === sceneBase
+                  && (!ticket || record.docToken === ticket.docToken));
+            const mayAdoptScene = ticketForThisDoc && sceneCompatible && !!doc.lastVersion;
             Promise.resolve(draftStore()?.readLatest?.(doc.absPath)).then(async saved=>{
               const slot=saved??readRecoverySlot(null,doc.absPath);
               if(!alive() || doc.flushed) return;
@@ -9083,6 +9774,18 @@ const __test = {
                 doc.staleDraftPending=slot;
                 showError('旧草稿归档失败；草稿仍保留，未改动当前文件。可重试归档。');
                 return;
+              }
+              if (mayAdoptScene && slotOwnsLeaveTicket(slot, ticket)) {
+                // 只有"同一页面亲手切走"才自动续编：正文用 journal，位置随后复位。
+                const seqAtResume = doc.editSeq;
+                const applied = await applyToFrame({kind:'restore',value:{text:slot.text,version:doc.lastVersion,displayPath:doc.displayPath,size:slot.text.length},firstOpen:false,opts:{},path:doc.absPath,baseVersion:doc.lastVersion,loadSeq:doc.loadSeq,editSeq:doc.editSeq,recoverySlot:slot});
+                if (applied) {
+                  if (alive()) showPhase(doc.dirty ? 'dirty' : 'ready', '已续编上次未保存的内容（未写盘，按 Ctrl+S 保存）');
+                  if (alive()) placeSceneSelection(record, doc.editSeq);
+                  return;
+                }
+                if (!alive() || doc.flushed || doc.editSeq !== seqAtResume) return;
+                // 自动续编没成功 ⇒ 回到原来的"横幅 + 用户点恢复"，绝不静默丢内容。
               }
               doc.recovery=slot;doc.phase='recovery';setUiIfChanged({phase:'recovery',detail:'检测到上次关闭时未保存的内容',notice:'',recovery:slot});
             }).catch(error=>{
@@ -9427,7 +10130,11 @@ const __test = {
           if (doc.flushed) return;
           doc.flushed = true; doc.closeUntil = Date.now() + FLUSH_WAIT_MS + 80;
           if (!doc.dirty) void clearDraftMirror("close");
-          if (!doc.opened || !doc.absPath || !doc.dirty) return;
+          if (!doc.opened || !doc.absPath) return;
+          // 关闭不是切档（不经过工作台闸门）：在这里补一次光标现场（clean 也可能只移动了光标）。
+          // 同一位置重复写由 writeSelectionRecord 的短路挡掉。
+          try { captureDocScene(); } catch (e0) { /* 尽力而为，不阻塞关闭 */ }
+          if (!doc.dirty) return;
           persistCurrentRecovery();
           // The reliable copy on a dirty close is the journal above. This is the
           // best-effort last mirror write for readers; it never promotes text to disk.
@@ -11230,7 +11937,7 @@ const __test = {
           if (type === "insert-to-chat") { void onInsertToChat(data.content); return; }
           if (type === "insert-quote") { void onInsertQuote(data.content); return; }
           if (type === "edit-target") { void onEditTarget(data.content); return; }
-          if (type === "host-invoke") { handleHostInvoke(data.content, post); return; }
+          if (type === "host-invoke") { handleHostInvoke(data.content, post, hostInvokeBinding()); return; }
           if (type === "openLink" && data.content) {
             try {
               const url = new URL(data.content);
@@ -11913,6 +12620,19 @@ const __test = {
 
         // tab 关闭/替换：signal 在记录移除时 abort，比 React 卸载更早，留出 requestText 的窗口。
         const tabSignal = tab && tab.signal;
+        /* 【S2·浏览器硬刷新】reload 不会 abort tab.signal，也不会跑到 React 卸载：
+           唯一能同步执行的边缘是 window 的 pagehide。这里**只做一次** captureDocScene()
+           （既有实现：读 view.state.selection.main + 按 pathKey 写一份记录，失败静默），
+           与切档/关闭完全同一条路径，绝不每键、每选区写，不碰磁盘正文。 */
+        const onPageHide = () => {
+          try { captureDocScene(); } catch (e) { /* 尽力而为：刷新边缘不能抛 */ }
+        };
+        try {
+          if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+            window.addEventListener("pagehide", onPageHide);
+            cleanups.push(() => { try { window.removeEventListener("pagehide", onPageHide); } catch (e) { /* 忽略 */ } });
+          }
+        } catch (e) { /* 无 window（测试环境） */ }
         try {
           if (tabSignal && typeof tabSignal.addEventListener === "function") {
             const onAbort = () => {
@@ -11929,6 +12649,18 @@ const __test = {
         return () => {
           try { flushClose(); } catch (e) { /* 已尽力 */ }
           try { stopReadingPosition(true); } catch (e) { /* 位置收尾不阻塞关闭 */ }
+          /* 文章/AI/公众号绑定随这一代退场：先发出 unbind（同代幂等），再置 dead。
+             顺序要紧：`alive()` 依赖 doc.dead，先置 dead 就等于放弃了通知服务端解绑。 */
+          try {
+            void articleForwarder.release({
+              tabId: String((tab && (tab.occurrenceId || tab.id)) || ""),
+              docToken: String(doc.token || ""),
+              generation: doc.gen,
+              path: String(doc.absPath || ""),
+              sessionId: String(currentConversationSessionId() || workspaceContext().sessionId || ""),
+              alive: () => false,
+            });
+          } catch (e) { /* 解绑失败不影响关闭 */ }
           doc.dead = true;
           cancelDraftMirror();
           // live 会话离场：先请 facade 解绑（iframe 还在时经上行 leave），再直接向宿主
@@ -12272,7 +13004,10 @@ const __test = {
           src: FRAME_SRC,
           allowFullScreen: true,
           // 同源整装：内容是插件自带的可信 renderer（非第三方文档），需要 localStorage（主题/偏好）。
-          sandbox: "allow-scripts allow-same-origin allow-forms allow-popups allow-modals",
+          // allow-downloads：工作台「导出 → 单文件 HTML」由编辑器里的一次真实用户点击触发下载；
+          // 没有它 Chromium 会拒绝该下载（PDF 走父层保存桥，所以此前不受影响）。
+          // 只放开这一个**固定可信的 CM6 编辑框**；内容预览 iframe 的 sandbox 不动。
+          sandbox: "allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads",
           onLoad: () => {
             const win = frameRef.current ? frameRef.current.contentWindow : null;
             const current = st.doc;
