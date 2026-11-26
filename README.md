@@ -1,3 +1,9 @@
+# MarkPilot 3.7.4 · DSH 插件 2.1.10
+
+书页、研报和默认（宋韵）可在主题设置中选择，各主题支持独立浅色和深色。切换文件时有未保存提醒，并可按文件恢复草稿与光标。微信、知乎和静态文档继续提供发布预览与复制。
+
+[Windows 安装程序与便携版](https://github.com/ltmroberthk915/markpilot/releases/tag/v3.7.4) · [DSH 插件与安装说明](https://github.com/ltmroberthk915/markpilot/releases/tag/dsh-markdown-editor-typora-v2.1.10)
+
 > **更名（1.4.0 起）：** 插件包名从 `dsh-markdown-typora` 改为 **`dsh-markdown-editor-typora`**。安装/升级：`dsh plugin --profile desktop add dsh-markdown-editor-typora@1.4.0`；旧包停在 1.3.x，不再更新。下文旧版本记录里的旧包名保留原样。
 
 [MarkPilot 3.7.1 for Windows](https://github.com/ltmroberthk915/markpilot/releases/latest) · [MarkPilot for DSH on npm](https://www.npmjs.com/package/dsh-markdown-editor-typora)

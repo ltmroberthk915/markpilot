@@ -52,6 +52,12 @@ import { installSourceEvidence } from './source-evidence.js';
 import { installAttachmentImageTool } from './attachment-image.js';
 import { createAnswerWriter } from './answer-write.js';
 import { inspectMarkdownFile } from './markdown-inspection.js';
+/* 工作台 article/*：选区 AI 与公众号草稿箱的服务端。
+ * 这一层只做身份/绑定/取消，**不读文档、不碰凭据**；模型与微信两条实现各自在
+ * ./selection-rewrite-model.js 与 ./wechat-draft.js（同伴维护，惰性载入）。 */
+import { createArticleService } from './article-service.js';
+/* 服务端 article/* 的构造器也导出：测试与宿主侧诊断需要直接建一份（不依赖路由）。 */
+export { createArticleService, ARTICLE_CODES, CAPABILITY_TTL_MS, CAPABILITY_LIMIT } from './article-service.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize, sep, extname, basename, resolve as pathResolve, isAbsolute, relative as pathRelative }  from 'node:path';
 
@@ -345,6 +351,12 @@ const MODEL_TOOL = Symbol('markdown model tool');
 export { MODEL_TOOL };
 const IMG_PREFIX = ROUTE_PREFIX + '/img/';
 const CORE_JSON_PATH = ROUTE_PREFIX + '/core.json';
+/* 工作台 article/* 的方法名与 iframe 的 hostApi.invoke 逐字相同（见 plugin-server-contract.md）。 */
+const ARTICLE_PREFIX = API_PREFIX + 'article/';
+const ARTICLE_METHODS = new Set([
+  'bind', 'unbind', 'aiStatus', 'aiDiag', 'aiRewrite', 'aiRewriteCancel',
+  'wxStatus', 'wxConfigure', 'wxClear', 'wxVerify', 'wxPickCover', 'wxCreateDraft', 'wxAcknowledge',
+]);
 const KNOWN_ENDPOINTS = new Set(['open', 'save', 'stat', 'edit', 'live', 'reading', 'docs/create', 'docs/saveAs', 'documents.fileState', 'documents.locate', 'documents.session', 'documents.recoveryList', 'documents.recoveryRead', 'documents.recoveryDiscard', 'docs/recent', 'docs/archive', 'documents.read', 'documents.applyEdits', 'documents.state', 'documents.reconcile', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.merge3', 'documents.reviewGroup', 'documents.reviewGroups', 'documents.undoGroups', 'documents.conflictOpen', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftRead', 'documents.draftClear', 'documents.reference', 'documents.answerOffer', 'documents.writeAnswer', 'documents.captureSelection', 'documents.readSelection', 'documents.editSelection', 'documents.editPrepare', 'documents.editArm', 'documents.editStatus', 'documents.editAbort', 'export/pdf', 'export/pdfCancel', 'diag']);
 const SESSION_MUTATING_ENDPOINTS = new Set(['open', 'save', 'edit', 'documents.writeAnswer', 'live', 'docs/create', 'docs/saveAs', 'docs/archive', 'documents.applyEdits', 'documents.recover', 'documents.discardRecovery', 'documents.undoGroup', 'documents.undoGroups', 'documents.merge3', 'documents.reviewGroup', 'documents.conflictResolve', 'documents.conflictCancel', 'documents.draftMirror', 'documents.draftClear']);
 /** 最近一次客户端布局诊断（仅当页面 URL 带 &mpdiag=1 时上报；生产不会有）。内存里只留最后一份。 */
@@ -1001,6 +1013,32 @@ export function createHost(options = {}) {
     apply: (payload, key, internal) => dispatch('documents.applyEdits', payload, MODEL_TOOL, {agent: {session: answerSession(key)}}, internal),
   });
   const hostInternals = { watchers, liveStreams, lookupDocument, documents, fileIdentities, editIsolation: null, referenceScope };
+
+  /* ── 工作台 article/*（选区 AI + 公众号草稿箱）──────────────────────────────
+   * 文档权威只有一处：`readingTarget()` —— 它只认**本 host 实例经编辑器 open() 打开过**
+   * 且当前仍在盘上的绝对路径。所以 capability 绑定与 wx 的 isCurrent 都走它，
+   * 客户端自报的 path/dir/owner 一个都不采信。
+   * 模型组与微信实现惰性载入：宿主没有对应服务时给明确的"没有模型/未装配"，不假成功。 */
+  const getService = typeof options.getService === 'function' ? options.getService : () => undefined;
+  let wechatLazy = null;
+  const articleService = createArticleService({
+    getService,
+    log,
+    resolveDocument: async (rawPath) => {
+      const target = await readingTarget(rawPath);
+      if (!target) return { ok: false };
+      return { ok: true, canonicalPath: target.path };
+    },
+    wechat: async () => {
+      if (wechatLazy) return wechatLazy;
+      const factory = options.wechatHostFactory;
+      if (typeof factory !== 'function') return null;
+      wechatLazy = await factory();
+      return wechatLazy;
+    },
+    loadRewrite: async () => import('./selection-rewrite-model.js'),
+  });
+  hostInternals.articleService = articleService;
 
   function watchKeyOf(target) {
     return String(target?.targetKey ?? target?.displayPath ?? '');
@@ -2371,6 +2409,63 @@ export function createHost(options = {}) {
     sendJson(res, 200, result);
   }
 
+  /**
+   * POST /dsh-markdown-editor-typora/api/article/<method>
+   *
+   * 与既有端点同一鉴权栅栏（fenceStatus 在 route 入口已过），体上限与 content-type
+   * 规则也一致。方法名与 iframe 的 hostApi.invoke 逐字相同；成功/失败都以 HTTP 200
+   * + 体内 {ok,...} 返回，客户端不从状态码猜语义。
+   * 传进来的 `req` 原样交给 article 服务：它要用 connection.admit 自己解析**连接身份**，
+   * 绝不采信 body 里的 owner/session/path 自证。
+   */
+  async function handleArticlePost(req, res, rawMethod) {
+    const method = decodeURIComponent(String(rawMethod || '')).replace(/\/+$/, '');
+    if (!ARTICLE_METHODS.has(method)) {
+      try { req.resume(); } catch { /* 已断 */ }
+      sendJson(res, 404, {
+        ok: false,
+        code: 'MP_ARTICLE_UNKNOWN_METHOD',
+        error: `不支持的工作台方法：${method || '(empty)'}`,
+      });
+      return;
+    }
+    const mediaType = req.headers['content-type']?.split(';', 1)[0]?.trim().toLowerCase();
+    if (mediaType !== 'application/json') {
+      try { req.resume(); } catch { /* 已断 */ }
+      sendJson(res, 415, { ok: false, code: 'MP_ARTICLE_BAD_INPUT', error: 'content type must be application/json' });
+      return;
+    }
+    const body = await readBody(req, bodyLimit);
+    if (!body.ok) {
+      const status = body.code === 'too-large' ? 413 : 400;
+      sendJson(res, status, {
+        ok: false, code: 'MP_ARTICLE_BAD_INPUT',
+        error: body.code === 'too-large' ? `body exceeds ${bodyLimit} bytes` : 'body read failed',
+      }, { connection: 'close' });
+      return;
+    }
+    let payload;
+    try {
+      payload = JSON.parse(body.buffer.toString('utf8'));
+    } catch {
+      sendJson(res, 400, { ok: false, code: 'MP_ARTICLE_BAD_INPUT', error: 'body is not JSON' });
+      return;
+    }
+    if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+      sendJson(res, 400, { ok: false, code: 'MP_ARTICLE_BAD_INPUT', error: 'body must be a JSON object' });
+      return;
+    }
+    let result;
+    try {
+      result = await articleService.handle(method, payload, req);
+    } catch (error) {
+      // handle() 自己已经兜住异常；这里只作最后一道，绝不让工作台看到 500。
+      try { log.warn?.('%s: article/%s failed: %s', name, method, String(error?.message ?? error)); } catch { /* 忽略 */ }
+      result = { ok: false, code: 'MP_ARTICLE_INTERNAL', error: String(error?.message ?? error) };
+    }
+    sendJson(res, 200, result);
+  }
+
   const route = {
     kind: 'prefix',
     path: ROUTE_PREFIX,
@@ -2428,6 +2523,10 @@ export function createHost(options = {}) {
           sendJson(res, 200, { ok: true, diag: lastDiag });
           return;
         }
+        if (req.method === 'POST' && pathname.startsWith(ARTICLE_PREFIX)) {
+          await handleArticlePost(req, res, pathname.slice(ARTICLE_PREFIX.length));
+          return;
+        }
         if (req.method === 'POST' && pathname.startsWith(API_PREFIX)) {
           await handleApiPost(req, res, url);
           return;
@@ -2444,6 +2543,7 @@ export function createHost(options = {}) {
 
   function close() {
     closed=true;
+    try { articleService.close(); } catch { /* 在途润色停流失败不影响关闭 */ }
     try { reading.close(); } catch { /* position store is optional */ }
     // 先放本 host 自己的资源（leases → SSE → watchers），再离场代际计数：
     // 已接纳的异步 save 排空后才可能触发旧代资源关闭（scheduleHostRetirement）。
@@ -2628,6 +2728,22 @@ function safeGet(ctx, serviceName) {
   }
 }
 
+/**
+ * 公众号草稿箱宿主：惰性载入 `lib/wechat-draft.js` 并构造 host。
+ *
+ * 为什么要单独一个函数：`lib/wechat-draft.js` 用 CommonJS 载入 `host/wechat-*.js`
+ * （由 scripts/sync-host.mjs 从桌面壳逐字节同步）。这些资产任何一方缺席都要给出
+ * **明确失败**（工作台看到"未装配"），而不是让整个插件启动失败。
+ * 构造一次、进程内复用；插件卸载时由 article service 的 close() 收尾。
+ */
+async function createWechatHostFrom() {
+  const mod = await import('./wechat-draft.js');
+  if (!mod || typeof mod.createPluginWechatHost !== 'function') {
+    throw new Error('wechat-draft.js 缺少 createPluginWechatHost');
+  }
+  return mod.createPluginWechatHost();
+}
+
 function safeLogger(ctx) {
   try {
     if (typeof ctx?.logger === 'function') return ctx.logger(name);
@@ -2663,6 +2779,10 @@ export function apply(ctx, config = {}) {
       sandboxPolicy: () => safeGet(ctx, 'sandboxPolicy'),
       sessions: () => safeGet(ctx, 'sessions'),
       connectionProvider: () => safeGet(ctx, 'connection'),
+      // 工作台 article/*：连接身份与模型组都在请求时现取，服务晚注册也能用。
+      getService: (serviceName) => safeGet(ctx, serviceName),
+      // 公众号草稿箱：只在真正用到时构造（缺 host/wechat-* 资产时给出明确"未装配"）。
+      wechatHostFactory: async () => createWechatHostFrom(),
     });
   } catch (error) {
     log.warn?.('%s: host init failed: %s', name, String(error?.message ?? error));

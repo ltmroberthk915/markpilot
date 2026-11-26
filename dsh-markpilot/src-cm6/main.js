@@ -53,6 +53,12 @@ import { createHistoryGuard } from './history-guard.mjs';
 import { editPlan, inlineCodeRanges, rangesTouching } from './edit-plan.js';
 import { installToolbar, wrap as wrapInline, TOOLBAR_ACTIONS } from "./toolbar.js";
 import { installExtras } from "./extras.js";
+/* 【文章版式·书页/研报】投影层：只写根属性 + 标题行编号装饰；配方唯一来源是 article-recipes.js。
+   未选择（plain）时这一组扩展**不产生任何 DOM/CSS 变化**（属性不写、编号不出）。 */
+import { articleEditionField, setArticleEdition, articleEditionExtension, applyArticleEdition, installArticleEditionStyles, interfaceIsDark } from './edition-view.js';
+import { readStoredEdition, normalizeEdition, EDITION_STORAGE_KEY, resolveEditionTone } from './article-edition.js';
+/* 【AI 选区润色】内核由同组编码者交付；这里只做安装与菜单入口（getView/toast 契约）。 */
+import { installSelectionRewrite } from './selection-rewrite.js';
 import { createFootnotesExtension, footnoteGoTo, footnoteIndex, footnoteInsert, footnoteJumpAt, footnoteMove, footnoteNav, footnoteStats } from './footnotes-view.js';
 import { scanSingleDollarMath, singleDollarLineKey } from './single-dollar-math.js';
 import { inlineCodeSpans, renderInline, inlineLinkSpans, webLink, inlineEmphasisSpans, inlineMathSpans, hasUnescapedDollar, singleLineDisplayTex } from './inline-format.js';
@@ -5840,14 +5846,42 @@ function noteCompositionTargetUpdate(update) {
   }
 }
 let compositionTargetProbe = null;
-const headingDecorations = EditorView.decorations.compute(["selection", lineStylesField, markdownContext], (state) => {
+/* ══ 标题井号投影：把 **H1–H6 前缀**单独从「选区依赖」里拆出来 ═══════════════════
+ * 【PATCH-5 起点】本段到 headingDecorations 的标题分支为止属于补丁 5（标题阅读态冻结）；
+ *   其余改动（H1–H6 之外）不属于任何补丁，验收时按本注释边界单独回退即可。
+ * 编辑态（原样，一字不改）：光标/选区入行显源码、离行隐藏 —— F7 同一手感，仍由
+ *   headingDecorations 负责（它读 "selection"）。
+ * 阅读态（新增约束）：标题**永远**保持排版，井号在任何选区下都不显形。阅读面是只读的，
+ *   那里的点击/拖选/Shift+方向键只为"选中并复制"；若跟随选区把 `#` 翻出来，标题会当场
+ *   重排（replace 装饰被撤销 ⇒ 行内多出 1–7 个字符宽），读者看到的是一行正文位移。
+ *   ⇒ 阅读态下井号改由下面这条**不依赖 selection** 的静态派生提供。
+ * 拆分边界（只拆标题，别的一律不动）：
+ *   · 分隔线 mp-hr、围栏行 mp-fence、图表/markdown 围栏的显隐与交互**仍留在
+ *     headingDecorations**，按原来的选区判据走 —— 它们的语义本来就与"复制时别翻源码"
+ *     无关，且改道会连带改变阅读态围栏块的呈现；
+ *   · 于是同一次选区变化里唯一不再翻转的装饰就是 H1–H6 前缀，资源/版式对比可归因于标题。
+ * 代价：阅读态选区移动仍会重算 headingDecorations（围栏那部分需要），但标题分支 O(1) 跳过；
+ *   能否就此省下可观工作量只看实测（装饰重建/布局计数），不预支结论。 */
+const readingHeadingDecorations = EditorView.decorations.compute([EditorState.readOnly, lineStylesField], (state) => {
+  if (!state.readOnly) return Decoration.none;
+  const { headings } = state.field(lineStylesField);
+  if (!headings.length) return Decoration.none;
+  const out = [];
+  for (const mark of headings) out.push(Decoration.replace({}).range(mark.from, mark.to));
+  return Decoration.set(out, true);
+});
+const headingDecorations = EditorView.decorations.compute(["selection", EditorState.readOnly, lineStylesField, markdownContext], (state) => {
   const out = [];
   const { headings, hrs } = state.field(lineStylesField);
   const notIn = (line) => !state.selection.ranges.some((r) => r.from <= line.to && r.to >= line.from);
-  for (const mark of headings) {
-    const line = state.doc.lineAt(mark.from);
-    if (notIn(line)) out.push(Decoration.replace({}).range(mark.from, mark.to)); // 光标不在 → 隐藏井号
+  // 编辑态：光标/选区入行显源码（原样）。阅读态：井号由 readingHeadingDecorations 固定隐藏。
+  if (!state.readOnly) {
+    for (const mark of headings) {
+      const line = state.doc.lineAt(mark.from);
+      if (notIn(line)) out.push(Decoration.replace({}).range(mark.from, mark.to)); // 光标不在 → 隐藏井号
+    }
   }
+  // 以下 hrs / 围栏两段与改前逐字相同（两态都走选区判据，阅读态行为不变）。
   for (const line of hrs) {
     if (notIn(line)) {
       out.push(Decoration.line({ class: "mp-hr" }).range(line.from));
@@ -6940,12 +6974,68 @@ class QuoteMarkWidget extends WidgetType {
   }
   ignoreEvent() { return true; }
 }
-const inlineMarkDecorations = EditorView.decorations.compute(["selection", EditorState.readOnly, inlineMarksField, tableDataField, tableSourceRangeField, tablePointerFreezeField, imgBaseField, imgPreviewField, regionIndexField, regionSessionField], (state) => {
+/* 【PATCH-5·标题行查找】阅读态要把"落点在某标题行内"的行内定界符冻结（见
+ *  inlineMarkDecorations）。判据必须来自 lineStylesField —— 它是**唯一真源**：
+ *  scanLineStyles 先跳过了 ``` 围栏块与 frontMatter，才跑 `^( {0,3})(#{1,6})([ \t]+|$)`
+ *  ⇒ 这里天然不会把三反引号里的 `# 注释` 当成标题，也不需要在本模块再实现一次 ATX 识别。
+ *
+ *  性能纪律（改前是 O(H) 建表 + O(M×H) 查找，而选区每动一次就要重算）：
+ *   · 缓存键 = lineStylesField 的**值身份**。该字段只在文档变化时换对象（mapLineStyles /
+ *     重扫都返回新对象），纯选区移动拿到的是同一个值 ⇒ 整段生命周期只建一次表；
+ *   · WeakMap ⇒ 条目随字段值一起被回收，**不会常驻多文档**、也没有模块级数组累积；
+ *   · 表是**按 line.from 升序**的紧凑区间，查找用二分 O(log H)，不是 some 的 O(H)；
+ *   · 判据仍是"mark 整段落在同一标题行内"（from >= 行首 && to <= 行尾），与改前逐字等价。 */
+const readingHeadingSpanCache = new WeakMap();
+function readingHeadingSpans(styles, doc) {
+  if (!styles || !styles.headings.length) return null;
+  const cached = readingHeadingSpanCache.get(styles);
+  // doc 校验只是保险：值身份变化本来就意味着文档变了。
+  if (cached && cached.doc === doc) return cached.spans;
+  /* headings 由 scanLineStyles 按 doc.iterLines() 顺序 push ⇒ **from 天然升序**，
+   * 每行最多一条（同一行只有一次正则命中）⇒ 不需要再排序、也不需要去重。
+   * 这里只把"标题行首/行尾"物化成紧凑区间，供二分使用。 */
+  const spans = new Array(styles.headings.length);
+  for (let i = 0; i < spans.length; i++) {
+    const line = doc.lineAt(styles.headings[i].from);
+    spans[i] = { from: line.from, to: line.to };
+  }
+  readingHeadingSpanCache.set(styles, { doc, spans });
+  return spans;
+}
+/** 二分：最后一个 lineFrom <= pos 的区间，再看 mark 是否整段落在该行内。 */
+function markInHeadingSpan(spans, from, to) {
+  let lo = 0, hi = spans.length - 1, hit = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (spans[mid].from <= from) { hit = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  return hit >= 0 && to <= spans[hit].to;
+}
+
+const inlineMarkDecorations = EditorView.decorations.compute(["selection", EditorState.readOnly, lineStylesField, inlineMarksField, tableDataField, tableSourceRangeField, tablePointerFreezeField, imgBaseField, imgPreviewField, regionIndexField, regionSessionField], (state) => {
   const out = [];
   const tables = state.field(tableDataField, false) || [];
   const inTable = (pos) => tables.some((t) => pos >= t.from && pos <= t.to);   // 表格行走块级 widget，行内装饰必须让位
+  /* 【阅读态·ATX 内联格式】标题里的 `**`／`_`／`` ` ``／`~~` 也是"标题排版"的一部分：
+   *  阅读面选中一个 `## **粗体** 标题` 时，若按 inSel 把这些定界符翻出来，标题会当场
+   *  重排（每对定界符 2–3 个字符宽、且 strong 的 900 字重描边随之消失），读者看到的
+   *  是标题位移＋字重跳变 —— 与井号翻源码是同一类缺陷。故阅读态下**整行标题**冻结
+   *  行内定界符的显隐，只保留选区高亮与复制（复制仍走 sliceDoc 的源码）。
+   *  编辑态完全不变：光标/选区入段照旧显源码。
+   *  【PATCH-5】本块（headingSpans 惰性解析 + inHeadingLine + frozenHeading，以及下面那处
+   *  `&& !frozenHeading`）与 readingHeadingDecorations 同属补丁 5，可整块摘除回退。
+   *  【惰性】表只在**真的遇到 inSel mark**时构造一次；没有选区命中就没有任何遍历。 */
+  let headingSpans;                       // undefined = 未解析；null = 本文档没有标题
+  const inHeadingLine = (from, to) => {
+    if (headingSpans === undefined)
+      headingSpans = state.readOnly
+        ? readingHeadingSpans(state.field(lineStylesField, false), state.doc)
+        : null;
+    return !!headingSpans && markInHeadingSpan(headingSpans, from, to);
+  };
   for (const mark of state.field(inlineMarksField)) {
     const inSel = state.selection.ranges.some((r) => r.from <= mark.to && r.to >= mark.from);
+    const frozenHeading = inSel && inHeadingLine(mark.from, mark.to);
     /* 【图片优先判】先于 "inSel ⇒ 显源码"：data URI 一旦展开就是 90 万字符回灌 DOM，
        前沿线实测那种行"折行"要 50~78ms/键。所以**长 src 的图永远保持 widget**（要改地址走"编辑源码"）。 */
     if (mark.image) {
@@ -6971,7 +7061,7 @@ const inlineMarkDecorations = EditorView.decorations.compute(["selection", Edito
       const from = mark.hides[0][1], to = mark.hides[1][0];
       if (from < to) out.push(Decoration.mark({tagName:'a', attributes:linkAttributes(mark.href)}).range(from,to));
     }
-    if (inSel && !(mark.href && state.readOnly)) continue; // 光标在包裹段 → 显示源码标记
+    if (inSel && !frozenHeading && !(mark.href && state.readOnly)) continue; // 光标在包裹段 → 显示源码标记
     /* 【下划线 <u>…</u>·2026-10-11 已按"隐藏区间"落地 ✓】走过的三条路（留档，别再回头）：
        ① `hides` 零宽替换 + **单个 width** ⇒ 开闭标记长度不等（3 与 4）⇒ 屏幕上留 `>` 与 `</`、
           外加两个高亮拆出来的游离 `u` 字形 ✗（**真因**见上面 `scan()` 的 openLen/closeLen 注释 ✓）；
@@ -7002,8 +7092,7 @@ const inlineMarkDecorations = EditorView.decorations.compute(["selection", Edito
       if (head >= hl.from && head <= hl.to && mark.to >= hl.from && mark.from <= hl.to) continue;
       for (const [a, b] of mark.hides) out.push(Decoration.replace({}).range(a, b));
       continue;
-    }
-    if (mark.bullet) { out.push(Decoration.replace({ widget: new BulletWidget() }).range(mark.from, mark.to)); continue; }
+    }    if (mark.bullet) { out.push(Decoration.replace({ widget: new BulletWidget() }).range(mark.from, mark.to)); continue; }
     /* 【有序列表】序号 widget（Typora 观感：1.  顶替源码里的 1. ——与 • 同一套 F7 规则）。 */
     if (mark.ordered) {
       out.push(Decoration.replace({ widget: new OrderedWidget(mark.ordered) }).range(mark.from, mark.to)); continue;
@@ -9148,9 +9237,17 @@ table.mp-row tr.mp-cell-drag-selected > *, table.mp-row tr.mp-src-sel > th, tabl
    是**空的一下**（pop 的 rect 全 0），既看不到当前档也切不了档。
    只放行"更多"这一只（.mp-pop-keep），其余浮层在阅读态照旧隐藏。 */
 [data-mp-reading="1"] .cm-editor:not(.mp-split-source) .cm-content { max-width: 780px !important; margin: 0 auto !important;
-  padding: 56px 28px 40vh !important; font-size: 16px !important; line-height: 1.95 !important;
+  /* 【页首物理边界·2026-11-26】scrollTop 已 = 0 时，上方留白是唯一还能调的排版量：
+     编辑态 padding-top = var(--mp-toolbar-h)+2，阅读态固定 56px，窄窗两者差 ~28px；
+     此时再往上滚不可能（scrollTop 不能为负）。于是用**阅读视图专有**变量补足那段留白：
+     只影响阅读态、只影响顶部内边距，退出即清零；默认 0 时逐像素等同改前。 */
+  padding: calc(56px + var(--mp-reading-top-pad, 0px)) 28px 40vh !important; font-size: 16px !important; line-height: 1.95 !important;
   /* 阅读态才要的两条：strict 收紧行首行尾禁则；justify 让中文两端对齐（编辑态不给，避免光标/选区手感变化） */
   line-break: strict !important; text-align: justify !important; }
+/* 页末边界：不在此处写 padding-bottom 规则。尾部留白由 tailSpacePlugin
+   用行内 style 动态决定（常规 48px / 图片会话时视口高），任何带 !important
+   的规则都会压掉它，并且会连分栏的 contentDOM 一起命中。需要补偿时由
+   restoreReadingAnchor 只对主编辑器 contentDOM 临时写行内值并即时还原。 */
 [data-mp-reading="1"] .cm-editor:not(.mp-split-source) .cm-line[class*="mp-h"]::before { display: none; }
 [data-mp-reading="1"] .cm-editor:not(.mp-split-source) .cm-content * { -webkit-text-stroke-width: 0 !important; }
 [data-mp-reading="1"] .cm-editor:not(.mp-split-source) .cm-cursor, [data-mp-reading="1"] .cm-editor:not(.mp-split-source) .cm-dropCursor { display: none; }
@@ -9527,16 +9624,101 @@ const historyGuardNotify = why => {
 // only that turn may arm a ticket. Later user intent always cancels restoration.
 let readingAnchorTicket = null;
 const readingAnchorMeasureKey = {};
+/* 段落行盒（legacy 比例路径专用，保持原语义）。 */
 function readingParagraphBox(target, from, to) {
   try {
-  const at = target.domAtPos(from);
-  const node = at.node.nodeType === 1 ? at.node : at.node.parentElement;
-  const element = node?.closest('.cm-line');
-  if (!element || !target.contentDOM.contains(element)) return null;
-  const line = target.state.doc.lineAt(target.posAtDOM(element, 0));
-  if (line.from !== from || line.to !== to) return null;
-  const box = element.getBoundingClientRect();
-  return box.height > 0 && box.width > 0 ? box : null;
+    const at = target.domAtPos(from);
+    const node = at.node.nodeType === 1 ? at.node : at.node.parentElement;
+    const element = node?.closest('.cm-line');
+    if (!element || !target.contentDOM.contains(element)) return null;
+    const line = target.state.doc.lineAt(target.posAtDOM(element, 0));
+    if (line.from !== from || line.to !== to) return null;
+    const box = element.getBoundingClientRect();
+    return box.height > 0 && box.width > 0 ? box : null;
+  } catch { return null; }
+}
+/* 阅读锚点：**当刻真实屏幕中央的可见正文字符**。
+ *
+ * 旧实现取 scroller 左缘 +4、30% 段落比例，恢复时按切换后的 scroller 几何换算，
+ * 实测仍差 20–50px（正文列在两种外壳下宽度/字号不同，比例换算把版式差当成了位置）。
+ * 新做法全部基于**同一个字符**：
+ *   · 捕获：用视口中线取一个真实可见的正文字符，记它的源码偏移 + 该字符 DOM Range
+ *     的绝对屏幕 Y（iframe 内的 CSS px，不乘 DPR）；
+ *   · 恢复：切换完成后重新量**同一字符**的 DOM Range，差量除以真实 scroller scale
+ *     修正 scrollTop。没有比例换算，也就没有版式差进入结果。
+ * 分帧等待真实工具栏/CM 布局收敛（原生 rAF，严格有界，零常驻）；边界钳制；
+ * 用户滚轮/触控/编辑/切档即取消。显隐或 selection 姿态的内部变化不算用户意图，
+ * 允许本次合法恢复继续。 */
+/* 帧上限。稳定判定需要：至少两帧比对 + 写后至少确认一帧 ⇒ 4 帧偏紧，给到 6。 */
+const READING_MAX_FRAMES = 6;
+/* 取视口中线附近一个真实可测的正文字符。只读，不滚动、不改选区。 */
+function readingVisibleChar(target) {
+  let sc, rect, content;
+  try {
+    sc = target.scrollDOM;
+    rect = sc.getBoundingClientRect();
+    content = target.contentDOM.getBoundingClientRect();
+  } catch { return null; }
+  if (!(rect.height > 0)) return null;
+  const colLeft = content && content.width > 0 ? content.left : rect.left;
+  const colW = content && content.width > 0 ? content.width : rect.width;
+  const x = colLeft + Math.min(Math.max(24, colW * 0.3), Math.max(24, colW - 24));
+  const midY = rect.top + rect.height / 2;
+  const doc = target.state.doc;
+  /* 从中线向上下交替探：就近命中，避开空行与块级 widget。 */
+  for (let i = 0; i < 8; i++) {
+    const off = i === 0 ? 0 : Math.ceil(i / 2) * 20 * (i % 2 ? 1 : -1);
+    const y = midY + off;
+    if (y < rect.top + 2 || y > rect.bottom - 2) continue;
+    let pos = null;
+    try { pos = target.posAtCoords({ x, y }); } catch { pos = null; }
+    if (pos == null) continue;
+    const at = Math.max(0, Math.min(pos, doc.length));
+    const line = doc.lineAt(at);
+    if (!line.text.trim()) continue;
+    const ch = Math.max(0, Math.min(at - line.from, line.length));
+    const box = readingCharRect(target, line.from, ch);
+    if (!box) continue;
+    if (box.top < rect.top - 1 || box.bottom > rect.bottom + 1) continue;
+    return { pos: line.from + ch, line, ch, box };
+  }
+  return null;
+}
+/* 某字符的 DOM Range 矩形（CSS px）。取不到就返回 null，绝不推断。 */
+function readingCharRect(target, from, ch) {
+  try {
+    const start = target.domAtPos(from + ch, 1);
+    const end = target.domAtPos(Math.min(from + ch + 1, target.state.doc.length), 1);
+    const range = document.createRange();
+    range.setStart(start.node, start.offset);
+    range.setEnd(end.node, end.offset);
+    const box = range.getBoundingClientRect();
+    if (!(box.width > 0.5 && box.height > 0.5)) return null;
+    return box;
+  } catch { return null; }
+}
+/* 光标优先：用户真实的光标 / 阅读选区 head。
+ * 与"显示中心找正文"相比，它才是读者认知里的那个点（V2 实测：pos72030 正是
+ * selection.main.head，用它做锚点才能保证退出后回到同一处）。
+ * 条件：单 range、非空行、DOM Range 可测、且矩形完整落在 scroller 内。
+ * 全程只读 —— **不** scrollIntoView、不为了取锚点把视口滚回光标。 */
+function readingCaretChar(target) {
+  try {
+    const sel = target.state.selection;
+    if (!sel || sel.ranges.length !== 1) return null;
+    const head = sel.main.head;
+    if (!Number.isInteger(head) || head < 0) return null;
+    const doc = target.state.doc;
+    const line = doc.lineAt(head);
+    if (!line.text.trim()) return null;
+    const ch = Math.max(0, Math.min(head - line.from, line.length));
+    const box = readingCharRect(target, line.from, ch);
+    if (!box) return null;
+    const scRect = target.scrollDOM.getBoundingClientRect();
+    if (!(scRect.height > 0)) return null;
+    /* 必须在有效正文视区内且无遮挡 */
+    if (box.top < scRect.top - 1 || box.bottom > scRect.bottom + 1) return null;
+    return { pos: line.from + ch, line, ch, box, fromCaret: true };
   } catch { return null; }
 }
 /* Reading source intent: the original logical source selection plus its live
@@ -9544,12 +9726,45 @@ function readingParagraphBox(target, from, to) {
 let readingSourceIntent = null;
 function captureReadingAnchor(on) {
   if ((document.documentElement.dataset.mpReading === '1') === !!on) return null;
-  return captureParagraphAnchor(on);
+  /* 模式切换必须走 mode=true（字符 + 绝对屏幕 Y）；宽度滑杆仍走 false。 */
+  return captureParagraphAnchor(on, true);
 }
-function captureParagraphAnchor(on) {
+/**
+ * `mode` 区分两类调用者：
+ *   · true  —— 阅读/编辑切换，走字符 + 绝对屏幕 Y 的路径；
+ *   · false —— 既有的同面调用者（页面宽度重排，~L1108），**保持原几何语义**。
+ */
+function captureParagraphAnchor(on, mode = false) {
   const target = view;
   if (!target || target.composing || cellComposing) return null;
   try {
+    if (mode) {
+      /* 优先级：① 用户真实光标/选区 head（视口内、有效正文字形）
+       *          ② 显示中心附近的可见正文。
+       * 用 Range 的 **TOP** 而不是 center：两态字号/行高不同，用 center 会把
+       * 半字高差直接算成偏差（书页 16px/31.2px 与编辑态 25.2px 的行高差尤其明显）。 */
+      const hit = readingCaretChar(target) || readingVisibleChar(target);
+      if (!hit) return null;
+      /* 【清除上一轮留白：只在此处、且在捕获旧锚点之后】
+       * 顺序要求：先把 hit 的 box 量完（上面已经完成），再清留白，然后才由
+       * restore 重新测量。否则旧留白会污染本次的字符 TOP。
+       * 过期票据不能清新票据的留白：这里无条件清，但清完立刻由本次切换重新决定
+       * 是否需要留白；票据本身用 readingAnchorTicket 的当前值判归属，旧 ticket
+       * 的 finish 已经不碰留白了。 */
+      try { document.documentElement.style.removeProperty('--mp-reading-top-pad'); } catch { /* 无样式不影响 */ }
+      const ticket = readingAnchorTicket = { target, doc: target.state.doc,
+        selection: target.state.selection, epoch: target.state.field(regionIndexField).epoch,
+        revision: sourceRevision, pos: hit.pos, ch: hit.ch, lineFrom: hit.line.from,
+        screenTop: hit.box.top, mode: true, on: !!on,
+        fromCaret: !!hit.fromCaret,
+        canArm: true, armed: false };
+      queueMicrotask(() => {
+        ticket.canArm = false;
+        if (readingAnchorTicket === ticket && !ticket.armed) readingAnchorTicket = null;
+      });
+      return ticket;
+    }
+    /* legacy 路径：逐字保留原语义。 */
     const sc = target.scrollDOM, rect = sc.getBoundingClientRect();
     const scale = rect.height / sc.offsetHeight;
     if (!(Number.isFinite(scale) && scale > 0)) return null;
@@ -9562,7 +9777,7 @@ function captureParagraphAnchor(on) {
     if (!Number.isFinite(fraction) || fraction < 0 || fraction > 1) return null;
     const ticket = readingAnchorTicket = { target, doc: target.state.doc,
       selection: target.state.selection, epoch: target.state.field(regionIndexField).epoch,
-      revision: sourceRevision, from: line.from, to: line.to, fraction, on: !!on,
+      revision: sourceRevision, from: line.from, to: line.to, fraction, mode: false, on: !!on,
       canArm: true, armed: false };
     queueMicrotask(() => {
       ticket.canArm = false;
@@ -9571,49 +9786,358 @@ function captureParagraphAnchor(on) {
     return ticket;
   } catch { return null; }
 }
-function restoreReadingAnchor(ticket) {
+function restoreReadingAnchor(ticket, reboundSelection = null) {
   const target = view;
+  /* 显隐/selection 姿态的内部变化（进入阅读时 dispatch 会动 selection）不算用户意图：
+   * 票据记录的是**源码字符**，字符还在就允许恢复。用户真实意图由下面的
+   * commands/viewportIntent 序号单独判。 */
   const sameSource = () => readingAnchorTicket === ticket && view === ticket.target &&
     target.dom.isConnected && target.state.doc === ticket.doc &&
-    target.state.selection.eq(ticket.selection) && sourceRevision === ticket.revision &&
     target.state.field(regionIndexField).epoch === ticket.epoch &&
-    (document.documentElement.dataset.mpReading === '1') === ticket.on &&
-    target.state.readOnly === ticket.on;
+    sourceRevision === ticket.revision &&
+    (document.documentElement.dataset.mpReading === '1') === ticket.on;
   if (!ticket || !ticket.canArm || !target || !sameSource()) return;
-  // Arm after our synchronous theme/font and readonly effects, never after await.
   ticket.canArm = false; ticket.armed = true;
   const serial = commands.serial(), viewportSerial = viewportIntent.serial(target);
+  /* 用户意图：滚轮/触控/编辑/切档任一发生，序号前进 ⇒ 本次恢复作废。 */
   const valid = () => sameSource() && commands.serial() === serial &&
     viewportIntent.serial(target) === viewportSerial;
-  const finish = () => { if (readingAnchorTicket === ticket) readingAnchorTicket = null; };
-  let remaining = 3;
-  const measure = () => {
+  /* 本次已追加的额外尾部补偿量（CSS px）。0 表示当前未补偿。
+   * 声明位置必须在 finish/writeBottomPad 使用之前（避免 TDZ）。 */
+  let bottomExtra = 0;
+  /* 票据收尾：**只释放票据**，不动顶部留白。
+   * 顶部留白要"进入后保持直到退出"——首帧对齐靠它，300ms 后仍在靠它。把它在这里
+   * 清掉会让字符立刻回退 −28/−17.84（V4 实测）。顶部留白只在**下一次真实切换捕获
+   * 旧锚点之后**由 captureParagraphAnchor 清除。
+   * 尾部补偿不同：它是行内样式、且只在退出方向临时加，所以收尾时立即还原，
+   * 让 tailSpacePlugin 的原行内声明自然生效（不必等下一次切换）。 */
+  const finish = () => {
+    if (bottomExtra !== 0) { writeBottomPad(0); bottomExtra = 0; }
+    if (readingAnchorTicket === ticket) readingAnchorTicket = null;
+  };
+
+  if (!ticket.mode) {
+    /* legacy：逐字保留原比例换算路径。 */
+    let remaining = 3;
+    const measure = () => {
+      if (!valid()) { finish(); return; }
+      target.requestMeasure({ key: readingAnchorMeasureKey,
+        read() {
+          if (!valid()) return null;
+          const sc = target.scrollDOM, rect = sc.getBoundingClientRect();
+          const scale = rect.height / sc.offsetHeight;
+          if (!(Number.isFinite(scale) && scale > 0)) return null;
+          const box = readingParagraphBox(target, ticket.from, ticket.to);
+          if (!box) return { retry: true };
+          const delta = (box.top + ticket.fraction * box.height -
+            (rect.top + sc.clientHeight * .30 * scale)) / scale;
+          const top = sc.scrollTop + delta, max = Math.max(0, sc.scrollHeight - sc.clientHeight);
+          return Number.isFinite(top) && top >= 0 && top <= max ? { top } : null;
+        },
+        write(value) {
+          if (!value || !valid()) { finish(); return; }
+          queueMicrotask(() => {
+            if (!valid()) { finish(); return; }
+            if (!value.retry) target.scrollDOM.scrollTop = value.top;
+            if (--remaining > 0) measure(); else finish();
+          });
+        },
+      });
+    };
+    measure();
+    return;
+  }
+
+  /* ── mode：同一字符的 DOM Range 差量修正 ────────────────────────────────
+   * 分帧等真实工具栏/CM 布局收敛；每帧只读几何。
+   * 【早停条件·已修正】不能"首帧 delta<0.5 就收尾"——首帧对齐时工具栏往往还没
+   * 恢复显示，正文 padding-top 随后才从 34 涨到 84，字符会被整体推走。所以要求
+   * **相邻两帧**同时满足：① 字符 Y 相对上一帧变化 <0.5；② 工具栏高度变量不再变化。
+   * 只读 `--mp-toolbar-h`（一次样式读），不加观察者。
+   * 严格有界：最多 READING_MAX_FRAMES 帧，无定时器、无常驻。 */
+  const raf = typeof requestAnimationFrame === 'function'
+    ? (fn) => requestAnimationFrame(fn)
+    : (fn) => setTimeout(fn, 16);
+  let frames = 0;
+  let prevCharY = null;      // 上一帧同一字符的 TOP
+  let prevToolbarVar = null; // 上一帧的 --mp-toolbar-h
+  let sinceWrite = 0;        // 写完后又过了几帧（写后至少再确认一帧）
+  const nextFrame = () => raf(() => step());
+  const readToolbarVar = () => {
+    try { return document.documentElement.style.getPropertyValue('--mp-toolbar-h').trim() || null; }
+    catch { return null; }
+  };
+  /* 【页首物理边界】目标 scrollTop 会 < 0（已在顶端）时，滚动补偿物理上做不到。
+   * 改用**阅读视图专有的顶部留白**补不足，把 `--mp-reading-top-pad` 设成尚缺的留白，
+   * 内容整体下移同样距离 ⇒ 同一字符回到原屏幕 Y。
+   *
+   * ⚠️【单位】该变量是 `.cm-content` 的 padding-top，而 `.cm-editor{zoom:var(--mp-zoom)}`
+   * 是它**祖先**上的 CSS zoom ⇒ padding 用的是**未缩放的局部 CSS px**；
+   * 而 readingCharRect / getBoundingClientRect 量到的 delta 是**已缩放**的屏幕 px。
+   * 因此赋值必须 `delta / zoom`（V5 直接写 delta ⇒ 只补上 1/zoom，实测 80% 差 20%：
+   *  −4.484 / −3.406 恰是 −22.42 / −17.03 的 20%；125% 则过量 —— 与现象逐位吻合）。
+   * 纪律：只在 `ticket.on === true`（阅读态）时启用；只在本票生命周期内有效；
+   * 退出时清零。不监听按键、不改用户配置、不用负 scrollTop 或遮罩。 */
+  const TOP_PAD_VAR = '--mp-reading-top-pad';
+  /* 局部 px ↔ 屏幕 px 的换算系数：就是 .cm-content 实际所处的 CSS zoom。
+   * 复用全仓唯一的 zoom 判定路径 mpZoomOf（别在这里另写第二套）。 */
+  const readLocalZoom = () => {
+    try {
+      const z = mpZoomOf(target.contentDOM);
+      return Number.isFinite(z) && z > 0 && z <= 3 ? z : 1;
+    } catch { return 1; }
+  };
+  /* 变量存的是**未缩放局部 px**（与它作用的 padding 同一坐标系）。 */
+  const readTopPad = () => {
+    try {
+      const v = parseFloat(document.documentElement.style.getPropertyValue(TOP_PAD_VAR));
+      return Number.isFinite(v) && v > 0 ? v : 0;
+    } catch { return 0; }
+  };
+  const writeTopPad = (localPx) => {
+    try {
+      if (Number.isFinite(localPx) && localPx > 0.5) {
+        document.documentElement.style.setProperty(TOP_PAD_VAR, localPx.toFixed(2) + 'px');
+      } else document.documentElement.style.removeProperty(TOP_PAD_VAR);
+    } catch { /* 样式写入失败不影响滚动路径 */ }
+  };
+  /* 【页末】编辑态尾部补偿：**行内样式、只针对主编辑器 contentDOM**。
+   * 基底 = 该元素在应用补偿之前的实际计算 paddingBottom（即 tailSpacePlugin
+   * 用行内 style 写下的 48px 或视口高），补偿**叠加**在它之上而非替换。
+   * 基底保存在本票闭包里（不挂 DOM 属性），收尾时按原字符串还原；
+   * 基底本不是行内值时清空行内属性，让原声明自然生效。 */
+  const bottomBaseInline = (() => {
+    try { return target.contentDOM.style.paddingBottom || ''; } catch { return ''; }
+  })();
+  const readBottomBase = () => {
+    try {
+      const v = parseFloat(getComputedStyle(target.contentDOM).paddingBottom);
+      return Number.isFinite(v) && v > 0 ? v : 0;
+    } catch { return 0; }
+  };
+  const writeBottomPad = (extra) => {
+    const el = target.contentDOM;
+    if (!el) return;
+    try {
+      if (extra > 0.5) {
+        const basePx = parseFloat(bottomBaseInline);
+        const base = Number.isFinite(basePx) && basePx > 0 ? basePx : readBottomBase();
+        el.style.paddingBottom = (base + extra).toFixed(2) + 'px';
+      } else if (bottomBaseInline) {
+        el.style.paddingBottom = bottomBaseInline;
+      } else {
+        el.style.removeProperty('padding-bottom');
+      }
+    } catch { /* 样式失败不影响滚动路径 */ }
+  };
+  /* 还需要再追加多少：delta 是"当前字符 TOP 比目标低了多少"，补同样多即可。 */
+  const needExtraBottom = (delta) => Math.max(0, bottomExtra + delta);
+  /* 恢复编辑态时先还原上一轮尾部补偿（同顶部纪律：捕获之后、重测之前）。 */
+  if (!ticket.on && bottomExtra !== 0) { writeBottomPad(0); bottomExtra = 0; }
+  /* 旧留白已在 captureParagraphAnchor 捕获旧锚点之后清掉，这里不再重复清
+   *（重复清会把本次将要写入的留白也抹掉）。 */
+
+  /* 阶段一：CSS + readonly 变更已同步完成，先做一次**立即**的对齐。
+   * 目的：不让转换后的首帧出现明显重排跳动（远端实测首帧 -339.5px）。
+   * 这次只读一次几何、写一次 scrollTop；随后才进入有界跨帧确认。 */
+  /* ── 阶段一：单次字符坐标校正（只在微任务里调用一次）─────────────────────
+   * V6 用 coordsAtPos(pos) + 另取一次 DOM Range：
+   *   coordsAtPos 内部走 bidi 再测光标（昂贵），随后又要 readingCharRect 再测一遍同一个字。
+   * V7 换成 vendor 已确认的**公开** target.coordsForChar(pos)：它一次完成
+   *   pending readMeasured + 真实源字符 glyph box（CJK / 普通文本都适用），
+   *   正是 V6 那两步重复测量的合体。API 不可用 / 返回 null / 零宽高时
+   *   回退原有 readingCharRect，行为与 V6 一致（不加特例、不加额外 rAF）。
+   * 顺序也按"先测字符、后读 scale"：位移近零时直接返回，连 scroller 几何都不用读。 */
+  const charScreenBox = (pos, lineFrom, ch) => {
+    /* ① 首选：公开 coordsForChar —— 一次拿到字符在屏幕上的 box。 */
+    if (typeof target.coordsForChar === 'function') {
+      try {
+        const c = target.coordsForChar(pos);
+        if (c && Number.isFinite(c.left) && Number.isFinite(c.top) &&
+            Number.isFinite(c.right) && Number.isFinite(c.bottom) &&
+            c.right - c.left > 0.5 && c.bottom - c.top > 0.5) {
+          return { top: c.top, left: c.left, height: c.bottom - c.top, source: 'coordsForChar' };
+        }
+      } catch { /* 落到下面回退 */ }
+    }
+    /* ② 回退：原有 DOM Range（与 V6 同一实现）。 */
+    const box = readingCharRect(target, lineFrom, ch);
+    if (!box) return null;
+    return { top: box.top, left: box.left, height: box.height, source: 'readingCharRect' };
+  };
+  const syncCorrect = () => {
+    const sc = target.scrollDOM;
+    /* ① 先测字符（这一次调用同时完成 pending readMeasured）。 */
+    const glyph = charScreenBox(ticket.pos, ticket.lineFrom, ticket.ch);
+    if (!glyph) return false;
+    const delta = glyph.top - ticket.screenTop;
+    /* ② 位移近零：提前退出，不去读 scroller 几何。 */
+    if (!Number.isFinite(delta) || Math.abs(delta) < 0.5) return false;
+    /* ③ 再读 scale / scrollHeight（此时才需要）。 */
+    const rect = sc.getBoundingClientRect();
+    const scale = rect.height / sc.offsetHeight;
+    if (!(Number.isFinite(scale) && scale > 0)) return false;
+    const max = Math.max(0, sc.scrollHeight - sc.clientHeight);
+    const targetTop = sc.scrollTop + delta / scale;
+    /* 顶部边界：滚不动了（目标 < 0 或已在 0），用阅读态专有留白补。
+     * delta<0 = 字符在目标之上 ⇒ 需要把内容往下推。
+     * 换算：delta 是屏幕 px，留白变量是**未缩放局部 px** ⇒ 除以 zoom；
+     * 且**累加**在已有留白之上（部分可滚时前面已滚了一段，这里只补尚缺的局部量）。
+     * zoom 只在真的要走留白这条支路时读一次，并在两个用量上复用。 */
+    if (ticket.on && delta < -0.5 && targetTop < 0.5) {
+      const zoom = readLocalZoom();
+      const localNeed = Math.max(0, -delta) / zoom;
+      const curLocal = readTopPad();
+      const nextLocal = curLocal + localNeed;
+      /* 局部量的有效上限：可滚高度换算到局部坐标，避免超出视口无意义地推。 */
+      const capLocal = sc.clientHeight / zoom;
+      const clamped = Math.min(nextLocal, capLocal);
+      if (clamped - curLocal > 0.5) {
+        writeTopPad(clamped);
+        return true;
+      }
+      return false;
+    }
+    const top = Math.max(0, Math.min(max, targetTop));
+    if (Math.abs(top - sc.scrollTop) < 0.5) return false;
+    try { sc.scrollTop = top; } catch { return false; }
+    return true;
+  };
+  /* ── 后续跨帧确认：原有有界 step（READING_MAX_FRAMES 上限，无定时器）──────
+   * 首轮由下方微任务在**一次校正之后**安装；step 自身逻辑不变，
+   * 只在顶部边界补差那一处按同一套 zoom 换算（与 syncCorrect 同口径）。 */
+
+  const step = () => {
     if (!valid()) { finish(); return; }
+    if (frames++ >= READING_MAX_FRAMES) { finish(); return; }
     target.requestMeasure({ key: readingAnchorMeasureKey,
       read() {
         if (!valid()) return null;
         const sc = target.scrollDOM, rect = sc.getBoundingClientRect();
         const scale = rect.height / sc.offsetHeight;
         if (!(Number.isFinite(scale) && scale > 0)) return null;
-        const box = readingParagraphBox(target, ticket.from, ticket.to);
-        if (!box) return { retry: true };
-        const delta = (box.top + ticket.fraction * box.height -
-          (rect.top + sc.clientHeight * .30 * scale)) / scale;
-        const top = sc.scrollTop + delta, max = Math.max(0, sc.scrollHeight - sc.clientHeight);
-        return Number.isFinite(top) && top >= 0 && top <= max ? { top } : null;
+        const box = readingCharRect(target, ticket.lineFrom, ticket.ch);
+        /* 跨帧拿不到 glyph（虚拟化没渲染该行）：不放弃、也不猜。
+         * 改为只定位到**源行**（scrollIntoView 的等价：用 CM 自己的
+         * lineBlockAt 高度图把该行滚进视口），不改 selection、可被用户取消。
+         * 下一帧再尝试精确对齐。 */
+        if (!box) {
+          try {
+            const blk = target.lineBlockAt(ticket.lineFrom);
+            if (blk && Number.isFinite(blk.top) && Number.isFinite(target.documentTop)) {
+              const cur = sc.scrollTop;
+              const want = cur + (target.documentTop + blk.top - rect.top) / scale;
+              const maxR = Math.max(0, sc.scrollHeight - sc.clientHeight);
+              const clampTop = Math.max(0, Math.min(maxR, want));
+              if (Math.abs(clampTop - cur) >= 1) return { top: clampTop, lineOnly: true };
+            }
+          } catch { /* 高度图不可用时退回重试 */ }
+          return { retry: true };
+        }
+        /* 用 Range 的 TOP 与捕获时的 TOP 比：两态字号不同也不会引入半字高差。 */
+        const nowTop = box.top;
+        const delta = nowTop - ticket.screenTop;
+        if (!Number.isFinite(delta)) return null;
+        const toolbarVar = readToolbarVar();
+        /* 相邻帧稳定性：字符 TOP 没动 且 工具栏高度变量没变。 */
+        const charStable = prevCharY !== null && Math.abs(nowTop - prevCharY) < 0.5;
+        const toolbarStable = prevToolbarVar !== null && toolbarVar === prevToolbarVar;
+        prevCharY = nowTop;
+        prevToolbarVar = toolbarVar;
+        const max = Math.max(0, sc.scrollHeight - sc.clientHeight);
+        const targetTop = sc.scrollTop + delta / scale;
+        /* 顶端且仍需下移 ⇒ 用顶部留白补（滚动已到 0，物理上无法再上滚）。
+         * 换算同首轮：delta 是屏幕 px，留白变量是**未缩放局部 px** ⇒ /zoom，
+         * 并在**已有留白**之上累加尚缺量（部分可滚时前面已滚掉一段，只补剩下的）。 */
+        if (ticket.on && targetTop < 0.5 && delta < -0.5) {
+          const zoom = readLocalZoom();
+          const curLocal = readTopPad();
+          const localNeed = Math.max(0, -delta) / zoom;
+          const capLocal = sc.clientHeight / zoom;
+          const needPad = Math.min(curLocal + localNeed, capLocal);
+          if (needPad - curLocal > 0.5) {
+            return { topPad: needPad };
+          }
+          /* 留白已给足仍不对齐：说明不是这条边界能解决的，如实收尾。 */
+          return { done: true, pinned: true };
+        }
+        const top = Math.max(0, Math.min(max, targetTop));
+        /* 底端且仍需下移（delta > 0）⇒ 滚不动了，用尾部补偿。
+         * 只作用于退出方向（!ticket.on）：阅读态本来就有 40vh 尾空。
+         * extra 是**累计**的补偿量（叠加在 tailSpacePlugin 的基底之上）。 */
+        if (!ticket.on && sc.scrollTop >= max - 0.5 && delta > 0.5) {
+          const extra = needExtraBottom(delta);
+          if (extra > 0) return { bottomPad: Math.min(extra, sc.clientHeight * 2) };
+          return { done: true, pinned: true };
+        }
+        /* 到达自然边界仍对不齐：如实记录，不再徒劳重试。
+         * 符号：delta = now - target。
+         *   · 顶端（scrollTop 已 0）：缺的是向上量 ⇒ delta < 0 才说明还没对齐；
+         *   · 底端（scrollTop 已 max）：缺的是向下量 ⇒ delta > 0 才说明还没对齐。 */
+        const pinned = (sc.scrollTop <= 0.5 && delta < -0.5) ||
+          (sc.scrollTop >= max - 0.5 && delta > 0.5);
+        const needWrite = Math.abs(delta) >= 0.5 && Math.abs(top - sc.scrollTop) >= 0.5 && !pinned;
+        if (!needWrite && charStable && toolbarStable && sinceWrite >= 1) {
+          return { done: true, pinned: !!pinned };
+        }
+        if (!needWrite) return { wait: true };   // 看着对齐但还没稳：再等一帧
+        return { top };
       },
       write(value) {
         if (!value || !valid()) { finish(); return; }
-        // CM compensates its scroll anchor after measure.write; own only the tail.
+        if (value.done) {
+          if (value.pinned) ticket.pinnedAtBoundary = true;
+          finish(); return;
+        }
+        if (value.retry || value.wait) { sinceWrite += 1; nextFrame(); return; }
+        if (typeof value.topPad === 'number') {
+          /* 顶部留白：写变量后必须再测一帧，让排版跟上。 */
+          writeTopPad(value.topPad);
+          prevCharY = null;
+          prevToolbarVar = null;
+          sinceWrite = 0;
+          if (frames < READING_MAX_FRAMES) nextFrame(); else finish();
+          return;
+        }
+        if (typeof value.bottomPad === 'number') {
+          /* 尾部补偿：写**增量**（累计值），写完再测一帧。 */
+          bottomExtra = value.bottomPad;
+          writeBottomPad(value.bottomPad);
+          prevCharY = null;
+          prevToolbarVar = null;
+          sinceWrite = 0;
+          if (frames < READING_MAX_FRAMES) nextFrame(); else finish();
+          return;
+        }
+        /* 同 alignNow：写入延到 measure 循环之后的微任务，避免被 CM 的底部重锚推翻。 */
+        const wanted = value.top;
         queueMicrotask(() => {
           if (!valid()) { finish(); return; }
-          if (!value.retry) target.scrollDOM.scrollTop = value.top;
-          if (--remaining > 0) measure(); else finish();
+          try { target.scrollDOM.scrollTop = wanted; } catch { finish(); return; }
+          prevCharY = null;
+          prevToolbarVar = null;
+          sinceWrite = 0;
+          if (frames < READING_MAX_FRAMES) nextFrame(); else finish();
         });
       },
     });
   };
-  measure();
+  /* ── 唯一一次校正：同任务微任务（第一批可见帧之前）─────────────────────────
+   * 顺序关键：**先校正、后安装 step**。
+   *   · 校正要用「此刻」的字符 box 与 scrollTop，此时布局才是切换后的；
+   *   · 若先把 step 的 requestMeasure 排进去，它可能先于校正跑，
+   *     读到切换前几何算出的过期绝对值，之后还得用相对补正去抵消。
+   * 顶部边界（页首滚不动）由 syncCorrect 内部按 zoom 换算后写留白，无需额外参数。
+   * 有界性：本处只调用一次；之后仍是原有 READING_MAX_FRAMES 跨帧确认。 */
+  queueMicrotask(() => {
+    if (!valid()) { finish(); return; }
+    try { syncCorrect(); } catch { /* 单次校正失败不阻断后续有界 step */ }
+    prevCharY = null;
+    prevToolbarVar = null;
+    sinceWrite = 0;
+    /* 校正之后才安装首轮 step（见上面的顺序说明）。 */
+    step();
+  });
 }
 
 const checkpointViewportMeasureKey = {};
@@ -10212,7 +10736,8 @@ function boot(content) {
         mathSpansField, // 数据层：仅文档变化时重扫（选区变化零重扫）
         blockMathField, // 块级投影：StateField 直供（须排在 mathSpansField 之后——update 读其 spans）
         mathFencePointerSelection,
-        headingDecorations, // 标题井号投影：光标入行显源码、离行隐藏
+        headingDecorations, // 标题井号投影：光标入行显源码、离行隐藏（编辑态）
+        readingHeadingDecorations, // 阅读态：井号恒隐藏，不随选区翻转（只此一条，与上面同源数据）
         lineStylesField, // 行级样式数据层（标题/围栏/引用，仅文档变化重扫）
         tableDataField, // 表数据层（窄字段；非结构不触表时身份稳定 ⇒ 跳过整条 compute）
         lineClassDecorations, // 行类派生（mp-h1..h6/mp-code/mp-quote → telari 版式）
@@ -10268,6 +10793,8 @@ function boot(content) {
         tableCellClick,
         tablePointerFreezeLifecycle, // 手势解冻：mouseup 微任务 + 失焦/取消/组字兜底
         searchCellFocus,
+        /* 【文章版式】配方字段 + 研报章节编号行装饰（编号在装饰属性上，源码零改动）。 */
+        ...articleEditionExtension(lineStylesField),
         extrasCompartment.of([]),
         keyCompartment.of(keymap.of([])),
         activeCellField, // 活动格状态（effect 驱动）
@@ -11015,6 +11542,45 @@ function boot(content) {
   window.mpExtras = extras;
   try { view.dispatch({ effects: extrasCompartment.reconfigure(extras.extension) }); } catch (e) { console.error('[extras] reconfigure failed', e); }
   try { extras.rebindKeys(); } catch (e) { console.error('[extras] rebindKeys failed', e); }
+  /* 【文章版式】样式注入一次 + 按持久设置写根属性 + 把配方灌进编辑器状态。
+    顺序：先注入 CSS（首帧就有正确规则）、再写属性、最后 dispatch 字段 ⇒ 首帧即正确版式。
+    未选择（plain）时 applyArticleEdition 会摘掉全部属性，与旧行为逐字节一致。 */
+  try {
+    installArticleEditionStyles(document);
+    const storedEdition = readStoredEdition();
+    window.mpArticleEdition = {
+      current: () => readStoredEdition(),
+      set(edition, opts = {}) {
+        const next = normalizeEdition(edition);
+        try { localStorage.setItem(EDITION_STORAGE_KEY, JSON.stringify(next)); } catch { /* 无存储 */ }
+        const snapshot = applyArticleEdition(next, opts);
+        try { view.dispatch({ effects: setArticleEdition.of(next) }); } catch { /* 视图未就绪 */ }
+        /* 版式换了，表格列宽/公式几何要重测（与主题切换同一口径）。 */
+        try { mathGeometryVersion++; window.mpEngine?.commands.geometryIntent(); } catch { /* 忽略 */ }
+        try { document.dispatchEvent(new CustomEvent('mp-article-edition-changed', { detail: snapshot })); } catch { /* 忽略 */ }
+        return snapshot;
+      },
+      snapshot: (isDark) => ({ ...normalizeEdition(readStoredEdition()), tone: resolveEditionTone(readStoredEdition(), typeof isDark === 'boolean' ? isDark : interfaceIsDark(document)) }),
+      isDark: () => interfaceIsDark(document),
+    };
+    applyArticleEdition(storedEdition, { isDark: interfaceIsDark(document) });
+    view.dispatch({ effects: setArticleEdition.of(storedEdition) });
+    /* 主题（明暗/配色）变化 ⇒ follow 档要跟着重解析一次属性值；显式档不变（但重写一次无害且幂等）。 */
+    try {
+      const root = document.documentElement;
+      new MutationObserver(() => {
+        const cur = readStoredEdition();
+        if (cur.kind === 'plain') return;
+        applyArticleEdition(cur, { isDark: interfaceIsDark(document) });
+      }).observe(root, { attributes: true, attributeFilter: ['data-mode', 'data-editor-theme', 'data-mp-dark'] });
+    } catch { /* 无 MutationObserver */ }
+  } catch (e) { console.error('[edition] 版式初始化失败（按未选择处理）', e); }
+  /* 【AI 选区润色】安装内核并把 open() 交给菜单/快捷键（extras.js 读 window.mpSelectionRewrite）。
+     契约：installSelectionRewrite({getView, toast}) —— toast 用同一个提示通道。 */
+  try {
+    const rewrite = installSelectionRewrite({ getView: () => view, toast: extras.toast });
+    window.mpSelectionRewrite = rewrite;
+  } catch (e) { console.error('[selection-rewrite] 安装失败', e); }
   // 【首帧】登记表刚就位，立刻按用户所选配色重绘一次。这一段与上面的 boot 同属一个同步任务，
   // 中间不发生布局/绘制 ⇒ 首帧就是正确配色，不存在"先 TELARI 默认、再跳变"的闪烁。
   applyEditorTheme();
@@ -11036,3 +11602,30 @@ try {
     if (window.__keyLog.length > 60) window.__keyLog.shift();
   }, true);
 } catch { /* 调试位 */ }
+
+/* 【公众号草稿·3.7.1】渲染侧入口：宿主（桌面壳）发出 "wechatDraft" 命令时调用本入口。
+ * 渲染器自己**不联网、不碰凭据**（CSP connect-src 'none'）；对话框只把可上传表示交给 window.mpHost。
+ * 采用**同步**回调而不是异步抓文档：命令到达这一刻的正文就是要发的那一份，不给"晚一拍"留窗口。
+ *
+ * 【单一实现·2026-11-25】本条入口、发布面板的「微信预览/复制」与面板里的「发送到草稿箱」按钮
+ * 全部委托给 `extras.buildWechatArticle()`（正文投影只有那一份）。原生菜单兼容名 `window.mpWechat.open`
+ * 保持不变；它不再自己调 mdToHtml —— 否则会绕过文章版式（书页/研报）、外链文末编号与去重，
+ * 也会与面板预览产生"预览一份、发出去另一份"的平行实现。 */
+window.mpWechat = {
+  open: async (options = {}) => {
+    const api = window.mpExtras;
+    if (!api || typeof api.openWechatDraft !== 'function') {
+      return { ok: false, error: '编辑器还没就绪，暂时不能发送到公众号' };
+    }
+    try { return await api.openWechatDraft(options); }
+    catch (error) { return { ok: false, error: String((error && error.message) || error) }; }
+  },
+  /* 只读投影（面板/探针用）：与上面同一条链，不打开对话框。 */
+  article: async (options = {}) => {
+    const api = window.mpExtras;
+    if (!api || typeof api.buildWechatArticle !== 'function') return { ok: false, error: 'not-ready' };
+    try { return await api.buildWechatArticle(options); }
+    catch (error) { return { ok: false, error: String((error && error.message) || error) }; }
+  },
+  __ready: true,
+};

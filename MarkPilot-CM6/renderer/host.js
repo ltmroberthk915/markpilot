@@ -957,6 +957,7 @@ window.mpHost.onMenu(async (cmd) => {
       try { if (window.mpEngine && window.mpEngine.applyPrefs) window.mpEngine.applyPrefs(); } catch { /* 忽略 */ }
       break;
     case 'exportPdf': await exportPdfFlow(); break;   // 菜单：文件 → 导出为 PDF…（Ctrl+Shift+P）
+    case 'wechatDraft': await wechatDraftFlow(); break;   // 菜单：文件 → 发送到公众号草稿箱…（只建草稿）
     /* 【缩放解耦·3.0.4】菜单项与 Ctrl+= / Ctrl+- / Ctrl+0 一律走**引擎的内容缩放**：
        壳层 webFrame.setZoomLevel 是整页缩放（工具岛、状态栏一起变大），正是要改掉的观感。
        引擎未就位（极端时序）才回退到壳层缩放，保证菜单永远不静默。 */
@@ -1061,6 +1062,34 @@ async function exportPdfFlow() {
   } catch (e) {
     showBanner(`导出 PDF 异常：${(e && e.message) || e}`, [{ label: '关闭', run: () => hideBanner() }]);
     return { ok: false, error: String((e && e.message) || e) };
+  }
+}
+
+/* ── 发送到公众号草稿箱（3.7.1）───────────────────────────────────────────────
+ * 对话框与正文投影在引擎侧（dsh-markpilot/src-cm6/wechat-draft-dialog.js）：动态 import 的
+ * 独立模块，按菜单命令懒加载。**只建草稿**：主进程的 wx:* 通道里没有发布/群发，渲染侧也没有。
+ * 宿主只做两件事：把命令转给引擎入口；把结果如实提示给用户（失败带真实原因）。 */
+async function wechatDraftFlow() {
+  try {
+    if (!window.mpWechat || typeof window.mpWechat.open !== 'function') {
+      showBanner('发送到公众号草稿箱需要 MarkPilot 桌面版 3.7.1 及以上（当前页面没有这个入口）', [{ label: '关闭', run: () => hideBanner() }]);
+      return { ok: false, error: 'engine-not-ready' };
+    }
+    const r = await window.mpWechat.open();
+    window.__mpDbg.lastWechatDraft = r || null;
+    if (r && r.ok) {
+      const ticket = showBanner(`已发送到公众号草稿箱（media_id ${r.mediaId || '?'}）。请到公众号后台草稿箱确认后自行发布。`,
+        [{ label: '关闭', run: () => hideBanner() }], true);
+      setTimeout(() => hideBanner(ticket), 12000);
+    } else if (r && r.canceled) {
+      /* 用户自己关掉的对话框：什么都不用说。 */
+    } else if (r && r.error && r.error !== 'host-unavailable') {
+      showBanner(`发送到公众号草稿箱失败：${r.error}`, [{ label: '关闭', run: () => hideBanner() }]);
+    }
+    return r || { ok: false };
+  } catch (error) {
+    showBanner(`发送到公众号草稿箱异常：${(error && error.message) || error}`, [{ label: '关闭', run: () => hideBanner() }]);
+    return { ok: false, error: String((error && error.message) || error) };
   }
 }
 

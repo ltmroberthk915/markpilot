@@ -39,12 +39,47 @@
     {
       "path": "native/file-worker.exe",
       "bytes": 19968,
-      "sha256": "c6f1bf4e5a0335ff066eca2597b273a32e39d7fe9762c566b393ea01c542ce22"
+      "sha256": "b0e15c753ffdea5345b513596343eeec0fdd790f77630970b4e67d669d43175f"
     },
     {
       "path": "native/file-worker.exe.build.json",
       "bytes": 410,
-      "sha256": "88c38aa21f9ef494240e42c6ac55b82f6e2d4aff02404aa5824ee235cff39b6b"
+      "sha256": "43593f1df292961cc53c963524276a600247d8226c3eb221e65afae9895f6da0"
+    },
+    {
+      "path": "wechat-api.js",
+      "bytes": 11131,
+      "sha256": "5ae22f9747ee78f088256b82a4e1964b9ce93ca09aef96fbe9812a4061381f05"
+    },
+    {
+      "path": "wechat-transport.js",
+      "bytes": 6915,
+      "sha256": "4144ba4062dc42683a35ec6896c75350f2576ab57d5b04e3baa474b4dc5c88ca"
+    },
+    {
+      "path": "wechat-credentials.js",
+      "bytes": 7128,
+      "sha256": "c52f2469ff12134841086b87b593400c6d8d5ea94886c8000fea0d2516bee382"
+    },
+    {
+      "path": "wechat-draft-service.js",
+      "bytes": 30407,
+      "sha256": "af02178e3b706b19065f898d591a47e5470db32e362014ed811f79f787f088d2"
+    },
+    {
+      "path": "capped-read.js",
+      "bytes": 1239,
+      "sha256": "e1c1e9774b38df0c1e4e9c1f2402452543d442720095973f147103638a472688"
+    },
+    {
+      "path": "data-image-bytes.js",
+      "bytes": 1768,
+      "sha256": "47aff293549f3a5aa63a57fa8105244a04a8b0fd891b7d9d421b20561a36f507"
+    },
+    {
+      "path": "data-images.cjs",
+      "bytes": 3750,
+      "sha256": "451b24a506cf564039bbc1f7dd7d61968d78819e2d6baf103658670b4d2dc188"
     },
     {
       "path": "package.json",

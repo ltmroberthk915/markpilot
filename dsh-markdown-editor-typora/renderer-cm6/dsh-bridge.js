@@ -832,6 +832,358 @@
     };
   })();
 
+  /* ── AI 润色与公众号草稿的宿主面 ──────────────────────────────────────────
+   * 与 EXE 交付的 preload 同名同形，方法名就是上行 cmd（不另造一套命令）：
+   *   aiRewrite(payload, { requestId?, signal? }) → args = { payload, requestId }
+   *   aiRewriteCancel(requestId)                  → args = { requestId }
+   *   aiStatus()                                  → args = {}
+   *   wxStatus/wxClear/wxVerify/wxAcknowledge()   → args = {}
+   *   wxConfigure(payload) / wxCreateDraft(payload) → args = payload（与 preload 实参同形）
+   *   wxPickCover()  → 本 iframe 自己的 <input type=file accept="image/png,image/jpeg">，
+   *                    用户选完才上行，args = { name, mime, bytesBase64 }（只有这一张的字节）
+   *
+   * 边界：本桥不做身份判定。真实 session、当前文档、代次由父窗口持有并校验；子窗口不接收、
+   * 也不从用户输入或 URL 里拼 owner。这里只转发用户已经确认的内容（选区正文、草稿 payload、
+   * 用户自己选的封面字节），不读配置、不落盘、不记日志。
+   * AbortSignal 过不了 postMessage：本地监听 abort 后改发 aiRewriteCancel（同一个 requestId），
+   * 信号对象本身绝不上行。
+   * 宿主没实现的 cmd 会以 host-result(null) 回来（父窗口 handleHostInvoke 的兜底）⇒ 这里翻译成
+   * 明确的"未接入"失败，绝不假装成功。
+   */
+  var HOST_TIMEOUTS = Object.freeze({
+    /* 与 preload 的 wxInvoke 超时一致；AI 那条按主进程 rewrite 的 45s 上限留足余量。 */
+    aiRewrite: 120000, aiRewriteCancel: 15000, aiStatus: 15000,
+    wxStatus: 15000, wxConfigure: 20000, wxClear: 20000, wxVerify: 45000,
+    wxPickCover: 120000, wxCreateDraft: 180000, wxAcknowledge: 15000,
+  });
+  var COVER_ACCEPT = 'image/png,image/jpeg';
+  var MAX_COVER_BYTES = 10 * 1024 * 1024;   // 与 wechat-draft-service 的 MAX_COVER_BYTES 一致
+  var AI_NOT_WIRED = '当前宿主还没有接入 AI 润色通道（父窗口未实现 aiRewrite）；请更新宿主后再试';
+  var WX_NOT_WIRED = '当前宿主还没有接入公众号草稿服务（父窗口未实现 wx 系列方法）；请更新宿主后再试';
+  var WX_TIMEOUT_TEXT = '等待宿主响应超时。若正在创建草稿，结果可能已经生效——请到公众号后台草稿箱核对后再决定是否重发。';
+  var aiRequestSerial = 0;
+
+  function hostText(error) {
+    if (error && typeof error === 'object' && typeof error.message === 'string' && error.message) return error.message;
+    try { return String(error); } catch (ignored) { return '宿主调用失败'; }
+  }
+
+  /** 一次 host-invoke 的结果信封：**永不 reject**；超时与其它拒绝分开，供上层给不同码。 */
+  function invokeHost(cmd, args, timeoutMs) {
+    var pending;
+    try { pending = window.hostApi.invoke(cmd, args, timeoutMs); }
+    catch (error) { return Promise.resolve({ ok: false, timeout: false, error: hostText(error) }); }
+    return Promise.resolve(pending).then(function (value) {
+      return { ok: true, value: value };
+    }, function (error) {
+      var text = hostText(error);
+      return { ok: false, timeout: text.indexOf('宿主未响应') === 0, error: text };
+    });
+  }
+
+  function aiFailure(envelope) {
+    return { ok: false, code: envelope.timeout ? 'timeout' : 'host-error', message: envelope.error };
+  }
+  function aiNotWired() { return { ok: false, code: 'not-wired', message: AI_NOT_WIRED }; }
+  function wxNotWired() {
+    /* 状态形状带 configured/problem，让引擎的对话框显示"配置不可用"而不是"还没配置"。 */
+    return { ok: false, code: 'MP_WX_HOST_UNAVAILABLE', configured: false,
+      error: WX_NOT_WIRED, problem: { code: 'MP_WX_HOST_UNAVAILABLE', error: WX_NOT_WIRED } };
+  }
+  function wxFailure(envelope) {
+    return envelope.timeout
+      ? { ok: false, code: 'MP_WX_TIMEOUT_LOCAL', timeout: true, error: WX_TIMEOUT_TEXT }
+      : { ok: false, code: 'MP_WX_IPC', error: envelope.error };
+  }
+  function hostTimeout(value, fallback) {
+    var wait = Number(value);
+    return Number.isFinite(wait) && wait > 0 ? wait : fallback;
+  }
+  function wxCall(cmd, args, timeoutMs) {
+    return invokeHost(cmd, args, hostTimeout(timeoutMs, HOST_TIMEOUTS[cmd])).then(function (envelope) {
+      if (!envelope.ok) return wxFailure(envelope);
+      if (envelope.value === null || envelope.value === undefined) return wxNotWired();
+      return envelope.value;
+    });
+  }
+
+  function aiSignalOf(options) {
+    var signal = options && typeof options === 'object' ? options.signal : null;
+    return signal && typeof signal === 'object' && typeof signal.addEventListener === 'function' ? signal : null;
+  }
+  function aiAbortedAlready(options) {
+    var signal = options && typeof options === 'object' ? options.signal : null;
+    return !!signal && typeof signal === 'object' && signal.aborted === true;
+  }
+  function aiRequestIdOf(options) {
+    var given = options && typeof options === 'object' ? options.requestId : '';
+    var id = given == null ? '' : String(given);
+    if (id && id.length <= 128) return id;
+    aiRequestSerial += 1;
+    return 'dshai-' + aiRequestSerial + '-' + Date.now().toString(36);
+  }
+
+  var MAX_AI_DETAIL_CHARS = 500;
+
+  /** 服务端的人类可读说明：字符串 error，或结构化 { message | detail | reason }。 */
+  function aiDetailOf(value) {
+    if (typeof value === 'string') return value;
+    if (!value || typeof value !== 'object') return '';
+    var keys = ['message', 'detail', 'reason', 'error'];
+    for (var i = 0; i < keys.length; i += 1) {
+      var text = value[keys[i]];
+      if (typeof text === 'string' && text.trim()) return text;
+    }
+    return '';
+  }
+
+  /** 说明文本只做长度上限，不改写内容（内核用 textContent 显示，换行/中文都按原样）。 */
+  function aiDetailText(text) {
+    var value = String(text == null ? '' : text);
+    if (value.length <= MAX_AI_DETAIL_CHARS) return value;
+    return value.slice(0, MAX_AI_DETAIL_CHARS - 1) + '…';
+  }
+
+  /**
+   * 失败回包的交付形状。
+   *
+   * 服务端按 `{ ok:false, code, error }` 说明原因，而共用内核
+   * （`selection-rewrite.js` 的回包分支）**只读 `message` 显示**、用 `code` 路由：
+   * 直接把回包透传过去，面板就会把内部码写成人话（实测："润色失败：MP_ARTICLE_NO_MODEL"）。
+   * 这里只补 `message`：
+   *   · `code` 原样保留（上层仍能按码路由）；
+   *   · 已有非空 `message` 一律**不覆盖**；
+   *   · 否则用人类可读的 `error`（字符串，或结构化的 message/detail/reason）补上；
+   *   · 没有任何可读说明时原样返回（内核的 `message || code` 仍会退到 code）。
+   * 成功回包、以及 hint/errcode/status 等其它字段一律原样带过。
+   */
+  function aiReceiptOf(value) {
+    if (!value || typeof value !== 'object' || value.ok !== false) return value;
+    if (typeof value.message === 'string' && value.message.trim()) return value;
+    var detail = aiDetailText(aiDetailOf(value.error) || aiDetailOf(value.detail) || aiDetailOf(value.reason));
+    if (!detail.trim()) return value;
+    var receipt = {};
+    var keys = Object.keys(value);
+    for (var i = 0; i < keys.length; i += 1) receipt[keys[i]] = value[keys[i]];
+    receipt.message = detail;
+    return receipt;
+  }
+
+  function aiRewrite(payload, options) {
+    if (aiAbortedAlready(options)) return Promise.resolve({ ok: false, code: 'cancelled', message: '已取消' });
+    var requestId = aiRequestIdOf(options);
+    var body = payload && typeof payload === 'object' ? payload : {};
+    var call = invokeHost('aiRewrite', { payload: body, requestId: requestId },
+      hostTimeout(options && options.timeoutMs, HOST_TIMEOUTS.aiRewrite));
+    function settle(envelope) {
+      if (!envelope.ok) return aiFailure(envelope);
+      if (envelope.value === null || envelope.value === undefined) return aiNotWired();
+      return aiReceiptOf(envelope.value);
+    }
+    var signal = aiSignalOf(options);
+    if (!signal) return call.then(settle);
+    return new Promise(function (resolve) {
+      var settled = false;
+      function finish(value) {
+        if (settled) return;
+        settled = true;
+        try { signal.removeEventListener('abort', onAbort); } catch (ignored) { /* 已摘除 */ }
+        resolve(value);
+      }
+      function onAbort() {
+        /* 取消是另一条上行：信号对象不能过 postMessage，只带同一个 requestId。 */
+        void invokeHost('aiRewriteCancel', { requestId: requestId }, HOST_TIMEOUTS.aiRewriteCancel);
+        finish({ ok: false, code: 'cancelled', message: '已取消' });
+      }
+      try { signal.addEventListener('abort', onAbort, { once: true }); }
+      catch (ignored) { /* 非标准信号：按无信号处理 */ }
+      call.then(function (envelope) {
+        if (settled) return;
+        finish(settle(envelope));
+      });
+    });
+  }
+
+  function aiRewriteCancel(requestId) {
+    var id = requestId == null ? '' : String(requestId);
+    if (!id) return Promise.resolve({ ok: false, code: 'bad-request', error: '缺少 requestId' });
+    return invokeHost('aiRewriteCancel', { requestId: id }, HOST_TIMEOUTS.aiRewriteCancel).then(function (envelope) {
+      if (!envelope.ok) return { ok: false, code: envelope.timeout ? 'timeout' : 'host-error', error: envelope.error };
+      if (envelope.value === null || envelope.value === undefined) return { ok: false, code: 'not-wired', error: AI_NOT_WIRED };
+      return envelope.value;
+    });
+  }
+
+  function aiStatus() {
+    return invokeHost('aiStatus', {}, HOST_TIMEOUTS.aiStatus).then(function (envelope) {
+      if (!envelope.ok) return { ok: false, code: envelope.timeout ? 'timeout' : 'host-error', error: envelope.error };
+      if (envelope.value === null || envelope.value === undefined) return { ok: false, code: 'not-wired', error: AI_NOT_WIRED };
+      return envelope.value;
+    });
+  }
+
+  function wxStatus() { return wxCall('wxStatus', {}, HOST_TIMEOUTS.wxStatus); }
+  function wxConfigure(payload) {
+    return wxCall('wxConfigure', payload && typeof payload === 'object' ? payload : {}, HOST_TIMEOUTS.wxConfigure);
+  }
+  function wxClear() { return wxCall('wxClear', {}, HOST_TIMEOUTS.wxClear); }
+  function wxVerify() { return wxCall('wxVerify', {}, HOST_TIMEOUTS.wxVerify); }
+  function wxCreateDraft(payload) {
+    return wxCall('wxCreateDraft', payload && typeof payload === 'object' ? payload : {}, HOST_TIMEOUTS.wxCreateDraft);
+  }
+  function wxAcknowledge() { return wxCall('wxAcknowledge', {}, HOST_TIMEOUTS.wxAcknowledge); }
+
+  /** 封面字节 → base64；无法编码时返回 null（由调用方报明确失败，不静默传空串）。 */
+  function coverBase64(bytes) {
+    var binary = '';
+    for (var i = 0; i < bytes.length; i += 0x8000) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
+    try {
+      if (typeof btoa === 'function') return btoa(binary);
+      if (typeof Buffer === 'function') return Buffer.from(binary, 'binary').toString('base64');
+    } catch (ignored) { return null; }
+    return null;
+  }
+
+  function coverFileBytes(file) {
+    if (file && typeof file.arrayBuffer === 'function') {
+      return Promise.resolve(file.arrayBuffer()).then(function (buffer) { return new Uint8Array(buffer); });
+    }
+    if (typeof FileReader === 'function') {
+      return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(new Uint8Array(reader.result)); };
+        reader.onerror = function () { reject(reader.error || new Error('读取失败')); };
+        reader.readAsArrayBuffer(file);
+      });
+    }
+    return Promise.reject(new Error('当前环境不能读取本地文件'));
+  }
+
+  /** 只接受 PNG/JPEG 且不超过微信上限的那一张；类型/体积在读字节之前就判掉。 */
+  function readCoverFile(file) {
+    var name = '', mime = '', size = 0;
+    try { name = String(file.name == null ? '' : file.name); } catch (ignored) { name = ''; }
+    try { mime = String(file.type == null ? '' : file.type).toLowerCase(); } catch (ignored) { mime = ''; }
+    try { size = Number(file.size); } catch (ignored) { size = 0; }
+    if (mime !== 'image/png' && mime !== 'image/jpeg') {
+      return Promise.resolve({ ok: false, code: 'MP_WX_COVER_TYPE', error: '封面只支持 PNG / JPG，请换一张图片' });
+    }
+    if (Number.isFinite(size) && size > MAX_COVER_BYTES) {
+      return Promise.resolve({ ok: false, code: 'MP_WX_COVER_LARGE',
+        error: '封面 ' + (size / 1048576).toFixed(1) + ' MB，超过微信上限 ' + (MAX_COVER_BYTES / 1048576).toFixed(1) + ' MB' });
+    }
+    return coverFileBytes(file).then(function (bytes) {
+      if (!bytes || bytes.length === 0) return { ok: false, code: 'MP_WX_COVER_EMPTY', error: '选中的封面是空文件' };
+      if (bytes.length > MAX_COVER_BYTES) {
+        return { ok: false, code: 'MP_WX_COVER_LARGE', error: '封面超过微信上限 ' + (MAX_COVER_BYTES / 1048576).toFixed(1) + ' MB' };
+      }
+      var base64 = coverBase64(bytes);
+      if (!base64) return { ok: false, code: 'MP_WX_COVER_ENCODE', error: '当前环境不能编码封面字节' };
+      return { ok: true, name: name, mime: mime, bytes: bytes.length, base64: base64 };
+    }, function (error) {
+      return { ok: false, code: 'MP_WX_COVER_READ', error: '读取封面失败：' + hostText(error) };
+    });
+  }
+
+  /**
+   * 本 iframe 的真实用户选择：`<input type=file accept="image/png,image/jpeg">`。
+   * 取消（`cancel` 事件，或 change 却没有文件）一律回 `{ok:false,canceled:true}`，不上行任何东西。
+   */
+  function pickCoverBytes() {
+    return new Promise(function (resolve) {
+      var doc = typeof document !== 'undefined' ? document : null;
+      if (!doc || typeof doc.createElement !== 'function') {
+        resolve({ ok: false, code: 'MP_WX_COVER_PICK', error: '当前环境不能选择本地封面图' });
+        return;
+      }
+      var input;
+      try { input = doc.createElement('input'); }
+      catch (error) { resolve({ ok: false, code: 'MP_WX_COVER_PICK', error: hostText(error) }); return; }
+      try { input.type = 'file'; input.accept = COVER_ACCEPT; } catch (ignored) { /* 老内核无属性 */ }
+      try { input.setAttribute('type', 'file'); input.setAttribute('accept', COVER_ACCEPT); } catch (ignored) { /* 同上 */ }
+      try { if (input.style) input.style.display = 'none'; } catch (ignored) { /* 无样式对象 */ }
+      var settled = false;
+      function detach() {
+        try { input.removeEventListener('change', onChange); } catch (ignored) { /* 已移除 */ }
+        try { input.removeEventListener('cancel', onCancel); } catch (ignored) { /* 已移除 */ }
+        try { if (input.parentNode) input.parentNode.removeChild(input); } catch (ignored) { /* 未挂载 */ }
+      }
+      function finish(result) {
+        if (settled) return;
+        settled = true;
+        detach();
+        resolve(result);
+      }
+      function onChange() {
+        var file = null;
+        try { file = input.files && input.files.length ? input.files[0] : null; } catch (ignored) { file = null; }
+        if (!file) { finish({ ok: false, canceled: true }); return; }
+        readCoverFile(file).then(finish);
+      }
+      function onCancel() { finish({ ok: false, canceled: true }); }
+      try { input.addEventListener('change', onChange); } catch (ignored) { /* 无监听 */ }
+      try { input.addEventListener('cancel', onCancel); } catch (ignored) { /* 老内核没有 cancel 事件 */ }
+      try { if (doc.body && typeof doc.body.appendChild === 'function') doc.body.appendChild(input); } catch (ignored) { /* 不挂载也能点 */ }
+      try { input.click(); }
+      catch (error) { finish({ ok: false, code: 'MP_WX_COVER_PICK', error: hostText(error) }); }
+    });
+  }
+
+  var coverPick = null;
+  function wxPickCover() {
+    if (coverPick) return coverPick;   // 只允许一个真实选择框在途
+    coverPick = pickCoverBytes().then(function (picked) {
+      if (!picked || picked.ok !== true) return picked;   // 取消/类型/体积/读取失败：本地上报，不上行
+      return invokeHost('wxPickCover', { name: picked.name, mime: picked.mime, bytesBase64: picked.base64 },
+        HOST_TIMEOUTS.wxPickCover).then(function (envelope) {
+        if (!envelope.ok) return wxFailure(envelope);
+        if (envelope.value === null || envelope.value === undefined) return wxNotWired();
+        var answer = envelope.value;
+        if (answer && typeof answer === 'object' && answer.ok === true) {
+          /* 补全引擎对话框要读的字段：预览图用的是**用户刚选的这一张**。 */
+          var complete = {};
+          for (var key in answer) if (Object.prototype.hasOwnProperty.call(answer, key)) complete[key] = answer[key];
+          if (typeof complete.name !== 'string' || !complete.name) complete.name = picked.name;
+          if (typeof complete.mime !== 'string' || !complete.mime) complete.mime = picked.mime;
+          if (!Number.isFinite(Number(complete.bytes))) complete.bytes = picked.bytes;
+          if (typeof complete.dataUrl !== 'string' || !complete.dataUrl) {
+            complete.dataUrl = 'data:' + picked.mime + ';base64,' + picked.base64;
+          }
+          return complete;
+        }
+        return answer;
+      });
+    }).then(function (result) {
+      coverPick = null;
+      return result;
+    }, function (error) {
+      coverPick = null;
+      return { ok: false, code: 'MP_WX_COVER_PICK', error: hostText(error) };
+    });
+    return coverPick;
+  }
+
+  (function installSelectionAiAndWechatHost() {
+    var host = window.mpHost;
+    if (!host || (typeof host !== 'object' && typeof host !== 'function')) host = window.mpHost = {};
+    function install(name, fn) {
+      if (typeof host[name] === 'function') return;   // 宿主已有同名实现：绝不覆盖
+      host[name] = fn;
+    }
+    install('aiRewrite', aiRewrite);
+    install('aiRewriteCancel', aiRewriteCancel);
+    install('aiStatus', aiStatus);
+    install('wxStatus', wxStatus);
+    install('wxConfigure', wxConfigure);
+    install('wxClear', wxClear);
+    install('wxVerify', wxVerify);
+    install('wxPickCover', wxPickCover);
+    install('wxCreateDraft', wxCreateDraft);
+    install('wxAcknowledge', wxAcknowledge);
+  })();
+
   // 诊断/取证位（只读快照；dsh-selection 与 Electron 验收都从这里读）。
   window.__dshBridge = {
     send: send,
@@ -848,6 +1200,12 @@
     routeReady: function () { return imageRouteReady; },
     openTrace: function () { return openTrace; },
     liveState: function () { return { bound: !!liveBound, docToken: liveBound && liveBound.docToken || null, pending: liveBound ? liveBound.pending.size : 0 }; },
+    hostApi: {
+      aiPending: function () { return aiRequestSerial; },
+      coverPickInFlight: function () { return !!coverPick; },
+      timeouts: HOST_TIMEOUTS,
+      coverAccept: COVER_ACCEPT,
+    },
   };
 
   // 首帧：若上一次宿主主题已知，直接上屏（避免深色宿主闪白/浅色宿主闪黑）。

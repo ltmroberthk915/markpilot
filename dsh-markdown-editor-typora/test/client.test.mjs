@@ -85,12 +85,14 @@ test('tab 类型定义：id / patterns / priority / keepMounted / canOpen', asyn
   const { test: T } = await loadClientFactory();
   const def = T.buildTabDefinition();
   assert.equal(def.id, 'dsh-markdown-editor-typora/editor');
-  assert.deepEqual(plain(def.patterns), ['*.md', '*.markdown']);
+  assert.deepEqual(plain(def.patterns), ['**/*.md', '**/*.markdown', 'session/**', 'absolute/**'].map(p => 'dsh-resource://file/'+p));
   assert.equal(def.priority, 'extension');
   assert.equal(def.keepMounted, true);
   assert.equal(def.canOpen('dsh-resource://file/session/s/a.md'), true);
   assert.equal(def.canOpen('dsh-resource://file/absolute/C%3A/a.md'), true);
   assert.equal(def.canOpen('dsh-resource://terminal/1'), false);
+  assert.equal(def.canOpen('dsh-resource://file/session/s/a%2EMD?line=2#章/节'), true);
+  assert.equal(def.canOpen('dsh-resource://file/session/s/a.txt?q=b.md'), false);
   assert.equal(def.canOpen(undefined), false);
   assert.equal(def.title('dsh-resource://file/session/s/dir/My%20Note.md'), 'My Note.md');
   assert.equal(def.title('not-an-address'), 'Markdown');

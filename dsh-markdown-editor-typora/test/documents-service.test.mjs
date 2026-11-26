@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createDocumentsService, parseRevisionId, makeLiveRevisionId, makeDiskRevisionId,
-  sha256Text, normalizeCompare, isCanonicalUnder, replaceExact,
+  sha256Text, normalizeCompare, isCanonicalUnder, replaceExact, applyChanges,
   parseDocumentBlocks, findDocumentBlock, merge3Text,
   revisionContentKey, sameRevisionContent,
 } from '../lib/documents-service.js';
@@ -15,8 +15,10 @@ function makeWorld(options = {}) {
   let version = options.version ?? 'v1';
   let diskVersion = version;
   const calls = { append: [], edit: [], save: [], archive: [] };
+  const groups = new Map();
   const room = options.room === undefined ? null : options.room;
   if (room && room.localMembers === undefined) room.localMembers = room.members;
+  if (room && room.allReplaySafe === undefined) room.allReplaySafe = room.members > 0;
   const live = {
     async readRoom(p) { assert.equal(p, file); return room; },
     async listAppendRecovery(p) { assert.equal(p, file); return options.recovery ?? []; },
@@ -33,11 +35,12 @@ function makeWorld(options = {}) {
     async append(p, req) {
       assert.equal(p, file);
       calls.append.push(req);
-      const next = req.baseText.replace(/x/g, '') + req.changes.map((c) => c.insert).join('');
+      const next = applyChanges(req.baseText, req.changes);
       room.version += 1;
       room.text = next;
       room.textSha256 = sha256Text(next);
-      return { epoch: room.epoch, version: room.version, savedVersion: room.savedVersion, diskHash: room.diskHash, text: next, textSha256: sha256Text(next), recoveryPath: options.recoveryPath };
+      if (req.group) groups.set(req.group.groupId, structuredClone(req.group));
+      return { epoch: room.epoch, version: room.version, savedVersion: room.savedVersion, diskHash: room.diskHash, text: next, textSha256: room.textSha256, recoveryPath: options.recoveryPath, groupRecorded: groups.has(req.groupId) };
     },
   };
   const service = createDocumentsService({
@@ -71,7 +74,7 @@ function makeWorld(options = {}) {
     enqueue(_key, action) { return action(); },
     log: { warn() {} },
   });
-  return { service, live, calls, file, get state() { return { text, version, room }; }, setText(v) { text = v; }, setVersion(v) { version = v; diskVersion = v; } };
+  return { service, live, calls, groups, file, get state() { return { text, version, room }; }, setText(v) { text = v; }, setVersion(v) { version = v; diskVersion = v; } };
 }
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
@@ -427,6 +430,11 @@ test('B4.1-S2 block edit replaces exactly the selected section through buffer ap
   assert.match(result.value.groupId, /^[0-9a-f-]{36}$/);
   assert.equal(w.calls.append.length, 1);
   assert.deepEqual(w.calls.append[0].changes, [{ from: block.from, to: block.to, insert: '## B\nBETA\n' }]);
+  assert.equal(room.text, '# A\nalpha\n\n## B\nBETA\n');
+  assert.equal(w.state.text, text);
+  const group = w.groups.get(result.value.groupId);
+  assert.equal(group.baseRevision, token);
+  assert.equal(group.changes[0].removed, '## B\nbeta\n');
 });
 
 test('B4.1-S3 unknown block IDs fail closed without touching the document', async () => {

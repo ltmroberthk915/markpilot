@@ -166,3 +166,52 @@ test('unavailable preference storage leaves the engine preference alone', async 
   assert.equal(f.prefCalls.length, 0);
   assert.equal(f.messages.find(m => m.type === 'apply-result')?.content.applied, true);
 });
+
+/* ── 纸面不被透明规则抹掉（静态 CSS 契约，不需要浏览器）───────────────────────
+ * 背景：书页/研报的纸面色由 articleEditorCss（article-recipes.js）唯一提供，
+ * 而 skin 的透明模式会用 !important 把 .cm-editor/.cm-scroller 置透明、并用
+ * root 的 86% 混合染色（实测书页浅被画成 233,241,230 而非配方 251,246,236）。
+ * 契约：所有透明/混合规则的生效条件必须带 :not([data-mp-article-recipe])，
+ * 即"只在没有有效 recipe 时"才生效；plain 观感保持不变。 */
+test('transparency selectors never apply when an article recipe is active', () => {
+  /* 仓库布局：壳页固定为 ROOT/renderer-cm6/index.html（ROOT 是插件包根）。
+   * 不保留私有 staging 的备用路径——测试只针对真实仓库结构。
+   * 本测试只读这一个文件，不依赖 lib/ 与 dsh-bridge.js。 */
+  const html = readFileSync(resolve(ROOT, 'renderer-cm6/index.html'), 'utf8');
+  const styleBlock = html.slice(html.indexOf('<style>') + 7, html.indexOf('</style>'))
+    .replace(/\/\*[\s\S]*?\*\//g, '');           // 去注释，避免干扰选择器提取
+  /* 逐条提取 "选择器 { 声明 }"，只抓含 [data-mp-transparent] 的透明/混合规则，
+   * 避免把弹层、toast、工具条等无关 background 样式误当目标而误报。 */
+  const rules = [];
+  const re = /([^{}]+)\{([^{}]*)\}/g;
+  let m;
+  while ((m = re.exec(styleBlock))) {
+    const selectors = m[1].split(',').map((s) => s.trim()).filter(Boolean);
+    const body = m[2];
+    if (!selectors.some((s) => s.includes('[data-mp-transparent'))) continue;
+    const isTarget = /background\s*:\s*transparent\s*(!important)?\s*;?/.test(body)
+      || /color-mix\(in srgb\s*,\s*var\(--mp-bg/.test(body);
+    if (isTarget) rules.push({ selectors, body: body.trim() });
+  }
+  assert.ok(rules.length > 0, 'expected at least one transparency rule under [data-mp-transparent]');
+
+  const allSelectors = rules.flatMap((r) => r.selectors);
+
+  /* 行为断言 1：plain 必须保留透明——
+   * 存在"无 recipe 时生效"的选择器，且它确实落在 .cm-editor 或 root 上。
+   * 不绑定规则分组方式：合并成一条还是多条、拆成几组都可以。 */
+  const plainScoped = allSelectors.filter((s) => /:not\(\[data-mp-article-recipe\]\)/.test(s));
+  assert.ok(plainScoped.length > 0, 'plain transparency (scoped to no-recipe) must survive');
+  assert.ok(plainScoped.some((s) => /\.cm-editor|^html/.test(s)),
+    'plain transparency must still cover the editor surface or root');
+
+  /* 行为断言 2：recipe 生效时不得被全局透明覆盖——
+   * 凡会作用于编辑面的透明/混合选择器，都必须带 :not([data-mp-article-recipe])。
+   * 只检查真正命中编辑面的选择器，root 的 html/body 也在其列。 */
+  const surfaceSelectors = allSelectors.filter((s) => /\.cm-|^html|(^|\s)body($|\s|,)/.test(s));
+  assert.ok(surfaceSelectors.length > 0, 'expected editor/root surface selectors');
+  for (const selector of surfaceSelectors) {
+    assert.match(selector, /:not\(\[data-mp-article-recipe\]\)/,
+      'surface transparency must exclude active recipes: ' + selector);
+  }
+});

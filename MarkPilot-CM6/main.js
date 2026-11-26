@@ -6,7 +6,7 @@ const pdfWorkerArgument=process.argv.find(a=>a.startsWith('--mp-pdf-worker='));
 if(pdfWorkerArgument){require('./shell/pdf-worker').run(pdfWorkerArgument.slice('--mp-pdf-worker='.length));return;}
 /* nativeImage 是「图片进剪贴板」的前置：普查实测漏了它 ⇒ 图片右键「复制图片」必然失败
    （nativeImage is not defined 被 try/catch 吞成 {ok:false}，用户看到"复制图片失败"）。 */
-const { app, BrowserWindow, Menu, dialog, ipcMain, shell, nativeTheme, net, clipboard, nativeImage, ClipboardItem } = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain, shell, nativeTheme, net, clipboard, nativeImage, ClipboardItem, safeStorage } = require('electron');
 /* api44-fix-r1: Electron 44 public clipboard adaptation (allowlisted MIME items,
  * serialized native-write lane, factory DI for unit tests; no legacy API emulation,
  * no private native bindings). */
@@ -558,6 +558,10 @@ function buildMenu() {
         // 导出为 PDF：壳层入口。渲染侧调 window.mpHost.exportPdf()（引擎侧的 ⋯ 菜单项以后走同一个名字）
         // （id 固定：真链路测试用主进程 CDP 触发这个原生菜单项本身，避免"截图看菜单"这种间接证据）
         { id: 'menu-export-pdf', label: '导出为 PDF…', accelerator: 'CmdOrCtrl+Shift+P', click: (_item, W) => send('menu', 'exportPdf', activeWindow(W)) },
+        /* 【发送到公众号草稿箱·3.7.1】只建草稿、由用户自己发布（没有发布/群发入口）。
+           菜单项只是**入口**：真正的对话框与正文投影由引擎侧 wechat-draft-dialog.js 提供，
+           这里把命令转给渲染侧（与「导出为 PDF」同一条路由）。 */
+        { id: 'menu-wechat-draft', label: '发送到公众号草稿箱…', click: (_item, W) => send('menu', 'wechatDraft', activeWindow(W)) },
         { type: 'separator' },
         /* ── 文件位置 / 复制文件绝对路径 / 在资源管理器中显示（3.0.9）────────────────────
          * 【动态性】菜单在启动时构建一次，而"文件位置"必须跟着**当前文档**走：这里的
@@ -946,6 +950,9 @@ function createWindow(session = state) {   // 【文件多开·第 3 步·3a】�
   try { liveLeaveOwned(entry => __wcId != null ? entry.senderId === __wcId : entry.sender === W.webContents, 'window-closed'); } catch { }
   try { readingReleaseForSession(session); } catch { /* 阅读位置会话清理不阻塞关窗 */ }
   try { retireClipboardIntentFor(W.webContents); } catch { }
+  /* 【公众号草稿·3.7.1】窗口关了就清掉它名下的封面（别的窗口的封面不动）。
+     正在发送的那一次由服务层的 alive() 在"建稿前"判死 ⇒ 不会替已关闭的窗口建草稿。 */
+  try { wechatDrafts.releaseOwner(String(__wcId)); } catch { /* 清理失败不影响关窗 */ }
 });
   } catch (e) { dbg("session:register-failed", String((e && e.message) || e)); }
 
@@ -1979,6 +1986,350 @@ handle('image:base64ToFile', async (_e, { base64, mime, fileName } = {}) => {
   return { ok: true, absPath: target, tempPath: target, bytes: buf.length, mime: mime || imgMimeOf(target) };
 });
 handle('image:download', (_e, opts = {}) => imgDownload(opts));
+
+/* ── 微信公众号草稿（3.7.1）──────────────────────────────────────────────────
+ * 目标：把当前文档发到公众号**草稿箱**，由用户自己到后台确认并发布。
+ * 硬边界（逐条都在 `shell/wechat-draft-service.js` 与单测里）：
+ *  · 只调 draft/add，**没有任何发布/群发/删除入口**（接口表见 shell/wechat-api.js）；
+ *  · appid 明文 + secret 经系统密钥库加密后才落盘（safeStorage 不可用就拒绝保存）；
+ *    渲染进程只拿到配置状态，永远拿不到 secret；诊断日志经 sanitize 丢弃 secret/token；
+ *  · 渲染进程零网络（CSP `connect-src 'none'`），请求全部由主进程发出；
+ *  · **本工具不是 URL 下载器**：读图只接受本地路径/data:，http(s) 一律拒绝（见 wxReadImage），
+ *    正文里残留外链图在服务层 preflight 被拦下；
+ *  · 结果不明确（超时/网络中断/回包无法解析）⇒ 留 pending、不自动重试，直到用户核对草稿箱后确认。
+ * 隔离测试：`MP_TEST_HOOKS=1` 且 `MP_WX_BASE_URL` 指向 loopback 时才改打本机假传输
+ * （resolveBaseUrl 里的唯一例外）；正式启动永远官方域名。 */
+const wechatCredentials = require('./shell/wechat-credentials').createWechatCredentials({
+  dir: path.join(app.getPath('userData'), 'wechat'),
+  safeStorage: {
+    isEncryptionAvailable: () => { try { return safeStorage.isEncryptionAvailable(); } catch { return false; } },
+    encryptString: (s) => safeStorage.encryptString(s),
+    decryptString: (b) => safeStorage.decryptString(b),
+  },
+});
+
+/* 【选区 AI 润色·3.7.2】宿主服务：只把**选区**发出去，返回值里带稳定 code 供渲染侧分支。
+   无顶层副作用（纯函数集合），放在这里与其它 shell 模块同区。 */
+const aiRewrite = require('./shell/ai-rewrite');
+const wechatNet = require('./shell/wechat-transport').resolveBaseUrl({ env: process.env });
+const wechatDrafts = require('./shell/wechat-draft-service').createWechatDraftService({
+  credentials: wechatCredentials,
+  transport: require('./shell/wechat-transport').createNetTransport({ net, base: wechatNet.base }),
+  readImage: (src, opts) => wxReadImage(src, opts),
+  inspectImage: async ({ bytes }) => wxInspectImage(bytes),
+  dir: path.join(app.getPath('userData'), 'wechat'),
+  baseUrl: wechatNet.base,
+  log: (event, detail) => dbg('wx:' + event, detail || {}),
+});
+if (wechatNet.mock) dbg('wx:mock-transport', { base: wechatNet.base });
+/* 【公众号草稿·3.7.1】wx:* 的**身份门槛**（每个通道都过一遍，不靠 handle() 本身）。
+
+ * handle() 只负责"注册一次"，**不做任何身份判断**（实测确认：它内部就是 ipcMain.handle）。
+ * 而 wx:* 是本应用里少见的"会碰凭据、会发网络、会在远端留下东西"的通道 ⇒ 必须显式判定：
+ *   ① 发起 webContents 必须是**本进程创建的编辑窗口**（sessions 里有绑定会话的窗口，且窗口
+ *      自己的 webContents 就是发送者、窗口没销毁、不是隐藏打印窗口）；
+ *   ② 请求必须来自该 webContents 的**当前主框架**（子框架/已导航的旧页面一律拒绝）；
+ *   ③ 页面必须是本应用的编辑页（file:// 下的 renderer/index.html），不接受任何外部/内嵌页面；
+ *   ④ 窗口内只能有一个发起者：同一窗口同一时刻只允许一条 wx:* 在跑（见 wxOwnerGate）。
+ * 判定全在主进程用一个只读描述符 wxTrust(e) 完成，返回值里带 owner 描述（id + docDir + alive），
+ * 后续读图/封面/建稿都用它，而不是任何"最近一个文档目录"之类的全局状态。 */
+const WX_EDITOR_PAGE = path.join(__dirname, 'renderer', 'index.html');
+function wxFrameDesc(e) {
+  try {
+    const frame = e && e.senderFrame;
+    if (!frame || !e.sender || frame !== e.sender.mainFrame) return null;
+    const url = new URL(frame.url);
+    if (url.protocol !== 'file:') return null;
+    const here = fileURLToPath(url);
+    return path.resolve(here) === path.resolve(WX_EDITOR_PAGE) ? { url: url.href } : null;
+  } catch { return null; }
+}
+/** 受信窗口判定：返回 { ok, sender, win, session, frameUrl } 或 { ok:false, code, error }。
+ *  拒绝原因分两类：MP_WX_WINDOW（窗口层：已关闭/不可见/不是本应用的编辑窗口/没有会话绑定）、
+ *  MP_WX_FRAME（页面层：不是当前主框架，或页面不是编辑器页）。 */
+function wxTrust(e) {
+  const sender = e && e.sender ? e.sender : null;
+  if (!sender) return { ok: false, code: 'MP_WX_WINDOW', error: '请求没有来源窗口' };
+  let destroyed = false;
+  try { destroyed = sender.isDestroyed(); } catch { destroyed = true; }
+  if (destroyed) return { ok: false, code: 'MP_WX_WINDOW', error: '发起窗口已经关闭' };
+  const W = BrowserWindow.fromWebContents(sender);
+  if (!W || W.isDestroyed() || W.webContents !== sender) return { ok: false, code: 'MP_WX_WINDOW', error: '发起者不是本应用的编辑窗口' };
+  /* 只允许"应用自己的页面"：内容被换成别的页面（哪怕同 file: 协议）也拒绝。 */
+  if (W.isVisible && !W.isVisible()) return { ok: false, code: 'MP_WX_WINDOW', error: '发起窗口当前不可见' };
+  /* 打印/PDF 的隐藏窗口没有会话绑定：sessions 里查不到 ⇒ 一律拒绝（它们也不该发 wx:*）。 */
+  const session = sessions.get(sender.id);
+  if (!session) return { ok: false, code: 'MP_WX_WINDOW', error: '发起窗口没有绑定的文档会话' };
+  const frame = wxFrameDesc(e);
+  if (!frame) return { ok: false, code: 'MP_WX_FRAME', error: '只接受编辑器主框架发起的请求' };
+  return { ok: true, sender, win: W, session, frameUrl: frame.url };
+}
+/** 受信身份描述符：交给服务层做封面隔离与相对路径解析（**绑窗口**，不是全局目录）。 */
+function wxOwnerOf(trust) {
+  const sender = trust.sender, session = trust.session;
+  return {
+    id: String(sender.id),
+    docDir: () => (session.filePath ? path.dirname(path.resolve(session.filePath)) : null),
+    alive: () => {
+      try {
+        if (sender.isDestroyed()) return false;
+        if (!sender.mainFrame || sender.mainFrame !== trust.frame) return false;
+        return sessions.get(sender.id) === session && session.documentId === trust.documentId;
+      } catch { return false; }
+    },
+  };
+}
+/** 每个 wx:* 处理器的统一外壳：先过身份门槛，再统一 try/catch 成 {ok:false,code,error}。 */
+function wxHandle(channel, handler) {
+  handle(channel, async (e, ...args) => {
+    const trust = wxTrust(e);
+    if (!trust.ok) { dbg('wx:denied', { channel, code: trust.code }); return { ok: false, code: trust.code, error: trust.error }; }
+    trust.frame = e.senderFrame;
+    trust.documentId = trust.session.documentId;
+    try { return await handler(trust, ...args); }
+    catch (error) {
+      dbg('wx:error', { channel, error: String((error && error.message) || error) });
+      return { ok: false, code: 'MP_WX_INTERNAL', error: String((error && error.message) || error) };
+    }
+  });
+}
+
+/* ───────────────── 选区 AI 润色·3.7.2：可信端点配置 ─────────────────
+ *
+ * 为什么需要这一层：内置服务（deepseek/openai/anthropic）用**各自 origin 的密钥**，
+ * 密钥只从该服务自己的环境变量取；而自建/本地网关没有内置凭据，必须由**可信配置文件**
+ * 显式给出端点、模型与（可空的）密钥。渲染侧与普通 settings.json **都不能**提供这些值
+ * （否则改个 baseURL 就能把全机密钥发到任意主机）。
+ *
+ * 可信配置文件位置（`userData` 目录，普通 settings.json **之外**）：
+ *     <userData>/ai-rewrite.json
+ * 结构（UTF-8 JSON）：
+ *     { "baseURL": "http://127.0.0.1:18080",   // 远程必须 https；http 只允许回环
+ *       "model":   "local-fixture",            // 必填
+ *       "apiKey":  "" }                        // 可空：本地推理通常不要密钥
+ * userData 的实际路径可由「设置 → 关于」或主进程日志确认（Electron 默认在
+ * `%APPDATA%/MarkPilot`，便携版在解压目录旁的 userData）。
+ *
+ * 优先级：环境变量（供隔离验收临时指向本机假 provider）> 可信配置文件 > 不配置。
+ * 环境变量：MP_AI_CUSTOM_BASE_URL / MP_AI_CUSTOM_MODEL / MP_AI_CUSTOM_API_KEY
+ *          MP_AI_PROVIDER（可选，仅用于把默认 provider 切成 custom）
+ */
+const AI_CONFIG_FILE = path.join(app.getPath('userData'), 'ai-rewrite.json');
+let aiConfigCache = { at: 0, value: null, error: null };
+function readTrustedAiConfig() {
+  const now = Date.now();
+  /* 5 秒缓存：面板可能连点，但改完配置文件不必重启应用。 */
+  if (now - aiConfigCache.at < 5000) return aiConfigCache;
+  let value = null, error = null;
+  try {
+    const raw = fs.readFileSync(AI_CONFIG_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    const baseURL = String(parsed && parsed.baseURL || '').trim();
+    const model = String(parsed && parsed.model || '').trim();
+    const apiKey = String(parsed && parsed.apiKey || '').trim();
+    if (baseURL && model) value = { baseURL, model, apiKey, source: 'file' };
+    else error = { code: 'MP_AI_CONFIG_INCOMPLETE', message: 'ai-rewrite.json 需要 baseURL 与 model' };
+  } catch (e) {
+    if (e && e.code !== 'ENOENT') error = { code: 'MP_AI_CONFIG_READ', message: '读取 ai-rewrite.json 失败：' + String(e.message || e) };
+  }
+  aiConfigCache = { at: now, value, error };
+  return aiConfigCache;
+}
+/** 可信自定义端点：环境变量优先（隔离验收用），其次可信配置文件。 */
+function trustedCustomEndpoint() {
+  const envBase = String(process.env.MP_AI_CUSTOM_BASE_URL || '').trim();
+  const envModel = String(process.env.MP_AI_CUSTOM_MODEL || '').trim();
+  if (envBase && envModel) {
+    return { ok: true, endpoint: { baseURL: envBase, model: envModel, apiKey: String(process.env.MP_AI_CUSTOM_API_KEY || '').trim(), source: 'env' } };
+  }
+  const fromFile = readTrustedAiConfig();
+  if (fromFile.value) return { ok: true, endpoint: fromFile.value };
+  if (fromFile.error) return { ok: false, error: fromFile.error };
+  return { ok: true, endpoint: null };
+}
+/** AI 通道的身份门槛：**直接复用 wx 那四条判据**（同一个编辑窗口/主框架/编辑页/会话绑定），
+ *  只把拒绝码换成 MP_AI_* 前缀，便于用户与日志区分"是 AI 通道拒的"。 */
+function aiTrust(e) {
+  const trust = wxTrust(e);
+  if (trust.ok !== true) {
+    return {
+      ok: false,
+      code: String(trust.code || 'MP_AI_WINDOW').replace(/^MP_WX_/, 'MP_AI_'),
+      error: String(trust.error || '发起者不是受信的编辑窗口'),
+    };
+  }
+  return { ok: true, owner: { id: String(trust.sender.id), session: trust.session, win: trust.win } };
+}
+const aiRewriteService = aiRewrite.registerAiRewrite({
+  ipcMain,
+  authorize: aiTrust,
+  /* 每次调用现读：用户在设置里换 provider / 改超时，下一次润色立即生效，不必重启。 */
+  readSettings: () => {
+    const custom = trustedCustomEndpoint();
+    /* provider 解析顺序（**每一档都是用户可操作、可预期的**）：
+       ① 环境变量 MP_AI_PROVIDER（隔离验收/高级用户）
+       ② 设置里的 aiRewriteProvider（应用内可写，非秘密）
+       ③ 若已配置可信自定义端点 ⇒ custom（配了端点却用不到是最大的困惑源）
+       ④ 否则 deepseek（内置服务，密钥取 DEEPSEEK_API_KEY） */
+    const envProvider = String(process.env.MP_AI_PROVIDER || '').trim().toLowerCase();
+    const settingProvider = String(state.settings.aiRewriteProvider || '').trim().toLowerCase();
+    const provider = envProvider || settingProvider || (custom.endpoint ? 'custom' : 'deepseek');
+    return { ...state.settings, aiRewriteProvider: provider };
+  },
+  /* 函数形态：每次调用现读可信端点文件，改完不必重启；结构非法会在调用时如实回报。 */
+  customEndpoint: () => trustedCustomEndpoint(),
+  env: process.env,
+  fetchImpl: (url, init) => net.fetch(url, init),
+  log: { warn: (...args) => dbg('ai:rewrite', ...args) },
+});
+/* 窗口销毁 ⇒ 收掉该窗口名下所有在途请求：否则"关窗后请求还在跑"会白烧额度并留下未决 promise。 */
+app.on('web-contents-created', (_e, wc) => {
+  try { wc.once('destroyed', () => { try { aiRewriteService.sweepOwner(String(wc.id)); } catch { /* 已收 */ } }); } catch { /* 忽略 */ }
+});
+
+/** 读一张**本地**图片（data: 或本地路径）。http(s) 一律拒绝：不把远程 URL 变成宿主下载器。
+ *  相对地址按**发起窗口自己的文档目录**解析（owner.docDir()），不用任何全局"最近目录"。 */
+async function wxReadImage(src, { owner, base64 = false } = {}) {
+  const value = String(src == null ? '' : src);
+  if (!value) return { ok: false, error: '图片地址为空' };
+  if (/^(?:https?:)?\/\//i.test(value)) return { ok: false, code: 'MP_WX_IMAGE_REMOTE', error: '不接受远程图片地址（本工具不会替你下载外链图）' };
+  let buf = null, mime = null, name = null;
+  if (/^data:/i.test(value)) {
+    try {
+      const r = require('./shell/data-image-bytes').decodeAssetImage(value);
+      buf = r.buf; mime = r.mime;
+      name = 'inline.' + ((Object.keys(IMG_EXT_MIME).find((k) => IMG_EXT_MIME[k] === mime)) || 'png');
+    } catch (error) { return { ok: false, code: error.code || 'E_DATA_IMAGE', error: error.message }; }
+  } else {
+    let file = null;
+    if (/^file:/i.test(value)) { try { file = fileURLToPath(value); } catch { file = null; } }
+    else if (/^[A-Za-z]:[\\/]/.test(value) || /^\\\\/.test(value)) file = value;
+    else {
+      const dir = owner && typeof owner.docDir === 'function' ? owner.docDir() : null;
+      if (dir) {
+        try { file = path.resolve(dir, decodeURIComponent(value)); } catch { file = path.resolve(dir, value); }
+      }
+    }
+    if (!file) return { ok: false, code: 'MP_WX_IMAGE_READ', error: `无法定位本地图片（请先保存文档，或改用完整路径）：${value.slice(0, 120)}` };
+    const capped = await imgReadCapped(file).catch((e) => (e && e.__img) || { ok: false, error: String((e && e.message) || e) });
+    if (!capped.ok) return capped;
+    buf = capped.buf; mime = capped.mime; name = path.basename(file);
+  }
+  if (!buf || !buf.length) return { ok: false, code: 'MP_WX_IMAGE_READ', error: '图片内容为空' };
+  return { ok: true, bytes: buf, mime: String(mime || '').toLowerCase(), name: name || 'image.png' };
+}
+/** 图片可解码校验（封面必须真能被解码；损坏的图上传上去只会变成碎图）。 */
+async function wxInspectImage(bytes) {
+  try {
+    const img = nativeImage.createFromBuffer(bytes);
+    if (img.isEmpty()) return { ok: false, error: '不是可识别的图片（微信只支持 JPG/PNG）' };
+    const size = img.getSize();
+    if (!size || !size.width || !size.height) return { ok: false, error: '图片尺寸为 0' };
+    return { ok: true, width: size.width, height: size.height };
+  } catch (error) { return { ok: false, error: String((error && error.message) || error) }; }
+}
+/* ── wx:* 通道（每个都过 wxTrust 身份门槛；见上面的 wxHandle/wxTrust）──────────
+ * 并发：① 服务层自己有一条 createDraft 闸门（同进程内一次只跑一个）；
+ *       ② 主进程再加一条"跨窗口"闸门：同一时刻只允许一个窗口在发送，避免两窗口各建一篇重复草稿。
+ * 关窗：窗口关闭时清掉它名下的封面（releaseOwner），不碰别的窗口。
+ * 失败退出：任何 wx:* 抛错都被 wxHandle 统一包成 { ok:false, code:'MP_WX_INTERNAL' }，
+ *   渲染侧拿到的是可读错误，不会挂死；建稿的"结果不明确"仍由服务层的 pending 负责。 */
+wxHandle('wx:status', (trust) => wechatDrafts.status(wxOwnerOf(trust)));
+wxHandle('wx:configure', (_trust, payload) => {
+  const r = wechatDrafts.configure({ appId: payload && payload.appId, secret: payload && payload.secret });
+  /* 只记 appId 与结果码；secret 绝不进日志。 */
+  dbg('wx:configure', { ok: !!r.ok, appId: r.appId || null, code: r.ok ? null : r.code });
+  return r;
+});
+wxHandle('wx:clear', (trust) => { const r = wechatDrafts.clear(wxOwnerOf(trust)); dbg('wx:clear', { ok: !!r.ok }); return r; });
+wxHandle('wx:verify', async () => {
+  const r = await wechatDrafts.verify();
+  dbg('wx:verify', { ok: !!r.ok, stage: r.stage || null, errcode: r.errcode || null, total: r.total });
+  return r;
+});
+wxHandle('wx:pickCover', async (trust) => {
+  const owner = wxOwnerOf(trust);
+  const W = trust.win;
+  const preset = process.env.MP_TEST_WX_COVER;
+  let r;
+  if (preset !== undefined && MP_TEST_HOOKS) {
+    /* 自动化缝：只有 MP_TEST_HOOKS=1 才认这个变量（否则当作没设，弹原生框）。 */
+    const files = String(preset).split(';').map((s) => s.trim()).filter(Boolean).map((s) => path.resolve(s));
+    if (!files.length) return { ok: false, error: 'MP_TEST_WX_COVER 设了但没给路径（自动化里会直接失败，而不是弹原生框）' };
+    r = { canceled: false, filePaths: [files[0]] };
+  } else r = await dialog.showOpenDialog(W, wxCoverDialogOptions());
+  if (!r || r.canceled || !r.filePaths || !r.filePaths[0]) return { ok: false, canceled: true };
+  /* 选中之后窗口/文档可能已经变了：再验一次身份再入库。 */
+  if (!owner.alive()) return { ok: false, code: 'MP_WX_OWNER_GONE', error: '窗口或文档在选图期间发生了变化，请重新打开对话框' };
+  const chosen = path.resolve(r.filePaths[0]);
+  const picked = await wechatDrafts.putCover({ src: chosen }, owner);
+  if (!picked.ok) { dbg('wx:cover-failed', { code: picked.code || null }); return picked; }
+  /* 预览用 data URL 回给渲染侧（只回这一张**用户自己选的**图，不回磁盘其它内容）。 */
+  let dataUrl = null;
+  try {
+    const buf = await fsp.readFile(chosen);
+    if (buf.length <= 12 * 1024 * 1024) dataUrl = `data:${picked.mime};base64,${buf.toString('base64')}`;
+  } catch { dataUrl = null; }
+  return { ...picked, dataUrl, path: chosen };
+});
+function wxCoverDialogOptions() {
+  return { title: '选择公众号封面', buttonLabel: '用作封面', properties: ['openFile'],
+    filters: [{ name: '图片（JPG/PNG）', extensions: ['png', 'jpg', 'jpeg'] }] };
+}
+let wxCreateOwner = null;
+wxHandle('wx:createDraft', async (trust, payload = {}) => {
+  const owner = wxOwnerOf(trust);
+  const session = trust.session;
+  const documentId = session.documentId, filePath = session.filePath;
+  if (wxCreateOwner != null && wxCreateOwner !== owner.id) {
+    return { ok: false, code: 'MP_WX_BUSY', error: '另一个窗口正在发送到公众号草稿箱，请等它结束' };
+  }
+  wxCreateOwner = owner.id;
+  try {
+    const r = await wechatDrafts.createDraft({
+      title: payload.title, html: payload.html, images: Array.isArray(payload.images) ? payload.images : [],
+      coverId: payload.coverId, acknowledgeUncertain: payload.acknowledgeUncertain === true,
+      author: typeof payload.author === 'string' ? payload.author : null,
+      /* 发送期间文档被切换/关闭 ⇒ 在回执里标注出来，用户知道"发出去的是哪一份"。 */
+      isCurrent: () => {
+        try { return !trust.sender.isDestroyed() && trust.sender.mainFrame === trust.frame && session.documentId === documentId && session.filePath === filePath; }
+        catch { return false; }
+      },
+    }, owner);
+    const current = (() => { try { return !trust.sender.isDestroyed() && trust.sender.mainFrame === trust.frame && session.documentId === documentId; } catch { return false; } })();
+    dbg('wx:createDraft', { ok: !!r.ok, stage: r.stage || null, code: r.code || null, mediaId: r.mediaId || null,
+      images: r.uploaded ? r.uploaded.images : null, uncertain: !!r.uncertain, current });
+    /* 发送期间文档被切走：结果照实返回（草稿可能已建），但明确告诉用户"发出去的是旧文档"。 */
+    return current ? r : { ...r, documentChanged: true };
+  } finally { if (wxCreateOwner === owner.id) wxCreateOwner = null; }
+});
+wxHandle('wx:acknowledge', () => wechatDrafts.acknowledgeUncertain());
+
+/* 【选区 AI 润色·3.7.2】ai:rewrite / ai:rewrite-cancel / ai:status 由
+   aiRewriteService（上面的 registerAiRewrite）注册，三条都过 aiTrust 那套可信窗口/主框架判据。
+   这里不再重复注册（handle() 对重复通道会抛错），只补一条**只读诊断**通道给设置页：
+   它告诉用户"现在到底会打哪个服务、配置文件在哪"，且永不回显密钥。 */
+handle('ai:diag', () => {
+  try {
+    const custom = trustedCustomEndpoint();
+    const envProvider = String(process.env.MP_AI_PROVIDER || '').trim().toLowerCase();
+    const settingProvider = String(state.settings.aiRewriteProvider || '').trim().toLowerCase();
+    const provider = envProvider || settingProvider || (custom.endpoint ? 'custom' : 'deepseek');
+    return {
+      ok: true,
+      provider,
+      providerSource: envProvider ? 'env' : settingProvider ? 'settings' : custom.endpoint ? 'custom-configured' : 'default',
+      customEndpointSource: custom.endpoint ? custom.endpoint.source : null,
+      customEndpointConfigured: !!custom.endpoint,
+      configFile: AI_CONFIG_FILE,
+      builtinEnv: { deepseek: 'DEEPSEEK_API_KEY', openai: 'OPENAI_API_KEY', anthropic: 'ANTHROPIC_API_KEY' },
+    };
+  } catch (error) {
+    return { ok: false, code: 'internal', message: String((error && error.message) || error) };
+  }
+});
+
+
 // 全屏切换（工具栏「全屏」按钮）：返回新状态，渲染侧据此提示（插件形态没有这条通道，会如实提示"需要桌面版"）
 handle('win:fullscreen', (e) => {
   try {
