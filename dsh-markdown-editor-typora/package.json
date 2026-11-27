@@ -1,6 +1,6 @@
 {
   "name": "dsh-markdown-editor-typora",
-  "version": "2.1.10",
+  "version": "2.1.11",
   "description": "MarkPilot Markdown editor for DeepSeek Harness with selection editing, per-file draft recovery, book and research layouts, and publishing previews for WeChat and Zhihu.",
   "license": "MIT",
   "type": "module",

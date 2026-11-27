@@ -1,3 +1,11 @@
+# MarkPilot for DSH 2.1.11
+
+左栏选对话，中间写 Markdown，右栏与 AI 讨论。开启「编辑区透明」，壁纸会原样穿过正文区域。书页和研报各自保留标题样式、排版和明暗配色。
+
+![左侧对话列表、中间透明书页编辑区和右侧 AI 对话](https://raw.githubusercontent.com/ltmroberthk915/markpilot/dsh-markdown-editor-typora-v2.1.11/dsh-markdown-editor-typora/assets/screenshots/01-transparent-workbench.jpg)
+
+在插件设置中打开「编辑区透明」。收起 Markdown 文件列表和宿主文件面板，即可使用图中的三栏布局。关闭透明后，书页与研报使用各自的纸色。微信、知乎和静态文档的发布预览保留相应版式。
+
 # MarkPilot for DSH 2.1.10
 
 ## 本版更新
